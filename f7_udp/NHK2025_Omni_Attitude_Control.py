@@ -13,22 +13,67 @@ from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 from socket import *
 import time
 import math
+
+# 以下pipでのインストールが必要
 import pyfiglet
+from simple_pid import PID
 
 data = [0, 0, 0, 0, 0, 0, 0, 0, 0]  # 各モーターの回転数(RPM)を格納する
+
 
 # --------------------------#
 # オムニのパラメーター
 fth = 0
 vth = 0
 r = 0
-dir_target = 0
-rpm_limit = 120
+rpm_limit = 20
 sp_yaw = 0.5
 sp_omni = 1.0
+global dir_fix
 # --------------------------#
 
 deadzone = 0.3  # Joyスティックのデッドゾーンを設定
+imu_deadzone = 0.1
+
+online_mode = True  # ルーターと接続せずに実行したいときはFalseにする
+
+pid = PID(
+    1.0,  # Kp
+    0.1,  # Ki
+    0.0,  # Kd
+    setpoint=0,  # target
+    # sample_time=0.01,
+    output_limits=(-1.0, 1.0),
+    auto_mode=True,
+)
+
+
+class IMU_Listener(Node):
+
+    def __init__(self):
+        super().__init__("nhk25_omni_driver_imu_listener")
+
+        qos_profile = QoSProfile(  # imuのノードがROS1から移植されたものなのでQoSプロファイルを合わせる必要がある
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=10,
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+        )
+
+        self.subscription = self.create_subscription(
+            Float64, "/wit_ros/related_yaw", self.listener_callback, qos_profile
+        )
+        self.subscription  # prevent unused variable warning
+
+    def listener_callback(self, imu_msg):
+        global dir_fix
+        related_yow = imu_msg.data
+        # print(related_yow * 180 / math.pi)
+        dir_fix = pid(related_yow)
+        if math.fabs(dir_fix) < imu_deadzone:
+            dir_fix = 0
+        # print(dir_fix)
+        if online_mode == True:
+            udp.send()  # 関数実行
 
 
 class PS4_Listener(Node):
@@ -38,12 +83,16 @@ class PS4_Listener(Node):
         self.subscription = self.create_subscription(Joy, "joy", self.ps4_callback, 10)
         print(pyfiglet.figlet_format("NHK2025"))
         self.subscription  # prevent unused variable warning
+        global dir_fix
 
     def ps4_callback(self, ps4_msg):
-        LS_X = ps4_msg.axes[0]
+
+        global dir_fix
+
+        LS_X = (-1) * ps4_msg.axes[0]
         LS_Y = ps4_msg.axes[1]
-        # RS_X = (-1) * ps4_msg.axes[2]
-        # RS_Y = ps4_msg.axes[5]
+        RS_X = (-1) * ps4_msg.axes[2]
+        RS_Y = ps4_msg.axes[5]
 
         # print(LS_X, LS_Y, RS_X, RS_Y)
 
@@ -70,14 +119,48 @@ class PS4_Listener(Node):
         L3 = ps4_msg.buttons[10]
         R3 = ps4_msg.buttons[11]
 
+        if PS:
+            print(pyfiglet.figlet_format("HALT"))
+            data[1] = 0
+            data[2] = 0
+            data[3] = 0
+            data[4] = 0
+            data[5] = 0
+            data[6] = 0
+            data[7] = 0
+            data[8] = 0
+            if online_mode == True:
+                udp.send()  # 関数実行
+            time.sleep(1)
+            while True:
+                pass
+
+        if UP == 1:
+            LS_Y = 1.0
+
+        if DOWN == 1:
+            LS_Y = -1.0
+
+        if LEFT == 1:
+            LS_X = -1.0
+
+        if RIGHT == 1:
+            LS_X = 1.0
+
         rad = math.atan2(LS_Y, LS_X)
         # vx = math.cos(rad)
         # vy = math.sin(rad)
 
-        v1 = math.sin(rad - math.pi / 4) * sp_omni
+        v1 = math.sin(rad - 1 * math.pi / 4) * sp_omni
         v2 = math.sin(rad - 3 * math.pi / 4) * sp_omni
         v3 = math.sin(rad - 5 * math.pi / 4) * sp_omni
         v4 = math.sin(rad - 7 * math.pi / 4) * sp_omni
+
+        if RS_X >= deadzone:
+            R2 = 1
+
+        if RS_X <= -1 * deadzone:
+            L2 = 1
 
         if R2 == 1:
             v1 = -1.0 * sp_yaw
@@ -103,37 +186,16 @@ class PS4_Listener(Node):
             v4 = 0
 
         # print(v1, v2, v3, v4)
-        data[1] = v1 * (rpm_limit + 1)
-        data[2] = v2 * (rpm_limit + 1)
-        data[3] = v3 * (rpm_limit + 1)
-        data[4] = v4 * (rpm_limit + 1)
+        data[1] = v1 * (rpm_limit + 1) + (dir_fix * rpm_limit / 2)
+        data[2] = v2 * (rpm_limit + 1) + (dir_fix * rpm_limit / 2)
+        data[3] = v3 * (rpm_limit + 1) + (dir_fix * rpm_limit / 2)
+        data[4] = v4 * (rpm_limit + 1) + (dir_fix * rpm_limit / 2)
 
-        udp.send()  # 関数実行
+        print(data[1], data[2], data[3], data[4])
+        # print(dir_fix)
 
-
-class IMU_Listener(Node):
-
-    def __init__(self):
-        super().__init__("nhk25_omni_driver_imu_listener")
-
-        qos_profile = QoSProfile(  # imuのノードがROS1から移植されたものなのでQoSプロファイルを合わせる必要がある
-            history=QoSHistoryPolicy.KEEP_LAST,
-            depth=10,
-            reliability=QoSReliabilityPolicy.BEST_EFFORT,
-        )
-
-        self.subscription = self.create_subscription(
-            Float64, "/wit_ros/related_yaw", self.listener_callback, qos_profile
-        )
-        self.subscription  # prevent unused variable warning
-
-    def listener_callback(self, imu_msg):
-        related_yow = imu_msg.data
-        print(related_yow * 180 / math.pi)
-        udp.send()  # 関数実行
-        
-    def PID(target_dir,current):
-        pass
+        if online_mode == True:
+            udp.send()  # 関数実行
 
 
 class udpsend:
@@ -186,26 +248,27 @@ class udpsend:
         data[8] = 0
 
 
-udp = udpsend()  # クラス呼び出し
+if online_mode == True:
+    udp = udpsend()  # クラス呼び出し
 
 
 def main(args=None):
     rclpy.init(args=args)
     exec = SingleThreadedExecutor()
 
-    ps4_listener = PS4_Listener()
     imu_listener = IMU_Listener()
+    ps4_listener = PS4_Listener()
 
-    exec.add_node(ps4_listener)
     exec.add_node(imu_listener)
+    exec.add_node(ps4_listener)
 
     exec.spin()
 
     # Destroy the node explicitly
     # (optional - otherwise it will be done automatically
     # when the garbage collector destroys the node object)
-    ps4_listener.destroy_node()
     imu_listener.destroy_node()
+    ps4_listener.destroy_node()
     exec.shutdown()
     # ser.close
 

@@ -35,7 +35,9 @@ setup(
         'cr24_manual2_apk = f7_udp.cr24_manual2_unity:main',
         'nr25_omni = f7_udp.NHK2025_Omni_Driver:main',
         'nr25_omni_imu = f7_udp.NHK2025_Omni_Attitude_Control:main',
-        'imu_to_odom = f7_udp.imu_to_odom:main'
+        'imu_to_odom = f7_udp.imu_to_odom:main',
+        'yaw_pub = f7_udp.yaw_publisher:main',
+        'enc_obs = f7_udp.enc_obs:main',
         ],
     },
 )
