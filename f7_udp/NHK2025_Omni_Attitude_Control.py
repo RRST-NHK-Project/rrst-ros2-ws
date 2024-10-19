@@ -33,12 +33,12 @@ global dir_fix
 # --------------------------#
 
 deadzone = 0.3  # Joyスティックのデッドゾーンを設定
-imu_deadzone = 0.1
+imu_deadzone = 0.01
 
 online_mode = True  # ルーターと接続せずに実行したいときはFalseにする
 
 pid = PID(
-    1.0,  # Kp
+    2.0,  # Kp
     0.1,  # Ki
     0.0,  # Kd
     setpoint=0,  # target
@@ -186,10 +186,10 @@ class PS4_Listener(Node):
             v4 = 0
 
         # print(v1, v2, v3, v4)
-        data[1] = v1 * (rpm_limit + 1) + (dir_fix * rpm_limit / 2)
-        data[2] = v2 * (rpm_limit + 1) + (dir_fix * rpm_limit / 2)
-        data[3] = v3 * (rpm_limit + 1) + (dir_fix * rpm_limit / 2)
-        data[4] = v4 * (rpm_limit + 1) + (dir_fix * rpm_limit / 2)
+        data[1] = v1 * (rpm_limit + 1) + (dir_fix * rpm_limit)
+        data[2] = v2 * (rpm_limit + 1) + (dir_fix * rpm_limit)
+        data[3] = v3 * (rpm_limit + 1) + (dir_fix * rpm_limit)
+        data[4] = v4 * (rpm_limit + 1) + (dir_fix * rpm_limit)
 
         print(data[1], data[2], data[3], data[4])
         # print(dir_fix)
