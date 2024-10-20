@@ -13,9 +13,9 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='ubuntu',
-    maintainer_email='ubuntu@todo.todo',
-    description='TODO: Package description',
+    maintainer='K.Tashiro',
+    maintainer_email='tashikou1682@gmail.com',
+    description='RRST NHK2025 f7_udp package',
     license='Apache-2.0',
     tests_require=['pytest'],
     entry_points={
@@ -34,10 +34,11 @@ setup(
         'cr24_main_apk = f7_udp.cr24_main_unity:main',
         'cr24_manual2_apk = f7_udp.cr24_manual2_unity:main',
         'nr25_omni = f7_udp.NHK2025_Omni_Driver:main',
-        'nr25_omni_imu = f7_udp.NHK2025_Omni_Attitude_Control:main',
+        'nr25_omni_imu = f7_udp.NHK2025_Omni_Attitude_Control_imu:main',
         'imu_to_odom = f7_udp.imu_to_odom:main',
         'yaw_pub = f7_udp.yaw_publisher:main',
         'enc_obs = f7_udp.enc_obs:main',
+        'nr25_omni_odom = f7_udp.NHK2025_Omni_Attitude_Control_odom:main'
         ],
     },
 )

@@ -2,7 +2,9 @@
 ## coding: UTF-8
 
 """
+RRST NHK2025
 F7から速度[m/s]を受信しPublish
+2024/10/21
 """
 
 online_mode = False  # ルーター未接続でデバッグする場合はFalseにする
