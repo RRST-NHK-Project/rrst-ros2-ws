@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 ## coding: UTF-8
 
-# F7から速度[mm/s]を受信しPublish
+'''
+F7から速度[m/s]を受信しPublish
+'''
+
 import socket
 import rclpy
 from rclpy.node import Node
@@ -26,11 +29,14 @@ class ENC_OBS(Node):
     def __init__(self):
         super().__init__("enc_obs")
         self.publisher_ = self.create_publisher(Float32MultiArray, "enc", 10)
-        freq = 0.001  # seconds
+
+        #FIXME:もっといい方法がある気がする。1msごとに呼び出しはやりすぎ
+        freq = 0.001  # seconds　
+
         self.timer = self.create_timer(freq, self.timer_callback)
         # self.i = 0
 
-    def timer_callback(self):  # callback for publishing RPM
+    def timer_callback(self):  # 並進速度をPublishするコールバック関数
 
         global msg
 
@@ -51,6 +57,7 @@ class ENC_OBS(Node):
             for i in range(len(splited_float)):
                 enc_msg.data[i] = splited_float[i]
 
+            #TODO:ノイズ乗ってるからPublishする前にフィルターかけたい
             self.publisher_.publish(enc_msg)
 
         except KeyboardInterrupt:  # 強制終了の検知
