@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 ## coding: UTF-8
 
-'''
+"""
 F7から速度[m/s]を受信しPublish
-'''
+"""
+
+online_mode = False  # ルーター未接続でデバッグする場合はFalseにする
 
 import socket
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String
 from std_msgs.msg import Float32MultiArray
-
-online_mode = True  # ルーター未接続でデバッグする場合はFalseにする
 
 address = ("192.168.8.196", 4000)  # 自機アドレス, ポート
 
@@ -30,8 +29,14 @@ class ENC_OBS(Node):
         super().__init__("enc_obs")
         self.publisher_ = self.create_publisher(Float32MultiArray, "enc", 10)
 
-        #FIXME:もっといい方法がある気がする。1msごとに呼び出しはやりすぎ
-        freq = 0.001  # seconds　
+        #動作の表示
+        if online_mode:
+            print("ENC observer started.\nIP: " + str(address[0][:]))
+        else:
+            print("[OFFLINE] ENC observer started.\nIP: " + str(address[0][:]))
+
+        # FIXME:もっといい方法がある気がする。1msごとに呼び出しはやりすぎ
+        freq = 0.001  # seconds
 
         self.timer = self.create_timer(freq, self.timer_callback)
         # self.i = 0
@@ -52,12 +57,12 @@ class ENC_OBS(Node):
 
             # 全要素をfloatに変換
             splited_float = [float(item) for item in splited_str]
-            #print(enc_msg)
+            # print(enc_msg)
 
             for i in range(len(splited_float)):
                 enc_msg.data[i] = splited_float[i]
 
-            #TODO:ノイズ乗ってるからPublishする前にフィルターかけたい
+            # TODO:ノイズ乗ってるからPublishする前にフィルターかけたい
             self.publisher_.publish(enc_msg)
 
         except KeyboardInterrupt:  # 強制終了の検知
