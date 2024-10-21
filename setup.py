@@ -38,7 +38,8 @@ setup(
         'imu_to_odom = f7_udp.imu_to_odom:main',
         'yaw_pub = f7_udp.yaw_publisher:main',
         'enc_obs = f7_udp.enc_obs:main',
-        'nr25_omni_odom = f7_udp.NHK2025_Omni_Attitude_Control_odom:main'
+        'nr25_omni_odom = f7_udp.NHK2025_Omni_Attitude_Control_odom:main',
+        'enc_plotter = f7_udp.enc_plotter:main',
         ],
     },
 )

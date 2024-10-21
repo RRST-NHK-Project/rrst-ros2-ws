@@ -8,7 +8,7 @@ F7から各エンコーダーの速度[m/s]を受信しPublish
 """
 
 # デバッグモード設定
-online_mode = False  # ルーター未接続でデバッグする場合はFalseにする
+online_mode = True  # ルーター未接続でデバッグする場合はFalseにする
 
 # 必要なライブラリとモジュールのインポート
 import socket
@@ -63,7 +63,7 @@ class ENC_OBS(Node):
             # 受信したメッセージを処理
             # 文字列をカンマで分割してリストに格納（最初の6要素のみ使用）
             splited_str = msg.split(",")
-            splited_str = splited_str[:6]
+            splited_str = splited_str[:7]
 
             # 全要素をfloatに変換
             splited_float = [float(item) for item in splited_str]

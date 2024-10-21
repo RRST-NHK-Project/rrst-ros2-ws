@@ -9,7 +9,7 @@ RRST NHK2025
 """
 
 # オンラインモードの設定（ルーター接続時はTrue、デバッグ時はFalse）
-online_mode = False
+online_mode = True
 
 # 必要なライブラリのインポート
 import rclpy
@@ -41,14 +41,13 @@ deadzone = 0.3
 class Listener(Node):
     def __init__(self):
         super().__init__("nhk25_omni_driver")
-        # ジョイスティック入力のサブスクリプション設定
         self.subscription = self.create_subscription(
             Joy, "joy", self.listener_callback, 10
         )
         # プログラム開始メッセージの表示
         print(pyfiglet.figlet_format("NHK2025"))
         if not online_mode:
-            print("[OFFLINE] Omni driver started.")
+            print("[OFFLINE] Omni driver started.\nlimit{}")
 
     def listener_callback(self, ps4_msg):
         # ジョイスティックの入力値を取得
@@ -170,7 +169,7 @@ class udpsend:
             + str(data[8])
         )  # パケットを作成
 
-        print(str_data)
+        #print(str_data)
 
         send_data = str_data.encode("utf-8")  # バイナリに変換
 
