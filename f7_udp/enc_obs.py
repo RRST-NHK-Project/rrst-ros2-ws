@@ -3,84 +3,95 @@
 
 """
 RRST NHK2025
-F7から速度[m/s]を受信しPublish
+F7から各エンコーダーの速度[m/s]を受信しPublish
 2024/10/21
 """
 
+# デバッグモード設定
 online_mode = False  # ルーター未接続でデバッグする場合はFalseにする
 
+# 必要なライブラリとモジュールのインポート
 import socket
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32MultiArray
 
+# UDP通信の設定
 address = ("192.168.8.196", 4000)  # 自機アドレス, ポート
 
+# オンラインモードの場合、UDPソケットを初期化
 if online_mode == True:
     udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # ソケットの作成
     udp.bind(address)  # バインド
 
+# グローバル変数の初期化
 enc_msg = Float32MultiArray()
 msg = "0.0,0.0,0.0,0.0,0.0,0.0"
 enc_msg.data = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
 
+# ROS2ノードクラスの定義
 class ENC_OBS(Node):
 
     def __init__(self):
         super().__init__("enc_obs")
+        # パブリッシャーの作成
         self.publisher_ = self.create_publisher(Float32MultiArray, "enc", 10)
 
-        #動作の表示
+        # 起動メッセージの表示
         if online_mode:
             print("ENC observer started.\nIP: " + str(address[0][:]))
         else:
             print("[OFFLINE] ENC observer started.\nIP: " + str(address[0][:]))
 
-        # FIXME:もっといい方法がある気がする。1msごとに呼び出しはやりすぎ
+        # タイマーコールバックの設定
+        # FIXME: 1msごとの呼び出しはやりすぎかも
         freq = 0.001  # seconds
-
         self.timer = self.create_timer(freq, self.timer_callback)
-        # self.i = 0
 
-    def timer_callback(self):  # 並進速度をPublishするコールバック関数
-
+    def timer_callback(self):
+        """各エンコーダーの速度をPublishするコールバック関数"""
         global msg
 
         try:
             if online_mode == True:
+                # UDPからデータを受信
                 rcv_byte = bytes()
-                rcv_byte, addr = udp.recvfrom(64)
-                msg = rcv_byte.decode()
+                rcv_byte, addr = udp.recvfrom(64)  # 最大64バイトのデータを受信
+                msg = rcv_byte.decode()  # バイト列を文字列にデコード
 
-            # 文字列をカンマで分割してリストに格納
+            # 受信したメッセージを処理
+            # 文字列をカンマで分割してリストに格納（最初の6要素のみ使用）
             splited_str = msg.split(",")
             splited_str = splited_str[:6]
 
             # 全要素をfloatに変換
             splited_float = [float(item) for item in splited_str]
-            # print(enc_msg)
 
+            # 変換した浮動小数点数をenc_msgのdataにコピー
             for i in range(len(splited_float)):
                 enc_msg.data[i] = splited_float[i]
 
-            # TODO:ノイズ乗ってるからPublishする前にフィルターかけたい
+            # TODO: ノイズ除去のためのフィルタリングを実装する
+            # 現在のデータをそのままPublish
             self.publisher_.publish(enc_msg)
 
-        except KeyboardInterrupt:  # 強制終了の検知
-            udp.close()
+        except KeyboardInterrupt:  # Ctrl+Cなどによる強制終了の検知
+            udp.close()  # UDPソケットを閉じる
 
 
+# メイン関数
 def main(args=None):
-    rclpy.init(args=args)
-    enc_obs = ENC_OBS()
-    rclpy.spin(enc_obs)
-    # Destroy the node explicitly
-    # (optional - otherwise it will be done automatically
-    # when the garbage collector destroys the node object)
+    rclpy.init(args=args)  # ROS2の初期化
+    enc_obs = ENC_OBS()  # ノードのインスタンス化
+    rclpy.spin(enc_obs)  # ノードの実行（コールバック待機）
+
+    # ノードの明示的な破棄
+    # （オプション - ガベージコレクタがノードオブジェクトを破棄する際に自動的に行われる）
     enc_obs.destroy_node()
-    rclpy.shutdown()
+    rclpy.shutdown()  # ROS2のシャットダウン
 
 
+# スクリプトが直接実行された場合にmain関数を呼び出す
 if __name__ == "__main__":
     main()
