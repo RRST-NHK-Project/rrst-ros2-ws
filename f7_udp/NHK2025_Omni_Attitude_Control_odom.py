@@ -3,9 +3,7 @@
 
 """
 RRST NHK2025
-4輪オムニホイールロボットの制御プログラム
-ジョイスティック入力に基づいてロボットの動きを制御し、UDPで速度指令を送信する
-2024/10/21
+2024/10/23
 """
 
 # オンラインモードの設定（ルーター接続時はTrue、デバッグ時はFalse）
@@ -17,11 +15,16 @@ from rclpy.node import Node
 from sensor_msgs.msg import Joy
 from geometry_msgs.msg import Twist
 from std_msgs.msg import String
+from std_msgs.msg import Float32MultiArray
+from rclpy.executors import SingleThreadedExecutor
 
 from socket import *
 import time
 import math
+
+# 以下pipでのインストールが必要
 import pyfiglet
+from simple_pid import PID
 
 # モーター速度データの初期化 (0%-100%)
 data = [0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -30,15 +33,30 @@ data = [0, 0, 0, 0, 0, 0, 0, 0, 0]
 fth = 0  # 前方向の閾値
 vth = 0  # 速度閾値
 r = 0  # 回転半径
-rpm_limit = 15  # RPM制限
+rpm_limit = 10  # RPM制限
 sp_yaw = 0.5  # ヨー回転速度
 sp_omni = 1.0  # オムニ移動速度
+global dir_fix
+global rad_target
+global rad_actual
+
+rad_target = 0.0
 
 # ジョイスティックのデッドゾーン
 deadzone = 0.3
 
+pid = PID(
+    0.1,  # Kp
+    0.05,  # Ki
+    0.0,  # Kd
+    setpoint=0.0,
+    sample_time=0.01,
+    output_limits=(-1.0, 1.0),
+    auto_mode=True,
+)
 
-class Listener(Node):
+
+class PS4_Listener(Node):
     def __init__(self):
         super().__init__("nhk25_omni_driver")
         self.subscription = self.create_subscription(
@@ -50,6 +68,11 @@ class Listener(Node):
             print("[OFFLINE] Omni driver started.\nlimit{}")
 
     def listener_callback(self, ps4_msg):
+
+        global rad_target
+        global rad_actual
+        global dir_fix
+
         # ジョイスティックの入力値を取得
         LS_X = -1 * ps4_msg.axes[0]
         LS_Y = ps4_msg.axes[1]
@@ -79,6 +102,22 @@ class Listener(Node):
         L3 = ps4_msg.buttons[10]
         R3 = ps4_msg.buttons[11]
 
+        if PS:
+            print(pyfiglet.figlet_format("HALT"))
+            data[1] = 0
+            data[2] = 0
+            data[3] = 0
+            data[4] = 0
+            data[5] = 0
+            data[6] = 0
+            data[7] = 0
+            data[8] = 0
+            if online_mode == True:
+                udp.send()  # 関数実行
+            time.sleep(1)
+            while True:
+                pass
+
         # 方向キー入力の処理
         if UP == 1:
             LS_Y = 1.0
@@ -90,13 +129,13 @@ class Listener(Node):
             LS_X = 1.0
 
         # 移動方向の計算
-        rad = math.atan2(LS_Y, LS_X)
+        rad_target = math.atan2(LS_Y, LS_X)
 
         # 各ホイールの速度計算
-        v1 = math.sin(rad - math.pi / 4) * sp_omni
-        v2 = math.sin(rad - 3 * math.pi / 4) * sp_omni
-        v3 = math.sin(rad - 5 * math.pi / 4) * sp_omni
-        v4 = math.sin(rad - 7 * math.pi / 4) * sp_omni
+        v1 = math.sin(rad_target - math.pi / 4) * sp_omni
+        v2 = math.sin(rad_target - 3 * math.pi / 4) * sp_omni
+        v3 = math.sin(rad_target - 5 * math.pi / 4) * sp_omni
+        v4 = math.sin(rad_target - 7 * math.pi / 4) * sp_omni
 
         # 右スティックによる回転
         if RS_X >= deadzone:
@@ -120,14 +159,36 @@ class Listener(Node):
             v1 = v2 = v3 = v4 = 0
 
         # 速度データの設定
-        data[1] = v1 * (rpm_limit + 1)
-        data[2] = v2 * (rpm_limit + 1)
-        data[3] = v3 * (rpm_limit + 1)
-        data[4] = v4 * (rpm_limit + 1)
+        data[1] = v1 * (rpm_limit + 1) + (dir_fix * rpm_limit)
+        data[2] = v2 * (rpm_limit + 1) + (dir_fix * rpm_limit)
+        data[3] = v3 * (rpm_limit + 1) + (dir_fix * rpm_limit)
+        data[4] = v4 * (rpm_limit + 1) + (dir_fix * rpm_limit)
 
         # オンラインモードの場合、UDPで送信
         if online_mode:
             udp.send()
+
+
+class ENC_Listener(Node):
+    def __init__(self):
+        super().__init__("enc_handler")
+        self.subscription = self.create_subscription(
+            Float32MultiArray, "enc", self.listener_callback, 10
+        )
+
+    def listener_callback(self, enc_msg):
+
+        global rad_actual
+        global rad_target
+        global dir_fix
+
+        Vx = enc_msg.data[1]
+        Vy = enc_msg.data[2]
+
+        rad_actual = math.atan2(Vy, Vx)
+        # print(rad_actual)
+        dir_fix = pid(rad_target - rad_actual)
+        print(dir_fix)
 
 
 class udpsend:
@@ -169,7 +230,7 @@ class udpsend:
             + str(data[8])
         )  # パケットを作成
 
-        #print(str_data)
+        # print(str_data)
 
         send_data = str_data.encode("utf-8")  # バイナリに変換
 
@@ -193,14 +254,21 @@ if online_mode:
 def main(args=None):
     # ROSの初期化
     rclpy.init(args=args)
+    exec = SingleThreadedExecutor()
 
     # Listenerノードの作成と実行
-    listener = Listener()
-    rclpy.spin(listener)
+    ps4_listener = PS4_Listener()
+    enc_listener = ENC_Listener()
+
+    exec.add_node(ps4_listener)
+    exec.add_node(enc_listener)
+
+    exec.spin()
 
     # ノードの終了処理
-    listener.destroy_node()
-    rclpy.shutdown()
+    ps4_listener.destroy_node()
+    enc_listener.destroy_node()
+    exec.shutdown()
 
 
 if __name__ == "__main__":
