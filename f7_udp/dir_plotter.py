@@ -27,6 +27,7 @@ fig, ax = plt.subplots()
 target_arrow = None
 actual_arrow = None
 
+
 def update_plot():
     global target_arrow, actual_arrow
     if target_arrow:
@@ -35,23 +36,40 @@ def update_plot():
         actual_arrow.remove()
 
     # rad_target の矢印（赤色）
-    target_arrow = ax.arrow(0, 0, np.cos(rad_target), np.sin(rad_target), 
-                            color='red', width=0.02, head_width=0.1, 
-                            head_length=0.1, length_includes_head=True)
+    target_arrow = ax.arrow(
+        0,
+        0,
+        np.cos(rad_target),
+        np.sin(rad_target),
+        color="red",
+        width=0.02,
+        head_width=0.1,
+        head_length=0.1,
+        length_includes_head=True,
+    )
 
     # rad_actual の矢印（青色）
-    actual_arrow = ax.arrow(0, 0, np.cos(rad_actual), np.sin(rad_actual), 
-                            color='blue', width=0.02, head_width=0.1, 
-                            head_length=0.1, length_includes_head=True)
+    actual_arrow = ax.arrow(
+        0,
+        0,
+        np.cos(rad_actual),
+        np.sin(rad_actual),
+        color="blue",
+        width=0.02,
+        head_width=0.1,
+        head_length=0.1,
+        length_includes_head=True,
+    )
 
     ax.set_xlim(-1.2, 1.2)
     ax.set_ylim(-1.2, 1.2)
-    ax.set_aspect('equal')
-    ax.set_title('Direction Visualization')
-    ax.legend(['Target', 'Actual'])
+    ax.set_aspect("equal")
+    ax.set_title("Direction Visualization")
+    ax.legend(["Target", "Actual"])
 
     plt.draw()
     plt.pause(0.1)
+
 
 class PS4_Listener(Node):
     def __init__(self):
@@ -66,13 +84,49 @@ class PS4_Listener(Node):
         # ジョイスティックの入力値を取得
         LS_X = -1 * ps4_msg.axes[0]
         LS_Y = ps4_msg.axes[1]
+        RS_X = (-1) * ps4_msg.axes[2]
+        RS_Y = ps4_msg.axes[5]
+
+        # ボタン入力の取得
+        CROSS = ps4_msg.buttons[1]
+        CIRCLE = ps4_msg.buttons[2]
+        TRIANGLE = ps4_msg.buttons[3]
+        SQUARE = ps4_msg.buttons[0]
+
+        # 方向キーの入力取得
+        LEFT = ps4_msg.axes[12] == 1.0
+        RIGHT = ps4_msg.axes[12] == -1.0
+        UP = ps4_msg.axes[13] == 1.0
+        DOWN = ps4_msg.axes[13] == -1.0
+
+        # その他のボタン入力
+        L1 = ps4_msg.buttons[4]
+        R1 = ps4_msg.buttons[5]
+        L2 = ps4_msg.buttons[6]
+        R2 = ps4_msg.buttons[7]
+        SHARE = ps4_msg.buttons[8]
+        OPTION = ps4_msg.buttons[9]
+        PS = ps4_msg.buttons[12]
+        L3 = ps4_msg.buttons[10]
+        R3 = ps4_msg.buttons[11]
+
+        # 方向キー入力の処理
+        if UP == 1:
+            LS_Y = 1.0
+        if DOWN == 1:
+            LS_Y = -1.0
+        if LEFT == 1:
+            LS_X = -1.0
+        if RIGHT == 1:
+            LS_X = 1.0
 
         # 移動方向の計算
         rad_target = math.atan2(LS_Y, LS_X)
-        self.get_node().get_logger().info(f'Target angle: {rad_target}')
+        # self.get_node().get_logger().info(f'Target angle: {rad_target}')
 
         # プロットの更新
         update_plot()
+
 
 class ENC_Listener(Node):
     def __init__(self):
@@ -88,18 +142,22 @@ class ENC_Listener(Node):
         Vy = enc_msg.data[2]
 
         rad_actual = math.atan2(Vy, Vx)
+        # プロットの更新
+        update_plot()
+
 
 def signal_handler(sig, frame):
     global running
-    print('\nCtrl+C pressed. Stopping...')
+    print("\nCtrl+C pressed. Stopping...")
     running = False
+
 
 def main(args=None):
     global running
-    
+
     # Ctrl+C のハンドラを設定
     signal.signal(signal.SIGINT, signal_handler)
-    
+
     # ROSの初期化
     rclpy.init(args=args)
     exec = SingleThreadedExecutor()
@@ -120,6 +178,7 @@ def main(args=None):
         enc_listener.destroy_node()
         exec.shutdown()
         plt.close()
+
 
 if __name__ == "__main__":
     plt.ion()  # インタラクティブモードを有効にする

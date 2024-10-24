@@ -30,30 +30,30 @@ from simple_pid import PID
 data = [0, 0, 0, 0, 0, 0, 0, 0, 0]
 
 # オムニホイールパラメーター
-fth = 0  # 前方向の閾値
-vth = 0  # 速度閾値
-r = 0  # 回転半径
-rpm_limit = 10  # RPM制限
-sp_yaw = 0.5  # ヨー回転速度
-sp_omni = 1.0  # オムニ移動速度
-global dir_fix
-global rad_target
-global rad_actual
+sp_yaw = 5  # ヨー回転duty比[%]
+duty_limit = 10  # duty比の上限[%]
+v_limit = 2.0  # 並進速度の上限[m/s]
 
 rad_target = 0.0
+rad_actual = 0.0
+
+target = [0, 0, 0, 0, 0, 0]
+actual = [0, 0, 0, 0, 0, 0]
+
+Output = [0, 0, 0, 0, 0, 0]
+Error = [0, 0, 0, 0, 0, 0]
+last_Error = [0, 0, 0, 0, 0, 0]
+Integral = [0, 0, 0, 0, 0, 0]
+Differential = [0, 0, 0, 0, 0, 0]
+
+rad_Output = 0.0
+
+
+PID_control_period = 0.01  # PID制御周期 [s]
+
 
 # ジョイスティックのデッドゾーン
 deadzone = 0.3
-
-pid = PID(
-    0.1,  # Kp
-    0.05,  # Ki
-    0.0,  # Kd
-    setpoint=0.0,
-    sample_time=0.01,
-    output_limits=(-1.0, 1.0),
-    auto_mode=True,
-)
 
 
 class PS4_Listener(Node):
@@ -62,16 +62,20 @@ class PS4_Listener(Node):
         self.subscription = self.create_subscription(
             Joy, "joy", self.listener_callback, 10
         )
+
+        self.timer = self.create_timer(PID_control_period, self.PID)
+
         # プログラム開始メッセージの表示
         print(pyfiglet.figlet_format("NHK2025"))
         if not online_mode:
-            print("[OFFLINE] Omni driver started.\nlimit{}")
+            print("[OFFLINE] Omni driver started.")
 
     def listener_callback(self, ps4_msg):
 
         global rad_target
         global rad_actual
-        global dir_fix
+        global target
+        global actual
 
         # ジョイスティックの入力値を取得
         LS_X = -1 * ps4_msg.axes[0]
@@ -129,13 +133,17 @@ class PS4_Listener(Node):
             LS_X = 1.0
 
         # 移動方向の計算
-        rad_target = math.atan2(LS_Y, LS_X)
+        # rad_target = math.atan2(LS_Y, LS_X)
+
+        target[0] = LS_X
+        target[1] = LS_Y
 
         # 各ホイールの速度計算
-        v1 = math.sin(rad_target - math.pi / 4) * sp_omni
-        v2 = math.sin(rad_target - 3 * math.pi / 4) * sp_omni
-        v3 = math.sin(rad_target - 5 * math.pi / 4) * sp_omni
-        v4 = math.sin(rad_target - 7 * math.pi / 4) * sp_omni
+        if RS_X <= deadzone and RS_Y <= deadzone and R1 == 0 and L1 == 0:
+            v1 = math.sin(rad_Output - math.pi / 4) * duty_limit
+            v2 = math.sin(rad_Output - 3 * math.pi / 4) * duty_limit
+            v3 = math.sin(rad_Output - 5 * math.pi / 4) * duty_limit
+            v4 = math.sin(rad_Output - 7 * math.pi / 4) * duty_limit
 
         # 右スティックによる回転
         if RS_X >= deadzone:
@@ -159,14 +167,43 @@ class PS4_Listener(Node):
             v1 = v2 = v3 = v4 = 0
 
         # 速度データの設定
-        data[1] = v1 * (rpm_limit + 1) + (dir_fix * rpm_limit)
-        data[2] = v2 * (rpm_limit + 1) + (dir_fix * rpm_limit)
-        data[3] = v3 * (rpm_limit + 1) + (dir_fix * rpm_limit)
-        data[4] = v4 * (rpm_limit + 1) + (dir_fix * rpm_limit)
+        data[1] = v1
+        data[2] = v2
+        data[3] = v3
+        data[4] = v4
 
         # オンラインモードの場合、UDPで送信
         if online_mode:
             udp.send()
+
+    def PID(self):
+
+        global target
+        global actual
+        global Output
+        global Error
+        global last_Error
+        global Integral
+        global Differential
+        global PID_control_period
+        global v_limit
+        global rad_Output
+
+        Kp = [1000.0, 1000.0, 1.0, 1.0, 1.0, 1.0]
+        Ki = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        Kd = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+        for i in range(6):
+            Error[i] = target[i] - (actual[i] / v_limit)
+            Integral[i] += Error[i] * PID_control_period
+            Differential[i] = (Error[i] - last_Error[i]) / PID_control_period
+
+            Output[i] = Kp[i] * Error[i] + Ki[i] * Integral[i] + Kd[i] * Differential[i]
+
+            last_Error[i] = Error[i]
+
+        rad_Output = math.atan2(Output[1], Output[0])
+        # print(Error[1], Integral[1], Differential[1], Output[1], rad_Output)
 
 
 class ENC_Listener(Node):
@@ -180,15 +217,13 @@ class ENC_Listener(Node):
 
         global rad_actual
         global rad_target
-        global dir_fix
+        global target
+        global actual
 
-        Vx = enc_msg.data[1]
-        Vy = enc_msg.data[2]
+        actual[0] = enc_msg.data[1]
+        actual[1] = enc_msg.data[2]
 
-        rad_actual = math.atan2(Vy, Vx)
         # print(rad_actual)
-        dir_fix = pid(rad_target - rad_actual)
-        print(dir_fix)
 
 
 class udpsend:
@@ -230,7 +265,7 @@ class udpsend:
             + str(data[8])
         )  # パケットを作成
 
-        # print(str_data)
+        print(str_data)
 
         send_data = str_data.encode("utf-8")  # バイナリに変換
 

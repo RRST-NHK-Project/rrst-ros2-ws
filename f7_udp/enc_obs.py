@@ -7,8 +7,8 @@ F7から各エンコーダーの速度[m/s]を受信しPublish
 2024/10/21
 """
 
-# デバッグモード設定
-online_mode = True  # ルーター未接続でデバッグする場合はFalseにする
+# オンラインモードの設定（ルーター接続時はTrue、デバッグ時はFalse）
+online_mode = True  
 
 # 必要なライブラリとモジュールのインポート
 import socket
