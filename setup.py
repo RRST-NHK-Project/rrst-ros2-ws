@@ -41,6 +41,8 @@ setup(
         'nr25_omni_odom = f7_udp.NHK2025_Omni_Attitude_Control_odom:main',
         'enc_plotter = f7_udp.enc_plotter:main',
         'dir_plotter = f7_udp.dir_plotter:main',
+        'imu_plotter = f7_udp.imu_plotter:main',
+        'nr25_ohf = f7_udp.NR25_Omni_HDG_Fix:main',
         ],
     },
 )
