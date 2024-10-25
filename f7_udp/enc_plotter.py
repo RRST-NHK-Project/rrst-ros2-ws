@@ -17,7 +17,6 @@ from std_msgs.msg import Float32MultiArray
 import signal
 import sys
 import time
-import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import threading
@@ -47,18 +46,13 @@ class Listener(Node):
         # アニメーションの設定
         self.ani = FuncAnimation(self.fig, self.update_plot, interval=100, blit=True)
 
-    def moving_average(self, data, window_size):
-        """移動平均を計算する関数"""
-        if len(data) < window_size:
-            return data  # データが少なすぎる場合はそのまま返す
-        return np.convolve(data, np.ones(window_size) / window_size, mode='valid')
-
     def listener_callback(self, enc_msg):
         current_time = time.time() - self.start_time
         self.times.append(current_time)
 
+        # エンコーダーデータの更新（1から6番目の要素を使用）
         for i in range(6):
-            if i + 1 < len(enc_msg.data):
+            if i + 1 < len(enc_msg.data):  # 1番から6番までに対応
                 self.enc_data[i].append(enc_msg.data[i + 1])  # 1から6にマッピング
             else:
                 self.enc_data[i].append(0)  # データがない場合は0を追加
@@ -70,17 +64,14 @@ class Listener(Node):
             for i in range(6):
                 self.enc_data[i] = self.enc_data[i][-max_points:]
 
-        # 平滑化処理を追加
-        window_size = 5  # ウィンドウサイズを指定
-        for i in range(6):
-            self.enc_data[i] = self.moving_average(self.enc_data[i], window_size)
-
     def update_plot(self, frame):
         for i, line in enumerate(self.lines):
             line.set_data(self.times, self.enc_data[i])
 
         self.ax.relim()
         self.ax.autoscale_view()
+
+        # 縦軸の範囲を固定
         self.ax.set_ylim(-1.5, 1.5)
 
         return self.lines

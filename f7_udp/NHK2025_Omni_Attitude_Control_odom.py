@@ -32,7 +32,7 @@ data = [0, 0, 0, 0, 0, 0, 0, 0, 0]
 # オムニホイールパラメーター
 sp_yaw = 5  # ヨー回転duty比[%]
 duty_limit = 10  # duty比の上限[%]
-v_limit = 2.0  # 並進速度の上限[m/s]
+v_limit = 3.0  # 並進速度の上限[m/s]
 
 rad_target = 0.0
 rad_actual = 0.0
@@ -139,7 +139,7 @@ class PS4_Listener(Node):
         target[1] = LS_Y
 
         # 各ホイールの速度計算
-        if RS_X <= deadzone and RS_Y <= deadzone and R1 == 0 and L1 == 0:
+        if RS_X <= deadzone and RS_Y <= deadzone and R2 == 0 and L2 == 0:
             v1 = math.sin(rad_Output - math.pi / 4) * duty_limit
             v2 = math.sin(rad_Output - 3 * math.pi / 4) * duty_limit
             v3 = math.sin(rad_Output - 5 * math.pi / 4) * duty_limit
@@ -189,7 +189,7 @@ class PS4_Listener(Node):
         global v_limit
         global rad_Output
 
-        Kp = [1000.0, 1000.0, 1.0, 1.0, 1.0, 1.0]
+        Kp = [10.0, 10.0, 1.0, 1.0, 1.0, 1.0]
         Ki = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         Kd = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
@@ -198,12 +198,12 @@ class PS4_Listener(Node):
             Integral[i] += Error[i] * PID_control_period
             Differential[i] = (Error[i] - last_Error[i]) / PID_control_period
 
-            Output[i] = Kp[i] * Error[i] + Ki[i] * Integral[i] + Kd[i] * Differential[i]
+            Output[i] = (Kp[i] * Error[i]) + (Ki[i] * Integral[i]) + (Kd[i] * Differential[i])
 
             last_Error[i] = Error[i]
 
         rad_Output = math.atan2(Output[1], Output[0])
-        # print(Error[1], Integral[1], Differential[1], Output[1], rad_Output)
+        print(rad_Output)
 
 
 class ENC_Listener(Node):
@@ -265,7 +265,7 @@ class udpsend:
             + str(data[8])
         )  # パケットを作成
 
-        print(str_data)
+        #print(str_data)
 
         send_data = str_data.encode("utf-8")  # バイナリに変換
 
