@@ -13,7 +13,7 @@ def generate_launch_description():
         Node(
             package='f7_udp',
             executable='nr25_ohf',
-            name='omni_fix',
+            name='omni_hdg_fix',
             output='screen',
             emulate_tty=True
         ),

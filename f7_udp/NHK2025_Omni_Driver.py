@@ -19,7 +19,7 @@ data = [0, 0, 0, 0, 0, 0, 0, 0, 0]  # 各モーターの回転数(RPM)
 fth = 0
 vth = 0
 r = 0
-rpm_limit = 10
+rpm_limit = 20
 sp_yaw = 0.5
 sp_omni = 1.0
 # --------------------------#
@@ -84,10 +84,10 @@ class Listener(Node):
         # vx = math.cos(rad)
         # vy = math.sin(rad)
 
-        v1 = math.sin(rad - math.pi / 4) * sp_omni
-        v2 = math.sin(rad - 3 * math.pi / 4) * sp_omni
-        v3 = math.sin(rad - 5 * math.pi / 4) * sp_omni
-        v4 = math.sin(rad - 7 * math.pi / 4) * sp_omni
+        v1 = math.sin(rad) * sp_omni
+        v2 = math.sin(rad - 2 * math.pi / 4) * sp_omni
+        v3 = math.sin(rad - 4 * math.pi / 4) * sp_omni
+        v4 = math.sin(rad - 6 * math.pi / 4) * sp_omni
 
         if RS_X >= deadzone:
             R2 = 1
