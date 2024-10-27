@@ -33,6 +33,7 @@ data = [0, 0, 0, 0, 0, 0, 0, 0, 0]
 sp_yaw = 5  # ヨー回転duty比[%]
 duty_limit = 10  # duty比の上限[%]
 v_limit = 3.0  # 並進速度の上限[m/s]
+rpm_limit = 400.0  # RPMの上限
 
 rad_target = 0.0
 rad_actual = 0.0
@@ -47,6 +48,8 @@ Integral = [0, 0, 0, 0, 0, 0]
 Differential = [0, 0, 0, 0, 0, 0]
 
 rad_Output = 0.0
+
+CIRCLE = 0
 
 
 PID_control_period = 0.01  # PID制御周期 [s]
@@ -76,6 +79,7 @@ class PS4_Listener(Node):
         global rad_actual
         global target
         global actual
+        global Output
 
         # ジョイスティックの入力値を取得
         LS_X = -1 * ps4_msg.axes[0]
@@ -135,8 +139,6 @@ class PS4_Listener(Node):
         # 移動方向の計算
         # rad_target = math.atan2(LS_Y, LS_X)
 
-        target[0] = LS_X
-        target[1] = LS_Y
 
         # 各ホイールの速度計算
         if RS_X <= deadzone and RS_Y <= deadzone and R2 == 0 and L2 == 0:
@@ -167,10 +169,12 @@ class PS4_Listener(Node):
             v1 = v2 = v3 = v4 = 0
 
         # 速度データの設定
-        data[1] = v1
+        data[1] = Output[0] * 100
         data[2] = v2
         data[3] = v3
         data[4] = v4
+        
+        print(data[1])
 
         # オンラインモードの場合、UDPで送信
         if online_mode:
@@ -188,22 +192,25 @@ class PS4_Listener(Node):
         global PID_control_period
         global v_limit
         global rad_Output
-
-        Kp = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-        Ki = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        
+        target[0] = 100.0
+        
+        Kp = [0.5, 1.0, 1.0, 1.0, 1.0, 1.0]
+        Ki = [0.06, 0.0, 0.0, 0.0, 0.0, 0.0]
         Kd = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
         for i in range(6):
-            Error[i] = target[i] - (actual[i] / v_limit)
+            Error[i] = target[i] - actual[i]
             Integral[i] += Error[i] * PID_control_period
             Differential[i] = (Error[i] - last_Error[i]) / PID_control_period
 
             Output[i] = (Kp[i] * Error[i]) + (Ki[i] * Integral[i]) + (Kd[i] * Differential[i])
+            Output[i] /= rpm_limit 
 
             last_Error[i] = Error[i]
+            
 
-        rad_Output = math.atan2(Output[1], Output[0]) * math.sqrt(Output[0] ** 2 + Output[1] ** 2)
-        print(rad_Output)
+        #print(Output[0])
 
 
 class ENC_Listener(Node):
@@ -220,8 +227,8 @@ class ENC_Listener(Node):
         global target
         global actual
 
-        actual[0] = enc_msg.data[1]
-        actual[1] = enc_msg.data[2]
+        actual[0] = enc_msg.data[0]
+        actual[1] = enc_msg.data[1]
 
         # print(rad_actual)
 

@@ -10,7 +10,7 @@ IMUからのYAW角に対しPID制御で追従させる
 """
 
 # オンラインモードの設定（ルーター接続時はTrue、デバッグ時はFalse）
-online_mode = False
+online_mode = True
 
 # 必要なライブラリのインポート
 import rclpy
@@ -232,8 +232,8 @@ class PS4_Listener(Node):
         global Output
         global PID_control_period
 
-        Kp = 50.0
-        Ki = 0.0
+        Kp = 100.0
+        Ki = 15.0
         Kd = 0.0
 
         Error = hdg_target - hdg_actual

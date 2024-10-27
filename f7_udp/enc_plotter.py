@@ -36,7 +36,7 @@ class Listener(Node):
 
         # グラフの初期化
         self.fig, self.ax = plt.subplots()
-        self.lines = [self.ax.plot([], [], label=f"Encoder {i+1}")[0] for i in range(6)]
+        self.lines = [self.ax.plot([], [], label=f"Encoder {i}")[0] for i in range(6)]
         self.ax.set_xlabel("Time (s)")
         self.ax.set_ylabel("Encoder Value")
         self.ax.set_title("Encoder Data over Time")
@@ -53,7 +53,7 @@ class Listener(Node):
         # エンコーダーデータの更新（1から6番目の要素を使用）
         for i in range(6):
             if i + 1 < len(enc_msg.data):  # 1番から6番までに対応
-                self.enc_data[i].append(enc_msg.data[i + 1])  # 1から6にマッピング
+                self.enc_data[i].append(enc_msg.data[i])  # 1から6にマッピング
             else:
                 self.enc_data[i].append(0)  # データがない場合は0を追加
 
@@ -72,7 +72,7 @@ class Listener(Node):
         self.ax.autoscale_view()
 
         # 縦軸の範囲を固定
-        self.ax.set_ylim(-1.5, 1.5)
+        self.ax.set_ylim(0, 150)
 
         return self.lines
 

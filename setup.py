@@ -43,6 +43,7 @@ setup(
         'dir_plotter = f7_udp.dir_plotter:main',
         'imu_plotter = f7_udp.imu_plotter:main',
         'nr25_ohf = f7_udp.NR25_Omni_HDG_Fix:main',
+        'nr25_vc = f7_udp.NR25_Omni_V_Ctrl:main',
         ],
     },
 )
