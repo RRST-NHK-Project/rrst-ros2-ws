@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 ## coding: UTF-8
 
+"""
+RRST NHK2025
+４輪オムニのフィードフォワード制御
+"""
+
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Joy
@@ -10,6 +15,8 @@ from std_msgs.msg import String
 from socket import *
 import time
 import math
+
+#以下pipでのインストールが必要
 import pyfiglet
 
 data = [0, 0, 0, 0, 0, 0, 0, 0, 0]  # 各モーターの回転数(RPM)

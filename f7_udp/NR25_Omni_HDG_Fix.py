@@ -6,13 +6,12 @@ RRST NHK2025
 ４輪オムニの直進補正
 IMUからのYAW角に対しPID制御で追従させる
 最終的にはオドメトリと統合する予定
-2024/10/25
+2024/10/30
 """
 
-# オンラインモードの設定（ルーター接続時はTrue、デバッグ時はFalse）
-online_mode = True
+# Falseにすることでルーター未接続でもデバッグ可能、Trueへの戻し忘れに注意
+ONLINE_MODE = False
 
-# 必要なライブラリのインポート
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Joy
@@ -33,14 +32,19 @@ import numpy as np
 # 以下pipでのインストールが必要
 import pyfiglet  # アスキーアート風のprintができる
 from simple_pid import PID  # PIDライブラリ（未使用なので削除予定）
-from transforms3d.euler import quat2euler  # クォータニオンからオイラー角への変換
+from transforms3d.euler import (
+    quat2euler,
+)  # クォータニオンからオイラー角への変換（/imuからYAW角を導出する）
 
-# モーター速度データの初期化 (0%-100%)
+# MDに出力するDuty比を格納する(0%-100%)
 data = [0, 0, 0, 0, 0, 0, 0, 0, 0]
 
-# オムニホイールパラメーター
+
 sp_yaw = 5  # ヨー回転duty比[%]
-duty_limit = 10  # duty比の上限[%]
+
+# 上限は安全のためのリミッター、下限はPIDで出力が小さいときでもアクチュエータが応答するように調整する
+duty_min = 0  # duty比の下限[%]
+duty_max = 10  # duty比の上限[%]
 
 hdg_fix = 0.0
 hdg_target = 0.0
@@ -92,12 +96,13 @@ class PS4_Listener(Node):
 
         self.timer = self.create_timer(
             PID_control_period, self.PID
-        )  # PID関数のタイマー呼び出し
+        )  # PID関数を一定周期で呼び出すためのタイマーを作成
 
         # プログラム開始メッセージの表示
         print(pyfiglet.figlet_format("NHK2025"))
-        if not online_mode:
-            print("[OFFLINE] Omni driver started.")
+        if not ONLINE_MODE:
+            print(pyfiglet.figlet_format("DEBUG"))
+            time.sleep(3)
 
     def listener_callback(self, ps4_msg):
         """
@@ -139,6 +144,7 @@ class PS4_Listener(Node):
         L3 = ps4_msg.buttons[10]
         R3 = ps4_msg.buttons[11]
 
+        # PSボタンで緊急停止
         if PS:
             print(pyfiglet.figlet_format("HALT"))
             data[1] = 0
@@ -149,7 +155,7 @@ class PS4_Listener(Node):
             data[6] = 0
             data[7] = 0
             data[8] = 0
-            if online_mode == True:
+            if ONLINE_MODE:
                 udp.send()  # 関数実行
             time.sleep(1)
             while True:
@@ -171,7 +177,8 @@ class PS4_Listener(Node):
         stick_deg = (
             stick_deg + 360
         ) % 360  # スティック角の正規化(0~360度の範囲に収まるようにする)
-        #hdg_target = stick_deg
+
+        # hdg_target = stick_deg
 
         # print(stick_deg)
 
@@ -180,10 +187,10 @@ class PS4_Listener(Node):
 
         # 各ホイールの速度計算
         if RS_X <= deadzone and RS_Y <= deadzone and R2 == 0 and L2 == 0:
-            v1 = math.sin(stick_rad - math.pi / 4) * duty_limit
-            v2 = math.sin(stick_rad - 3 * math.pi / 4) * duty_limit
-            v3 = math.sin(stick_rad - 5 * math.pi / 4) * duty_limit
-            v4 = math.sin(stick_rad - 7 * math.pi / 4) * duty_limit
+            v1 = math.sin(stick_rad - math.pi / 4) * duty_max
+            v2 = math.sin(stick_rad - 3 * math.pi / 4) * duty_max
+            v3 = math.sin(stick_rad - 5 * math.pi / 4) * duty_max
+            v4 = math.sin(stick_rad - 7 * math.pi / 4) * duty_max
 
         # 右スティックによる回転
         if RS_X >= deadzone:
@@ -213,7 +220,7 @@ class PS4_Listener(Node):
         data[4] = v4 + hdg_fix
 
         # オンラインモードの場合、UDPで送信
-        if online_mode:
+        if ONLINE_MODE:
             udp.send()
 
     def PID(self):
@@ -370,23 +377,22 @@ class IMU_Listener(Node):
         global hdg_target
         global hdg_actual
 
-        # Extract quaternion
+        # クォータニオンの要素を取り出す
         x = imu_msg.orientation.x
         y = imu_msg.orientation.y
         z = imu_msg.orientation.z
         w = imu_msg.orientation.w
 
-        # Convert quaternion to Euler angles
+        # クォータニオンからオイラー角へ変換
         roll, pitch, yaw = quat2euler([w, x, y, z])
 
-        # Convert yaw to degrees
+        # YAW角を度数法に変換
         yaw_deg = math.degrees(yaw)
 
-        # Ensure yaw is between 0 and 360 degrees
         yaw_deg = (
             yaw_deg + 360
         ) % 360  # YAW角の正規化(0~360度の範囲に収まるようにする)
-        
+
         hdg_actual = yaw_deg
 
         if init == False:
@@ -416,6 +422,11 @@ class udpsend:
     def send(self):
 
         # print(data[1], data[2], data[3], data[4])
+
+        # Duty比のリミッター、消すな！
+        for i in range(len(data)):
+            if data[i] > duty_max:
+                data[i] = duty_max
 
         str_data = (
             str(data[1])
@@ -452,20 +463,23 @@ class udpsend:
 
 
 # オンラインモード時のUDPインスタンス作成
-if online_mode:
+if ONLINE_MODE:
     udp = udpsend()
 
 
 def main(args=None):
     # ROSの初期化
     rclpy.init(args=args)
+
+    # マルチスレッドもあるので環境に応じて適切な方を使う
     exec = SingleThreadedExecutor()
 
-    # Listenerノードの作成と実行
+    # ノードの作成（クラス呼び出し？？）
     ps4_listener = PS4_Listener()
     # enc_listener = ENC_Listener()
     imu_listener = IMU_Listener()
 
+    # ノードの実行
     exec.add_node(ps4_listener)
     # exec.add_node(enc_listener)
     exec.add_node(imu_listener)
@@ -473,14 +487,14 @@ def main(args=None):
     try:
         exec.spin()
     except KeyboardInterrupt:
-        print("Shutting down...")
+        print(pyfiglet.figlet_format("HALT"))
     finally:
+        # 明示的な表記
         ps4_listener.destroy_node()
         # enc_listener.destroy_node()
         imu_listener.destroy_node()
         exec.shutdown()
-        plt.close()  # Matplotlibのウィンドウを閉じる
-
+        plt.close()
 
 if __name__ == "__main__":
     main()
