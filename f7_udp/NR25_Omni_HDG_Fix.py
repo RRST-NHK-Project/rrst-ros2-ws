@@ -6,6 +6,7 @@ RRST NHK2025
 ４輪オムニの直進補正
 IMUからのYAW角に対しPID制御で追従させる
 最終的にはオドメトリと統合する予定
+TODO: duty_minの機能実装
 2024/10/30
 """
 
@@ -62,7 +63,7 @@ Differential = 0.0
 init = False
 
 """
-以下エンコーダー関連、そのうち使う
+TODO: 以下エンコーダー関連、そのうち使う
 v_limit = 3.0  # 並進速度の上限[m/s]
 
 rad_target = 0.0
@@ -298,7 +299,7 @@ class PS4_Listener(Node):
 
 
 """
-    以下エンコーダー関連、そのうち使う
+    TODO: 以下エンコーダー関連、そのうち使う
     def PID(self):
 
         global targetnode_namespace='my_ns',
@@ -495,6 +496,7 @@ def main(args=None):
         imu_listener.destroy_node()
         exec.shutdown()
         plt.close()
+
 
 if __name__ == "__main__":
     main()
