@@ -16,20 +16,14 @@ from socket import *
 import time
 import math
 
-#以下pipでのインストールが必要
+# 以下pipでのインストールが必要
 import pyfiglet
 
 data = [0, 0, 0, 0, 0, 0, 0, 0, 0]  # 各モーターの回転数(RPM)
 
-# --------------------------#
-# オムニのパラメーター
-fth = 0
-vth = 0
-r = 0
-rpm_limit = 50
-sp_yaw = 0.5
+duty_max = 40
+sp_yaw = 0.25
 sp_omni = 1.0
-# --------------------------#
 
 deadzone = 0.3  # adjust DS4 deadzone
 
@@ -75,6 +69,14 @@ class Listener(Node):
         L3 = ps4_msg.buttons[10]
         R3 = ps4_msg.buttons[11]
 
+        shift = 0.5
+
+        if TRIANGLE:
+            shift = 1.0
+
+        if CROSS:
+            shift = 0.5
+
         if UP == 1:
             LS_Y = 1.0
 
@@ -90,12 +92,12 @@ class Listener(Node):
         rad = math.atan2(LS_Y, LS_X)
         # vx = math.cos(rad)
         # vy = math.sin(rad)
-        
-        v1 = math.sin(rad - 1 * math.pi / 4) * sp_omni * math.sqrt(LS_X ** 2 + LS_Y ** 2)
-        v2 = math.sin(rad - 3 * math.pi / 4) * sp_omni * math.sqrt(LS_X ** 2 + LS_Y ** 2)
-        v3 = math.sin(rad - 5 * math.pi / 4) * sp_omni * math.sqrt(LS_X ** 2 + LS_Y ** 2)
-        v4 = math.sin(rad - 7 * math.pi / 4) * sp_omni * math.sqrt(LS_X ** 2 + LS_Y ** 2)
-        
+
+        v1 = math.sin(rad - 1 * math.pi / 4) * sp_omni * math.sqrt(LS_X**2 + LS_Y**2)
+        v2 = math.sin(rad - 3 * math.pi / 4) * sp_omni * math.sqrt(LS_X**2 + LS_Y**2)
+        v3 = math.sin(rad - 5 * math.pi / 4) * sp_omni * math.sqrt(LS_X**2 + LS_Y**2)
+        v4 = math.sin(rad - 7 * math.pi / 4) * sp_omni * math.sqrt(LS_X**2 + LS_Y**2)
+
         """
         v1 = math.sin(rad) * sp_omni
         v2 = math.sin(rad - 2 * math.pi / 4) * sp_omni
@@ -132,10 +134,10 @@ class Listener(Node):
             v4 = 0
 
         # print(v1, v2, v3, v4)
-        data[1] = v1 * (rpm_limit + 1)
-        data[2] = v2 * (rpm_limit + 1)
-        data[3] = v3 * (rpm_limit + 1)
-        data[4] = v4 * (rpm_limit + 1)
+        data[1] = v1 * duty_max * shift
+        data[2] = v2 * duty_max * shift
+        data[3] = v3 * duty_max * shift
+        data[4] = v4 * duty_max * shift
 
         udp.send()  # 関数実行
 

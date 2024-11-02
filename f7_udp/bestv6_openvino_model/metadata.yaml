@@ -1,7 +1,7 @@
 description: Ultralytics bestv6 model trained on C:\Users\tashi\Desktop\Python\datasets\yEpZKENLjU\data.yaml
 author: Ultralytics
-date: '2024-09-15T15:01:56.501604'
-version: 8.2.66
+date: '2024-11-02T20:54:54.488382'
+version: 8.3.1
 license: AGPL-3.0 License (https://ultralytics.com/license)
 docs: https://docs.ultralytics.com
 stride: 32

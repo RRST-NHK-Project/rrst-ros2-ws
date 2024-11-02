@@ -44,6 +44,10 @@ setup(
         'imu_plotter = f7_udp.imu_plotter:main',
         'nr25_ohf = f7_udp.NR25_Omni_HDG_Fix:main',
         'nr25_vc = f7_udp.NR25_Omni_V_Ctrl:main',
+        'cr24_exh_automatic = f7_udp.cr24_exh_automatic:main',
+        'cr24_exh_yolo = f7_udp.cr24_exh_yolo:main',
+        'cr24_exh_manual = f7_udp.cr24_exh_manual:main',
+        'cr24_exh_gui = f7_udp.cr24_exh_gui:main',
         ],
     },
 )
