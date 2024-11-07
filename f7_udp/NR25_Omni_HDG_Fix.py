@@ -6,8 +6,11 @@ RRST NHK2025
 ４輪オムニの直進補正
 IMUからのYAW角に対しPID制御で追従させる
 最終的にはオドメトリと統合する予定
-TODO: duty_minの機能実装
-2024/10/30
+TODO: 
+
+！現在開発停止中！
+
+2024/11/07
 """
 
 # Falseにすることでルーター未接続でもデバッグ可能、Trueへの戻し忘れに注意
@@ -30,6 +33,10 @@ import time
 import math
 import matplotlib.pyplot as plt
 import numpy as np
+
+#imu関連quaternionライブラリがだめならこれらを使う
+import tf_transformations
+from geometry_msgs.msg import Quaternion
 
 # 以下pipでのインストールが必要
 import pyfiglet  # アスキーアート風のprintができる
@@ -86,7 +93,7 @@ rad_Output = 0.0
 PID_control_period = 0.01  # PID制御周期 [s]
 
 
-# ジョイスティックのデッドゾーン
+# ジョイスティックのデッドゾーン（しきい値）
 deadzone = 0.3
 
 

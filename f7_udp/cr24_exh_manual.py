@@ -2,7 +2,7 @@
 ## coding: UTF-8
 
 # Falseにすることでルーター未接続でもデバッグ可能、Trueへの戻し忘れに注意
-ONLINE_MODE = False
+ONLINE_MODE = True
 
 import rclpy
 from rclpy.node import Node
@@ -174,7 +174,7 @@ class udpsend:
 
     def send(self):
 
-        print(data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8])
+        #print(data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8])
 
         str_data = (
             str(data[1])

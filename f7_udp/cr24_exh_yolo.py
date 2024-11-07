@@ -39,7 +39,7 @@ class setoshio_pub(Node):
     def __init__(self):
         super().__init__("yolov8_setoshio")
         self.publisher_ = self.create_publisher(Int32MultiArray, "setoshio_pub", 10)
-        freq = 0.000001  # seconds
+        freq = 0.1  # seconds
         self.timer = self.create_timer(freq, self.timer_callback)
         # self.i = 0
 

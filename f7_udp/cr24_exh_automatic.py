@@ -7,7 +7,7 @@ YOLOからの情報とGUIからの入力をもとにシューティングコン�
 """
 
 # Falseにすることでルーター未接続でもデバッグ可能、Trueへの戻し忘れに注意
-ONLINE_MODE = False
+ONLINE_MODE = True
 
 import rclpy
 from rclpy.node import Node
@@ -21,7 +21,8 @@ from socket import *
 import time
 import math
 import pyfiglet
-#import serial
+
+# import serial
 
 data = [0, 0, 0, 0, 0, 0, 0, 0, 0]  # モタドラ用のPWMを想定
 fth = 0
@@ -53,6 +54,7 @@ ser.setDTR(False)
 ser.open()
 """
 
+
 class YOLO_Listener(Node):
 
     def __init__(self):
@@ -77,9 +79,11 @@ class YOLO_Listener(Node):
         ebi = yolo_msg.data[0] == 0
         nori = yolo_msg.data[0] == 1
         yuzu = yolo_msg.data[0] == 2
+        
+        global data 
 
         if void == 1:
-            #ser.write(b"0")
+            # ser.write(b"0")
             if mode == 0:
                 data[2] = 1
             if mode == 1:
@@ -91,17 +95,17 @@ class YOLO_Listener(Node):
 
         if ebi:
             # print("ebi")
-            #ser.write(b"1")
+            # ser.write(b"1")
             target = ebi_selector
 
         if nori:
             # print("nori")
-            #ser.write(b"2")
+            # ser.write(b"2")
             target = nori_selector
 
         if yuzu:
             # print("yuzu")
-            #ser.write(b"3")
+            # ser.write(b"3")
             target = yuzu_selector
 
         r_1 = 200
@@ -129,7 +133,7 @@ class YOLO_Listener(Node):
                 data[3] = 1
 
             if target == 6:
-                data[1] = -15
+                data[1] = 15
                 data[3] = 2
 
         if mode == 1:
@@ -159,7 +163,7 @@ class YOLO_Listener(Node):
 
         # print(target)
         # print(mode)
-        #print(data[1])
+        # print(data[1])
         # time.sleep(10)
 
         if ONLINE_MODE:
@@ -211,9 +215,6 @@ class GUI_Listener(Node):
 
         # print(ebi_selector, nori_selector, yuzu_selector)
 
-        if ONLINE_MODE:
-            udp.send()
-
 
 class DS4_Listener(Node):
 
@@ -258,16 +259,20 @@ class DS4_Listener(Node):
 
         """
         if SQUARE  == 1:
-            print("SAUARE ") 
+            #print("SAUARE ") 
+            data[1] = 0
         
         if CROSS == 1:
-            print("CROSS") 
+            #print("CROSS") 
+            data[1] = -1
         
         if  CIRCLE== 1:
-            print("CIRCLE") 
+            #print("CIRCLE") 
+            data[1] = 1
         
         if  TRIANGLE== 1:
             print("TRIANGLE") 
+            
         
         if  UP == 1:
             print("UP") 
@@ -367,8 +372,8 @@ class udpsend:
         # str_data = (str(data[1])+str(data[2])+str(data[3])+str(data[4])+str(data[5]))
         send_data = str_data.encode("utf-8")  # バイナリに変換
         # binary = data.to_bytes(4,'big')
-        
-        #print(data[1])
+
+        #print(str_data)
 
         self.udpClntSock.sendto(send_data, self.DstAddr)  # 宛先アドレスに送信
 
@@ -380,7 +385,6 @@ class udpsend:
         data[6] = 0
         data[7] = 0
         data[8] = 0
-        
 
 
 if ONLINE_MODE:
@@ -408,7 +412,7 @@ def main(args=None):
     gui_listener.destroy_node()
     ds4_listener.destroy_node()
     exec.shutdown()
-    #ser.close
+    # ser.close
 
 
 if __name__ == "__main__":

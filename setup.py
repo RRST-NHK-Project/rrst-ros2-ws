@@ -48,6 +48,7 @@ setup(
         'cr24_exh_yolo = f7_udp.cr24_exh_yolo:main',
         'cr24_exh_manual = f7_udp.cr24_exh_manual:main',
         'cr24_exh_gui = f7_udp.cr24_exh_gui:main',
+        'nr25_ff_ad = f7_udp.NR25_Omni_FF_Ad:main',
         ],
     },
 )
