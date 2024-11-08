@@ -14,7 +14,7 @@ ROS2 Humble<br>
 https://github.com/KouTashi/f7_udp_mbed_fb.git <br>
 エンコーダーの読み取りに必要なQEIライブラリ（Mbed OS 6に対応するように改変）を含みます。
 フィードバック制御に対応できるようにエンコーダーから速度(m/s)を求め、UDPで返す機能もあります。（1番と２番のエンコーダーのみ動作確認済み）
-UDPで返された速度をROS2ノードで受信＆Publishするノードについてはf7_udpパッケージ内のソースファイル、 enc_obs.py を参照してください。
+UDPで返された速度をROS2ノードで受信＆Publishするノードについてはf7_udpパッケージ内のソースファイル、enc_obs.py を参照してください。
 ## Powered by
 2024年度立命館大学ロボット技術研究会NHKプロジェクト<br>
 ![Logo](https://www.rrst.jp/img/logo.png)  
