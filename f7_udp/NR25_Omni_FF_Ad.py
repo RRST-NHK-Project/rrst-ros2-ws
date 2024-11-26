@@ -9,6 +9,9 @@ RRST NHK2025
 FBが詰まってるのでFFで操作性の向上を目指す
 """
 
+# Falseにすることでルーター未接続でもデバッグ可能、Trueへの戻し忘れに注意
+ONLINE_MODE = True
+
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Joy
@@ -24,8 +27,8 @@ import pyfiglet
 
 data = [0, 0, 0, 0, 0, 0, 0, 0, 0]  # 各モーターの出力（0% ~ 100%）
 
-duty_max = 40
-sp_yaw = 0.25
+duty_max = 50
+sp_yaw = 0.1
 
 deadzone = 0.3  # adjust DS4 deadzone
 
@@ -61,9 +64,8 @@ class Listener(Node):
         L1 = ps4_msg.buttons[4]
         R1 = ps4_msg.buttons[5]
 
-        # FIXME: L2,R2をボタンではなく軸(範囲:0.0~1.0)として扱うように変更する
-        L2 = ps4_msg.buttons[6]
-        R2 = ps4_msg.buttons[7]
+        L2 = (-1 * ps4_msg.axes[3] + 1) / 2
+        R2 = (-1 * ps4_msg.axes[4] + 1) / 2
 
         SHARE = ps4_msg.buttons[8]
         OPTION = ps4_msg.buttons[9]
@@ -71,6 +73,23 @@ class Listener(Node):
 
         L3 = ps4_msg.buttons[10]
         R3 = ps4_msg.buttons[11]
+
+        # PSボタンで緊急停止
+        if PS:
+            print(pyfiglet.figlet_format("HALT"))
+            data[1] = 0
+            data[2] = 0
+            data[3] = 0
+            data[4] = 0
+            data[5] = 0
+            data[6] = 0
+            data[7] = 0
+            data[8] = 0
+            if ONLINE_MODE:
+                udp.send()  # 関数実行
+            time.sleep(1)
+            while True:
+                pass
 
         rad = math.atan2(LS_Y, LS_X)
         # vx = math.cos(rad)
@@ -81,13 +100,13 @@ class Listener(Node):
         v3 = math.sin(rad - 5 * math.pi / 4) * R2
         v4 = math.sin(rad - 7 * math.pi / 4) * R2
 
-        if RS_X >= deadzone:
+        if RS_X >= deadzone or R1:
             v1 = -1.0 * sp_yaw
             v2 = -1.0 * sp_yaw
             v3 = -1.0 * sp_yaw
             v4 = -1.0 * sp_yaw
 
-        if RS_X <= -1 * deadzone:
+        if RS_X <= -1 * deadzone or L1:
             v1 = 1.0 * sp_yaw
             v2 = 1.0 * sp_yaw
             v3 = 1.0 * sp_yaw
@@ -98,7 +117,8 @@ class Listener(Node):
             and (math.fabs(LS_Y) <= deadzone)
             and (math.fabs(RS_X) <= deadzone)
             and (math.fabs(RS_Y) <= deadzone)
-            and R2 == 0
+            and not R1
+            and not L1
         ):
             v1 = 0
             v2 = 0
@@ -111,7 +131,8 @@ class Listener(Node):
         data[3] = v3 * duty_max
         data[4] = v4 * duty_max
 
-        udp.send()  # 関数実行
+        if ONLINE_MODE:
+            udp.send()  # 関数実行
 
 
 class udpsend:
@@ -171,7 +192,8 @@ class udpsend:
         data[8] = 0
 
 
-udp = udpsend()  # クラス呼び出し
+if ONLINE_MODE:
+    udp = udpsend()  # クラス呼び出し
 
 
 def main(args=None):

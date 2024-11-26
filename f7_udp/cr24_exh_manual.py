@@ -40,8 +40,8 @@ class Listener(Node):
     def listener_callback(self, ps4_msg):
         LS_X = ps4_msg.axes[0]
         LS_Y = ps4_msg.axes[1]
-        # RS_X = (-1) * ps4_msg.axes[2]
-        # RS_Y = ps4_msg.axes[5]
+        RS_X = (-1) * ps4_msg.axes[2]
+        RS_Y = ps4_msg.axes[5]
 
         # print(LS_X, LS_Y, RS_X, RS_Y)
 
@@ -86,6 +86,18 @@ class Listener(Node):
             time.sleep(1)
             while True:
                 pass
+            
+        if LS_X < -0.3:
+            RIGHT = 1.0
+            
+        if LS_X > 0.3:
+            LEFT = 1.0
+            
+        if RS_Y < -0.3:
+            DOWN = 1.0
+            
+        if RS_Y > 0.3:
+            UP = 1.0
 
         if UP:
             data[7] = -80 # 上押したらハンド軸前進
@@ -108,10 +120,11 @@ class Listener(Node):
         if SQUARE:
             data[3] = 2
 
-        if L1:
+        if TRIANGLE:
             data[2] = -70
-        if L2:
+        if CROSS:
             data[2] = 70
+            
 
         if R2:
             if UP:
@@ -177,21 +190,21 @@ class udpsend:
         #print(data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8])
 
         str_data = (
-            str(data[1])
+            str(data[1]*0.5)
             + ","
-            + str(data[2])
+            + str(data[2]*0.5)
             + ","
-            + str(data[3])
+            + str(data[3]*0.5)
             + ","
-            + str(data[4])
+            + str(data[4]*0.5)
             + ","
-            + str(data[5])
+            + str(data[5]*0.5)
             + ","
-            + str(data[6])
+            + str(data[6]*0.5)
             + ","
-            + str(data[7])
+            + str(data[7]*0.5)
             + ","
-            + str(data[8])
+            + str(data[8]*0.5)
         )  # パケットを作成
         
         #print(str_data)
