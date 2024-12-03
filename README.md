@@ -1,5 +1,5 @@
 # f7_udp ROS2パッケージ
-ROS2 ノードと NUCLEO-F767ZI をUDP経由で通信するパッケージです。
+ROS2 ノードと NUCLEO-F767ZI をUDP経由で通信するパッケージです。  
 ROS2 Package for connecting ROS2 node and NUCLEO-F767ZI over UDP protocol.
 
 ## 概要 / Overview
@@ -27,7 +27,7 @@ It also has the capability to calculate velocity (m/s) from encoders for feedbac
 For the ROS2 node that receives and publishes the velocity returned via UDP, please refer to the source file enc_obs.py in the f7_udp package.
 
 ## Powered by
-2024年度立命館大学ロボット技術研究会NHKプロジェクト
+2024年度立命館大学ロボット技術研究会NHKプロジェクト  
 2024 NHK Project, RRST, Ritsumeikan University 
 
 ![Logo](https://www.rrst.jp/img/logo.png)
