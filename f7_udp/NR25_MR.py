@@ -7,6 +7,7 @@ RRST NHK2025
 """
 
 # Falseにすることでルーター未接続でもデバッグ可能、Trueへの戻し忘れに注意
+# アドレスのバインドに失敗すると自動でオフラインモードで開始される
 ONLINE_MODE = True
 
 import rclpy
@@ -23,22 +24,25 @@ import math
 import pyfiglet
 
 data = [0, -1, -1, -1, 0, 0, 0, 0, 0]  # 各モーターの出力（0% ~ 100%）
+# 1,2,3番のデジタルピンを電磁弁制御に割り当て
 
 duty_max = 50
 sp_yaw = 0.1
 
-deadzone = 0.3  # adjust DS4 deadzone
+deadzone = 0.3  # Adjust DS4 deadzone
 ready_for_shoot = False
+
+roller_speed = 10
 
 
 class Listener(Node):
 
     def __init__(self):
-        super().__init__("nhk25_omni_driver")
+        super().__init__("nhk25_mr")
         self.subscription = self.create_subscription(
             Joy, "joy", self.listener_callback, 10
         )
-        print(pyfiglet.figlet_format("NHK2025"))
+        print(pyfiglet.figlet_format("MR"))
         self.subscription  # prevent unused variable warning
 
     def listener_callback(self, ps4_msg):
@@ -71,7 +75,7 @@ class Listener(Node):
 
         L3 = ps4_msg.buttons[10]
         R3 = ps4_msg.buttons[11]
-        
+
         global ready_for_shoot
 
         # PSボタンで緊急停止
@@ -85,60 +89,54 @@ class Listener(Node):
             data[6] = 0
             data[7] = 0
             data[8] = 0
-            if ONLINE_MODE:
-                udp.send()  # 関数実行
+            udp.send()  # UDPで送信
             time.sleep(1)
             while True:
                 pass
 
+        # 射出準備
         if CIRCLE and not ready_for_shoot:
             print("Ready for Shooting")
             data[1] = 1
-            data[3] = 1 
-            data[5] = 30
-            data[6] = 30
-            if ONLINE_MODE:
-                udp.send()  # 関数実行
+            data[3] = 1
+            data[7] = roller_speed
+            data[8] = roller_speed
+            udp.send()  # UDPで送信
             CIRCLE = False
             ready_for_shoot = True
             time.sleep(0.5)
-            
+
+        # 射出シーケンス
         if CIRCLE and ready_for_shoot:
             print("Shoot")
             data[2] = 1
-            if ONLINE_MODE:
-                udp.send()  # 関数実行
+            udp.send()  # 　UDPで送信
             ready_for_shoot = False
             time.sleep(1.0)
             print("Ready for Retraction")
             data[2] = -1
-            if ONLINE_MODE:
-                udp.send()  # 関数実行
+            udp.send()  # 　UDPで送信
             time.sleep(1.0)
             print("Retract")
             data[1] = -1
             data[3] = -1
-            data[5] = 0
-            data[6] = 0
-            if ONLINE_MODE:
-                udp.send()  # 関数実行
-                
+            data[7] = 0
+            data[8] = 0
+            udp.send()  # UDPで送信
+
+        # ドリブル
         if TRIANGLE:
             data[3] = 1
-            data[5] = -30
-            data[6] = -30
-            if ONLINE_MODE:
-                udp.send()  # 関数実行
+            data[7] = -1 * roller_speed
+            data[8] = -1 * roller_speed
+            udp.send()  # UDPで送信
             time.sleep(2.0)
             data[3] = -1
-            data[5] = 0
-            data[6] = 0
-            if ONLINE_MODE:
-                udp.send()  # 関数実行
-        
+            data[7] = 0
+            data[8] = 0
+            udp.send()  # UDPで送信
 
-        if ONLINE_MODE:
-            udp.send()  # 関数実行
+        udp.send()  # UDPで送信
 
 
 class udpsend:
@@ -153,34 +151,39 @@ class udpsend:
         self.DstAddr = (DstIP, DstPort)  # アドレスをtupleに格納
 
         self.udpClntSock = socket(AF_INET, SOCK_DGRAM)  # ソケット作成
-        self.udpClntSock.bind(self.SrcAddr)  # 送信元アドレスでバインド
+        try:  # 送信元アドレスでバインド
+            self.udpClntSock.bind(self.SrcAddr)
+        except:  # 例外処理、バインドに失敗したときはオフラインモードで開始
+            print("Cannot assign requested address.\nOFFLINE Mode started.")
+            ONLINE_MODE = False
 
     def send(self):
 
-        # print(data[1], data[2], data[3], data[4])
+        if ONLINE_MODE:
+            # print(data[1], data[2], data[3], data[4])
 
-        # Duty比のリミッター、消すな！
-        for i in range(len(data)):
-            if data[i] > duty_max:
-                data[i] = duty_max
+            # Duty比のリミッター、消すな！
+            for i in range(len(data)):
+                if data[i] > duty_max:
+                    data[i] = duty_max
 
-        str_data = (
-            str(data[1])
-            + ","
-            + str(data[2])
-            + ","
-            + str(data[3])
-            + ","
-            + str(data[4])
-            + ","
-            + str(data[5])
-            + ","
-            + str(data[6])
-            + ","
-            + str(data[7])
-            + ","
-            + str(data[8])
-        )  # パケットを作成
+            str_data = (
+                str(data[1])
+                + ","
+                + str(data[2])
+                + ","
+                + str(data[3])
+                + ","
+                + str(data[4])
+                + ","
+                + str(data[5])
+                + ","
+                + str(data[6])
+                + ","
+                + str(data[7])
+                + ","
+                + str(data[8])
+            )  # パケットを作成
 
         print(str_data)
 
@@ -188,18 +191,17 @@ class udpsend:
 
         self.udpClntSock.sendto(send_data, self.DstAddr)  # 宛先アドレスに送信
 
-        #data[1] = 0
-        #data[2] = 0
-        #data[3] = 0
-        #data[4] = 0
-        #data[5] = 0
-        #ata[6] = 0
-        data[7] = 0
-        data[8] = 0
+        # data[1] = 0
+        # data[2] = 0
+        # data[3] = 0
+        # data[4] = 0
+        # data[5] = 0
+        # ata[6] = 0
+        #data[7] = 0
+        #data[8] = 0
 
 
-if ONLINE_MODE:
-    udp = udpsend()  # クラス呼び出し
+udp = udpsend()  # クラス呼び出し
 
 
 def main(args=None):

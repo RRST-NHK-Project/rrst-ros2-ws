@@ -3,11 +3,16 @@
 
 """
 RRST NHK2025
-ダンク機の機構制御
+４輪オムニのフィードフォワード制御
+操舵とアクセル軸を分離
+左スティックで操舵、R2でアクセル、右スティックで回転
+FBが詰まってるのでFFで操作性の向上を目指す
 """
 
 # Falseにすることでルーター未接続でもデバッグ可能、Trueへの戻し忘れに注意
+# アドレスのバインドに失敗すると自動でオフラインモードで開始される
 ONLINE_MODE = True
+
 
 import rclpy
 from rclpy.node import Node
@@ -33,7 +38,7 @@ deadzone = 0.3  # adjust DS4 deadzone
 class Listener(Node):
 
     def __init__(self):
-        super().__init__("nhk25_omni_driver")
+        super().__init__("nhk25_mr_omni")
         self.subscription = self.create_subscription(
             Joy, "joy", self.listener_callback, 10
         )
@@ -82,8 +87,7 @@ class Listener(Node):
             data[6] = 0
             data[7] = 0
             data[8] = 0
-            if ONLINE_MODE:
-                udp.send()  # 関数実行
+            udp.send()  # 関数実行
             time.sleep(1)
             while True:
                 pass
@@ -128,8 +132,7 @@ class Listener(Node):
         data[3] = v3 * duty_max
         data[4] = v4 * duty_max
 
-        if ONLINE_MODE:
-            udp.send()  # 関数実行
+        udp.send()  # 関数実行
 
 
 class udpsend:
@@ -144,53 +147,56 @@ class udpsend:
         self.DstAddr = (DstIP, DstPort)  # アドレスをtupleに格納
 
         self.udpClntSock = socket(AF_INET, SOCK_DGRAM)  # ソケット作成
-        self.udpClntSock.bind(self.SrcAddr)  # 送信元アドレスでバインド
+        try:  # 送信元アドレスでバインド
+            self.udpClntSock.bind(self.SrcAddr)
+        except:  # 例外処理、バインドに失敗したときはオフラインモードで開始
+            print("Cannot assign requested address.\nOFFLINE Mode started.")
+            ONLINE_MODE = False
 
     def send(self):
 
-        # print(data[1], data[2], data[3], data[4])
+        if ONLINE_MODE:
+                    # print(data[1], data[2], data[3], data[4])
 
-        # Duty比のリミッター、消すな！
-        for i in range(len(data)):
-            if data[i] > duty_max:
-                data[i] = duty_max
+            # Duty比のリミッター、消すな！
+            for i in range(len(data)):
+                if data[i] > duty_max:
+                    data[i] = duty_max
 
-        str_data = (
-            str(data[1])
-            + ","
-            + str(data[2])
-            + ","
-            + str(data[3])
-            + ","
-            + str(data[4])
-            + ","
-            + str(data[5])
-            + ","
-            + str(data[6])
-            + ","
-            + str(data[7])
-            + ","
-            + str(data[8])
-        )  # パケットを作成
+            str_data = (
+                str(data[1])
+                + ","
+                + str(data[2])
+                + ","
+                + str(data[3])
+                + ","
+                + str(data[4])
+                + ","
+                + str(data[5])
+                + ","
+                + str(data[6])
+                + ","
+                + str(data[7])
+                + ","
+                + str(data[8])
+            )  # パケットを作成
 
-        print(str_data)
+            #print(str_data)
 
-        send_data = str_data.encode("utf-8")  # バイナリに変換
+            send_data = str_data.encode("utf-8")  # バイナリに変換
 
-        self.udpClntSock.sendto(send_data, self.DstAddr)  # 宛先アドレスに送信
+            self.udpClntSock.sendto(send_data, self.DstAddr)  # 宛先アドレスに送信
 
-        data[1] = 0
-        data[2] = 0
-        data[3] = 0
-        data[4] = 0
-        data[5] = 0
-        data[6] = 0
-        data[7] = 0
-        data[8] = 0
+            data[1] = 0
+            data[2] = 0
+            data[3] = 0
+            data[4] = 0
+            data[5] = 0
+            data[6] = 0
+            data[7] = 0
+            data[8] = 0
 
-
-if ONLINE_MODE:
-    udp = udpsend()  # クラス呼び出し
+udp = udpsend()  # クラス呼び出し
 
 
 def main(args=None):
