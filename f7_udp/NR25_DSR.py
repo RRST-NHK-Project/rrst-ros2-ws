@@ -3,14 +3,11 @@
 
 """
 RRST NHK2025
-４輪オムニのフィードフォワード制御
-操舵とアクセル軸を分離
-左スティックで操舵、R2でアクセル、右スティックで回転
-FBが詰まってるのでFFで操作性の向上を目指す
+ダンク機の機構制御
 """
 
 # Falseにすることでルーター未接続でもデバッグ可能、Trueへの戻し忘れに注意
-ONLINE_MODE = False
+ONLINE_MODE = True
 
 import rclpy
 from rclpy.node import Node
@@ -176,7 +173,7 @@ class udpsend:
             + str(data[8])
         )  # パケットを作成
 
-        #print(str_data)
+        print(str_data)
 
         send_data = str_data.encode("utf-8")  # バイナリに変換
 

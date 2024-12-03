@@ -3,14 +3,11 @@
 
 """
 RRST NHK2025
-４輪オムニのフィードフォワード制御
-操舵とアクセル軸を分離
-左スティックで操舵、R2でアクセル、右スティックで回転
-FBが詰まってるのでFFで操作性の向上を目指す
+汎用機の機構制御
 """
 
 # Falseにすることでルーター未接続でもデバッグ可能、Trueへの戻し忘れに注意
-ONLINE_MODE = False
+ONLINE_MODE = True
 
 import rclpy
 from rclpy.node import Node
@@ -25,12 +22,13 @@ import math
 # 以下pipでのインストールが必要
 import pyfiglet
 
-data = [0, 0, 0, 0, 0, 0, 0, 0, 0]  # 各モーターの出力（0% ~ 100%）
+data = [0, -1, -1, -1, 0, 0, 0, 0, 0]  # 各モーターの出力（0% ~ 100%）
 
 duty_max = 50
 sp_yaw = 0.1
 
 deadzone = 0.3  # adjust DS4 deadzone
+ready_for_shoot = False
 
 
 class Listener(Node):
@@ -73,13 +71,15 @@ class Listener(Node):
 
         L3 = ps4_msg.buttons[10]
         R3 = ps4_msg.buttons[11]
+        
+        global ready_for_shoot
 
         # PSボタンで緊急停止
         if PS:
             print(pyfiglet.figlet_format("HALT"))
-            data[1] = 0
-            data[2] = 0
-            data[3] = 0
+            data[1] = -1
+            data[2] = -1
+            data[3] = -1
             data[4] = 0
             data[5] = 0
             data[6] = 0
@@ -91,45 +91,51 @@ class Listener(Node):
             while True:
                 pass
 
-        rad = math.atan2(LS_Y, LS_X)
-        # vx = math.cos(rad)
-        # vy = math.sin(rad)
-
-        v1 = math.sin(rad - 3 * math.pi / 4) * R2
-        v2 = math.sin(rad - 5 * math.pi / 4) * R2
-        v3 = math.sin(rad - 7 * math.pi / 4) * R2
-        v4 = math.sin(rad - 9 * math.pi / 4) * R2
-
-        if RS_X >= deadzone or R1:
-            v1 = -1.0 * sp_yaw
-            v2 = -1.0 * sp_yaw
-            v3 = -1.0 * sp_yaw
-            v4 = -1.0 * sp_yaw
-
-        if RS_X <= -1 * deadzone or L1:
-            v1 = 1.0 * sp_yaw
-            v2 = 1.0 * sp_yaw
-            v3 = 1.0 * sp_yaw
-            v4 = 1.0 * sp_yaw
-
-        if (
-            (math.fabs(LS_X) <= deadzone)
-            and (math.fabs(LS_Y) <= deadzone)
-            and (math.fabs(RS_X) <= deadzone)
-            and (math.fabs(RS_Y) <= deadzone)
-            and not R1
-            and not L1
-        ):
-            v1 = 0
-            v2 = 0
-            v3 = 0
-            v4 = 0
-
-        # print(v1, v2, v3, v4)
-        data[1] = v1 * duty_max
-        data[2] = v2 * duty_max
-        data[3] = v3 * duty_max
-        data[4] = v4 * duty_max
+        if CIRCLE and not ready_for_shoot:
+            print("Ready for Shooting")
+            data[1] = 1
+            data[3] = 1 
+            data[5] = 30
+            data[6] = 30
+            if ONLINE_MODE:
+                udp.send()  # 関数実行
+            CIRCLE = False
+            ready_for_shoot = True
+            time.sleep(0.5)
+            
+        if CIRCLE and ready_for_shoot:
+            print("Shoot")
+            data[2] = 1
+            if ONLINE_MODE:
+                udp.send()  # 関数実行
+            ready_for_shoot = False
+            time.sleep(1.0)
+            print("Ready for Retraction")
+            data[2] = -1
+            if ONLINE_MODE:
+                udp.send()  # 関数実行
+            time.sleep(1.0)
+            print("Retract")
+            data[1] = -1
+            data[3] = -1
+            data[5] = 0
+            data[6] = 0
+            if ONLINE_MODE:
+                udp.send()  # 関数実行
+                
+        if TRIANGLE:
+            data[3] = 1
+            data[5] = -30
+            data[6] = -30
+            if ONLINE_MODE:
+                udp.send()  # 関数実行
+            time.sleep(2.0)
+            data[3] = -1
+            data[5] = 0
+            data[6] = 0
+            if ONLINE_MODE:
+                udp.send()  # 関数実行
+        
 
         if ONLINE_MODE:
             udp.send()  # 関数実行
@@ -138,11 +144,11 @@ class Listener(Node):
 class udpsend:
     def __init__(self):
 
-        SrcIP = "192.168.8.195"  # 送信元IP
+        SrcIP = "192.168.8.196"  # 送信元IP
         SrcPort = 4000  # 送信元ポート番号
         self.SrcAddr = (SrcIP, SrcPort)  # アドレスをtupleに格納
 
-        DstIP = "192.168.8.215"  # 宛先IP
+        DstIP = "192.168.8.216"  # 宛先IP
         DstPort = 5000  # 宛先ポート番号
         self.DstAddr = (DstIP, DstPort)  # アドレスをtupleに格納
 
@@ -176,18 +182,18 @@ class udpsend:
             + str(data[8])
         )  # パケットを作成
 
-        #print(str_data)
+        print(str_data)
 
         send_data = str_data.encode("utf-8")  # バイナリに変換
 
         self.udpClntSock.sendto(send_data, self.DstAddr)  # 宛先アドレスに送信
 
-        data[1] = 0
-        data[2] = 0
-        data[3] = 0
-        data[4] = 0
-        data[5] = 0
-        data[6] = 0
+        #data[1] = 0
+        #data[2] = 0
+        #data[3] = 0
+        #data[4] = 0
+        #data[5] = 0
+        #ata[6] = 0
         data[7] = 0
         data[8] = 0
 
