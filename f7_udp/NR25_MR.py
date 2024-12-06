@@ -23,7 +23,7 @@ import math
 # 以下pipでのインストールが必要
 import pyfiglet
 
-data = [0, -1, -1, -1, 0, 0, 0, 0, 0]  # 各モーターの出力（0% ~ 100%）
+data = [0, 0, 0, 0, 0, 0, -1, -1, -1]  # 各モーターの出力（0% ~ 100%）
 # 1,2,3番のデジタルピンを電磁弁制御に割り当て
 
 duty_max = 50
@@ -81,14 +81,14 @@ class Listener(Node):
         # PSボタンで緊急停止
         if PS:
             print(pyfiglet.figlet_format("HALT"))
-            data[1] = -1
-            data[2] = -1
-            data[3] = -1
+            data[1] = 0
+            data[2] = 0
+            data[3] = 0
             data[4] = 0
             data[5] = 0
-            data[6] = 0
-            data[7] = 0
-            data[8] = 0
+            data[6] = -1
+            data[7] = -1
+            data[8] = -1
             udp.send()  # UDPで送信
             time.sleep(1)
             while True:
@@ -97,10 +97,12 @@ class Listener(Node):
         # 射出準備
         if CIRCLE and not ready_for_shoot:
             print("Ready for Shooting")
-            data[1] = 1
-            data[3] = 1
-            data[7] = roller_speed
-            data[8] = roller_speed
+            data[6] = 1
+            data[8] = 1
+            data[1] = roller_speed
+            data[2] = roller_speed
+            data[3] = roller_speed
+            data[4] = roller_speed
             udp.send()  # UDPで送信
             CIRCLE = False
             ready_for_shoot = True
@@ -109,31 +111,37 @@ class Listener(Node):
         # 射出シーケンス
         if CIRCLE and ready_for_shoot:
             print("Shoot")
-            data[2] = 1
+            data[7] = 1
             udp.send()  # 　UDPで送信
             ready_for_shoot = False
             time.sleep(1.0)
             print("Ready for Retraction")
-            data[2] = -1
+            data[7] = -1
             udp.send()  # 　UDPで送信
             time.sleep(1.0)
             print("Retract")
-            data[1] = -1
-            data[3] = -1
-            data[7] = 0
-            data[8] = 0
+            data[6] = -1
+            data[8] = -1
+            data[1] = 0
+            data[2] = 0
+            data[3] = 0
+            data[4] = 0
             udp.send()  # UDPで送信
 
         # ドリブル
         if TRIANGLE:
-            data[3] = 1
-            data[7] = -1 * roller_speed
-            data[8] = -1 * roller_speed
+            data[8] = 1
+            data[1] = -1 * roller_speed
+            data[2] = -1 * roller_speed
+            data[3] = -1 * roller_speed
+            data[4] = -1 * roller_speed
             udp.send()  # UDPで送信
             time.sleep(2.0)
-            data[3] = -1
-            data[7] = 0
-            data[8] = 0
+            data[8] = -1
+            data[1] = 0
+            data[2] = 0
+            data[3] = 0
+            data[4] = 0
             udp.send()  # UDPで送信
 
         udp.send()  # UDPで送信
