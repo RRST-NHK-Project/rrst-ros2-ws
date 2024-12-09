@@ -1,4 +1,4 @@
-# f7_udp ROS2パッケージ
+# f7_udp
 ROS2 ノードと NUCLEO-F767ZI をUDP経由で通信するパッケージです。  
 ROS2 Package for connecting ROS2 node and NUCLEO-F767ZI over UDP protocol.
 
