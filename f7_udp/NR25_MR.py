@@ -32,7 +32,9 @@ sp_yaw = 0.1
 deadzone = 0.3  # Adjust DS4 deadzone
 ready_for_shoot = False
 
-roller_speed = 10
+roller_speed_dribble_ab = 20
+roller_speed_dribble_cd = 60 #60あたりが天井？？
+roller_speed_shoot = 50
 
 
 class Listener(Node):
@@ -99,10 +101,10 @@ class Listener(Node):
             print("Ready for Shooting")
             data[6] = 1
             data[8] = 1
-            data[1] = roller_speed
-            data[2] = roller_speed
-            data[3] = roller_speed
-            data[4] = roller_speed
+            data[1] = -1 * roller_speed_shoot
+            data[2] = -1 * roller_speed_shoot
+            data[3] = roller_speed_shoot
+            data[4] = roller_speed_shoot
             udp.send()  # UDPで送信
             CIRCLE = False
             ready_for_shoot = True
@@ -131,12 +133,12 @@ class Listener(Node):
         # ドリブル
         if TRIANGLE:
             data[8] = 1
-            data[1] = -1 * roller_speed
-            data[2] = -1 * roller_speed
-            data[3] = -1 * roller_speed
-            data[4] = -1 * roller_speed
+            data[1] = roller_speed_dribble_ab
+            data[2] = roller_speed_dribble_ab
+            data[3] = -1 * roller_speed_dribble_cd
+            data[4] = -1 * roller_speed_dribble_cd 
             udp.send()  # UDPで送信
-            time.sleep(2.0)
+            time.sleep(6.0)
             data[8] = -1
             data[1] = 0
             data[2] = 0
