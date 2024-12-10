@@ -52,6 +52,7 @@ setup(
         'nr25_dr_ff_ad = f7_udp.NR25_DR_Omni_FF_Ad:main',
         'nr25_dr = f7_udp.NR25_DR:main',
         'nr25_mr = f7_udp.NR25_MR:main',
+        'nr25_pr_tuner = f7_udp.NR25_param_tuner:main',
         ],
     },
 )

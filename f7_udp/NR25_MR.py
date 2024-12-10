@@ -10,11 +10,15 @@ RRST NHK2025
 # アドレスのバインドに失敗すると自動でオフラインモードで開始される
 ONLINE_MODE = True
 
+#パラメーター調整モード
+GUI_PARAM_MODE = False
+
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Joy
 from geometry_msgs.msg import Twist
 from std_msgs.msg import String
+from std_msgs.msg import Int32MultiArray
 
 from socket import *
 import time
@@ -33,7 +37,7 @@ deadzone = 0.3  # Adjust DS4 deadzone
 ready_for_shoot = False
 
 roller_speed_dribble_ab = 20
-roller_speed_dribble_cd = 60 #60あたりが天井？？
+roller_speed_dribble_cd = 60
 roller_speed_shoot = 50
 
 
@@ -147,7 +151,20 @@ class Listener(Node):
             udp.send()  # UDPで送信
 
         udp.send()  # UDPで送信
+"""      
+class Listener(Node):
 
+    def __init__(self):
+        super().__init__("gui_param_listener")
+        self.subscription = self.create_subscription(
+            Int32MultiArray, "parameter_array", self.listener_callback, 10
+        )
+        self.subscription  # prevent unused variable warning
+
+    def listener_callback(self, gui_msg):
+        gui_param = gui_msg.data
+        print(gui_param)
+"""
 
 class udpsend:
     def __init__(self):
@@ -195,7 +212,7 @@ class udpsend:
                 + str(data[8])
             )  # パケットを作成
 
-        print(str_data)
+        #print(str_data)
 
         send_data = str_data.encode("utf-8")  # バイナリに変換
 
