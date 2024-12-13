@@ -20,7 +20,7 @@ def generate_launch_description():
         Node(
             package='f7_udp',
             executable='nr25_mr',
-            name='mpr',
+            name='mr',
             output='screen',
             emulate_tty=True
         ),

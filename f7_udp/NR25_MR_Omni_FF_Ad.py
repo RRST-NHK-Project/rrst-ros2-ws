@@ -156,12 +156,14 @@ class udpsend:
     def send(self):
 
         if ONLINE_MODE:
-                    # print(data[1], data[2], data[3], data[4])
+            # print(data[1], data[2], data[3], data[4])
 
             # Duty比のリミッター、消すな！
             for i in range(len(data)):
                 if data[i] > duty_max:
                     data[i] = duty_max
+                elif data[i] < -duty_max:
+                    data[i] = -duty_max
 
             str_data = (
                 str(data[1])
@@ -181,7 +183,7 @@ class udpsend:
                 + str(data[8])
             )  # パケットを作成
 
-            #print(str_data)
+            # print(str_data)
 
             send_data = str_data.encode("utf-8")  # バイナリに変換
 
@@ -195,6 +197,7 @@ class udpsend:
             data[6] = 0
             data[7] = 0
             data[8] = 0
+
 
 udp = udpsend()  # クラス呼び出し
 
