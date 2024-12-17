@@ -6,6 +6,7 @@ RRST NHK2025
 汎用機の機構制御
 
 2024/12/13: クラス名の変更、機構制御の関数化、GUI連携、大規模な修正のため実機テスト注意
+2024/12/16: 実機テスト完了
 TODO: 配列dataの拡張
 TODO: MD出力のPublish(デバッグ用)
 TODO: ds4drvの代替手段の選定
@@ -38,14 +39,14 @@ import pyfiglet
 data = [0, 0, 0, 0, 0, 0, -1, -1, -1]  # 各モーターの出力（0% ~ 100%）
 # 6, 7, 8, を電磁弁制御に割り当て
 
-duty_max = 80
+duty_max = 90
 sp_yaw = 0.1
 
 deadzone = 0.3  # Adjust DS4 deadzone
 ready_for_shoot = False
 
-roller_speed_dribble_ab = 20
-roller_speed_dribble_cd = 60
+roller_speed_dribble_ab = 30
+roller_speed_dribble_cd = 50
 roller_speed_shoot_ab = 50
 roller_speed_shoot_cd = 50
 shoot = 0

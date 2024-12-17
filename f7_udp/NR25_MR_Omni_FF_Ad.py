@@ -29,7 +29,7 @@ import pyfiglet
 
 data = [0, 0, 0, 0, 0, 0, 0, 0, 0]  # 各モーターの出力（0% ~ 100%）
 
-duty_max = 50
+duty_max = 70
 sp_yaw = 0.1
 
 deadzone = 0.3  # adjust DS4 deadzone
