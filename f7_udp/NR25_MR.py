@@ -114,13 +114,13 @@ class Listener(Node):
                 pass
 
         # 射出準備
-        if CIRCLE and not ready_for_shoot:
+        if CIRCLE :
             Action.ready_for_shoot()
             CIRCLE = False
-            time.sleep(0.5)
+            time.sleep(3)
 
         # 射出シーケンス
-        if CIRCLE and ready_for_shoot:
+        if ready_for_shoot:
             Action.shoot()
 
         # ドリブル
