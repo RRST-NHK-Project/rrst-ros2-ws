@@ -29,7 +29,7 @@ import pyfiglet
 
 data = [0, 0, 0, 0, 0, 0, 0, 0, 0]  # 各モーターの出力（0% ~ 100%）
 
-duty_max = 50
+duty_max = 70
 sp_yaw = 0.1
 
 deadzone = 0.3  # adjust DS4 deadzone
@@ -38,7 +38,7 @@ deadzone = 0.3  # adjust DS4 deadzone
 class Listener(Node):
 
     def __init__(self):
-        super().__init__("nhk25_dr_omni")
+        super().__init__("nhk25_mr_omni")
         self.subscription = self.create_subscription(
             Joy, "joy", self.listener_callback, 10
         )
@@ -142,7 +142,7 @@ class udpsend:
         SrcPort = 4000  # 送信元ポート番号
         self.SrcAddr = (SrcIP, SrcPort)  # アドレスをtupleに格納
 
-        DstIP = "192.168.8.215"  # 宛先IP
+        DstIP = "192.168.8.217"  # 宛先IP
         DstPort = 5000  # 宛先ポート番号
         self.DstAddr = (DstIP, DstPort)  # アドレスをtupleに格納
 
@@ -156,12 +156,14 @@ class udpsend:
     def send(self):
 
         if ONLINE_MODE:
-                    # print(data[1], data[2], data[3], data[4])
+            # print(data[1], data[2], data[3], data[4])
 
             # Duty比のリミッター、消すな！
             for i in range(len(data)):
                 if data[i] > duty_max:
                     data[i] = duty_max
+                elif data[i] < -duty_max:
+                    data[i] = -duty_max
 
             str_data = (
                 str(data[1])
@@ -181,7 +183,7 @@ class udpsend:
                 + str(data[8])
             )  # パケットを作成
 
-            #print(str_data)
+            # print(str_data)
 
             send_data = str_data.encode("utf-8")  # バイナリに変換
 
@@ -195,6 +197,7 @@ class udpsend:
             data[6] = 0
             data[7] = 0
             data[8] = 0
+
 
 udp = udpsend()  # クラス呼び出し
 

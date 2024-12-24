@@ -46,9 +46,10 @@ deadzone = 0.3  # Adjust DS4 deadzone
 ready_for_shoot = False
 
 roller_speed_dribble_ab = 30
-roller_speed_dribble_cd = 50
+roller_speed_dribble_cd = 30
 roller_speed_shoot_ab = 50
 roller_speed_shoot_cd = 50
+roller_speed_reload = 10
 shoot = 0
 dribble = 0
 
@@ -179,6 +180,18 @@ class Action:  # 機構制御関数を格納するクラス
         print("Ready for Shooting...")
         data[6] = 1
         data[8] = 1
+        data[1] = roller_speed_reload
+        data[2] = roller_speed_reload
+        data[3] = -1 * roller_speed_reload
+        data[4] = -1 * roller_speed_reload
+        udp.send()  # UDPで送信
+        time.sleep(1)
+        data[1] = 0
+        data[2] = 0
+        data[3] = 0
+        data[4] = 0
+        udp.send()  # UDPで送信
+        time.sleep(0.5)
         data[1] = -1 * roller_speed_shoot_ab
         data[2] = -1 * roller_speed_shoot_ab
         data[3] = roller_speed_shoot_cd
