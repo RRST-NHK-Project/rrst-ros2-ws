@@ -243,8 +243,18 @@ class Action:  # 機構制御関数を格納するクラス
 
 class UDP:  # UDP通信のクラス
     def __init__(self):
+        
+        
+        try:
+            # ダミー接続を使ってIPアドレスを取得
+            with socket(AF_INET, SOCK_DGRAM) as s:
+                s.connect(("8.8.8.8", 80))  # Google DNSに接続 (実際には接続しない)
+                ip_address = s.getsockname()[0]
+        except Exception as e:
+            return f"Getting IP Error: {e}"
 
-        SrcIP = "192.168.8.196"  # 送信元IP
+
+        SrcIP = ip_address  # 送信元IP
         SrcPort = 4000  # 送信元ポート番号
         self.SrcAddr = (SrcIP, SrcPort)  # アドレスをtupleに格納
 
