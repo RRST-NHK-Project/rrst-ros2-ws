@@ -42,7 +42,7 @@ class Listener(Node):
         self.subscription = self.create_subscription(
             Joy, "joy", self.listener_callback, 10
         )
-        print(pyfiglet.figlet_format("NHK2025"))
+        print(pyfiglet.figlet_format("MR Omni"))
         self.subscription  # prevent unused variable warning
 
     def listener_callback(self, ps4_msg):
