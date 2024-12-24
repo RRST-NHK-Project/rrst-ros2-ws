@@ -114,7 +114,7 @@ class Listener(Node):
                 pass
 
         # 射出準備
-        if CIRCLE :
+        if CIRCLE:
             Action.ready_for_shoot()
             CIRCLE = False
             time.sleep(3)
@@ -243,8 +243,7 @@ class Action:  # 機構制御関数を格納するクラス
 
 class UDP:  # UDP通信のクラス
     def __init__(self):
-        
-        
+
         try:
             # ダミー接続を使ってIPアドレスを取得
             with socket(AF_INET, SOCK_DGRAM) as s:
@@ -253,9 +252,8 @@ class UDP:  # UDP通信のクラス
         except Exception as e:
             return f"Getting IP Error: {e}"
 
-
         SrcIP = ip_address  # 送信元IP
-        SrcPort = 4000  # 送信元ポート番号
+        SrcPort = 0  # 送信元ポート番号,0にすることでポートが自動割り当てされる。これにより複数ノードで同一IPアドレスを使い分けることができる。
         self.SrcAddr = (SrcIP, SrcPort)  # アドレスをtupleに格納
 
         DstIP = "192.168.8.216"  # 宛先IP
