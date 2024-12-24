@@ -139,7 +139,7 @@ class udpsend:
     def __init__(self):
 
         SrcIP = "192.168.8.195"  # 送信元IP
-        SrcPort = 4000  # 送信元ポート番号
+        SrcPort = 0  # 送信元ポート番号,0にすることでポートが自動割り当てされる。これにより複数ノードで同一IPアドレスを使い分けることができる。
         self.SrcAddr = (SrcIP, SrcPort)  # アドレスをtupleに格納
 
         DstIP = "192.168.8.217"  # 宛先IP
