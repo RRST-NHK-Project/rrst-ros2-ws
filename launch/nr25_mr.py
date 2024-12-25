@@ -13,7 +13,7 @@ def generate_launch_description():
         Node(
             package='f7_udp',
             executable='nr25_mr_ff_ad',
-            name='omni',
+            name='me_omni',
             output='screen',
             emulate_tty=True
         ),

@@ -3,8 +3,10 @@
 
 """
 RRST NHK2025
-ダンク機の機構制御
-オムニのやつそのまま、なんもいじってない
+４輪オムニのフィードフォワード制御
+操舵とアクセル軸を分離
+左スティックで操舵、R2でアクセル、右スティックで回転
+FBが詰まってるのでFFで操作性の向上を目指す
 """
 
 # Falseにすることでルーター未接続でもデバッグ可能、Trueへの戻し忘れに注意
@@ -27,7 +29,7 @@ import pyfiglet
 
 data = [0, 0, 0, 0, 0, 0, 0, 0, 0]  # 各モーターの出力（0% ~ 100%）
 
-duty_max = 50
+duty_max = 70
 sp_yaw = 0.1
 
 deadzone = 0.3  # adjust DS4 deadzone
@@ -36,11 +38,11 @@ deadzone = 0.3  # adjust DS4 deadzone
 class Listener(Node):
 
     def __init__(self):
-        super().__init__("nhk25_omni_driver")
+        super().__init__("nhk25_dr")
         self.subscription = self.create_subscription(
             Joy, "joy", self.listener_callback, 10
         )
-        print(pyfiglet.figlet_format("NHK2025"))
+        print(pyfiglet.figlet_format("NHK2025 DR"))
         self.subscription  # prevent unused variable warning
 
     def listener_callback(self, ps4_msg):
@@ -90,46 +92,6 @@ class Listener(Node):
             while True:
                 pass
 
-        rad = math.atan2(LS_Y, LS_X)
-        # vx = math.cos(rad)
-        # vy = math.sin(rad)
-
-        v1 = math.sin(rad - 3 * math.pi / 4) * R2
-        v2 = math.sin(rad - 5 * math.pi / 4) * R2
-        v3 = math.sin(rad - 7 * math.pi / 4) * R2
-        v4 = math.sin(rad - 9 * math.pi / 4) * R2
-
-        if RS_X >= deadzone or R1:
-            v1 = -1.0 * sp_yaw
-            v2 = -1.0 * sp_yaw
-            v3 = -1.0 * sp_yaw
-            v4 = -1.0 * sp_yaw
-
-        if RS_X <= -1 * deadzone or L1:
-            v1 = 1.0 * sp_yaw
-            v2 = 1.0 * sp_yaw
-            v3 = 1.0 * sp_yaw
-            v4 = 1.0 * sp_yaw
-
-        if (
-            (math.fabs(LS_X) <= deadzone)
-            and (math.fabs(LS_Y) <= deadzone)
-            and (math.fabs(RS_X) <= deadzone)
-            and (math.fabs(RS_Y) <= deadzone)
-            and not R1
-            and not L1
-        ):
-            v1 = 0
-            v2 = 0
-            v3 = 0
-            v4 = 0
-
-        # print(v1, v2, v3, v4)
-        data[1] = v1 * duty_max
-        data[2] = v2 * duty_max
-        data[3] = v3 * duty_max
-        data[4] = v4 * duty_max
-
         udp.send()  # 関数実行
 
 
@@ -137,10 +99,10 @@ class udpsend:
     def __init__(self):
 
         SrcIP = "192.168.8.195"  # 送信元IP
-        SrcPort = 4000  # 送信元ポート番号
+        SrcPort = 0  # 送信元ポート番号,0にすることでポートが自動割り当てされる。これにより複数ノードで同一IPアドレスを使い分けることができる。
         self.SrcAddr = (SrcIP, SrcPort)  # アドレスをtupleに格納
 
-        DstIP = "192.168.8.215"  # 宛先IP
+        DstIP = "192.168.8.218"  # 宛先IP
         DstPort = 5000  # 宛先ポート番号
         self.DstAddr = (DstIP, DstPort)  # アドレスをtupleに格納
 
@@ -154,12 +116,14 @@ class udpsend:
     def send(self):
 
         if ONLINE_MODE:
-                    # print(data[1], data[2], data[3], data[4])
+            # print(data[1], data[2], data[3], data[4])
 
             # Duty比のリミッター、消すな！
             for i in range(len(data)):
                 if data[i] > duty_max:
                     data[i] = duty_max
+                elif data[i] < -duty_max:
+                    data[i] = -duty_max
 
             str_data = (
                 str(data[1])
@@ -179,7 +143,7 @@ class udpsend:
                 + str(data[8])
             )  # パケットを作成
 
-            #print(str_data)
+            # print(str_data)
 
             send_data = str_data.encode("utf-8")  # バイナリに変換
 
@@ -193,6 +157,7 @@ class udpsend:
             data[6] = 0
             data[7] = 0
             data[8] = 0
+
 
 udp = udpsend()  # クラス呼び出し
 

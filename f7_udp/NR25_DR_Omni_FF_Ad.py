@@ -42,7 +42,7 @@ class Listener(Node):
         self.subscription = self.create_subscription(
             Joy, "joy", self.listener_callback, 10
         )
-        print(pyfiglet.figlet_format("NHK2025"))
+        print(pyfiglet.figlet_format("DR Omni"))
         self.subscription  # prevent unused variable warning
 
     def listener_callback(self, ps4_msg):
@@ -139,7 +139,7 @@ class udpsend:
     def __init__(self):
 
         SrcIP = "192.168.8.195"  # 送信元IP
-        SrcPort = 4000  # 送信元ポート番号
+        SrcPort = 0  # 送信元ポート番号,0にすることでポートが自動割り当てされる。これにより複数ノードで同一IPアドレスを使い分けることができる。
         self.SrcAddr = (SrcIP, SrcPort)  # アドレスをtupleに格納
 
         DstIP = "192.168.8.217"  # 宛先IP

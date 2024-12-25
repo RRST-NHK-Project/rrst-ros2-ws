@@ -4,13 +4,6 @@
 """
 RRST NHK2025
 汎用機の機構制御
-
-2024/12/13: クラス名の変更、機構制御の関数化、GUI連携、大規模な修正のため実機テスト注意
-2024/12/16: 実機テスト完了
-TODO: 配列dataの拡張
-TODO: MD出力のPublish(デバッグ用)
-TODO: ds4drvの代替手段の選定
-TODO: pyfiglet未インストール時の例外処理
 """
 
 # Falseにすることでルーター未接続でもデバッグ可能、Trueへの戻し忘れに注意
@@ -61,7 +54,7 @@ class Listener(Node):
         self.subscription = self.create_subscription(
             Joy, "joy", self.listener_callback, 10
         )
-        print(pyfiglet.figlet_format("MR"))
+        print(pyfiglet.figlet_format("NHK2025 MR"))
         self.subscription  # prevent unused variable warning
 
     def listener_callback(self, ps4_msg):
@@ -114,7 +107,7 @@ class Listener(Node):
                 pass
 
         # 射出準備
-        if CIRCLE :
+        if CIRCLE:
             Action.ready_for_shoot()
             CIRCLE = False
             time.sleep(3)
@@ -244,8 +237,16 @@ class Action:  # 機構制御関数を格納するクラス
 class UDP:  # UDP通信のクラス
     def __init__(self):
 
-        SrcIP = "192.168.8.196"  # 送信元IP
-        SrcPort = 4000  # 送信元ポート番号
+        try:
+            # ダミー接続を使ってIPアドレスを取得
+            with socket(AF_INET, SOCK_DGRAM) as s:
+                s.connect(("8.8.8.8", 80))  # Google DNSに接続 (実際には接続しない)
+                ip_address = s.getsockname()[0]
+        except Exception as e:
+            return f"Getting IP Error: {e}"
+
+        SrcIP = ip_address  # 送信元IP
+        SrcPort = 0  # 送信元ポート番号,0にすることでポートが自動割り当てされる。これにより複数ノードで同一IPアドレスを使い分けることができる。
         self.SrcAddr = (SrcIP, SrcPort)  # アドレスをtupleに格納
 
         DstIP = "192.168.8.216"  # 宛先IP

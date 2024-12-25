@@ -42,7 +42,7 @@ class Listener(Node):
         self.subscription = self.create_subscription(
             Joy, "joy", self.listener_callback, 10
         )
-        print(pyfiglet.figlet_format("NHK2025"))
+        print(pyfiglet.figlet_format("MR Omni"))
         self.subscription  # prevent unused variable warning
 
     def listener_callback(self, ps4_msg):
@@ -138,8 +138,16 @@ class Listener(Node):
 class udpsend:
     def __init__(self):
 
-        SrcIP = "192.168.8.195"  # 送信元IP
-        SrcPort = 4000  # 送信元ポート番号
+        try:
+            # ダミー接続を使ってIPアドレスを取得
+            with socket(AF_INET, SOCK_DGRAM) as s:
+                s.connect(("8.8.8.8", 80))  # Google DNSに接続 (実際には接続しない)
+                ip_address = s.getsockname()[0]
+        except Exception as e:
+            return f"Getting IP Error: {e}"
+
+        SrcIP = ip_address  # 送信元IP
+        SrcPort = 0  # 送信元ポート番号,0にすることでポートが自動割り当てされる。これにより複数ノードでポートを使い分けることができる。
         self.SrcAddr = (SrcIP, SrcPort)  # アドレスをtupleに格納
 
         DstIP = "192.168.8.215"  # 宛先IP
