@@ -13,7 +13,6 @@ FBが詰まってるのでFFで操作性の向上を目指す
 # アドレスのバインドに失敗すると自動でオフラインモードで開始される
 ONLINE_MODE = True
 
-
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Joy
@@ -48,33 +47,33 @@ class Listener(Node):
     def listener_callback(self, ps4_msg):
         LS_X = -1 * ps4_msg.axes[0]
         LS_Y = ps4_msg.axes[1]
-        RS_X = (-1) * ps4_msg.axes[2]
-        RS_Y = ps4_msg.axes[5]
+        RS_X = (-1) * ps4_msg.axes[3]
+        RS_Y = ps4_msg.axes[4]
 
         # print(LS_X, LS_Y, RS_X, RS_Y)
 
-        CROSS = ps4_msg.buttons[1]
-        CIRCLE = ps4_msg.buttons[2]
-        TRIANGLE = ps4_msg.buttons[3]
-        SQUARE = ps4_msg.buttons[0]
+        CROSS = ps4_msg.buttons[0]
+        CIRCLE = ps4_msg.buttons[1]
+        TRIANGLE = ps4_msg.buttons[2]
+        SQUARE = ps4_msg.buttons[3]
 
-        LEFT = ps4_msg.axes[12] == 1.0
-        RIGHT = ps4_msg.axes[12] == -1.0
-        UP = ps4_msg.axes[13] == 1.0
-        DOWN = ps4_msg.axes[13] == -1.0
+        LEFT = ps4_msg.axes[6] == 1.0
+        RIGHT = ps4_msg.axes[6] == -1.0
+        UP = ps4_msg.axes[7] == 1.0
+        DOWN = ps4_msg.axes[7] == -1.0
 
         L1 = ps4_msg.buttons[4]
         R1 = ps4_msg.buttons[5]
 
-        L2 = (-1 * ps4_msg.axes[3] + 1) / 2
-        R2 = (-1 * ps4_msg.axes[4] + 1) / 2
+        L2 = (-1 * ps4_msg.axes[2] + 1) / 2
+        R2 = (-1 * ps4_msg.axes[5] + 1) / 2
 
         SHARE = ps4_msg.buttons[8]
         OPTION = ps4_msg.buttons[9]
-        PS = ps4_msg.buttons[12]
+        PS = ps4_msg.buttons[10]
 
-        L3 = ps4_msg.buttons[10]
-        R3 = ps4_msg.buttons[11]
+        L3 = ps4_msg.buttons[11]
+        R3 = ps4_msg.buttons[12]
 
         # PSボタンで緊急停止
         if PS:
