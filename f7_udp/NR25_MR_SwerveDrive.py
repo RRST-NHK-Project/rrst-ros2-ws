@@ -90,7 +90,7 @@ class Listener(Node):
                 pass
 
         rad = math.atan2(LS_Y, LS_X)
-        deg = rad * 180 / math.pi
+        deg = int(rad * 180 / math.pi)
         if deg < 0:
             deg = deg + 180
         print(deg)
@@ -167,14 +167,14 @@ class udpsend:
 
         if ONLINE_MODE:
             # print(data[1], data[2], data[3], data[4])
-
+            """
             # Duty比のリミッター、消すな！
             for i in range(len(data)):
                 if data[i] > duty_max:
                     data[i] = duty_max
                 elif data[i] < -duty_max:
                     data[i] = -duty_max
-
+            """
             str_data = (
                 str(data[1])
                 + ","
@@ -198,15 +198,6 @@ class udpsend:
             send_data = str_data.encode("utf-8")  # バイナリに変換
 
             self.udpClntSock.sendto(send_data, self.DstAddr)  # 宛先アドレスに送信
-
-            data[1] = 0
-            data[2] = 0
-            data[3] = 0
-            data[4] = 0
-            data[5] = 0
-            data[6] = 0
-            data[7] = 0
-            data[8] = 0
 
 
 udp = udpsend()  # クラス呼び出し
