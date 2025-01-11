@@ -90,12 +90,12 @@ class Listener(Node):
                 pass
 
         rad = math.atan2(LS_Y, LS_X)
-        deg = int(rad * 180 / math.pi)
-        if deg < 0:
-            deg = deg + 180
-        print(deg)
-        
-        data[1] = deg
+        if math.fabs(LS_X)  > deadzone or math.fabs(LS_Y) > deadzone:
+            deg = int(rad * 180 / math.pi)
+            if deg < 0:
+                deg += 360
+            print(deg)
+            data[1] = deg
         
         """
         v1 = wheelspeed * R2
@@ -175,23 +175,7 @@ class udpsend:
                 elif data[i] < -duty_max:
                     data[i] = -duty_max
             """
-            str_data = (
-                str(data[1])
-                + ","
-                + str(data[2])
-                + ","
-                + str(data[3])
-                + ","
-                + str(data[4])
-                + ","
-                + str(data[5])
-                + ","
-                + str(data[6])
-                + ","
-                + str(data[7])
-                + ","
-                + str(data[8])
-            )  # パケットを作成
+            str_data = ','.join(map(str, data[1:9]))  # カンマ区切りで文字列化
 
             # print(str_data)
 
