@@ -16,7 +16,7 @@ setup(
     zip_safe=True,
     maintainer='K.Tashiro',
     maintainer_email='tashikou1682@gmail.com',
-    description='RRST NHK2025 f7_udp package',
+    description='ROS 2 ノードと NUCLEO-F767ZI をUDPで通信するパッケージ / ROS 2 Package for connecting ROS2 node and NUCLEO-F767ZI over UDP ',
     license='Apache-2.0',
     tests_require=['pytest'],
     entry_points={
