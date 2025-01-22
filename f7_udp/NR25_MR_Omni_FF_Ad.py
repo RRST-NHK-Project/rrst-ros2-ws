@@ -24,7 +24,12 @@ import time
 import math
 
 # 以下pipでのインストールが必要
-import pyfiglet
+try:
+    import pyfiglet
+except ModuleNotFoundError:
+    print("Please install 'pyfiglet' with pip: pip install pyfiglet")
+    print("Then, if you have a error: externally-managed-environment, try: pip install pyfiglet --break-system-packages")
+    exit(1)
 
 data = [0, 0, 0, 0, 0, 0, 0, 0, 0]  # 各モーターの出力（0% ~ 100%）
 
@@ -148,6 +153,7 @@ class udpsend:
         SrcIP = ip_address  # 送信元IP
         SrcPort = 0  # 送信元ポート番号,0にすることでポートが自動割り当てされる。これにより複数ノードでポートを使い分けることができる。
         self.SrcAddr = (SrcIP, SrcPort)  # アドレスをtupleに格納
+        print("IP:" + str(SrcIP))
 
         DstIP = "192.168.8.215"  # 宛先IP
         DstPort = 5000  # 宛先ポート番号

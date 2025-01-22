@@ -25,7 +25,12 @@ import time
 import math
 
 # 以下pipでのインストールが必要
-import pyfiglet
+try:
+    import pyfiglet
+except ModuleNotFoundError:
+    print("Please install 'pyfiglet' with pip: pip install pyfiglet")
+    print("Then, if you have a error: externally-managed-environment, try: pip install pyfiglet --break-system-packages")
+    exit(1)
 
 data = [0, 0, 0, 0, 0, 0, 0, 0, 0]  # 各モーターの出力（0% ~ 100%）
 

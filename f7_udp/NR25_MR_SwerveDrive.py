@@ -6,9 +6,6 @@ RRST NHK2025
 サーボ独ステの制御！
 """
 
-# Falseにすることでルーター未接続でもデバッグ可能、Trueへの戻し忘れに注意
-# アドレスのバインドに失敗すると自動でオフラインモードで開始される
-ONLINE_MODE = True
 
 import rclpy
 from rclpy.node import Node
@@ -20,8 +17,18 @@ from socket import *
 import time
 import math
 
+#サブモジュール（関数）のインポート
+from .submodules.udpsend import udpsend
+
 # 以下pipでのインストールが必要
-import pyfiglet
+try:
+    import pyfiglet
+except ModuleNotFoundError:
+    print("Please install 'pyfiglet' with pip: pip install pyfiglet")
+    print(
+        "Then, if you have a error: externally-managed-environment, try: pip install pyfiglet --break-system-packages"
+    )
+    exit(1)
 
 data = [0, 0, 0, 0, 0, 0, 0, 0, 0]  # 各モーターの出力（0% ~ 100%）
 
@@ -30,6 +37,11 @@ sp_yaw = 0.1
 wheelspeed = 20
 
 deadzone = 0.3  # adjust DS4 deadzone
+
+DST_IP = "192.168.128.215"  # 宛先IP
+DST_PORT = 5000  # 宛先ポート番号
+
+udp = udpsend(DST_IP,DST_PORT)  # クラス呼び出し
 
 
 class Listener(Node):
@@ -84,19 +96,19 @@ class Listener(Node):
             data[6] = 0
             data[7] = 0
             data[8] = 0
-            udp.send()  # 関数実行
+            udp.send(data)  # 関数実行
             time.sleep(1)
             while True:
                 pass
 
         rad = math.atan2(LS_Y, LS_X)
-        if math.fabs(LS_X)  > deadzone or math.fabs(LS_Y) > deadzone:
-            deg = int(rad * 180 / math.pi)
-            if deg < 0:
-                deg += 360
-            print(deg)
-            data[1] = deg
-        
+        deg = int(rad * 180 / math.pi)
+        if deg < 0:
+            deg = deg + 180
+        print(deg)
+
+        data[1] = deg
+
         """
         v1 = wheelspeed * R2
         v2 = wheelspeed * R2
@@ -134,57 +146,7 @@ class Listener(Node):
         data[3] = v3 * duty_max
         data[4] = v4 * duty_max
         """
-        udp.send()  # 関数実行
-
-
-class udpsend:
-    def __init__(self):
-
-        try:
-            # ダミー接続を使ってIPアドレスを取得
-            with socket(AF_INET, SOCK_DGRAM) as s:
-                s.connect(("8.8.8.8", 80))  # Google DNSに接続 (実際には接続しない)
-                ip_address = s.getsockname()[0]
-        except Exception as e:
-            return f"Getting IP Error: {e}"
-
-        SrcIP = ip_address  # 送信元IP
-        SrcPort = 0  # 送信元ポート番号,0にすることでポートが自動割り当てされる。これにより複数ノードでポートを使い分けることができる。
-        self.SrcAddr = (SrcIP, SrcPort)  # アドレスをtupleに格納
-
-        DstIP = "192.168.8.215"  # 宛先IP
-        DstPort = 5000  # 宛先ポート番号
-        self.DstAddr = (DstIP, DstPort)  # アドレスをtupleに格納
-
-        self.udpClntSock = socket(AF_INET, SOCK_DGRAM)  # ソケット作成
-        try:  # 送信元アドレスでバインド
-            self.udpClntSock.bind(self.SrcAddr)
-        except:  # 例外処理、バインドに失敗したときはオフラインモードで開始
-            print("Cannot assign requested address.\nOFFLINE Mode started.")
-            ONLINE_MODE = False
-
-    def send(self):
-
-        if ONLINE_MODE:
-            # print(data[1], data[2], data[3], data[4])
-            """
-            # Duty比のリミッター、消すな！
-            for i in range(len(data)):
-                if data[i] > duty_max:
-                    data[i] = duty_max
-                elif data[i] < -duty_max:
-                    data[i] = -duty_max
-            """
-            str_data = ','.join(map(str, data[1:9]))  # カンマ区切りで文字列化
-
-            # print(str_data)
-
-            send_data = str_data.encode("utf-8")  # バイナリに変換
-
-            self.udpClntSock.sendto(send_data, self.DstAddr)  # 宛先アドレスに送信
-
-
-udp = udpsend()  # クラス呼び出し
+        udp.send(data)  # 関数実行
 
 
 def main(args=None):

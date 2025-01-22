@@ -27,7 +27,12 @@ import time
 import math
 
 # 以下pipでのインストールが必要
-import pyfiglet
+try:
+    import pyfiglet
+except ModuleNotFoundError:
+    print("Please install 'pyfiglet' with pip: pip install pyfiglet")
+    print("Then, if you have a error: externally-managed-environment, try: pip install pyfiglet --break-system-packages")
+    exit(1)
 
 data = [0, 0, 0, 0, 0, 0, -1, -1, -1]  # 各モーターの出力（0% ~ 100%）
 # 6, 7, 8, を電磁弁制御に割り当て
@@ -248,6 +253,7 @@ class UDP:  # UDP通信のクラス
         SrcIP = ip_address  # 送信元IP
         SrcPort = 0  # 送信元ポート番号,0にすることでポートが自動割り当てされる。これにより複数ノードで同一IPアドレスを使い分けることができる。
         self.SrcAddr = (SrcIP, SrcPort)  # アドレスをtupleに格納
+        print("IP:" + str(SrcIP))
 
         DstIP = "192.168.8.216"  # 宛先IP
         DstPort = 5000  # 宛先ポート番号
