@@ -5,14 +5,14 @@ UDPで送信するクラス
 
 from socket import *
 
-class udpsend:
+class UDP:
     def __init__(self,DstIP,DstPort):
 
         try:
             # ダミー接続を使ってIPアドレスを取得
             with socket(AF_INET, SOCK_DGRAM) as s:
                 s.connect(("8.8.8.8", 80))  # Google DNSに接続 (実際には接続しない)
-                ip_address = s.getsockname()[0]
+                ip_address = s.getsockname()[0] #IPアドレスを取得
         except Exception as e:
             return f"Getting IP Error: {e}"
 
@@ -32,23 +32,7 @@ class udpsend:
 
     def send(self,data):
 
-        str_data = (
-            str(data[1])
-            + ","
-            + str(data[2])
-            + ","
-            + str(data[3])
-            + ","
-            + str(data[4])
-            + ","
-            + str(data[5])
-            + ","
-            + str(data[6])
-            + ","
-            + str(data[7])
-            + ","
-            + str(data[8])
-        )  # パケットを作成
+        str_data = ",".join(str(data[i]) for i in range(1, 9))  # パケットを作成
 
         # print(str_data)
 

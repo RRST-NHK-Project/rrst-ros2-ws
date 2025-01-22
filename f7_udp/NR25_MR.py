@@ -6,10 +6,6 @@ RRST NHK2025
 汎用機の機構制御
 """
 
-# Falseにすることでルーター未接続でもデバッグ可能、Trueへの戻し忘れに注意
-# 追加: アドレスのバインドに失敗すると自動でオフラインモードで開始される機能を実装
-ONLINE_MODE = True
-
 # パラメーター調整モード、GUIでのパラメーター変更を有効化
 GUI_PARAM_MODE = True
 
@@ -25,6 +21,12 @@ from std_msgs.msg import Int32MultiArray
 from socket import *
 import time
 import math
+
+# サブモジュール（関数）のインポート
+from .submodules.UDP import UDP
+DST_IP = "192.168.128.216"  # 宛先IP
+DST_PORT = 5000  # 宛先ポート番号
+udp = UDP(DST_IP, DST_PORT)  # インスタンスを生成
 
 # 以下pipでのインストールが必要
 try:
@@ -106,7 +108,7 @@ class Listener(Node):
             data[6] = -1
             data[7] = -1
             data[8] = -1
-            udp.send()  # UDPで送信
+            udp.send(data)  # UDPで送信
             time.sleep(1)
             while True:
                 pass
@@ -125,7 +127,7 @@ class Listener(Node):
         if TRIANGLE and not ready_for_shoot:
             Action.dribble()
 
-        udp.send()  # UDPで送信
+        udp.send(data)  # UDPで送信
 
 
 class Param_Listener(Node):
@@ -182,13 +184,13 @@ class Action:  # 機構制御関数を格納するクラス
         data[2] = roller_speed_reload
         data[3] = -1 * roller_speed_reload
         data[4] = -1 * roller_speed_reload
-        udp.send()  # UDPで送信
+        udp.send(data)  # UDPで送信
         time.sleep(1)
         data[1] = 0
         data[2] = 0
         data[3] = 0
         data[4] = 0
-        udp.send()  # UDPで送信
+        udp.send(data)  # UDPで送信
         time.sleep(0.5)
         data[1] = -1 * roller_speed_shoot_ab
         data[2] = -1 * roller_speed_shoot_ab
@@ -203,12 +205,12 @@ class Action:  # 機構制御関数を格納するクラス
         global ready_for_shoot
         print("Shooting...")
         data[7] = 1
-        udp.send()  # 　UDPで送信
+        udp.send(data)  # 　UDPで送信
         ready_for_shoot = False
         time.sleep(1.0)
         print("Ready for Retraction...")
         data[7] = -1
-        udp.send()  # 　UDPで送信
+        udp.send(data)  # 　UDPで送信
         time.sleep(1.0)
         print("Retracting....")
         data[6] = -1
@@ -217,7 +219,7 @@ class Action:  # 機構制御関数を格納するクラス
         data[2] = 0
         data[3] = 0
         data[4] = 0
-        udp.send()  # UDPで送信
+        udp.send(data)  # UDPで送信
         print("Done.")
 
     # ドリブル
@@ -228,91 +230,15 @@ class Action:  # 機構制御関数を格納するクラス
         data[2] = roller_speed_dribble_ab
         data[3] = -1 * roller_speed_dribble_cd
         data[4] = -1 * roller_speed_dribble_cd
-        udp.send()  # UDPで送信
+        udp.send(data)  # UDPで送信
         time.sleep(6.0)
         data[8] = -1
         data[1] = 0
         data[2] = 0
         data[3] = 0
         data[4] = 0
-        udp.send()  # UDPで送信
+        udp.send(data)  # UDPで送信
         print("Done.")
-
-
-class UDP:  # UDP通信のクラス
-    def __init__(self):
-
-        try:
-            # ダミー接続を使ってIPアドレスを取得
-            with socket(AF_INET, SOCK_DGRAM) as s:
-                s.connect(("8.8.8.8", 80))  # Google DNSに接続 (実際には接続しない)
-                ip_address = s.getsockname()[0]
-        except Exception as e:
-            return f"Getting IP Error: {e}"
-
-        SrcIP = ip_address  # 送信元IP
-        SrcPort = 0  # 送信元ポート番号,0にすることでポートが自動割り当てされる。これにより複数ノードで同一IPアドレスを使い分けることができる。
-        self.SrcAddr = (SrcIP, SrcPort)  # アドレスをtupleに格納
-        print("IP:" + str(SrcIP))
-
-        DstIP = "192.168.8.216"  # 宛先IP
-        DstPort = 5000  # 宛先ポート番号
-        self.DstAddr = (DstIP, DstPort)  # アドレスをtupleに格納
-
-        self.udpClntSock = socket(AF_INET, SOCK_DGRAM)  # ソケット作成
-        try:  # 送信元アドレスでバインド
-            self.udpClntSock.bind(self.SrcAddr)
-        except:  # 例外処理、バインドに失敗したときはオフラインモードで開始
-            print("Cannot assign requested address.\nOFFLINE Mode started.")
-            ONLINE_MODE = False
-
-    def send(self):
-
-        # print(data[1], data[2], data[3], data[4])
-
-        # Duty比のリミッター、消すな！
-        for i in range(len(data)):
-            if data[i] > duty_max:
-                data[i] = duty_max
-            elif data[i] < -duty_max:
-                data[i] = -duty_max
-
-        str_data = (
-            str(data[1])
-            + ","
-            + str(data[2])
-            + ","
-            + str(data[3])
-            + ","
-            + str(data[4])
-            + ","
-            + str(data[5])
-            + ","
-            + str(data[6])
-            + ","
-            + str(data[7])
-            + ","
-            + str(data[8])
-        )  # パケットを作成
-
-        print(str_data)
-
-        send_data = str_data.encode("utf-8")  # バイナリに変換
-
-        if ONLINE_MODE:
-            self.udpClntSock.sendto(send_data, self.DstAddr)  # 宛先アドレスに送信
-
-        # data[1] = 0
-        # data[2] = 0
-        # data[3] = 0
-        # data[4] = 0
-        # data[5] = 0
-        # ata[6] = 0
-        # data[7] = 0
-        # data[8] = 0
-
-
-udp = UDP()
 
 
 def main(args=None):

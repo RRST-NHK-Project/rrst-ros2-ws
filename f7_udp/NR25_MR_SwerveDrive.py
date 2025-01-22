@@ -18,7 +18,10 @@ import time
 import math
 
 #サブモジュール（関数）のインポート
-from .submodules.udpsend import udpsend
+from .submodules.UDP import UDP
+DST_IP = "192.168.128.215"  # 宛先IP
+DST_PORT = 5000  # 宛先ポート番号
+udp = UDP(DST_IP,DST_PORT)  # # インスタンスを生成
 
 # 以下pipでのインストールが必要
 try:
@@ -37,11 +40,6 @@ sp_yaw = 0.1
 wheelspeed = 20
 
 deadzone = 0.3  # adjust DS4 deadzone
-
-DST_IP = "192.168.128.215"  # 宛先IP
-DST_PORT = 5000  # 宛先ポート番号
-
-udp = udpsend(DST_IP,DST_PORT)  # クラス呼び出し
 
 
 class Listener(Node):
