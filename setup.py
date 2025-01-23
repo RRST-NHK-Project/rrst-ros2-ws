@@ -1,11 +1,12 @@
 from setuptools import find_packages, setup
 
 package_name = 'f7_udp'
+submodules = 'f7_udp/submodules'
 
 setup(
     name=package_name,
     version='0.0.0',
-    packages=find_packages(exclude=['test']),
+    packages=[package_name, submodules],
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
@@ -15,7 +16,7 @@ setup(
     zip_safe=True,
     maintainer='K.Tashiro',
     maintainer_email='tashikou1682@gmail.com',
-    description='RRST NHK2025 f7_udp package',
+    description='ROS 2 ノードと NUCLEO-F767ZI をUDPで通信するパッケージ / ROS 2 Package for connecting ROS2 node and NUCLEO-F767ZI over UDP ',
     license='Apache-2.0',
     tests_require=['pytest'],
     entry_points={
@@ -53,6 +54,8 @@ setup(
         'nr25_mr = f7_udp.NR25_MR:main',
         'nr25_dr = f7_udp.NR25_DR:main',
         'nr25_pr_tuner = f7_udp.NR25_param_tuner:main',
+        'nr25_mr_sd = f7_udp.NR25_MR_SwerveDrive:main',
+        'nr25_dr_sd = f7_udp.NR25_DR_SwerveDrive:main',
         ],
     },
 )

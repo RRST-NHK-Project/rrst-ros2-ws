@@ -3,10 +3,7 @@
 
 """
 RRST NHK2025
-４輪オムニのフィードフォワード制御
-操舵とアクセル軸を分離
-左スティックで操舵、R2でアクセル、右スティックで回転
-FBが詰まってるのでFFで操作性の向上を目指す
+サーボ独ステの制御！
 """
 
 
@@ -20,11 +17,11 @@ from socket import *
 import time
 import math
 
-# サブモジュール（関数）のインポート
+#サブモジュール（関数）のインポート
 from .submodules.UDP import UDP
 DST_IP = "192.168.128.215"  # 宛先IP
 DST_PORT = 5000  # 宛先ポート番号
-udp = UDP(DST_IP, DST_PORT)  # インスタンスを生成
+udp = UDP(DST_IP,DST_PORT)  # # インスタンスを生成
 
 # 以下pipでのインストールが必要
 try:
@@ -40,6 +37,7 @@ data = [0, 0, 0, 0, 0, 0, 0, 0, 0]  # 各モーターの出力（0% ~ 100%）
 
 duty_max = 70
 sp_yaw = 0.1
+wheelspeed = 20
 
 deadzone = 0.3  # adjust DS4 deadzone
 
@@ -47,11 +45,11 @@ deadzone = 0.3  # adjust DS4 deadzone
 class Listener(Node):
 
     def __init__(self):
-        super().__init__("nhk25_mr_omni")
+        super().__init__("nhk25_mr_sd")
         self.subscription = self.create_subscription(
             Joy, "joy", self.listener_callback, 10
         )
-        print(pyfiglet.figlet_format("MR Omni"))
+        print(pyfiglet.figlet_format("MR SwerveDrive"))
         self.subscription  # prevent unused variable warning
 
     def listener_callback(self, ps4_msg):
@@ -102,13 +100,18 @@ class Listener(Node):
                 pass
 
         rad = math.atan2(LS_Y, LS_X)
-        # vx = math.cos(rad)
-        # vy = math.sin(rad)
+        deg = int(rad * 180 / math.pi)
+        if deg < 0:
+            deg = deg + 180
+        print(deg)
 
-        v1 = math.sin(rad - 3 * math.pi / 4) * R2
-        v2 = math.sin(rad - 5 * math.pi / 4) * R2
-        v3 = math.sin(rad - 7 * math.pi / 4) * R2
-        v4 = math.sin(rad - 9 * math.pi / 4) * R2
+        data[1] = deg
+
+        """
+        v1 = wheelspeed * R2
+        v2 = wheelspeed * R2
+        v3 = wheelspeed * R2
+        v4 = wheelspeed * R2
 
         if RS_X >= deadzone or R1:
             v1 = -1.0 * sp_yaw
@@ -140,7 +143,7 @@ class Listener(Node):
         data[2] = v2 * duty_max
         data[3] = v3 * duty_max
         data[4] = v4 * duty_max
-
+        """
         udp.send(data)  # 関数実行
 
 
