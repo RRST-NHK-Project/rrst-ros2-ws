@@ -19,7 +19,7 @@ import math
 
 #サブモジュール（関数）のインポート
 from .submodules.UDP import UDP
-DST_IP = "192.168.128.215"  # 宛先IP
+DST_IP = "192.168.8.215"  # 宛先IP
 DST_PORT = 5000  # 宛先ポート番号
 udp = UDP(DST_IP,DST_PORT)  # # インスタンスを生成
 
