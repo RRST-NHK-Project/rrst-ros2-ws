@@ -56,6 +56,7 @@ setup(
         'nr25_pr_tuner = f7_udp.NR25_param_tuner:main',
         'nr25_mr_sd = f7_udp.NR25_MR_SwerveDrive:main',
         'nr25_dr_sd = f7_udp.NR25_DR_SwerveDrive:main',
+        'nr25_dev = f7_udp.NR25_Development:main',
         ],
     },
 )

@@ -34,7 +34,7 @@ class UDP:
 
         str_data = ",".join(str(data[i]) for i in range(1, 9))  # パケットを作成
 
-        # print(str_data)
+        #print(str_data)
 
         send_data = str_data.encode("utf-8")  # バイナリに変換
 
