@@ -18,22 +18,47 @@ import time
 import math
 
 # サブモジュール（関数）のインポート
-from .submodules.UDP import UDP
+from .submodules.UDP16 import UDP16
 DST_IP = "192.168.8.219"  # 宛先IP
 DST_PORT = 5000  # 宛先ポート番号
-udp = UDP(DST_IP, DST_PORT)  # インスタンスを生成
+udp = UDP16(DST_IP, DST_PORT)  # インスタンスを生成
 
 # 以下pipでのインストールが必要
 try:
     import pyfiglet
 except ModuleNotFoundError:
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     print("Please install 'pyfiglet' with pip: pip install pyfiglet")
     print(
-        "Then, if you have a error: externally-managed-environment, try: pip install pyfiglet --break-system-packages"
+        "Then, if you have a error 'externally-managed-environment', try: pip install pyfiglet --break-system-packages"
     )
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     exit(1)
 
-data = [0, 0, 0, 0, 0, 0, 0, 0, 0]  # 各モーターの出力（0% ~ 100%）
+data = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] 
+
+"""
+マイコンに送信される配列'data'は17個の要素を持っています。各要素の詳細をここにまとめます。
+| data[n] | 詳細 |
+| ---- | ---- |
+| data[0] | 未使用、送信もされないので注意 |
+| data[1] | MD1 |
+| data[2] | MD2 |
+| data[3] | MD3 |
+| data[4] | MD4 |
+| data[5] | MD5 |
+| data[6] | MD6 |
+| data[7] | サーボ1 |
+| data[8] | サーボ2 |
+| data[9] | サーボ3 |
+| data[10] | サーボ4|
+| data[11] | 電磁弁1 |
+| data[12] | 電磁弁2 |
+| data[13] | 電磁弁3 |
+| data[14] | 電磁弁4 |
+| data[15] | その他通信 |
+| data[16] | その他通信 |
+"""
 
 duty_max = 70
 sp_yaw = 0.1
@@ -85,14 +110,7 @@ class Listener(Node):
         # PSボタンで緊急停止
         if PS:
             print(pyfiglet.figlet_format("HALT"))
-            data[1] = 0
-            data[2] = 0
-            data[3] = 0
-            data[4] = 0
-            data[5] = 0
-            data[6] = 0
-            data[7] = 0
-            data[8] = 0
+            data[1:17] = [0] * 8
             udp.send(data)  # 関数実行
             time.sleep(1)
             while True:

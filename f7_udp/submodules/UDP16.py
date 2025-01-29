@@ -1,10 +1,10 @@
 """
-UDPで送信するクラス
+UDPで送信するクラスの拡張版
 """
 
 from socket import *
 
-class UDP:
+class UDP16:
     def __init__(self,DstIP,DstPort):
 
         try:
@@ -26,14 +26,14 @@ class UDP:
         try:  # 送信元アドレスでバインド
             self.udpClntSock.bind(self.SrcAddr)
         except:  # 例外処理、バインドに失敗したときはオフラインモードで開始
-            print("Cannot assign requested address.\nPlease make sure connected to network.")
+            print("Cannot assign requested address.\nPlease check your network.")
             exit(1)
 
     def send(self,data):
 
-        str_data = ",".join(str(data[i]) for i in range(1, 9))  # パケットを作成
+        str_data = ",".join(str(data[i]) for i in range(1, 17))  # パケットを作成
 
-        #print(str_data)
+        print(str_data)
 
         send_data = str_data.encode("utf-8")  # バイナリに変換
 
