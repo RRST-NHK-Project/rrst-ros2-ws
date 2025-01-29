@@ -11,14 +11,14 @@ def generate_launch_description():
             emulate_tty=True
         ),
         Node(
-            package='f7_udp',
-            executable='nr25_mr_ff_ad',
-            name='me_omni',
+            package='ros2udp',
+            executable='nr25_mr_omni',
+            name='mr_omni',
             output='screen',
             emulate_tty=True
         ),
         Node(
-            package='f7_udp',
+            package='ros2udp',
             executable='nr25_mr',
             name='mr',
             output='screen',

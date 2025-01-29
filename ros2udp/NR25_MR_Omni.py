@@ -3,7 +3,10 @@
 
 """
 RRST NHK2025
-サーボ独ステの制御！
+４輪オムニのフィードフォワード制御
+操舵とアクセル軸を分離
+左スティックで操舵、R2でアクセル、右スティックで回転
+FBが詰まってるのでFFで操作性の向上を目指す
 """
 
 
@@ -17,27 +20,51 @@ from socket import *
 import time
 import math
 
-#サブモジュール（関数）のインポート
-from .submodules.UDP import UDP
-DST_IP = "192.168.8.215"  # 宛先IP
+# サブモジュール（クラス）のインポート
+from .submodules.UDP16 import UDP16
+DST_IP = "192.168.8.219"  # 宛先IP
 DST_PORT = 5000  # 宛先ポート番号
-udp = UDP(DST_IP,DST_PORT)  # # インスタンスを生成
+udp = UDP16(DST_IP, DST_PORT)  # インスタンスを生成
 
 # 以下pipでのインストールが必要
 try:
     import pyfiglet
 except ModuleNotFoundError:
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     print("Please install 'pyfiglet' with pip: pip install pyfiglet")
     print(
-        "Then, if you have a error: externally-managed-environment, try: pip install pyfiglet --break-system-packages"
+        "Then, if you have a error 'externally-managed-environment', try: pip install pyfiglet --break-system-packages"
     )
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     exit(1)
 
-data = [0, 0, 0, 0, 0, 0, 0, 0, 0]  # 各モーターの出力（0% ~ 100%）
+data = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] 
+
+"""
+マイコンに送信される配列'data'は17個の要素を持っています。各要素の詳細をここにまとめます。
+| data[n] | 詳細 |
+| ---- | ---- |
+| data[0] | 未使用、送信もされないので注意 |
+| data[1] | MD1 |
+| data[2] | MD2 |
+| data[3] | MD3 |
+| data[4] | MD4 |
+| data[5] | MD5 |
+| data[6] | MD6 |
+| data[7] | サーボ1 |
+| data[8] | サーボ2 |
+| data[9] | サーボ3 |
+| data[10] | サーボ4|
+| data[11] | 電磁弁1 |
+| data[12] | 電磁弁2 |
+| data[13] | 電磁弁3 |
+| data[14] | 電磁弁4 |
+| data[15] | その他通信 |
+| data[16] | その他通信 |
+"""
 
 duty_max = 70
 sp_yaw = 0.1
-wheelspeed = 20
 
 deadzone = 0.3  # adjust DS4 deadzone
 
@@ -45,11 +72,11 @@ deadzone = 0.3  # adjust DS4 deadzone
 class Listener(Node):
 
     def __init__(self):
-        super().__init__("nhk25_mr_sd")
+        super().__init__("nhk25_mr_omni")
         self.subscription = self.create_subscription(
             Joy, "joy", self.listener_callback, 10
         )
-        print(pyfiglet.figlet_format("MR SwerveDrive"))
+        print(pyfiglet.figlet_format("MR Omni"))
         self.subscription  # prevent unused variable warning
 
     def listener_callback(self, ps4_msg):
@@ -100,18 +127,13 @@ class Listener(Node):
                 pass
 
         rad = math.atan2(LS_Y, LS_X)
-        deg = int(rad * 180 / math.pi)
-        if deg < 0:
-            deg = deg + 180
-        print(deg)
+        # vx = math.cos(rad)
+        # vy = math.sin(rad)
 
-        data[1] = deg
-
-        """
-        v1 = wheelspeed * R2
-        v2 = wheelspeed * R2
-        v3 = wheelspeed * R2
-        v4 = wheelspeed * R2
+        v1 = math.sin(rad - 3 * math.pi / 4) * R2
+        v2 = math.sin(rad - 5 * math.pi / 4) * R2
+        v3 = math.sin(rad - 7 * math.pi / 4) * R2
+        v4 = math.sin(rad - 9 * math.pi / 4) * R2
 
         if RS_X >= deadzone or R1:
             v1 = -1.0 * sp_yaw
@@ -143,7 +165,7 @@ class Listener(Node):
         data[2] = v2 * duty_max
         data[3] = v3 * duty_max
         data[4] = v4 * duty_max
-        """
+
         udp.send(data)  # 関数実行
 
 

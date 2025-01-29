@@ -22,22 +22,48 @@ from socket import *
 import time
 import math
 
-# サブモジュール（関数）のインポート
-from .submodules.UDP import UDP
-DST_IP = "192.168.8.216"  # 宛先IP
+# サブモジュール（クラス）のインポート
+from .submodules.UDP16 import UDP16
+DST_IP = "192.168.8.220"  # 宛先IP
 DST_PORT = 5000  # 宛先ポート番号
-udp = UDP(DST_IP, DST_PORT)  # インスタンスを生成
+udp = UDP16(DST_IP, DST_PORT)  # インスタンスを生成
 
 # 以下pipでのインストールが必要
 try:
     import pyfiglet
 except ModuleNotFoundError:
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     print("Please install 'pyfiglet' with pip: pip install pyfiglet")
-    print("Then, if you have a error: externally-managed-environment, try: pip install pyfiglet --break-system-packages")
+    print(
+        "Then, if you have a error 'externally-managed-environment', try: pip install pyfiglet --break-system-packages"
+    )
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     exit(1)
 
-data = [0, 0, 0, 0, 0, 0, -1, -1, -1]  # 各モーターの出力（0% ~ 100%）
-# 6, 7, 8, を電磁弁制御に割り当て
+data = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] 
+
+"""
+マイコンに送信される配列'data'は17個の要素を持っています。各要素の詳細をここにまとめます。
+| data[n] | 詳細 |
+| ---- | ---- |
+| data[0] | 未使用、送信もされないので注意 |
+| data[1] | MD1 |
+| data[2] | MD2 |
+| data[3] | MD3 |
+| data[4] | MD4 |
+| data[5] | MD5 |
+| data[6] | MD6 |
+| data[7] | サーボ1 |
+| data[8] | サーボ2 |
+| data[9] | サーボ3 |
+| data[10] | サーボ4|
+| data[11] | 電磁弁1 |
+| data[12] | 電磁弁2 |
+| data[13] | 電磁弁3 |
+| data[14] | 電磁弁4 |
+| data[15] | その他通信 |
+| data[16] | その他通信 |
+"""
 
 duty_max = 90
 sp_yaw = 0.1
@@ -100,32 +126,25 @@ class Listener(Node):
         # PSボタンで緊急停止
         if PS:
             print(pyfiglet.figlet_format("HALT"))
-            data[1] = 0
-            data[2] = 0
-            data[3] = 0
-            data[4] = 0
-            data[5] = 0
-            data[6] = -1
-            data[7] = -1
-            data[8] = -1
-            udp.send(data)  # UDPで送信
+            data[1:17] = [0] * 8
+            udp.send(data)  # 関数実行
             time.sleep(1)
             while True:
                 pass
 
         # 射出準備
         if CIRCLE:
-            Action.ready_for_shoot()
+            Action.ready_for_shoot(self)
             CIRCLE = False
             time.sleep(3)
 
         # 射出シーケンス
         if ready_for_shoot:
-            Action.shoot()
+            Action.shoot(self)
 
         # ドリブル
         if TRIANGLE and not ready_for_shoot:
-            Action.dribble()
+            Action.dribble(self)
 
         udp.send(data)  # UDPで送信
 
@@ -159,27 +178,27 @@ class Param_Listener(Node):
 
         # 射出準備
         if shoot and not ready_for_shoot:
-            Action.ready_for_shoot()
+            Action.ready_for_shoot(self)
             shoot = 0
             time.sleep(0.5)
 
         # 射出シーケンス
         if shoot and ready_for_shoot:
-            Action.shoot()
+            Action.shoot(self)
 
         # ドリブル
         if dribble and not ready_for_shoot:
-            Action.dribble()
+            Action.dribble(self)
 
 
 class Action:  # 機構制御関数を格納するクラス
 
     # 射出準備
-    def ready_for_shoot():
+    def ready_for_shoot(self):
         global ready_for_shoot
         print("Ready for Shooting...")
-        data[6] = 1
-        data[8] = 1
+        data[11] = 1
+        data[13] = 1
         data[1] = roller_speed_reload
         data[2] = roller_speed_reload
         data[3] = -1 * roller_speed_reload
@@ -196,25 +215,25 @@ class Action:  # 機構制御関数を格納するクラス
         data[2] = -1 * roller_speed_shoot_ab
         data[3] = roller_speed_shoot_cd
         data[4] = roller_speed_shoot_cd
-        udp.send()  # UDPで送信
+        udp.send(data)  # UDPで送信
         ready_for_shoot = True
         print("Done.")
 
     # 射出シーケンス
-    def shoot():
+    def shoot(self):
         global ready_for_shoot
         print("Shooting...")
-        data[7] = 1
+        data[12] = 1
         udp.send(data)  # 　UDPで送信
         ready_for_shoot = False
         time.sleep(1.0)
         print("Ready for Retraction...")
-        data[7] = -1
+        data[12] = 0
         udp.send(data)  # 　UDPで送信
         time.sleep(1.0)
         print("Retracting....")
-        data[6] = -1
-        data[8] = -1
+        data[11] = 0
+        data[13] = 0
         data[1] = 0
         data[2] = 0
         data[3] = 0
@@ -223,16 +242,17 @@ class Action:  # 機構制御関数を格納するクラス
         print("Done.")
 
     # ドリブル
-    def dribble():
+    def dribble(self):
         print("Dribbling...")
-        data[8] = 1
         data[1] = roller_speed_dribble_ab
         data[2] = roller_speed_dribble_ab
         data[3] = -1 * roller_speed_dribble_cd
         data[4] = -1 * roller_speed_dribble_cd
+        time.sleep(2.0)
+        data[13] = 1
         udp.send(data)  # UDPで送信
-        time.sleep(6.0)
-        data[8] = -1
+        time.sleep(3.0)
+        data[13] = 0
         data[1] = 0
         data[2] = 0
         data[3] = 0
