@@ -31,7 +31,7 @@ class UDP16:
 
     def send(self,data):
 
-        str_data = ",".join(str(data[i]) for i in range(1, 17))  # パケットを作成
+        str_data = ",".join(str(int(data[i])) for i in range(0, 17))  # パケットを作成
 
         print(str_data)
 
