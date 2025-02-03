@@ -3,12 +3,16 @@ RRST NHK2025
 汎用機の機構制御
 */
 
+// 標準
 #include <chrono>
 #include <thread>
 
-#include "include/UDP.hpp"
+// ROS
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
+
+// 自作クラス
+#include "include/UDP.hpp"
 
 // 各ローラーの速度を指定(%)
 int roller_speed_dribble_ab = 30;
@@ -18,7 +22,7 @@ int roller_speed_shoot_cd = 50;
 int roller_speed_reload = 10;
 
 // IPアドレスとポートの指定
-std::string udp_ip = "192.168.8.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
+std::string udp_ip = "192.168.8.216"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
 
 std::vector<int> data = {0, 0, 0, 0, 0, 0, -1, -1, -1}; // 7~9番を電磁弁制御に転用中（-1 or 1）
@@ -148,16 +152,27 @@ private:
 
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
-        /*
-                if (PS) {
-                    while (1) {
-                        std::fill(data.begin(), data.end(), 0);
-                        udp_.send(data);
-                        std::cout << "！緊急停止中！" << std::endl;
-                        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                    }
-                }
-        */
+
+        if (PS) {
+            std::fill(data.begin(), data.end(), 0);                              // 配列をゼロで埋める
+            data[6] = data[7] = data[8] = -1;                                    // 最後の3つを-1に
+            for (int attempt = 0; attempt < 10; attempt++) {                     // 10回試行
+                udp_.send(data);                                                 // データ送信
+                std::cout << "緊急停止！ 試行" << attempt + 1 << std::endl; // 試行回数を表示
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));     // 100msの遅延
+            }
+            rclcpp::shutdown();
+        }
+
+        // if (PS) {
+        //     std::fill(data.begin(), data.end(), 0);                              // 配列をゼロで埋める
+        //     for (int attempt = 0; attempt < 10; attempt++) {                     // 10回試行
+        //         udp_.send(data);                                                 // データ送信
+        //         std::cout << "緊急停止！ 試行" << attempt + 1 << std::endl; // 試行回数を表示
+        //         std::this_thread::sleep_for(std::chrono::milliseconds(100));     // 100msの遅延
+        //     }
+        //     rclcpp::shutdown();
+        // }
 
         if (CIRCLE) {
             Action::ready_for_shoot_action(udp_);
