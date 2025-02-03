@@ -81,23 +81,17 @@ private:
                     }
                 }
         */
-        if ((fabs(LS_X) <= deadzone)&&(fabs(LS_Y) <= deadzone)){
-            LS_X = 0;
-            LS_Y = 0;
-        }
+        float rad = atan2(LS_Y, LS_X);
+        int deg = rad * 180 / M_PI;
 
-        if (
-            (fabs(LS_X) <= deadzone)
-            && (fabs(LS_Y) <= deadzone)
-        ){
+        
+        if ((fabs(LS_X) <= deadzone)&& (fabs(LS_Y) <= deadzone)){
             data[1] = 0;
             data[2] = 0;
             data[3] = 0;
             data[4] = 0;
         }
 
-        float rad = atan2(LS_Y, LS_X);
-        float deg = int(rad * 180 / M_PI);
 
         if ((-180 <= deg)&&(deg <= -135)){
             deg= - deg -135;
@@ -113,6 +107,9 @@ private:
         data[3] = wheelspeed*R2;
         data[4] = wheelspeed*R2;
 
+        if ((fabs(LS_X) <= deadzone)&&(fabs(LS_Y) <= deadzone)){
+            data[7]=135;
+        }
     
         if (LEFT) {
             data[7] = 45;
