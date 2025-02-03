@@ -20,13 +20,83 @@ float deadzone = 0.3;  // adjust DS4 deadzone
 
 
 
+
 // IPアドレスとポートの指定
 std::string udp_ip = "192.168.8.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
 
 std::vector<int> data = {0, 0, 0, 0, 0, 0, 0, 0, 0}; // 各モーターの出力（0% ~ 100%）
 
+float v1, v2, v3, v4; 
+float LS_X =0.0; 
+float LS_Y = 0.0;
+float R2 = 0.0;
 float rad = atan2(LS_Y, LS_X);
+
+
+
+
+
+// 各機構のシーケンスを格納するクラス
+class Action {
+public:
+    // 事故防止のため、機構の展開状況を保存
+    static bool ready_for_roll;
+    // 速度
+    
+    static void ready_for_roll_action(UDP &udp){
+        std::cout << "<開始>" << std::endl;
+        std::cout << "..." << std::endl;
+            v1 = -1.0 * sp_yaw;
+            v2 = -1.0 * sp_yaw;
+            v3 = -1.0 * sp_yaw;
+            v4 = -1.0 * sp_yaw;
+        udp.send(data);
+        ready_for_roll = true;
+        std::cout << "完了." << std::endl;
+    }
+
+        
+    static void roll_stick_action(UDP &udp){
+        std::cout << "<開始>" << std::endl;
+        std::cout << "中..." << std::endl;
+            v1 = 1.0 * sp_yaw;
+            v2 = 1.0 * sp_yaw;
+            v3 = 1.0 * sp_yaw;
+            v4 = 1.0 * sp_yaw;
+            
+            udp.send(data);
+            std::cout << "完了." << std::endl;
+        }
+
+    static void null_roll_action(UDP &udp){
+        std::cout << "<開始>" << std::endl;
+        std::cout << "中..." << std::endl;
+                v1 = 0.0;
+                v2 = 0.0;
+                v3 = 0.0;
+                v4 = 0.0;
+            udp.send(data);
+            std::cout << "完了." << std::endl;
+        }
+
+        
+        static void send_roll_data(UDP &udp){
+        //printf("\t\n%d,%d,%d,%d\n",v1, v2, v3, v4);
+        std::cout << "<開始>" << std::endl;
+        std::cout << "中..." << std::endl;
+        data[1] = int(v1 * duty_max);
+        data[2] = int(v2 * duty_max);
+        data[3] = int(v3 * duty_max);
+        data[4] = int(v4 * duty_max);
+        udp.send(data);
+        std::cout << "完了." << std::endl;
+        }
+};
+
+
+ bool Action::ready_for_roll = false;
+
 
 class PS4_Listener : public rclcpp::Node {
 public:
@@ -43,6 +113,7 @@ PS4_Listener(const std::string &ip, int port)
 
 private:
     // コントローラーの入力を取得、使わない入力はコメントアウト推奨
+    
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
         float LS_X = -1 * msg->axes[0];
         float LS_Y = msg->axes[1];
@@ -62,15 +133,22 @@ private:
         float L1 = msg->buttons[4];
         float R1 = msg->buttons[5];
 
-        float L2 = (-1 * msg->axes[2] + 1) / 2;
-        float R2 = (-1 * msg->axes[5] + 1) / 2;
+        // float L2 = (-1 * msg->axes[2] + 1) / 2;
+        // float R2 = (-1 * msg->axes[5] + 1) / 2;
 
         // bool SHARE = msg->buttons[8];
         // // bool OPTION = msg->buttons[9];
-         bool PS = msg->buttons[10];
+        bool PS = msg->buttons[10];
 
         // // bool L3 = msg->buttons[11];
         // // bool R3 = msg->buttons[12];
+
+        //　↓オムニの一般的な計算？
+        /*float v1 = sin(rad - 3 * M_PI / 4) * R2; 
+        float v2 = sin(rad - 5 * M_PI / 4) * R2;
+        float v3 = sin(rad - 7 * M_PI / 4) * R2;
+        float v4 = sin(rad - 9 * M_PI / 4) * R2;*/
+ 
 
         
                 if (PS == 1) {
@@ -79,16 +157,16 @@ private:
                         udp_.send(data);
                         std::cout << "！緊急停止中！" << std::endl;
                       std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                      return 1;
+                      return;
                     }
                 }
         if( RS_X >= deadzone || R1 == 1){
              Action::ready_for_roll_action(udp_);
         }
-         if(RS_X <= -1 * deadzone || L1 == 1){
+        if(RS_X <= -1 * deadzone || L1 == 1){
              Action::roll_stick_action(udp_);
          }
-         if (
+        if(
             (fabsf(LS_X) <= deadzone)
             && (fabsf(LS_Y) <= deadzone)
             &&(fabsf(RS_X) <= deadzone)
@@ -98,78 +176,20 @@ private:
              Action::null_roll_action(udp_);   
             }
 
+        
+        Action::send_roll_data(udp_);
+        
 
         udp_.send(data);
     }
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
     UDP udp_;
-}
+};
 
 
 
-// 各機構のシーケンスを格納するクラス
-class Action {
-public:
-    // 事故防止のため、射出機構の展開状況を保存
-    static bool ready_for_roll;
-    // 速度
-        float R2 = (-1 * msg->axes[5] + 1) / 2;
 
-        float v1 = sin(rad - 3 * M_PI / 4) * R2; 
-        float v2 = sin(rad - 5 * M_PI / 4) * R2;
-        float v3 = sin(rad - 7 * M_PI / 4) * R2;
-        float v4 = sin(rad - 9 * M_PI / 4) * R2;
-    
-    static void ready_for_roll_action(UDP &udp) {
-        std::cout << "<開始>" << std::endl;
-        std::cout << "..." << std::endl;
-            v1 = -1.0 * sp_yaw;
-            v2 = -1.0 * sp_yaw;
-            v3 = -1.0 * sp_yaw;
-            v4 = -1.0 * sp_yaw;
-        udp.send(data);
-        ready_for_roll = true;
-        std::cout << "完了." << std::endl;
-
-        
-    static void roll_stick_action(UDP &udp) {
-        std::cout << "<開始>" << std::endl;
-        std::cout << "中..." << std::endl;
-            v1 = 1.0 * sp_yaw;
-            v2 = 1.0 * sp_yaw;
-            v3 = 1.0 * sp_yaw;
-            v4 = 1.0 * sp_yaw;
-            ready_for_roll = true;
-            std::cout << "完了." << std::endl;
-        }
-
-         static void null_roll_action(UDP &udp) {
-        std::cout << "<開始>" << std::endl;
-        std::cout << "中..." << std::endl;
-                v1 = 0.0;
-                v2 = 0.0;
-                v3 = 0.0;
-                v4 = 0.0;
-            std::cout << "完了." << std::endl;
-        }
-
-        
-        //printf("\t\n%d,%d,%d,%d\n",v1, v2, v3, v4);
-        data[1] = int(v1 * duty_max);
-        data[2] = int(v2 * duty_max);
-        data[3] = int(v3 * duty_max);
-        data[4] = int(v4 * duty_max);
-        udp.send(data);
-        
-        std::cout << "完了." << std::endl;
-
-    
-}
-}
-
-
- bool Action::ready_for_roll = false;
 
 
 int main(int argc, char *argv[]) {
