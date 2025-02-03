@@ -30,6 +30,9 @@ ament_target_dependencies(nr25_dr_omni rclcpp std_msgs sensor_msgs geometry_msgs
 add_executable(nr25_dr_sd src/NR25_DR_SwerveDrive.cpp src/include/UDP.cpp)
 ament_target_dependencies(nr25_dr_sd rclcpp std_msgs sensor_msgs geometry_msgs)
 
+add_executable(nr25_enc src/NR25_ENC.cpp)
+ament_target_dependencies(nr25_enc rclcpp std_msgs sensor_msgs geometry_msgs )
+
 install(TARGETS
   nr25_mr
   nr25_mr_omni
@@ -37,6 +40,7 @@ install(TARGETS
   nr25_dr
   nr25_dr_omni
   nr25_dr_sd
+  nr25_enc
   DESTINATION lib/${PROJECT_NAME})
 
 ament_package()
