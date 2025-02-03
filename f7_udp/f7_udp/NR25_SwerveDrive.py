@@ -35,7 +35,7 @@ except ModuleNotFoundError:
     print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     exit(1)
 
-data = [0, 0, 0, 0, 0, 0, 0, 0, 0]  # 各モーターの出力（0% ~ 100%）
+data = [0, 0, 0, 0, 0, 0, 0, 135, 0]  # 各モーターの出力（0% ~ 100%）
 
 
 duty_max = 70
@@ -92,6 +92,19 @@ class Listener(Node):
         ):
             LS_X = 0
             LS_Y = 0
+        
+        if (
+            (math.fabs(LS_X) <= deadzone)
+            and (math.fabs(LS_Y) <= deadzone)
+            and (math.fabs(RS_X) <= deadzone)
+            and (math.fabs(RS_Y) <= deadzone)
+            and not R1
+            and not L1
+        ):
+            data[1] = 0
+            data[2] = 0
+            data[3] = 0
+            data[4] = 0
     
         # PSボタンで緊急停止
         if PS:
@@ -105,7 +118,6 @@ class Listener(Node):
         rad = math.atan2(LS_Y, LS_X)
         deg = int(rad * 180 / math.pi)
         
-    
         
         if ((-180 <= deg)
             and(deg <= -135)
@@ -115,8 +127,36 @@ class Listener(Node):
             deg = 225-deg
         print(deg)
 
-        data[1] = deg
+        data[7] = deg
+        data[1] = wheelspeed*R2
+        data[2] = wheelspeed*R2
+        data[3] = wheelspeed*R2
+        data[4] = wheelspeed*R2
 
+        if LEFT:
+            data[7] = 45
+            data[1] = wheelspeed*R2
+            data[2] = wheelspeed*R2
+            data[3] = wheelspeed*R2
+            data[4] = wheelspeed*R2
+        if RIGHT:
+            data[7] = 225
+            data[1] = wheelspeed*R2
+            data[2] = wheelspeed*R2
+            data[3] = wheelspeed*R2
+            data[4] = wheelspeed*R2
+        if UP:
+            data[7] = 135
+            data[1] = wheelspeed*R2
+            data[2] = wheelspeed*R2
+            data[3] = wheelspeed*R2
+            data[4] = wheelspeed*R2
+        if DOWN:
+            data[7] = 135
+            data[1] = -wheelspeed*R2
+            data[2] = -wheelspeed*R2
+            data[3] = -wheelspeed*R2
+            data[4] = -wheelspeed*R2
         """
         v1 = wheelspeed * R2
         v2 = wheelspeed * R2
