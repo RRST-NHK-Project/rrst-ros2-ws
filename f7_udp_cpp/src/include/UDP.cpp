@@ -5,8 +5,6 @@ UDPで送信するクラス
 
 #include "UDP.hpp"
 
-std::vector<int> data = {0, 0, 0, 0, 0, 0, 0, 0, 0}; // グローバル変数
-
 int max = 999; // 最大値を3桁に制限
 
 UDP::UDP(const std::string &ip_address, int port)
@@ -37,7 +35,7 @@ UDP::UDP(const std::string &ip_address, int port)
     }
 }
 
-void UDP::send()
+void UDP::send(std::vector<int>& data)
 {
     for (auto &value : data)
     {

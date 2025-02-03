@@ -9,12 +9,10 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
-extern std::vector<int> data;
-
 class UDP {
 public:
     UDP(const std::string& ip_address, int port);
-    void send();
+    void send(std::vector<int>& data);
 
 private:
     int udp_socket;

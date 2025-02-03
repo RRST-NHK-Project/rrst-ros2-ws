@@ -17,8 +17,10 @@ int roller_speed_shoot_cd = 50;
 int roller_speed_reload = 10;
 
 // IPアドレスとポートの指定
-std::string udp_ip = "192.168.128.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
+std::string udp_ip = "192.168.8.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                    // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
+
+std::vector<int> data = {0, 0, 0, 0, 0, 0, -1, -1, -1}; // グローバル変数
 
 // 各機構のシーケンスを格納するクラス
 class Action
@@ -37,19 +39,19 @@ public:
         data[2] = roller_speed_reload;
         data[3] = -roller_speed_reload;
         data[4] = -roller_speed_reload;
-        udp.send();
+        udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         data[1] = 0;
         data[2] = 0;
         data[3] = 0;
         data[4] = 0;
-        udp.send();
+        udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         data[1] = -roller_speed_shoot_ab;
         data[2] = -roller_speed_shoot_ab;
         data[3] = roller_speed_shoot_cd;
         data[4] = roller_speed_shoot_cd;
-        udp.send();
+        udp.send(data);
         ready_for_shoot = true;
         std::cout << "完了." << std::endl;
     }
@@ -59,12 +61,12 @@ public:
     {
         std::cout << "シュート" << std::endl;
         data[7] = 1;
-        udp.send();
+        udp.send(data);
         ready_for_shoot = false;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         std::cout << "格納準備中..." << std::endl;
         data[7] = -1;
-        udp.send();
+        udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         std::cout << "格納中..." << std::endl;
         data[6] = -1;
@@ -73,7 +75,7 @@ public:
         data[2] = 0;
         data[3] = 0;
         data[4] = 0;
-        udp.send();
+        udp.send(data);
         std::cout << "完了." << std::endl;
         std::cout << "<射出シーケンス終了>" << std::endl;
     }
@@ -87,18 +89,18 @@ public:
         data[2] = roller_speed_dribble_ab;
         data[3] = -roller_speed_dribble_cd;
         data[4] = -roller_speed_dribble_cd;
-        udp.send();
+        udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         std::cout << "ドリブル" << std::endl;
         data[8] = 1;
-        udp.send();
+        udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         data[8] = -1;
         data[1] = 0;
         data[2] = 0;
         data[3] = 0;
         data[4] = 0;
-        udp.send();
+        udp.send(data);
         std::cout << "完了." << std::endl;
         std::cout << "<ドリブルシーケンス終了>" << std::endl;
     }
@@ -115,12 +117,6 @@ public:
         subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
             "joy", 10, std::bind(&PS4_Listener::ps4_listener_callback, this, std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(), "NHK2025 MR initialized with IP: %s, Port: %d", ip.c_str(), port);
-
-        // 初期値の代入、電磁弁の制御でのみ必要
-        data[6] = -1;
-        data[7] = -1;
-        data[8] = -1;
-        udp_.send();
     }
 
 private:
@@ -172,7 +168,7 @@ private:
             Action::dribble_action(udp_);
         }
 
-        udp_.send();
+        udp_.send(data);
     }
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
