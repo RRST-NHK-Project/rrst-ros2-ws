@@ -29,13 +29,13 @@ float deadzone = 0.3;
 class PS4_Listener : public rclcpp::Node {
 public:
     PS4_Listener(const std::string &ip, int port)
-        : Node("nhk25_mr"), udp_(ip, port) {
+        : Node("nhk25_mr_sd"), udp_(ip, port) {
         subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
             "joy", 10,
             std::bind(&PS4_Listener::ps4_listener_callback, this,
                       std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(),
-                    "NHK2025 MR initialized with IP: %s, Port: %d", ip.c_str(),
+                    "NHK2025 MR SD initialized with IP: %s, Port: %d", ip.c_str(),
                     port);
     }
 
@@ -65,7 +65,7 @@ private:
 
         // bool SHARE = msg->buttons[8];
         // bool OPTION = msg->buttons[9];
-        // bool PS = msg->buttons[10];
+        bool PS = msg->buttons[10];
 
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
