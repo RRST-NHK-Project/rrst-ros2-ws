@@ -68,7 +68,7 @@ private:
         // ジョイント名
         msg.name = {"Steering_servo_feed", "Steering_enc_actual", "Wheel"}; // ステア(サーボに司令している値), 実装予定：ステア(エンコーダーから計算したリアルタイムの角度), 駆動輪
 
-        // 機体の変位[m]
+        // 変位[m]
         msg.position = {float(servo_deg), v3, v4};
 
         // 速度[mm/s]
