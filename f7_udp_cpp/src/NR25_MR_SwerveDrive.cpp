@@ -6,6 +6,7 @@ RRST NHK2025
 #include "include/UDP.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
+#include "std_msgs/msg/int32.hpp"
 #include <chrono>
 #include <cmath>
 #include <thread>
@@ -16,6 +17,8 @@ int roller_speed_dribble_cd = 30;
 int roller_speed_shoot_ab = 50;
 int roller_speed_shoot_cd = 50;
 int roller_speed_reload = 10;
+
+int deg;
 
 // IPアドレスとポートの指定
 std::string udp_ip = "192.168.8.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
@@ -82,7 +85,7 @@ private:
         }
 
         float rad = atan2(LS_Y, LS_X);
-        int deg = rad * 180 / M_PI;
+        deg = rad * 180 / M_PI;
 
         if ((fabs(LS_X) <= deadzone) && (fabs(LS_Y) <= deadzone)) {
             data[1] = 0;
@@ -144,12 +147,44 @@ private:
     UDP udp_;
 };
 
+class Servo_Deg_Publisher : public rclcpp::Node
+{
+public:
+  Servo_Deg_Publisher()
+  : Node("servo_deg_publisher")
+  {
+    // Publisherの作成
+    publisher_ = this->create_publisher<std_msgs::msg::Int32>("mr_servo_deg", 10);
+    
+    // タイマーを使って定期的にメッセージをpublish
+    timer_ = this->create_wall_timer(
+      std::chrono::milliseconds(10),
+      std::bind(&Servo_Deg_Publisher::publish_message, this)
+    );
+  }
+
+private:
+  void publish_message()
+  {
+    auto message = std_msgs::msg::Int32();
+    message.data = deg; 
+
+    //RCLCPP_INFO(this->get_logger(), "Publishing: '%d'", message.data);
+    publisher_->publish(message);  // メッセージをpublish
+  }
+
+  rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr publisher_;
+  rclcpp::TimerBase::SharedPtr timer_;
+};
+
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
     rclcpp::executors::SingleThreadedExecutor exec;
     auto ps4_listener = std::make_shared<PS4_Listener>(udp_ip, udp_port);
+    auto servo_deg_publisher = std::make_shared<Servo_Deg_Publisher>();
     exec.add_node(ps4_listener);
+    exec.add_node(servo_deg_publisher);
 
     exec.spin();
 

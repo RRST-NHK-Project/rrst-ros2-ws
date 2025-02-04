@@ -1,16 +1,16 @@
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/float32_multi_array.hpp>
 
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
-#include <unistd.h>
 #include <cstring>
-#include <vector>
+#include <netinet/in.h>
 #include <sstream>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <vector>
 
-#define UDP_PORT 4000  // 受信ポート
-#define BUFFER_SIZE 128  // 受信バッファサイズ
+#define UDP_PORT 4000   // 受信ポート
+#define BUFFER_SIZE 128 // 受信バッファサイズ
 
 class UDPReceiver : public rclcpp::Node {
 public:
@@ -67,9 +67,9 @@ private:
             return;
         }
 
-        buffer[len] = '\0';  // 文字列の終端を設定
-        //RCLCPP_INFO(this->get_logger(), "Received raw: %s", buffer);
-        //RCLCPP_INFO(this->get_logger(), "Received %ld bytes", len);
+        buffer[len] = '\0'; // 文字列の終端を設定
+        // RCLCPP_INFO(this->get_logger(), "Received raw: %s", buffer);
+        // RCLCPP_INFO(this->get_logger(), "Received %ld bytes", len);
 
         // カンマ区切りのデータをパース
         std_msgs::msg::Float32MultiArray msg;

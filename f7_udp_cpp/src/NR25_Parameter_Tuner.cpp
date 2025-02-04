@@ -1,3 +1,8 @@
+/*
+RRST NHK2025
+CUIパラメーター調整ノード
+*/
+
 #include <iostream>
 #include <vector>
 #include <thread>
