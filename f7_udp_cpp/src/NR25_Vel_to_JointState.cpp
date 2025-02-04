@@ -66,9 +66,9 @@ private:
         msg.header.frame_id = "base_link"; // フレームID
 
         // ジョイント名
-        msg.name = {"Steering_servo_feed", "Steering_enc_actual", "Wheel"}; // ステア(サーボに司令している値), ステア(エンコーダーから計算したリアルタイムの角度), 駆動輪
+        msg.name = {"Steering_servo_feed", "Steering_enc_actual", "Wheel"}; // ステア(サーボに司令している値), 実装予定：ステア(エンコーダーから計算したリアルタイムの角度), 駆動輪
 
-        // 初期位置からの変位[m]
+        // 機体の変位[m]
         msg.position = {float(servo_deg), v3, v4};
 
         // 速度[mm/s]
@@ -98,7 +98,7 @@ public:
 private:
     void topic_callback(const std_msgs::msg::Int32::SharedPtr msg) {
         // メッセージを受け取って表示
-        //RCLCPP_INFO(this->get_logger(), "Received: '%d'", msg->data);
+        // RCLCPP_INFO(this->get_logger(), "Received: '%d'", msg->data);
         servo_deg = msg->data;
     }
 
