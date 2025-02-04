@@ -17,7 +17,7 @@ from rclpy.node import Node
 from std_msgs.msg import Float32MultiArray
 
 # UDP通信の設定
-address = ("192.168.8.196", 4000)  # 自機アドレス, ポート
+address = ("192.168.8.195", 4000)  # 自機アドレス, ポート
 
 # オンラインモードの場合、UDPソケットを初期化
 if online_mode == True:

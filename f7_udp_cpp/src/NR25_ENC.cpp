@@ -1,92 +1,104 @@
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/float32_multi_array.hpp>
-#include <boost/asio.hpp>
-#include <array>
-#include <string>
+
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <cstring>
 #include <vector>
 #include <sstream>
 
-class ENC_OBS : public rclcpp::Node {
+#define UDP_PORT 4000  // 受信ポート
+#define BUFFER_SIZE 128  // 受信バッファサイズ
+
+class UDPReceiver : public rclcpp::Node {
 public:
-    ENC_OBS() : Node("enc_obs"), socket_(io_service_) {
-        // パブリッシャーの作成
+    UDPReceiver() : Node("nr25_enc") {
         publisher_ = this->create_publisher<std_msgs::msg::Float32MultiArray>("enc", 10);
 
-        // UDPソケットの初期化
-        boost::asio::ip::udp::endpoint local_endpoint(boost::asio::ip::address::from_string("192.168.8.233"), 4000);
-        socket_.open(local_endpoint.protocol());
-        socket_.bind(local_endpoint);
+        // UDP ソケットの設定
+        udp_socket_ = socket(AF_INET, SOCK_DGRAM, 0);
+        if (udp_socket_ < 0) {
+            RCLCPP_ERROR(this->get_logger(), "Failed to create socket");
+            return;
+        }
 
-        RCLCPP_INFO(this->get_logger(), "ENC observer started. IP: %s", local_endpoint.address().to_string().c_str());
+        struct sockaddr_in server_addr{};
+        server_addr.sin_family = AF_INET;
+        server_addr.sin_addr.s_addr = INADDR_ANY;
+        server_addr.sin_port = htons(UDP_PORT);
 
-        // 受信バッファの確保
-        start_receive();
+        if (bind(udp_socket_, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+            RCLCPP_ERROR(this->get_logger(), "Bind failed");
+            close(udp_socket_);
+            return;
+        }
 
-        // 10msごとにデータをPublish
-        timer_ = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&ENC_OBS::publish_enc_data, this));
+        RCLCPP_INFO(this->get_logger(), "UDP Receiver started on port %d", UDP_PORT);
+
+        // 受信処理を非同期に実行
+        timer_ = this->create_wall_timer(std::chrono::milliseconds(10),
+                                         std::bind(&UDPReceiver::receive_udp_data, this));
+    }
+
+    ~UDPReceiver() {
+        if (udp_socket_ >= 0) {
+            close(udp_socket_);
+        }
     }
 
 private:
+    int udp_socket_;
     rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr publisher_;
     rclcpp::TimerBase::SharedPtr timer_;
 
-    boost::asio::io_service io_service_;
-    boost::asio::ip::udp::socket socket_;
-    boost::asio::ip::udp::endpoint remote_endpoint_;
-    std::array<char, 64> recv_buffer_;
-    
-    std::vector<float> enc_data_{0.0, 0.0, 0.0, 0.0, 0.0, 0.0};  // エンコーダーデータ
+    void receive_udp_data() {
+        struct sockaddr_in sender_addr;
+        socklen_t addr_len = sizeof(sender_addr);
+        char buffer[BUFFER_SIZE];
 
-    void start_receive() {
-        socket_.async_receive_from(
-            boost::asio::buffer(recv_buffer_), remote_endpoint_,
-            [this](boost::system::error_code ec, std::size_t bytes_recvd) {
-                if (!ec && bytes_recvd > 0) {
-                    process_received_data(bytes_recvd);
-                }
-                start_receive();  // 次の受信を開始
-            }
-        );
+        // UDPデータ受信
+        ssize_t len = recvfrom(udp_socket_, buffer, sizeof(buffer) - 1, 0,
+                               (struct sockaddr *)&sender_addr, &addr_len);
+
+        if (len < 0) {
+            RCLCPP_ERROR(this->get_logger(), "recvfrom failed: %s", strerror(errno));
+            return;
+        }
+
+        buffer[len] = '\0';  // 文字列の終端を設定
+        //RCLCPP_INFO(this->get_logger(), "Received raw: %s", buffer);
+        //RCLCPP_INFO(this->get_logger(), "Received %ld bytes", len);
+
+        // カンマ区切りのデータをパース
+        std_msgs::msg::Float32MultiArray msg;
+        std::vector<float> data = parse_udp_data(buffer);
+        msg.data = data;
+
+        // データをPublish
+        publisher_->publish(msg);
     }
 
-    void process_received_data(std::size_t bytes_recvd) {
-        // 受信したデータを文字列に変換
-        std::string received_str(recv_buffer_.data(), bytes_recvd);
-
-        // 受信データをログに表示
-        RCLCPP_INFO(this->get_logger(), "Received data: %s", received_str.c_str());
-
-        std::vector<std::string> split_str;
-        std::stringstream ss(received_str);
+    std::vector<float> parse_udp_data(const std::string &data_str) {
+        std::vector<float> values;
+        std::stringstream ss(data_str);
         std::string token;
 
-        // 受信データをカンマで分割
         while (std::getline(ss, token, ',')) {
-            split_str.push_back(token);
-        }
-
-        // 最初の6要素を float に変換
-        for (size_t i = 0; i < std::min(split_str.size(), enc_data_.size()); ++i) {
             try {
-                enc_data_[i] = std::stof(split_str[i]);
-            } catch (...) {
-                RCLCPP_WARN(this->get_logger(), "Invalid data received: %s", split_str[i].c_str());
-                enc_data_[i] = 0.0;  // 変換エラー時は0に
+                values.push_back(std::stof(token));
+            } catch (const std::exception &e) {
+                RCLCPP_ERROR(this->get_logger(), "Invalid data: %s", token.c_str());
             }
         }
-    }
-
-    void publish_enc_data() {
-        std_msgs::msg::Float32MultiArray msg;
-        msg.data = enc_data_;
-        publisher_->publish(msg);
+        return values;
     }
 };
 
-// メイン関数
 int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<ENC_OBS>();
+    auto node = std::make_shared<UDPReceiver>();
     rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;

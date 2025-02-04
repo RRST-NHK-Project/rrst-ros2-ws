@@ -18,12 +18,12 @@ int roller_speed_shoot_cd = 50;
 int roller_speed_reload = 10;
 
 // IPアドレスとポートの指定
-std::string udp_ip = "192.168.8.216"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
+std::string udp_ip = "192.168.8.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
 
 std::vector<int> data = {0, 0, 0, 0, 0, 0, 0, 0, 0}; 
 
-int wheelspeed = 20;
+int wheelspeed = 60;
 float deadzone = 0.3;
 
 class PS4_Listener : public rclcpp::Node {
