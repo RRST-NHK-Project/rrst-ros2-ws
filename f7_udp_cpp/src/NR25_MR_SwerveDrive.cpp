@@ -9,6 +9,7 @@ RRST NHK2025
 #include "std_msgs/msg/int32.hpp"
 #include <chrono>
 #include <cmath>
+#include <std_msgs/msg/int32_multi_array.hpp>
 #include <thread>
 
 // 各ローラーの速度を指定(%)
@@ -21,10 +22,10 @@ int roller_speed_reload = 10;
 int deg;
 
 // IPアドレスとポートの指定
-std::string udp_ip = "192.168.8.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
-int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
+std::string udp_ip = "192.168.128.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
+int udp_port = 5000;                    // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
 
-std::vector<int> data = {0, 0, 0, 0, 0, 0, 0, 0, 0}; 
+std::vector<int> data = {0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 int wheelspeed = 60;
 float deadzone = 0.3;
@@ -99,47 +100,67 @@ private:
         } else {
             deg = 225 - deg;
         }
-        std::cout << deg << std::endl;
+        // std::cout << deg << std::endl;
 
+        data[5] = deg;
+        data[6] = deg;
         data[7] = deg;
+        data[8] = deg;
+
         data[1] = wheelspeed * R2;
         data[2] = wheelspeed * R2;
         data[3] = wheelspeed * R2;
         data[4] = wheelspeed * R2;
 
         if ((fabs(LS_X) <= deadzone) && (fabs(LS_Y) <= deadzone)) {
+            data[5] = 135;
+            data[6] = 135;
             data[7] = 135;
+            data[8] = 135;
         }
 
         if (LEFT) {
+            data[5] = 45;
+            data[6] = 45;
             data[7] = 45;
+            data[8] = 45;
             data[1] = wheelspeed * R2;
             data[2] = wheelspeed * R2;
             data[3] = wheelspeed * R2;
             data[4] = wheelspeed * R2;
         }
         if (RIGHT) {
+            data[5] = 225;
+            data[6] = 225;
             data[7] = 225;
+            data[8] = 225;
             data[1] = wheelspeed * R2;
             data[2] = wheelspeed * R2;
             data[3] = wheelspeed * R2;
             data[4] = wheelspeed * R2;
         }
         if (UP) {
+            data[5] = 135;
+            data[6] = 135;
             data[7] = 135;
+            data[8] = 135;
             data[1] = wheelspeed * R2;
             data[2] = wheelspeed * R2;
             data[3] = wheelspeed * R2;
             data[4] = wheelspeed * R2;
         }
         if (DOWN) {
+            data[5] = 135;
+            data[6] = 135;
             data[7] = 135;
+            data[8] = 135;
             data[1] = -wheelspeed * R2;
             data[2] = -wheelspeed * R2;
             data[3] = -wheelspeed * R2;
             data[4] = -wheelspeed * R2;
         }
 
+        //std::cout << data << std::endl;
         udp_.send(data);
     }
 
@@ -147,34 +168,30 @@ private:
     UDP udp_;
 };
 
-class Servo_Deg_Publisher : public rclcpp::Node
-{
+class Servo_Deg_Publisher : public rclcpp::Node {
 public:
-  Servo_Deg_Publisher()
-  : Node("servo_deg_publisher")
-  {
-    // Publisherの作成
-    publisher_ = this->create_publisher<std_msgs::msg::Int32>("mr_servo_deg", 10);
-    
-    // タイマーを使って定期的にメッセージをpublish
-    timer_ = this->create_wall_timer(
-      std::chrono::milliseconds(10),
-      std::bind(&Servo_Deg_Publisher::publish_message, this)
-    );
-  }
+    Servo_Deg_Publisher()
+        : Node("servo_deg_publisher") {
+        // Publisherの作成
+        publisher_ = this->create_publisher<std_msgs::msg::Int32MultiArray>("mr_servo_deg", 10);
+
+        // タイマーを使って定期的にメッセージをpublish
+        timer_ = this->create_wall_timer(
+            std::chrono::milliseconds(10),
+            std::bind(&Servo_Deg_Publisher::publish_message, this));
+    }
 
 private:
-  void publish_message()
-  {
-    auto message = std_msgs::msg::Int32();
-    message.data = deg; 
+    void publish_message() {
+        auto message = std_msgs::msg::Int32MultiArray();
+        message.data = {data[5], data[6], data[7], data[8]};
 
-    //RCLCPP_INFO(this->get_logger(), "Publishing: '%d'", message.data);
-    publisher_->publish(message);  // メッセージをpublish
-  }
+        // RCLCPP_INFO(this->get_logger(), "Publishing: '%d'", message.data);
+        publisher_->publish(message); // メッセージをpublish
+    }
 
-  rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr publisher_;
-  rclcpp::TimerBase::SharedPtr timer_;
+    rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr publisher_;
+    rclcpp::TimerBase::SharedPtr timer_;
 };
 
 int main(int argc, char *argv[]) {
