@@ -13,13 +13,33 @@ Velocity to JointState
 #include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/int32.hpp"
 #include <std_msgs/msg/float32_multi_array.hpp>
+#include <std_msgs/msg/int32_multi_array.hpp>
 
-float v1;
-float v2;
-float v3;
-float v4;
+float v[5] = {0.0, 0.0, 0.0, 0.0, 0.0};
+float d[5] = {0.0, 0.0, 0.0, 0.0, 0.0};
+float deg[5] = {0.0, 0.0, 0.0, 0.0, 0.0};    
 
 int servo_deg;
+
+/*
+確認中・・・
+            　↑
+            　↑
+   v_fl---------------------v_fr
+    |                       |
+    |                       |
+    |                       |
+    |                       |　　　　　　　　　　　　　　　　y　　　　　
+    |                       |                                ↑
+    |                       |                                |
+    |                       |                                |  theta
+   v_rl---------------------v_rr                             |--------->x
+
+
+ サーボの角度は度数法で取ってきている
+ どれがどの車輪？
+
+*/
 
 class ENC_Listener : public rclcpp::Node {
 public:
@@ -35,14 +55,41 @@ public:
 
 private:
     void enc_listener_callback(std_msgs::msg::Float32MultiArray::SharedPtr msg) {
-        v1 = msg->data[0];
-        v2 = msg->data[1];
-        v3 = msg->data[2];
-        v4 = msg->data[3];
+        v[1] = msg->data[0];
+        v[2] = msg->data[1];
+        v[3] = msg->data[2];
+        v[4] = msg->data[3];
+        d[1] = msg->data[4];
+        d[2] = msg->data[5];
+        d[3] = msg->data[6];
+        d[4] = msg->data[7];
         // std::cout << v1 << " " << v2 << " " << v3 << " " << v4 <<std::endl;
     }
 
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr subscription_;
+};
+
+class Servo_Deg_Subscriber : public rclcpp::Node {
+public:
+    Servo_Deg_Subscriber()
+        : Node("Servo_Deg_Subscriber") {
+        // Subscriberの作成
+        subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
+            "mr_servo_deg", 10,
+            std::bind(&Servo_Deg_Subscriber::topic_callback, this, std::placeholders::_1));
+    }
+
+private:
+    void topic_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        // メッセージを受け取って表示
+        // RCLCPP_INFO(this->get_logger(), "Received: '%d'", msg->data);
+        deg[1] = msg->data[0];
+        deg[2] = msg->data[1];
+        deg[3] = msg->data[2];
+        deg[4] = msg->data[3];
+    }
+
+    rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
 };
 
 class JointStatePublisher : public rclcpp::Node {
@@ -66,16 +113,16 @@ private:
         msg.header.frame_id = "base_link"; // フレームID
 
         // ジョイント名
-        msg.name = {"Steering_servo_feed", "Steering_enc_actual", "Wheel"}; // ステア(サーボに司令している値), 実装予定：ステア(エンコーダーから計算したリアルタイムの角度), 駆動輪
+        msg.name = {"fl", "fr", "rl", "rr", "fl_servo", "fr_servo", "rl_servo", "rr_servo"}; 
 
         // 変位[m]
-        msg.position = {float(servo_deg), v3, v4};
+        msg.position = {d[1], d[2], d[3], d[4], deg[1], deg[2], deg[3], deg[4]};
 
         // 速度[mm/s]
-        msg.velocity = {0.0, v1, v2};
+        msg.velocity = {v[1], v[2], v[3], v[4], 0.0, 0.0, 0.0, 0.0};
 
         // なし
-        msg.effort = {0.0, 0.0, 0.0};
+        msg.effort = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
         // Publish
         joint_state_pub_->publish(msg);
@@ -85,25 +132,6 @@ private:
     rclcpp::TimerBase::SharedPtr timer_;
 };
 
-class Servo_Deg_Subscriber : public rclcpp::Node {
-public:
-    Servo_Deg_Subscriber()
-        : Node("Servo_Deg_Subscriber") {
-        // Subscriberの作成
-        subscription_ = this->create_subscription<std_msgs::msg::Int32>(
-            "mr_servo_deg", 10,
-            std::bind(&Servo_Deg_Subscriber::topic_callback, this, std::placeholders::_1));
-    }
-
-private:
-    void topic_callback(const std_msgs::msg::Int32::SharedPtr msg) {
-        // メッセージを受け取って表示
-        // RCLCPP_INFO(this->get_logger(), "Received: '%d'", msg->data);
-        servo_deg = msg->data;
-    }
-
-    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr subscription_;
-};
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
