@@ -1,6 +1,6 @@
 /*
 RRST NHK2025
-汎用機の機構制御
+足回り制御
 */
 
 #include <chrono>
@@ -11,7 +11,7 @@ RRST NHK2025
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 
-// 各ローラーの速度を指定(%)
+
 float duty_max = 70;
 float sp_yaw = 0.1;
 
@@ -24,13 +24,7 @@ std::string udp_ip = "192.168.8.215"; // 送信先IPアドレス、宛先マイ�
 int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
 
 std::vector<int> data = {0, 0, 0, 0, 0, 0, 0, 0, 0}; // 各モーターの出力（0% ~ 100%）
-
-float v1, v2, v3, v4; 
-float LS_X =0.0; 
-float LS_Y = 0.0;
-float R2 = 0.0;
-float rad = atan2(LS_Y, LS_X);
-
+float  v1, v2, v3, v4; 
 
 class PS4_Listener : public rclcpp::Node {
 public:
@@ -68,7 +62,7 @@ private:
         float R1 = msg->buttons[5];
 
         // float L2 = (-1 * msg->axes[2] + 1) / 2;
-        // float R2 = (-1 * msg->axes[5] + 1) / 2;
+        float R2 = (-1 * msg->axes[5] + 1) / 2;
 
         // bool SHARE = msg->buttons[8];
         // // bool OPTION = msg->buttons[9];
@@ -78,11 +72,7 @@ private:
         // // bool R3 = msg->buttons[12];
 
         //　↓必要なのか不明
-        /*float v1 = sin(rad - 3 * M_PI / 4) * R2; 
-        float v2 = sin(rad - 5 * M_PI / 4) * R2;
-        float v3 = sin(rad - 7 * M_PI / 4) * R2;
-        float v4 = sin(rad - 9 * M_PI / 4) * R2;*/
- 
+       
 
         
                 if (PS == 1) {
@@ -93,8 +83,15 @@ private:
                       std::this_thread::sleep_for(std::chrono::milliseconds(100));
                       return;
                     }
-                }
+                };
+        //９０〜９６まで必要なければコメントアウト
+        float rad = atan2(LS_Y, LS_X);
 
+         v1 = sin(rad - 3 * M_PI / 4) * R2; 
+         v2 = sin(rad - 5 * M_PI / 4) * R2;
+         v3 = sin(rad - 7 * M_PI / 4) * R2;
+         v4 = sin(rad - 9 * M_PI / 4) * R2;
+ 
 
         if( RS_X >= deadzone || R1 == 1){
             v1 = -1.0 * sp_yaw;
@@ -122,7 +119,7 @@ private:
                 v3 = 0.0;
                 v4 = 0.0;
             }
-            
+
         //printf("\t\n%d,%d,%d,%d\n",v1, v2, v3, v4);
         data[1] = int(v1 * duty_max);
         data[2] = int(v2 * duty_max);
@@ -134,6 +131,8 @@ private:
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
     UDP udp_;
 };
+
+
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
