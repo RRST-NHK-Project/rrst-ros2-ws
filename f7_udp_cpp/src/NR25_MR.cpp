@@ -1,6 +1,15 @@
 /*
 RRST NHK2025
 汎用機の機構制御
+クリコア　
+=== Current Parameters ===
+0: roller_speed_dribble_ab = 15
+1: roller_speed_dribble_cd = 75
+2: roller_speed_shoot_ab   = 35
+3: roller_speed_shoot_cd   = 35
+Shoot State: 0
+Dribble State: 0
+==========================
 */
 
 // 標準
@@ -20,7 +29,7 @@ int roller_speed_dribble_ab = 30;
 int roller_speed_dribble_cd = 30;
 int roller_speed_shoot_ab = 50;
 int roller_speed_shoot_cd = 50;
-int roller_speed_reload = 10;
+int roller_speed_reload = 15;
 
 // IPアドレスとポートの指定
 std::string udp_ip = "192.168.8.216"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
