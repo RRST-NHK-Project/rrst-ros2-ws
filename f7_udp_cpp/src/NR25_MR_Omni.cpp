@@ -58,15 +58,15 @@ private:
         // bool UP = msg->axes[7] == 1.0;
         // bool DOWN = msg->axes[7] == -1.0;
 
-        float L1 = msg->buttons[4];
-        float R1 = msg->buttons[5];
+        float L1 = msg->buttons[9];
+        float R1 = msg->buttons[10];
 
         // float L2 = (-1 * msg->axes[2] + 1) / 2;
         float R2 = (-1 * msg->axes[5] + 1) / 2;
 
         // bool SHARE = msg->buttons[8];
         // // bool OPTION = msg->buttons[9];
-        bool PS = msg->buttons[10];
+        // bool PS = msg->buttons[10];
 
         // // bool L3 = msg->buttons[11];
         // // bool R3 = msg->buttons[12];
@@ -75,7 +75,7 @@ private:
        
 
         
-                if (PS == 1) {
+               /* if (PS == 1) {
                     while (1) {
                         std::fill(data.begin(), data.end(), 0);
                         udp_.send(data);
@@ -83,37 +83,38 @@ private:
                       std::this_thread::sleep_for(std::chrono::milliseconds(100));
                       return;
                     }
-                };
+                };*/
         //９０〜９６まで必要なければコメントアウト
         float rad = atan2(LS_Y, LS_X);
-
+        if( R2 >= 0.3){
          v1 = sin(rad - 3 * M_PI / 4) * R2; 
          v2 = sin(rad - 5 * M_PI / 4) * R2;
          v3 = sin(rad - 7 * M_PI / 4) * R2;
          v4 = sin(rad - 9 * M_PI / 4) * R2;
+        }
  
 
-        if( RS_X >= deadzone || R1 == 1){
+        else if( RS_X >= deadzone || R1 == 1){
             v1 = -1.0 * sp_yaw;
             v2 = -1.0 * sp_yaw;
             v3 = -1.0 * sp_yaw;
             v4 = -1.0 * sp_yaw;
         }
 
-        if(RS_X <= -1 * deadzone || L1 == 1){
+        else if(RS_X <= -1 * deadzone || L1 == 1){
             v1 = 1.0 * sp_yaw;
             v2 = 1.0 * sp_yaw;
             v3 = 1.0 * sp_yaw;
             v4 = 1.0 * sp_yaw;
          }
 
-        if(
+        else if(
             (fabsf(LS_X) <= deadzone)
             && (fabsf(LS_Y) <= deadzone)
             &&(fabsf(RS_X) <= deadzone)
             && (fabsf(RS_Y) <= deadzone)
-            && (R1 != 0)
-            && (L1 != 0)){
+            && (R1 == 0)
+            && (L1 == 0)){
                 v1 = 0.0;
                 v2 = 0.0;
                 v3 = 0.0;
