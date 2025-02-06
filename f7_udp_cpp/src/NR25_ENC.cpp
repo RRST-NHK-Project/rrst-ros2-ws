@@ -1,3 +1,7 @@
+/*
+RRST NHK2025
+マイコンから受信したエンコーダーの速度、変位をPublish
+*/
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/float32_multi_array.hpp>
 
@@ -68,8 +72,8 @@ private:
         }
 
         buffer[len] = '\0'; // 文字列の終端を設定
-        //RCLCPP_INFO(this->get_logger(), "Received raw: %s", buffer);
-        //RCLCPP_INFO(this->get_logger(), "Received %ld bytes", len);
+        // RCLCPP_INFO(this->get_logger(), "Received raw: %s", buffer);
+        // RCLCPP_INFO(this->get_logger(), "Received %ld bytes", len);
 
         // カンマ区切りのデータをパース
         std_msgs::msg::Float32MultiArray msg;

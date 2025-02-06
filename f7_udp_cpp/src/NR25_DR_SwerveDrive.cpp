@@ -1,6 +1,5 @@
 /*
-RRST NHK2025
-汎用機の機構制御
+ビルド通すために書いてるだけ、書き直せ
 */
 
 #include "include/UDP.hpp"

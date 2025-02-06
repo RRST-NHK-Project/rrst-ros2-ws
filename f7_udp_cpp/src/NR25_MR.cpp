@@ -223,14 +223,13 @@ private:
         roller_speed_dribble_cd = msg->data[1];
         roller_speed_shoot_ab = msg->data[2];
         roller_speed_shoot_cd = msg->data[3];
-        std::cout << roller_speed_dribble_ab ;
-        std::cout << roller_speed_dribble_cd ;
-        std::cout << roller_speed_shoot_ab ;
+        std::cout << roller_speed_dribble_ab;
+        std::cout << roller_speed_dribble_cd;
+        std::cout << roller_speed_shoot_ab;
         std::cout << roller_speed_shoot_cd << std::endl;
     }
 
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
-    
 };
 
 int main(int argc, char *argv[]) {

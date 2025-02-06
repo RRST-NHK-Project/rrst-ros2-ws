@@ -17,12 +17,12 @@ Velocity to JointState
 
 float v[5] = {0.0, 0.0, 0.0, 0.0, 0.0};
 float d[5] = {0.0, 0.0, 0.0, 0.0, 0.0};
-float deg[5] = {0.0, 0.0, 0.0, 0.0, 0.0};    
+float deg[5] = {0.0, 0.0, 0.0, 0.0, 0.0};
 
 int servo_deg;
 
 /*
-確認中・・・
+この座標で統一します
             　↑
             　↑
    v_fl---------------------v_fr
@@ -35,9 +35,7 @@ int servo_deg;
     |                       |                                |  theta
    v_rl---------------------v_rr                             |--------->x
 
-
- サーボの角度は度数法で取ってきている
- どれがどの車輪？
+すべての車輪について速度、変位をPublish
 
 */
 
@@ -98,7 +96,7 @@ public:
         // Publisherの作成
         joint_state_pub_ = this->create_publisher<sensor_msgs::msg::JointState>("mr_joint_states", 10);
 
-        // タイマ
+        // タイマー
         timer_ = this->create_wall_timer(
             std::chrono::milliseconds(10),
             std::bind(&JointStatePublisher::publish_joint_state, this));
@@ -113,7 +111,7 @@ private:
         msg.header.frame_id = "base_link"; // フレームID
 
         // ジョイント名
-        msg.name = {"fl", "fr", "rl", "rr", "fl_servo", "fr_servo", "rl_servo", "rr_servo"}; 
+        msg.name = {"fl", "fr", "rl", "rr", "fl_servo", "fr_servo", "rl_servo", "rr_servo"};
 
         // 変位[m]
         msg.position = {d[1], d[2], d[3], d[4], deg[1], deg[2], deg[3], deg[4]};
@@ -131,7 +129,6 @@ private:
     rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
 };
-
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);

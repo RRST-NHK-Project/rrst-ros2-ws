@@ -1,6 +1,6 @@
 /*
 RRST NHK2025
-汎用機の機構制御
+汎用機独ステ
 */
 
 #include "include/UDP.hpp"
@@ -12,18 +12,11 @@ RRST NHK2025
 #include <std_msgs/msg/int32_multi_array.hpp>
 #include <thread>
 
-// 各ローラーの速度を指定(%)
-int roller_speed_dribble_ab = 30;
-int roller_speed_dribble_cd = 30;
-int roller_speed_shoot_ab = 50;
-int roller_speed_shoot_cd = 50;
-int roller_speed_reload = 10;
-
 int deg;
 
 // IPアドレスとポートの指定
 std::string udp_ip = "192.168.8.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
-int udp_port = 5000;                    // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
+int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
 
 std::vector<int> data = {0, 0, 0, 0, 0, 0, 0, 0, 0};
 
@@ -87,7 +80,6 @@ private:
 
         float rad = atan2(LS_Y, LS_X);
         deg = rad * 180 / M_PI;
-        
 
         if ((fabs(LS_X) <= deadzone) && (fabs(LS_Y) <= deadzone)) {
             data[1] = 0;
@@ -118,7 +110,7 @@ private:
         }
 
         if ((270 < deg) && (deg < 360)) {
-            deg = deg -180;
+            deg = deg - 180;
             data[5] = deg;
             data[6] = deg;
             data[7] = deg;
@@ -128,7 +120,7 @@ private:
             data[3] = wheelspeed * R2;
             data[4] = wheelspeed * R2;
         }
-        
+
         if (LEFT) {
             deg = 45;
             data[5] = deg;
@@ -177,19 +169,17 @@ private:
         data[7] = deg;
         data[8] = deg;
 
-        //わかりやすいように数値を45-135-225座標に合わせてます。不要なら消去で
-        if((deg > 45)&&(deg <= 135)){
+        // わかりやすいように数値を45-135-225座標に合わせてます。不要なら消去で
+        if ((deg > 45) && (deg <= 135)) {
             int adj_deg = int(deg * 0.9);
             std::cout << adj_deg << std::endl;
         }
-        if(((deg <= 45)&&(deg > 135))){
-            std::cout << deg-10 << std::endl; 
+        if (((deg <= 45) && (deg > 135))) {
+            std::cout << deg - 10 << std::endl;
         }
-        //std::cout << deg << std::endl;
-        
+        // std::cout << deg << std::endl;
 
-
-        //std::cout << data << std::endl;
+        // std::cout << data << std::endl;
         udp_.send(data);
     }
 

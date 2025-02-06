@@ -2,9 +2,9 @@
 ビルド通すために書いてるだけ、書き直せ
 */
 
+#include "include/UDP.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
-#include "include/UDP.hpp"
 #include <chrono>
 #include <thread>
 
@@ -22,14 +22,12 @@ int udp_port = 5000;                    // 送信元ポート番号、宛先マ�
 std::vector<int> data = {0, 0, 0, 0, 0, 0, -1, -1, -1}; // グローバル変数
 
 // 各機構のシーケンスを格納するクラス
-class Action
-{
+class Action {
 public:
     // 事故防止のため、射出機構の展開状況を保存
     static bool ready_for_shoot;
     // 射出機構展開シーケンス
-    static void ready_for_shoot_action(UDP &udp)
-    {
+    static void ready_for_shoot_action(UDP &udp) {
         std::cout << "<射出シーケンス開始>" << std::endl;
         std::cout << "展開中..." << std::endl;
         data[6] = 1;
@@ -56,8 +54,7 @@ public:
     }
 
     // 射出シーケンス
-    static void shoot_action(UDP &udp)
-    {
+    static void shoot_action(UDP &udp) {
         std::cout << "シュート" << std::endl;
         data[7] = 1;
         udp.send(data);
@@ -80,8 +77,7 @@ public:
     }
 
     // ドリブルシーケンス
-    static void dribble_action(UDP &udp)
-    {
+    static void dribble_action(UDP &udp) {
         std::cout << "<ドリブルシーケンス開始>" << std::endl;
         std::cout << "ドリブル準備中" << std::endl;
         data[1] = roller_speed_dribble_ab;
@@ -107,12 +103,10 @@ public:
 
 bool Action::ready_for_shoot = false;
 
-class PS4_Listener : public rclcpp::Node
-{
+class PS4_Listener : public rclcpp::Node {
 public:
     PS4_Listener(const std::string &ip, int port)
-        : Node("nhk25_mr"), udp_(ip, port)
-    {
+        : Node("nhk25_mr"), udp_(ip, port) {
         subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
             "joy", 10, std::bind(&PS4_Listener::ps4_listener_callback, this, std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(), "NHK2025 MR initialized with IP: %s, Port: %d", ip.c_str(), port);
@@ -120,8 +114,7 @@ public:
 
 private:
     // コントローラーの入力を取得、使わない入力はコメントアウト推奨
-    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg)
-    {
+    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
         //  float LS_X = -1 * msg->axes[0];
         //  float LS_Y = msg->axes[1];
         //  float RS_X = -1 * msg->axes[3];
@@ -150,20 +143,17 @@ private:
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
 
-        if (CIRCLE)
-        {
+        if (CIRCLE) {
             Action::ready_for_shoot_action(udp_);
             std::this_thread::sleep_for(std::chrono::seconds(3));
         }
 
-        if (Action::ready_for_shoot)
-        {
+        if (Action::ready_for_shoot) {
             Action::shoot_action(udp_);
         }
 
         // 射出機構が展開済みの場合のみシュートを行う
-        if (TRIANGLE && !Action::ready_for_shoot)
-        {
+        if (TRIANGLE && !Action::ready_for_shoot) {
             Action::dribble_action(udp_);
         }
 
@@ -174,8 +164,7 @@ private:
     UDP udp_;
 };
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
     rclcpp::executors::SingleThreadedExecutor exec;

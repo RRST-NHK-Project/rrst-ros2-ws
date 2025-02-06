@@ -1,16 +1,22 @@
 /*
 RRST NHK2025
 CUIパラメーター調整ノード
+使い方
+showで現在設定しているパラメーターが見れます
+例えばノード実行中のターミナルで,
+0 20
+と入力すると0番を20に設定できます
+シュートとドリブルもコマンドを設定してますがうまく動きません
 */
 
-#include <iostream>
-#include <vector>
-#include <thread>
-#include <chrono>
-#include <mutex>
 #include <atomic>
+#include <chrono>
+#include <iostream>
+#include <mutex>
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/int32_multi_array.hpp>
+#include <thread>
+#include <vector>
 
 class ParameterNode : public rclcpp::Node {
 public:
@@ -25,8 +31,10 @@ public:
 
     ~ParameterNode() {
         running = false;
-        if (publish_thread.joinable()) publish_thread.join();
-        if (input_thread.joinable()) input_thread.join();
+        if (publish_thread.joinable())
+            publish_thread.join();
+        if (input_thread.joinable())
+            input_thread.join();
     }
 
 private:
@@ -55,28 +63,26 @@ private:
         while (running) {
             std::string input;
             std::getline(std::cin, input);
-            if (input.empty()) continue;
+            if (input.empty())
+                continue;
 
             std::lock_guard<std::mutex> lock(param_mutex);
 
             if (input == "s") {
                 shoot_state = 1;
-                show_parameters();  // 状態変更後に表示
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));  // 0.5秒維持
-                //shoot_state = 0;
-                show_parameters();  // 状態リセット後に表示
-            } 
-            else if (input == "d") {
+                show_parameters();                                           // 状態変更後に表示
+                std::this_thread::sleep_for(std::chrono::milliseconds(500)); // 0.5秒維持
+                // shoot_state = 0;
+                show_parameters(); // 状態リセット後に表示
+            } else if (input == "d") {
                 dribble_state = 1;
                 show_parameters();
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
-                //dribble_state = 0;
+                // dribble_state = 0;
                 show_parameters();
-            } 
-            else if (input == "show") {
+            } else if (input == "show") {
                 show_parameters();
-            } 
-            else {
+            } else {
                 int idx, value;
                 if (sscanf(input.c_str(), "%d %d", &idx, &value) == 2 && idx >= 0 && idx < 4 && value >= 0 && value <= 100) {
                     params[idx] = value;
