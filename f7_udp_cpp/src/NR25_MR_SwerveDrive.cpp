@@ -22,12 +22,12 @@ int roller_speed_reload = 10;
 int deg;
 
 // IPアドレスとポートの指定
-std::string udp_ip = "192.168.128.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
+std::string udp_ip = "192.168.8.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                    // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
 
 std::vector<int> data = {0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-int wheelspeed = 60;
+int wheelspeed = 10;
 float deadzone = 0.3;
 
 class PS4_Listener : public rclcpp::Node {
@@ -101,39 +101,47 @@ private:
             deg = 225 - deg;
         }
         // std::cout << deg << std::endl;
-
-        data[5] = deg;
-        data[6] = deg;
-        data[7] = deg;
-        data[8] = deg;
-
-        data[1] = wheelspeed * R2;
-        data[2] = wheelspeed * R2;
-        data[3] = wheelspeed * R2;
-        data[4] = wheelspeed * R2;
+        data[1] = -wheelspeed * R2;
+        data[2] = -wheelspeed * R2;
+        data[3] = -wheelspeed * R2;
+        data[4] = -wheelspeed * R2;
 
         if ((fabs(LS_X) <= deadzone) && (fabs(LS_Y) <= deadzone)) {
-            data[5] = 135;
-            data[6] = 135;
-            data[7] = 135;
-            data[8] = 135;
+            deg = 135;
+            data[5] = deg;
+            data[6] = deg;
+            data[7] = deg;
+            data[8] = deg;
         }
 
-        if (LEFT) {
-            data[5] = 45;
-            data[6] = 45;
-            data[7] = 45;
-            data[8] = 45;
+        if ((270 < deg) && (deg < 360)) {
+            deg = deg -180;
+            data[5] = deg;
+            data[6] = deg;
+            data[7] = deg;
+            data[8] = deg;
             data[1] = wheelspeed * R2;
             data[2] = wheelspeed * R2;
             data[3] = wheelspeed * R2;
             data[4] = wheelspeed * R2;
         }
+        if (LEFT) {
+            deg = 45;
+            data[5] = deg;
+            data[6] = deg;
+            data[7] = deg;
+            data[8] = deg;
+            data[1] = -wheelspeed * R2;
+            data[2] = -wheelspeed * R2;
+            data[3] = -wheelspeed * R2;
+            data[4] = -wheelspeed * R2;
+        }
         if (RIGHT) {
-            data[5] = 225;
-            data[6] = 225;
-            data[7] = 225;
-            data[8] = 225;
+            deg = 45;
+            data[5] = deg;
+            data[6] = deg;
+            data[7] = deg;
+            data[8] = deg;
             data[1] = wheelspeed * R2;
             data[2] = wheelspeed * R2;
             data[3] = wheelspeed * R2;
@@ -144,21 +152,28 @@ private:
             data[6] = 135;
             data[7] = 135;
             data[8] = 135;
-            data[1] = wheelspeed * R2;
-            data[2] = wheelspeed * R2;
-            data[3] = wheelspeed * R2;
-            data[4] = wheelspeed * R2;
+            data[1] = -wheelspeed * R2;
+            data[2] = -wheelspeed * R2;
+            data[3] = -wheelspeed * R2;
+            data[4] = -wheelspeed * R2;
         }
         if (DOWN) {
             data[5] = 135;
             data[6] = 135;
             data[7] = 135;
             data[8] = 135;
-            data[1] = -wheelspeed * R2;
-            data[2] = -wheelspeed * R2;
-            data[3] = -wheelspeed * R2;
-            data[4] = -wheelspeed * R2;
+            data[1] = wheelspeed * R2;
+            data[2] = wheelspeed * R2;
+            data[3] = wheelspeed * R2;
+            data[4] = wheelspeed * R2;
         }
+        data[5] = deg;
+        data[6] = deg;
+        data[7] = deg;
+        data[8] = deg;
+
+        
+        std::cout << deg << std::endl;
 
         //std::cout << data << std::endl;
         udp_.send(data);
