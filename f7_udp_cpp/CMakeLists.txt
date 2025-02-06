@@ -37,6 +37,12 @@ ament_target_dependencies(nr25_pr rclcpp std_msgs sensor_msgs geometry_msgs )
 add_executable(nr25_vel2js src/NR25_Vel_to_JointState.cpp)
 ament_target_dependencies(nr25_vel2js rclcpp std_msgs sensor_msgs geometry_msgs )
 
+add_executable(nr25_enc_pid src/NR25_ENC_PID.cpp)
+ament_target_dependencies(nr25_enc_pid rclcpp std_msgs sensor_msgs geometry_msgs )
+add_executable(nr25_pid src/NR25_PID.cpp src/include/UDP.cpp)
+ament_target_dependencies(nr25_pid rclcpp std_msgs sensor_msgs geometry_msgs )
+
+
 install(TARGETS
   nr25_mr
   nr25_mr_omni
@@ -47,6 +53,8 @@ install(TARGETS
   nr25_enc
   nr25_pr
   nr25_vel2js
+  nr25_enc_pid
+  nr25_pid
   DESTINATION lib/${PROJECT_NAME})
 
 ament_package()

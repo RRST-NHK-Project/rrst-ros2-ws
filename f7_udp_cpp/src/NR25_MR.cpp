@@ -218,7 +218,6 @@ public:
     }
 
 private:
-    // コントローラーの入力を取得、使わない入力はコメントアウト推奨
     void params_listener_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
         roller_speed_dribble_ab = msg->data[0];
         roller_speed_dribble_cd = msg->data[1];
@@ -228,46 +227,6 @@ private:
         std::cout << roller_speed_dribble_cd ;
         std::cout << roller_speed_shoot_ab ;
         std::cout << roller_speed_shoot_cd << std::endl;
-        // float LS_X = -1 * msg->axes[0];
-        // float LS_Y = msg->axes[1];
-        //   float RS_X = -1 * msg->axes[3];
-        //   float RS_Y = msg->axes[4];
-
-        // bool CROSS = msg->buttons[0];
-        // bool CIRCLE = msg->buttons[1];
-        // bool TRIANGLE = msg->buttons[2];
-        // bool SQUARE = msg->buttons[3];
-
-        // bool LEFT = msg->axes[6] == 1.0;
-        // bool RIGHT = msg->axes[6] == -1.0;
-        // bool UP = msg->axes[7] == 1.0;
-        // bool DOWN = msg->axes[7] == -1.0;
-
-        // bool L1 = msg->buttons[4];
-        // bool R1 = msg->buttons[5];
-
-        // float L2 = (-1 * msg->axes[2] + 1) / 2;
-        // float R2 = (-1 * msg->axes[5] + 1) / 2;
-
-        // bool SHARE = msg->buttons[8];
-        // bool OPTION = msg->buttons[9];
-        // bool PS = msg->buttons[10];
-
-        // bool L3 = msg->buttons[11];
-        // bool R3 = msg->buttons[12];
-
-        // if (PS) {
-        //     std::fill(data.begin(), data.end(), 0);                        // 配列をゼロで埋める
-        //     data[6] = data[7] = data[8] = -1;                                // 最後の3つを-1に
-        //     for (int attempt = 0; attempt < 10; attempt++) {                 // 10回試行
-        //         udp_.send(data);                                             // データ送信
-        //         std::cout << "緊急停止！ 試行" << attempt + 1 << std::endl;  // 試行回数を表示
-        //         std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 100msの遅延
-        //     }
-        //     rclcpp::shutdown();
-        // }
-
-    
     }
 
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
