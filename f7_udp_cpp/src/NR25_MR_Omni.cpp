@@ -19,8 +19,6 @@ float deadzone = 0.3;  // adjust DS4 deadzone
 
 
 
-
-
 // IPアドレスとポートの指定
 std::string udp_ip = "192.168.8.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
@@ -32,70 +30,6 @@ float LS_X =0.0;
 float LS_Y = 0.0;
 float R2 = 0.0;
 float rad = atan2(LS_Y, LS_X);
-
-
-
-
-
-// 各機構のシーケンスを格納するクラス
-class Action {
-public:
-    // 事故防止のため、機構の展開状況を保存
-    static bool ready_for_roll;
-    // 速度
-    
-    static void ready_for_roll_action(UDP &udp){
-        std::cout << "<開始>" << std::endl;
-        std::cout << "..." << std::endl;
-            v1 = -1.0 * sp_yaw;
-            v2 = -1.0 * sp_yaw;
-            v3 = -1.0 * sp_yaw;
-            v4 = -1.0 * sp_yaw;
-        udp.send(data);
-        ready_for_roll = true;
-        std::cout << "完了." << std::endl;
-    }
-
-        
-    static void roll_stick_action(UDP &udp){
-        std::cout << "<開始>" << std::endl;
-        std::cout << "中..." << std::endl;
-            v1 = 1.0 * sp_yaw;
-            v2 = 1.0 * sp_yaw;
-            v3 = 1.0 * sp_yaw;
-            v4 = 1.0 * sp_yaw;
-            
-            udp.send(data);
-            std::cout << "完了." << std::endl;
-        }
-
-    static void null_roll_action(UDP &udp){
-        std::cout << "<開始>" << std::endl;
-        std::cout << "中..." << std::endl;
-                v1 = 0.0;
-                v2 = 0.0;
-                v3 = 0.0;
-                v4 = 0.0;
-            udp.send(data);
-            std::cout << "完了." << std::endl;
-        }
-
-        
-        static void send_roll_data(UDP &udp){
-        //printf("\t\n%d,%d,%d,%d\n",v1, v2, v3, v4);
-        std::cout << "<開始>" << std::endl;
-        std::cout << "中..." << std::endl;
-        data[1] = int(v1 * duty_max);
-        data[2] = int(v2 * duty_max);
-        data[3] = int(v3 * duty_max);
-        data[4] = int(v4 * duty_max);
-        udp.send(data);
-        std::cout << "完了." << std::endl;
-        }
-};
-
-
- bool Action::ready_for_roll = false;
 
 
 class PS4_Listener : public rclcpp::Node {
@@ -143,7 +77,7 @@ private:
         // // bool L3 = msg->buttons[11];
         // // bool R3 = msg->buttons[12];
 
-        //　↓オムニの一般的な計算？
+        //　↓必要なのか不明
         /*float v1 = sin(rad - 3 * M_PI / 4) * R2; 
         float v2 = sin(rad - 5 * M_PI / 4) * R2;
         float v3 = sin(rad - 7 * M_PI / 4) * R2;
@@ -160,12 +94,22 @@ private:
                       return;
                     }
                 }
+
+
         if( RS_X >= deadzone || R1 == 1){
-             Action::ready_for_roll_action(udp_);
+            v1 = -1.0 * sp_yaw;
+            v2 = -1.0 * sp_yaw;
+            v3 = -1.0 * sp_yaw;
+            v4 = -1.0 * sp_yaw;
         }
+
         if(RS_X <= -1 * deadzone || L1 == 1){
-             Action::roll_stick_action(udp_);
+            v1 = 1.0 * sp_yaw;
+            v2 = 1.0 * sp_yaw;
+            v3 = 1.0 * sp_yaw;
+            v4 = 1.0 * sp_yaw;
          }
+
         if(
             (fabsf(LS_X) <= deadzone)
             && (fabsf(LS_Y) <= deadzone)
@@ -173,24 +117,23 @@ private:
             && (fabsf(RS_Y) <= deadzone)
             && (R1 != 0)
             && (L1 != 0)){
-             Action::null_roll_action(udp_);   
+                v1 = 0.0;
+                v2 = 0.0;
+                v3 = 0.0;
+                v4 = 0.0;
             }
-
-        
-        Action::send_roll_data(udp_);
-        
-
+            
+        //printf("\t\n%d,%d,%d,%d\n",v1, v2, v3, v4);
+        data[1] = int(v1 * duty_max);
+        data[2] = int(v2 * duty_max);
+        data[3] = int(v3 * duty_max);
+        data[4] = int(v4 * duty_max);
         udp_.send(data);
     }
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
     UDP udp_;
 };
-
-
-
-
-
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
