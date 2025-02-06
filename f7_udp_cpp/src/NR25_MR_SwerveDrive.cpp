@@ -87,6 +87,7 @@ private:
 
         float rad = atan2(LS_Y, LS_X);
         deg = rad * 180 / M_PI;
+        
 
         if ((fabs(LS_X) <= deadzone) && (fabs(LS_Y) <= deadzone)) {
             data[1] = 0;
@@ -100,14 +101,16 @@ private:
         } else {
             deg = 225 - deg;
         }
+
         // std::cout << deg << std::endl;
         data[1] = -wheelspeed * R2;
         data[2] = -wheelspeed * R2;
         data[3] = -wheelspeed * R2;
         data[4] = -wheelspeed * R2;
 
+        // 進行方向にするため初期位置を135→145
         if ((fabs(LS_X) <= deadzone) && (fabs(LS_Y) <= deadzone)) {
-            deg = 135;
+            deg = 145;
             data[5] = deg;
             data[6] = deg;
             data[7] = deg;
@@ -125,6 +128,7 @@ private:
             data[3] = wheelspeed * R2;
             data[4] = wheelspeed * R2;
         }
+        
         if (LEFT) {
             deg = 45;
             data[5] = deg;
@@ -148,32 +152,42 @@ private:
             data[4] = wheelspeed * R2;
         }
         if (UP) {
-            data[5] = 135;
-            data[6] = 135;
-            data[7] = 135;
-            data[8] = 135;
+            data[5] = 145;
+            data[6] = 145;
+            data[7] = 145;
+            data[8] = 145;
             data[1] = -wheelspeed * R2;
             data[2] = -wheelspeed * R2;
             data[3] = -wheelspeed * R2;
             data[4] = -wheelspeed * R2;
         }
         if (DOWN) {
-            data[5] = 135;
-            data[6] = 135;
-            data[7] = 135;
-            data[8] = 135;
+            data[5] = 145;
+            data[6] = 145;
+            data[7] = 145;
+            data[8] = 145;
             data[1] = wheelspeed * R2;
             data[2] = wheelspeed * R2;
             data[3] = wheelspeed * R2;
             data[4] = wheelspeed * R2;
         }
+
         data[5] = deg;
         data[6] = deg;
         data[7] = deg;
         data[8] = deg;
 
+        //わかりやすいように数値を45-135-225座標に合わせてます。不要なら消去で
+        if((deg > 45)&&(deg <= 135)){
+            int adj_deg = int(deg * 0.9);
+            std::cout << adj_deg << std::endl;
+        }
+        if(((deg <= 45)&&(deg > 135))){
+            std::cout << deg-10 << std::endl; 
+        }
+        //std::cout << deg << std::endl;
         
-        std::cout << deg << std::endl;
+
 
         //std::cout << data << std::endl;
         udp_.send(data);
