@@ -118,28 +118,28 @@ private:
             data[7] = deg;
             data[8] = deg;
         }
-        // //時計回りYAW回転
-        // if (RS_X < 0){
-        //     data[5] = 180;
-        //     data[6] = 90;
-        //     data[7] = 90;
-        //     data[8] = 180;
-        //     data[1] = -yawspeed;
-        //     data[2] = yawspeed;
-        //     data[3] = -yawspeed;
-        //     data[4] = yawspeed;
-        // }
-        // //半時計回りYAW回転
-        // if (0 <= RS_X){
-        //     data[5] = 180;
-        //     data[6] = 90;
-        //     data[7] = 90;
-        //     data[8] = 180;
-        //     data[1] = yawspeed;
-        //     data[2] = -yawspeed;
-        //     data[3] = yawspeed;
-        //     data[4] = -yawspeed;
-        // }
+        //時計回りYAW回転
+        if (RS_X < 0){
+            data[5] = 180;
+            data[6] = 90;
+            data[7] = 90;
+            data[8] = 180;
+            data[1] = -yawspeed;
+            data[2] = yawspeed;
+            data[3] = -yawspeed;
+            data[4] = yawspeed;
+        }
+        //半時計回りYAW回転
+        if (0 <= RS_X){
+            data[5] = 180;
+            data[6] = 90;
+            data[7] = 90;
+            data[8] = 180;
+            data[1] = yawspeed;
+            data[2] = -yawspeed;
+            data[3] = yawspeed;
+            data[4] = -yawspeed;
+        }
         
         //独ステが扱えない範囲の変換
         if ((270 < deg) && (deg < 360)) {
