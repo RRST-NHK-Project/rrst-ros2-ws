@@ -1,7 +1,8 @@
 /*
 RRST NHK2025
 PID on ROS
-PID制御用にエンコーダーの速度、変位をマイコンｋら受信してPublish
+PID制御用にエンコーダーの速度、変位を受信してPublish
+いろいろやってみたけど無理そうなので凍結
 */
 
 #include <rclcpp/rclcpp.hpp>

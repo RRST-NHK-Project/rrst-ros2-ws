@@ -25,6 +25,7 @@ int wheelspeed = 10;
 float deadzone = 0.3;
 int yawspeed = 10;
 
+// joy_nodeからコントローラーの入力を取得するクラス
 class PS4_Listener : public rclcpp::Node {
 public:
     PS4_Listener(const std::string &ip, int port)
@@ -44,7 +45,7 @@ private:
         float LS_X = -1 * msg->axes[0];
         float LS_Y = msg->axes[1];
         float RS_X = -1 * msg->axes[3];
-        //float RS_Y = msg->axes[4];
+        // float RS_Y = msg->axes[4];
 
         // bool CROSS = msg->buttons[0];
         // bool CIRCLE = msg->buttons[1];
@@ -59,7 +60,7 @@ private:
         // bool L1 = msg->buttons[4];
         // bool R1 = msg->buttons[5];
 
-        //float L2 = (-1 * msg->axes[2] + 1) / 2;
+        // float L2 = (-1 * msg->axes[2] + 1) / 2;
         float R2 = (-1 * msg->axes[5] + 1) / 2;
 
         // bool SHARE = msg->buttons[8];
@@ -69,6 +70,7 @@ private:
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
 
+        // ソフト緊停、配列を初期化し送信、10回試行後にノードを落とす
         if (PS) {
             std::fill(data.begin(), data.end(), 0);                          // 配列をゼロで埋める
             data[6] = data[7] = data[8] = -1;                                // 最後の3つを-1に
@@ -82,22 +84,22 @@ private:
 
         float rad = atan2(LS_Y, LS_X);
         deg = rad * 180 / M_PI;
-        //XY座標での正しい角度truedeg
+        // XY座標での正しい角度truedeg
         truedeg = deg;
-        if((0<=truedeg)&&(truedeg<=180)){
+        if ((0 <= truedeg) && (truedeg <= 180)) {
             truedeg = truedeg;
         }
-        if((-180<=truedeg)&&(truedeg<=0)){
+        if ((-180 <= truedeg) && (truedeg <= 0)) {
             truedeg = -truedeg + 360;
         }
-        //deadzone追加
-        if ((fabs(LS_X) <= deadzone) && (fabs(LS_Y) <= deadzone)&& (fabs(RS_X) <= deadzone)) {
+        // deadzone追加
+        if ((fabs(LS_X) <= deadzone) && (fabs(LS_Y) <= deadzone) && (fabs(RS_X) <= deadzone)) {
             data[1] = 0;
             data[2] = 0;
             data[3] = 0;
             data[4] = 0;
         }
-        //XY座標での９０度の位置に１３５度を変換して計算
+        // XY座標での９０度の位置に１３５度を変換して計算
         if ((-180 <= deg) && (deg <= -135)) {
             deg = -deg - 135;
         } else {
@@ -118,8 +120,8 @@ private:
             data[7] = deg;
             data[8] = deg;
         }
-        //時計回りYAW回転
-        if (RS_X < 0){
+        // 時計回りYAW回転
+        if (RS_X < 0) {
             data[5] = 180;
             data[6] = 90;
             data[7] = 90;
@@ -129,8 +131,8 @@ private:
             data[3] = -yawspeed;
             data[4] = yawspeed;
         }
-        //半時計回りYAW回転
-        if (0 <= RS_X){
+        // 半時計回りYAW回転
+        if (0 <= RS_X) {
             data[5] = 180;
             data[6] = 90;
             data[7] = 90;
@@ -140,8 +142,8 @@ private:
             data[3] = yawspeed;
             data[4] = -yawspeed;
         }
-        
-        //独ステが扱えない範囲の変換
+
+        // 独ステが扱えない範囲の変換
         if ((270 < deg) && (deg < 360)) {
             deg = deg - 180;
             data[5] = deg;

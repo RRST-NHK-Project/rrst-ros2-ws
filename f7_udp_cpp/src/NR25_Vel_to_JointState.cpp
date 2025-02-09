@@ -39,6 +39,37 @@ int servo_deg;
 
 */
 
+/*
+mbed側から引用
+速度、変位の計算部分を貼っておきます
+
+float Pulse[6]; // エンコーダーのパルス格納用
+float v[5] = {0.0, 0.0, 0.0, 0.0, 0.0}; // 速度の格納[mm/s]
+float d[5] = {0.0, 0.0, 0.0, 0.0, 0.0}; // 変位[m]
+
+float period = 10; // 制御周期[ms]
+float R = 80;      // オムニ直径[mm]
+int PPRx4 = 8192;  // エンコーダーのResolution
+
+〜　中略　〜
+
+v[1] = Pulse[1] * (R * PI / PPRx4) *
+        (1000 / period); // エンコーダーのパルスから速度[mm/s]を計算
+v[2] = Pulse[2] * (R * PI / PPRx4) *
+        (1000 / period); // エンコーダーのパルスから速度[mm/s]を計算
+v[3] = Pulse[3] * (R * PI / PPRx4) *
+        (1000 / period); // エンコーダーのパルスから速度[mm/s]を計算
+v[4] = Pulse[4] * (R * PI / PPRx4) *
+        (1000 / period); // エンコーダーのパルスから速度[mm/s]を計算
+
+d[1] += Pulse[1] * R * PI / PPRx4 / 1000; //変位[m]
+d[2] += Pulse[2] * R * PI / PPRx4 / 1000; //変位[m]
+d[3] += Pulse[3] * R * PI / PPRx4 / 1000; //変位[m]
+d[4] += Pulse[4] * R * PI / PPRx4 / 1000; //変位[m]
+
+*/
+
+// 別ノードにてUDP受信した速度、変位をとってくる
 class ENC_Listener : public rclcpp::Node {
 public:
     ENC_Listener()
@@ -90,6 +121,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
 };
 
+// JointState型に格納しPublish
 class JointStatePublisher : public rclcpp::Node {
 public:
     JointStatePublisher() : Node("mr_joint_state_publisher") {
