@@ -125,7 +125,7 @@ public:
     PS4_Listener(const std::string &ip, int port)
         : Node("nhk25_mr"), udp_(ip, port) {
         subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
-            "joy", 10,
+            "joy0", 10,
             std::bind(&PS4_Listener::ps4_listener_callback, this,
                       std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(),

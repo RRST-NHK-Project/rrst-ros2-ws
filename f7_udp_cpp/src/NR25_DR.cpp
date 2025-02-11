@@ -16,7 +16,7 @@ RRST NHK2025
 #include "include/UDP.hpp"
 
 // IPアドレスとポートの指定
-std::string udp_ip = "192.168.8.217"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
+std::string udp_ip = "192.168.8.218"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
 
 std::vector<int> data = {0, 0, 0, 0, 0, 0, -1, -1, -1}; // 7~9番を電磁弁制御に転用中（-1 or 1）
@@ -48,13 +48,13 @@ public:
 class PS4_Listener : public rclcpp::Node {
 public:
     PS4_Listener(const std::string &ip, int port)
-        : Node("nhk25_mr"), udp_(ip, port) {
+        : Node("nhk25_dr"), udp_(ip, port) {
         subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
-            "joy", 10,
+            "joy1", 10,
             std::bind(&PS4_Listener::ps4_listener_callback, this,
                       std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(),
-                    "NHK2025 MR initialized with IP: %s, Port: %d", ip.c_str(),
+                    "NHK2025 DR initialized with IP: %s, Port: %d", ip.c_str(),
                     port);
     }
 

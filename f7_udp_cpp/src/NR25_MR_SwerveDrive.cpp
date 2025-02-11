@@ -12,6 +12,16 @@ RRST NHK2025
 #include <std_msgs/msg/int32_multi_array.hpp>
 #include <thread>
 
+// サーボの組み付け時のズレを補正（度数法）
+#define SERVO1_CAL 0
+#define SERVO2_CAL 0
+#define SERVO3_CAL 0
+#define SERVO4_CAL 0
+
+// スティックのデッドゾーン
+#define DEADZONE_L 0.7
+#define DEADZONE_R 0.3
+
 int deg;
 int truedeg;
 
@@ -25,13 +35,12 @@ int wheelspeed = 10;
 float deadzone = 0.3;
 int yawspeed = 10;
 
-// joy_nodeからコントローラーの入力を取得するクラス
 class PS4_Listener : public rclcpp::Node {
 public:
     PS4_Listener(const std::string &ip, int port)
         : Node("nhk25_mr_sd"), udp_(ip, port) {
         subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
-            "joy", 10,
+            "joy0", 10,
             std::bind(&PS4_Listener::ps4_listener_callback, this,
                       std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(),
@@ -70,7 +79,6 @@ private:
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
 
-        // ソフト緊停、配列を初期化し送信、10回試行後にノードを落とす
         if (PS) {
             std::fill(data.begin(), data.end(), 0);                          // 配列をゼロで埋める
             data[6] = data[7] = data[8] = -1;                                // 最後の3つを-1に
@@ -84,6 +92,8 @@ private:
 
         float rad = atan2(LS_Y, LS_X);
         deg = rad * 180 / M_PI;
+        // 135度を90度とみなしたときのズレの角度
+
         // XY座標での正しい角度truedeg
         truedeg = deg;
         if ((0 <= truedeg) && (truedeg <= 180)) {
@@ -92,77 +102,35 @@ private:
         if ((-180 <= truedeg) && (truedeg <= 0)) {
             truedeg = -truedeg + 360;
         }
-        // deadzone追加
-        if ((fabs(LS_X) <= deadzone) && (fabs(LS_Y) <= deadzone) && (fabs(RS_X) <= deadzone)) {
-            data[1] = 0;
-            data[2] = 0;
-            data[3] = 0;
-            data[4] = 0;
-        }
-        // XY座標での９０度の位置に１３５度を変換して計算
-        if ((-180 <= deg) && (deg <= -135)) {
-            deg = -deg - 135;
-        } else {
-            deg = 225 - deg;
-        }
+
+        // // XY座標での９０度の位置に１３５度を変換して計算
+        // if ((-180 <= deg) && (deg <= -135)) {
+        //     deg = -deg - 135;
+        //     data[5] = deg + SERVO1_CAL;
+        //     data[6] = deg + SERVO2_CAL;
+        //     data[7] = deg + SERVO3_CAL;
+        //     data[8] = deg + SERVO4_CAL;
+        // } else {
+        //     deg = 225 - deg;
+        //     data[5] = deg + SERVO1_CAL;
+        //     data[6] = deg + SERVO2_CAL;
+        //     data[7] = deg + SERVO3_CAL;
+        //     data[8] = deg + SERVO4_CAL;
+        // }
 
         // std::cout << deg << std::endl;
-        data[1] = -wheelspeed * R2;
-        data[2] = -wheelspeed * R2;
-        data[3] = wheelspeed * R2;
-        data[4] = wheelspeed * R2;
-
-        // 進行方向にするため初期位置を135→145
-        if ((fabs(LS_X) <= deadzone) && (fabs(LS_Y) <= deadzone)) {
-            deg = 135;
-            data[5] = deg;
-            data[6] = deg;
-            data[7] = deg;
-            data[8] = deg;
-        }
-
-        // // 時計回りYAW回転
-        // if (RS_X < 0) {
-        //     data[5] = 180;
-        //     data[6] = 90;
-        //     data[7] = 90;
-        //     data[8] = 180;
-        //     data[1] = -yawspeed;
-        //     data[2] = yawspeed;
-        //     data[3] = -yawspeed;
-        //     data[4] = yawspeed;
-        // }
-        // // 半時計回りYAW回転
-        // if (0 <= RS_X) {
-        //     data[5] = 180;
-        //     data[6] = 90;
-        //     data[7] = 90;
-        //     data[8] = 180;
-        //     data[1] = yawspeed;
-        //     data[2] = -yawspeed;
-        //     data[3] = yawspeed;
-        //     data[4] = -yawspeed;
-        // }
 
         // 独ステが扱えない範囲の変換
         if ((270 < deg) && (deg < 360)) {
             deg = deg - 180;
-            data[5] = deg;
-            data[6] = deg;
-            data[7] = deg;
-            data[8] = deg;
             data[1] = wheelspeed * R2;
             data[2] = wheelspeed * R2;
-            data[3] = -wheelspeed * R2;
-            data[4] = -wheelspeed * R2;
+            data[3] = wheelspeed * R2;
+            data[4] = wheelspeed * R2;
         }
 
         if (LEFT) {
             deg = 45;
-            data[5] = deg;
-            data[6] = deg;
-            data[7] = deg;
-            data[8] = deg;
             data[1] = -wheelspeed * R2;
             data[2] = -wheelspeed * R2;
             data[3] = -wheelspeed * R2;
@@ -170,10 +138,6 @@ private:
         }
         if (RIGHT) {
             deg = 45;
-            data[5] = deg;
-            data[6] = deg;
-            data[7] = deg;
-            data[8] = deg;
             data[1] = wheelspeed * R2;
             data[2] = wheelspeed * R2;
             data[3] = wheelspeed * R2;
@@ -181,10 +145,6 @@ private:
         }
         if (UP) {
             deg = 135;
-            data[5] = deg;
-            data[6] = deg;
-            data[7] = deg;
-            data[8] = deg;
             data[1] = -wheelspeed * R2;
             data[2] = -wheelspeed * R2;
             data[3] = -wheelspeed * R2;
@@ -192,30 +152,60 @@ private:
         }
         if (DOWN) {
             deg = 135;
-            data[5] = deg;
-            data[6] = deg;
-            data[7] = deg;
-            data[8] = deg;
             data[1] = wheelspeed * R2;
             data[2] = wheelspeed * R2;
             data[3] = wheelspeed * R2;
             data[4] = wheelspeed * R2;
         }
 
-        data[5] = deg;
-        data[6] = deg;
-        data[7] = deg;
-        data[8] = deg;
+        data[1] = -wheelspeed * R2;
+        data[2] = -wheelspeed * R2;
+        data[3] = -wheelspeed * R2;
+        data[4] = -wheelspeed * R2;
+        data[5] = deg + SERVO1_CAL;
+        data[6] = deg + SERVO2_CAL;
+        data[7] = deg + SERVO3_CAL;
+        data[8] = deg + SERVO4_CAL;
 
-        // わかりやすいように数値を45-135-225座標に合わせてます。不要なら消去で
-        // if ((deg > 45) && (deg <= 135)) {
-        //     int adj_deg = int(deg * 0.9);
-        //     std::cout << adj_deg << std::endl;
-        // }
-        // if (((deg <= 45) && (deg > 135))) {
-        //     std::cout << deg - 10 << std::endl;
-        // }
-        std::cout << data[5] << std::endl;
+        // 時計回りYAW回転
+        if (RS_X < 0) {
+            data[5] = 180 + SERVO1_CAL;
+            data[6] = 90 + SERVO2_CAL;
+            data[7] = 90 + SERVO3_CAL;
+            data[8] = 180 + SERVO4_CAL;
+            data[1] = -yawspeed;
+            data[2] = yawspeed;
+            data[3] = -yawspeed;
+            data[4] = yawspeed;
+        }
+        // 半時計回りYAW回転
+        if (0 < RS_X) {
+            data[5] = 180 + SERVO1_CAL;
+            data[6] = 90 + SERVO2_CAL;
+            data[7] = 90 + SERVO3_CAL;
+            data[8] = 180 + SERVO4_CAL;
+            data[1] = yawspeed;
+            data[2] = -yawspeed;
+            data[3] = yawspeed;
+            data[4] = -yawspeed;
+        }
+
+        // deadzone追加
+        if ((fabs(LS_X) <= DEADZONE_R) && (fabs(LS_Y) <= DEADZONE_R) && (fabs(RS_X) <= DEADZONE_L)) {
+            deg = 135;
+            data[1] = 0;
+            data[2] = 0;
+            data[3] = 0;
+            data[4] = 0;
+            data[5] = deg + SERVO1_CAL;
+            data[6] = deg + SERVO2_CAL;
+            data[7] = deg + SERVO3_CAL;
+            data[8] = deg + SERVO4_CAL;
+        }
+
+        // デバッグ用
+        std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4] << ", ";
+        std::cout << data[5] << ", " << data[6] << ", " << data[7] << ", " << data[8] << ", " << std::endl;
 
         // std::cout << data << std::endl;
         udp_.send(data);
