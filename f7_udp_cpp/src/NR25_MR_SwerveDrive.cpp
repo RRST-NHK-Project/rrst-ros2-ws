@@ -109,8 +109,8 @@ private:
         // std::cout << deg << std::endl;
         data[1] = -wheelspeed * R2;
         data[2] = -wheelspeed * R2;
-        data[3] = -wheelspeed * R2;
-        data[4] = -wheelspeed * R2;
+        data[3] = wheelspeed * R2;
+        data[4] = wheelspeed * R2;
 
         // 進行方向にするため初期位置を135→145
         if ((fabs(LS_X) <= deadzone) && (fabs(LS_Y) <= deadzone)) {
@@ -120,28 +120,29 @@ private:
             data[7] = deg;
             data[8] = deg;
         }
-        // 時計回りYAW回転
-        if (RS_X < 0) {
-            data[5] = 180;
-            data[6] = 90;
-            data[7] = 90;
-            data[8] = 180;
-            data[1] = -yawspeed;
-            data[2] = yawspeed;
-            data[3] = -yawspeed;
-            data[4] = yawspeed;
-        }
-        // 半時計回りYAW回転
-        if (0 <= RS_X) {
-            data[5] = 180;
-            data[6] = 90;
-            data[7] = 90;
-            data[8] = 180;
-            data[1] = yawspeed;
-            data[2] = -yawspeed;
-            data[3] = yawspeed;
-            data[4] = -yawspeed;
-        }
+
+        // // 時計回りYAW回転
+        // if (RS_X < 0) {
+        //     data[5] = 180;
+        //     data[6] = 90;
+        //     data[7] = 90;
+        //     data[8] = 180;
+        //     data[1] = -yawspeed;
+        //     data[2] = yawspeed;
+        //     data[3] = -yawspeed;
+        //     data[4] = yawspeed;
+        // }
+        // // 半時計回りYAW回転
+        // if (0 <= RS_X) {
+        //     data[5] = 180;
+        //     data[6] = 90;
+        //     data[7] = 90;
+        //     data[8] = 180;
+        //     data[1] = yawspeed;
+        //     data[2] = -yawspeed;
+        //     data[3] = yawspeed;
+        //     data[4] = -yawspeed;
+        // }
 
         // 独ステが扱えない範囲の変換
         if ((270 < deg) && (deg < 360)) {
@@ -152,8 +153,8 @@ private:
             data[8] = deg;
             data[1] = wheelspeed * R2;
             data[2] = wheelspeed * R2;
-            data[3] = wheelspeed * R2;
-            data[4] = wheelspeed * R2;
+            data[3] = -wheelspeed * R2;
+            data[4] = -wheelspeed * R2;
         }
 
         if (LEFT) {
@@ -214,7 +215,7 @@ private:
         // if (((deg <= 45) && (deg > 135))) {
         //     std::cout << deg - 10 << std::endl;
         // }
-        std::cout << data[1] << std::endl;
+        std::cout << data[5] << std::endl;
 
         // std::cout << data << std::endl;
         udp_.send(data);
