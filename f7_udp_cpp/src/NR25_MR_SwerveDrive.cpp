@@ -12,7 +12,7 @@ RRST NHK2025
 #include <std_msgs/msg/int32_multi_array.hpp>
 #include <thread>
 
-int deg
+int deg;
 //ズレの角度
 int deg1,deg2,deg3,deg4;
 int truedeg;
@@ -99,7 +99,7 @@ private:
             truedeg = -truedeg + 360;
         }
         //deadzone追加
-        if ((fabs(LS_X) <= deadzone) && (fabs(LS_Y) <= deadzone)&& (fabs(RS_X) <= deadzone)) {
+        if ((fabs(LS_X) <= deadzone) && (fabs(LS_Y) <= deadzone)&& (fabs(RS_X) <= deadzone+0.4)) {
             data[1] = 0;
             data[2] = 0;
             data[3] = 0;
@@ -108,8 +108,16 @@ private:
         //XY座標での９０度の位置に１３５度を変換して計算
         if ((-180 <= deg) && (deg <= -135)) {
             deg = -deg - 135;
+            data[5] = deg + deg1;
+            data[6] = deg + deg2;
+            data[7] = deg + deg3;
+            data[8] = deg + deg4;
         } else {
             deg = 225 - deg;
+            data[5] = deg + deg1;
+            data[6] = deg + deg2;
+            data[7] = deg + deg3;
+            data[8] = deg + deg4;
         }
 
         // std::cout << deg << std::endl;
@@ -220,7 +228,7 @@ private:
         // if (((deg <= 45) && (deg > 135))) {
         //     std::cout << deg - 10 << std::endl;
         // }
-        std::cout << data[1] << std::endl;
+        std::cout << deg << std::endl;
 
         // std::cout << data << std::endl;
         udp_.send(data);
