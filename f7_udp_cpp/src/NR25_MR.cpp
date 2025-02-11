@@ -1,7 +1,8 @@
 /*
 RRST NHK2025
 汎用機の機構制御
-クリコア　
+
+@クリコア
 === Current Parameters ===
 0: roller_speed_dribble_ab = 15
 1: roller_speed_dribble_cd = 75
@@ -32,8 +33,8 @@ int roller_speed_shoot_cd = 50;
 int roller_speed_reload = 15;
 
 // IPアドレスとポートの指定
-std::string udp_ip = "192.168.8.216"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
-int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
+std::string udp_ip = "192.168.8.216"; // 送信先IPアドレス、宛先マイコンのIPv4アドレスを指定
+int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンのポート番号を指定
 
 std::vector<int> data = {0, 0, 0, 0, 0, 0, -1, -1, -1}; // 7~9番を電磁弁制御に転用中（-1 or 1）
 
@@ -163,26 +164,27 @@ private:
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
 
+        // ソフト緊停、配列を初期化し送信、10回試行後にノードを落とす
         if (PS) {
             std::fill(data.begin(), data.end(), 0);                          // 配列をゼロで埋める
-            data[6] = data[7] = data[8] = -1;                                // 最後の3つを-1に
+            data[6] = data[7] = data[8] = -1;                                // 最後の3つを-1に（電磁弁に転用中の要素のみ-１を代入）
             for (int attempt = 0; attempt < 10; attempt++) {                 // 10回試行
                 udp_.send(data);                                             // データ送信
                 std::cout << "緊急停止！ 試行" << attempt + 1 << std::endl;  // 試行回数を表示
-                std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 100msの遅延
+                std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 遅延
             }
             rclcpp::shutdown();
         }
-
-        // if (PS) {
-        //     std::fill(data.begin(), data.end(), 0);                              // 配列をゼロで埋める
-        //     for (int attempt = 0; attempt < 10; attempt++) {                     // 10回試行
-        //         udp_.send(data);                                                 // データ送信
-        //         std::cout << "緊急停止！ 試行" << attempt + 1 << std::endl; // 試行回数を表示
-        //         std::this_thread::sleep_for(std::chrono::milliseconds(100));     // 100msの遅延
-        //     }
-        //     rclcpp::shutdown();
-        // }
+        // すべてモーターの場合はこっちを使え
+        //  if (PS) {
+        //      std::fill(data.begin(), data.end(), 0);                              // 配列をゼロで埋める
+        //      for (int attempt = 0; attempt < 10; attempt++) {                     // 10回試行
+        //          udp_.send(data);                                                 // データ送信
+        //          std::cout << "緊急停止！ 試行" << attempt + 1 << std::endl; // 試行回数を表示
+        //          std::this_thread::sleep_for(std::chrono::milliseconds(100));     // 100msの遅延
+        //      }
+        //      rclcpp::shutdown();
+        //  }
 
         if (CIRCLE) {
             Action::ready_for_shoot_action(udp_);
@@ -205,6 +207,7 @@ private:
     UDP udp_;
 };
 
+// パラメーター（各ローラーの速度）を受信するクラス
 class Params_Listener : public rclcpp::Node {
 public:
     Params_Listener()
@@ -219,14 +222,15 @@ public:
 
 private:
     void params_listener_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        // 受け取ったパラメーターを各変数に格納
         roller_speed_dribble_ab = msg->data[0];
         roller_speed_dribble_cd = msg->data[1];
         roller_speed_shoot_ab = msg->data[2];
         roller_speed_shoot_cd = msg->data[3];
-        std::cout << roller_speed_dribble_ab;
-        std::cout << roller_speed_dribble_cd;
-        std::cout << roller_speed_shoot_ab;
-        std::cout << roller_speed_shoot_cd << std::endl;
+        // std::cout << roller_speed_dribble_ab;
+        // std::cout << roller_speed_dribble_cd;
+        // std::cout << roller_speed_shoot_ab;
+        // std::cout << roller_speed_shoot_cd << std::endl;
     }
 
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
@@ -235,6 +239,7 @@ private:
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
+    // Executorを指定（MultiThreadedExecutorに変更するかも）
     rclcpp::executors::SingleThreadedExecutor exec;
     auto ps4_listener = std::make_shared<PS4_Listener>(udp_ip, udp_port);
     auto params_listener = std::make_shared<Params_Listener>();
