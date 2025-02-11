@@ -12,7 +12,9 @@ RRST NHK2025
 #include <std_msgs/msg/int32_multi_array.hpp>
 #include <thread>
 
-int deg;
+int deg
+//ズレの角度
+int deg1,deg2,deg3,deg4;
 int truedeg;
 
 // IPアドレスとポートの指定
@@ -82,6 +84,12 @@ private:
 
         float rad = atan2(LS_Y, LS_X);
         deg = rad * 180 / M_PI;
+        //135度を90度とみなしたときのズレの角度
+        deg1 = 0;
+        deg2 = 0;
+        deg3 = 0;
+        deg4 = 0;
+
         //XY座標での正しい角度truedeg
         truedeg = deg;
         if((0<=truedeg)&&(truedeg<=180)){
@@ -113,17 +121,17 @@ private:
         // 進行方向にするため初期位置を135→145
         if ((fabs(LS_X) <= deadzone) && (fabs(LS_Y) <= deadzone)) {
             deg = 135;
-            data[5] = deg;
-            data[6] = deg;
-            data[7] = deg;
-            data[8] = deg;
+            data[5] = deg + deg1;
+            data[6] = deg + deg2;
+            data[7] = deg + deg3;
+            data[8] = deg + deg4;
         }
         //時計回りYAW回転
         if (RS_X < 0){
-            data[5] = 180;
-            data[6] = 90;
-            data[7] = 90;
-            data[8] = 180;
+            data[5] = 180 + deg1;
+            data[6] = 90 + deg2;
+            data[7] = 90 + deg3;
+            data[8] = 180 + deg4;
             data[1] = -yawspeed;
             data[2] = yawspeed;
             data[3] = -yawspeed;
@@ -131,10 +139,10 @@ private:
         }
         //半時計回りYAW回転
         if (0 <= RS_X){
-            data[5] = 180;
-            data[6] = 90;
-            data[7] = 90;
-            data[8] = 180;
+            data[5] = 180 + deg1;
+            data[6] = 90 + deg2; 
+            data[7] = 90 + deg3;
+            data[8] = 180 + deg4;
             data[1] = yawspeed;
             data[2] = -yawspeed;
             data[3] = yawspeed;
@@ -144,10 +152,10 @@ private:
         //独ステが扱えない範囲の変換
         if ((270 < deg) && (deg < 360)) {
             deg = deg - 180;
-            data[5] = deg;
-            data[6] = deg;
-            data[7] = deg;
-            data[8] = deg;
+            data[5] = deg + deg1;
+            data[6] = deg + deg2;
+            data[7] = deg + deg3;
+            data[8] = deg + deg4;
             data[1] = wheelspeed * R2;
             data[2] = wheelspeed * R2;
             data[3] = wheelspeed * R2;
@@ -156,10 +164,10 @@ private:
 
         if (LEFT) {
             deg = 45;
-            data[5] = deg;
-            data[6] = deg;
-            data[7] = deg;
-            data[8] = deg;
+            data[5] = deg + deg1;
+            data[6] = deg + deg2;
+            data[7] = deg + deg3;
+            data[8] = deg + deg4;
             data[1] = -wheelspeed * R2;
             data[2] = -wheelspeed * R2;
             data[3] = -wheelspeed * R2;
@@ -167,10 +175,10 @@ private:
         }
         if (RIGHT) {
             deg = 45;
-            data[5] = deg;
-            data[6] = deg;
-            data[7] = deg;
-            data[8] = deg;
+            data[5] = deg + deg1;
+            data[6] = deg + deg2;
+            data[7] = deg + deg3;
+            data[8] = deg + deg4;
             data[1] = wheelspeed * R2;
             data[2] = wheelspeed * R2;
             data[3] = wheelspeed * R2;
@@ -178,10 +186,10 @@ private:
         }
         if (UP) {
             deg = 135;
-            data[5] = deg;
-            data[6] = deg;
-            data[7] = deg;
-            data[8] = deg;
+            data[5] = deg + deg1;
+            data[6] = deg + deg2;
+            data[7] = deg + deg3;
+            data[8] = deg + deg4;
             data[1] = -wheelspeed * R2;
             data[2] = -wheelspeed * R2;
             data[3] = -wheelspeed * R2;
@@ -189,10 +197,10 @@ private:
         }
         if (DOWN) {
             deg = 135;
-            data[5] = deg;
-            data[6] = deg;
-            data[7] = deg;
-            data[8] = deg;
+            data[5] = deg + deg1;
+            data[6] = deg + deg2;
+            data[7] = deg + deg3;
+            data[8] = deg + deg4;
             data[1] = wheelspeed * R2;
             data[2] = wheelspeed * R2;
             data[3] = wheelspeed * R2;
