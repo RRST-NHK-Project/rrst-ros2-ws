@@ -13,10 +13,10 @@ RRST NHK2025
 #include <thread>
 
 // サーボの組み付け時のズレを補正（度数法）
-#define SERVO1_CAL -10
-#define SERVO2_CAL -10
-#define SERVO3_CAL -10
-#define SERVO4_CAL -10
+#define SERVO1_CAL 0
+#define SERVO2_CAL 0
+#define SERVO3_CAL 0
+#define SERVO4_CAL 0
 
 // スティックのデッドゾーン
 #define DEADZONE_L 0.7
@@ -40,7 +40,7 @@ public:
     PS4_Listener(const std::string &ip, int port)
         : Node("nhk25_mr_sd"), udp_(ip, port) {
         subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
-            "joy", 10,
+            "joy0", 10,
             std::bind(&PS4_Listener::ps4_listener_callback, this,
                       std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(),

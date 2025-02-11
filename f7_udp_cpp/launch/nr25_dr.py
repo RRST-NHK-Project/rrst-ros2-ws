@@ -6,22 +6,18 @@ def generate_launch_description():
         Node(
             package='joy',
             executable='joy_node',
-            name='joy',
             output='screen',
-            emulate_tty=True
+            parameters=[{"device_id": 1}],  # ここで device_id を指定
+            remappings=[("/joy", "/joy1")]
         ),
         Node(
             package='f7_udp_cpp',
             executable='nr25_dr_sd',
-            name='nr25_dr_sd',
             output='screen',
-            emulate_tty=True
         ),
         Node(
             package='f7_udp_cpp',
             executable='nr25_dr',
-            name='dr_sd',
             output='screen',
-            emulate_tty=True
         ),
     ])
