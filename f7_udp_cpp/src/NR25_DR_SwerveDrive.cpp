@@ -1,6 +1,6 @@
 /*
 RRST NHK2025
-ダンク機独ステ
+汎用機独ステ
 */
 
 #include "include/UDP.hpp"
@@ -13,10 +13,10 @@ RRST NHK2025
 #include <thread>
 
 // サーボの組み付け時のズレを補正（度数法）
-#define SERVO1_CAL 0
+#define SERVO1_CAL 0 // 7
 #define SERVO2_CAL 0
-#define SERVO3_CAL 0
-#define SERVO4_CAL 0
+#define SERVO3_CAL 0 // 0
+#define SERVO4_CAL 0 //-5
 
 // スティックのデッドゾーン
 #define DEADZONE_L 0.7
@@ -31,8 +31,7 @@ int udp_port = 5000;                  // 送信元ポート番号、宛先マイ
 
 std::vector<int> data = {0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-int wheelspeed = 10;
-float deadzone = 0.3;
+int wheelspeed = 30;
 int yawspeed = 10;
 
 class PS4_Listener : public rclcpp::Node {
@@ -81,7 +80,6 @@ private:
 
         if (PS) {
             std::fill(data.begin(), data.end(), 0);                          // 配列をゼロで埋める
-            data[6] = data[7] = data[8] = -1;                                // 最後の3つを-1に
             for (int attempt = 0; attempt < 10; attempt++) {                 // 10回試行
                 udp_.send(data);                                             // データ送信
                 std::cout << "緊急停止！ 試行" << attempt + 1 << std::endl;  // 試行回数を表示
@@ -103,31 +101,37 @@ private:
             truedeg = -truedeg + 360;
         }
 
-        // // XY座標での９０度の位置に１３５度を変換して計算
-        // if ((-180 <= deg) && (deg <= -135)) {
-        //     deg = -deg - 135;
-        //     data[5] = deg + SERVO1_CAL;
-        //     data[6] = deg + SERVO2_CAL;
-        //     data[7] = deg + SERVO3_CAL;
-        //     data[8] = deg + SERVO4_CAL;
-        // } else {
-        //     deg = 225 - deg;
-        //     data[5] = deg + SERVO1_CAL;
-        //     data[6] = deg + SERVO2_CAL;
-        //     data[7] = deg + SERVO3_CAL;
-        //     data[8] = deg + SERVO4_CAL;
-        // }
+        // ！！！！！最重要！！！！！
+        //  XY座標での９０度の位置に１３５度を変換して計算
+        if ((-180 <= deg) && (deg <= -135)) {
+            deg = -deg - 135;
+        } else {
+            deg = 225 - deg;
+        }
 
         // std::cout << deg << std::endl;
 
-        // 独ステが扱えない範囲の変換
-        if ((270 < deg) && (deg < 360)) {
-            deg = deg - 180;
-            data[1] = wheelspeed * R2;
-            data[2] = wheelspeed * R2;
-            data[3] = wheelspeed * R2;
-            data[4] = wheelspeed * R2;
+        // deadzone追加
+        if ((fabs(LS_X) <= DEADZONE_R) && (fabs(LS_Y) <= DEADZONE_R) && (fabs(RS_X) <= DEADZONE_L)) {
+            deg = 135;
+            data[1] = 0;
+            data[2] = 0;
+            data[3] = 0;
+            data[4] = 0;
+            data[5] = deg + SERVO1_CAL;
+            data[6] = deg + SERVO2_CAL;
+            data[7] = deg + SERVO3_CAL;
+            data[8] = deg + SERVO4_CAL;
         }
+
+        data[1] = -wheelspeed * R2;
+        data[2] = -wheelspeed * R2;
+        data[3] = -wheelspeed * R2;
+        data[4] = -wheelspeed * R2;
+        data[5] = deg + SERVO1_CAL;
+        data[6] = deg + SERVO2_CAL;
+        data[7] = deg + SERVO3_CAL;
+        data[8] = deg + SERVO4_CAL;
 
         if (LEFT) {
             deg = 45;
@@ -158,17 +162,21 @@ private:
             data[4] = wheelspeed * R2;
         }
 
-        data[1] = -wheelspeed * R2;
-        data[2] = -wheelspeed * R2;
-        data[3] = -wheelspeed * R2;
-        data[4] = -wheelspeed * R2;
-        data[5] = deg + SERVO1_CAL;
-        data[6] = deg + SERVO2_CAL;
-        data[7] = deg + SERVO3_CAL;
-        data[8] = deg + SERVO4_CAL;
+        // 独ステが扱えない範囲の変換
+        if ((270 < deg) && (deg < 360)) {
+            deg = deg - 180;
+            data[1] = wheelspeed * R2;
+            data[2] = wheelspeed * R2;
+            data[3] = wheelspeed * R2;
+            data[4] = wheelspeed * R2;
+            data[5] = deg + SERVO1_CAL;
+            data[6] = deg + SERVO2_CAL;
+            data[7] = deg + SERVO3_CAL;
+            data[8] = deg + SERVO4_CAL;
+        }
 
         // 時計回りYAW回転
-        if (RS_X < 0) {
+        if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R) {
             data[5] = 180 + SERVO1_CAL;
             data[6] = 90 + SERVO2_CAL;
             data[7] = 90 + SERVO3_CAL;
@@ -179,7 +187,7 @@ private:
             data[4] = yawspeed;
         }
         // 半時計回りYAW回転
-        if (0 < RS_X) {
+        if (0 < RS_X && fabs(RS_X) >= DEADZONE_R) {
             data[5] = 180 + SERVO1_CAL;
             data[6] = 90 + SERVO2_CAL;
             data[7] = 90 + SERVO3_CAL;
@@ -190,22 +198,9 @@ private:
             data[4] = -yawspeed;
         }
 
-        // deadzone追加
-        if ((fabs(LS_X) <= DEADZONE_R) && (fabs(LS_Y) <= DEADZONE_R) && (fabs(RS_X) <= DEADZONE_L)) {
-            deg = 135;
-            data[1] = 0;
-            data[2] = 0;
-            data[3] = 0;
-            data[4] = 0;
-            data[5] = deg + SERVO1_CAL;
-            data[6] = deg + SERVO2_CAL;
-            data[7] = deg + SERVO3_CAL;
-            data[8] = deg + SERVO4_CAL;
-        }
-
         // デバッグ用
-        std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4] << ", ";
-        std::cout << data[5] << ", " << data[6] << ", " << data[7] << ", " << data[8] << ", " << std::endl;
+        // std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4] << ", ";
+        // std::cout << data[5] << ", " << data[6] << ", " << data[7] << ", " << data[8] << ", " << std::endl;
 
         // std::cout << data << std::endl;
         udp_.send(data);

@@ -19,31 +19,51 @@ RRST NHK2025
 std::string udp_ip = "192.168.8.218"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
 
-std::vector<int> data = {0, 0, 0, 0, 0, 0, -1, -1, -1}; // 7~9番を電磁弁制御に転用中（-1 or 1）
+std::vector<int> data = {0, -1, -1, -1, -1, -1, 0, 0, 0}; // 1~5番を電磁弁制御に転用中（-1 or 1）
 
 // 各機構のシーケンスを格納するクラス
 class Action {
 public:
-    static void dunk_shoot(UDP &udp) {
-        std::cout << "<ダンク開始>" << std::endl;
-        std::cout << "１段階..." << std::endl;
-        data[6] = 1;
+    // 事故防止のため、ブームの展開状況を保存
+    static bool ready_for_dunk;
+
+    static void ready_for_dunk_action(UDP &udp) {
+        std::cout << "１段階展開[1]" << std::endl;
+        data[1] = 1;
         udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(3000));
-        std::cout << "２段階..." << std::endl;
-        data[7] = 1;
-        udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-        std::cout << "バネ開放" << std::endl;
-        // バネ開放の処理をここへ
-        udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-        std::cout << "サーボ駆動" << std::endl;
-        data[5] = 0; // サーボ角度
-        udp.send(data);
+        ready_for_dunk = true;
         std::cout << "完了." << std::endl;
     }
+
+    static void dunk_shoot_action(UDP &udp) {
+        std::cout << "<ダンクシーケンス開始>" << std::endl;
+        std::cout << "２段階展開[2]＋トリガー[3]" << std::endl;
+        data[2] = 1;
+        data[3] = 1;
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(3));
+        std::cout << "ストッパ[4]" << std::endl;
+        data[4] = 1;
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        std::cout << "格納[5]" << std::endl;
+        data[5] = 1;
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
+        std::cout << "サーボ[8]" << std::endl;
+        data[8] = 0;
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::cout << "１段階格納[1]＋２段階格納[2]" << std::endl;
+        data[1] = -1;
+        data[2] = -1;
+        udp.send(data);
+        ready_for_dunk = false;
+        std::cout << "完了." << std::endl;
+        std::cout << "<ダンクシーケンス終了>" << std::endl;
+    }
 };
+bool Action::ready_for_dunk = false;
 
 class PS4_Listener : public rclcpp::Node {
 public:
@@ -68,7 +88,7 @@ private:
 
         // bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
-        // bool TRIANGLE = msg->buttons[2];
+        bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
@@ -110,9 +130,14 @@ private:
         //     rclcpp::shutdown();
         // }
 
-        if (CIRCLE) {
-            Action::dunk_shoot(udp_);
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        if (TRIANGLE) {
+            Action::ready_for_dunk_action(udp_);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        }
+
+        if (CIRCLE && Action::ready_for_dunk) {
+            Action::dunk_shoot_action(udp_);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
 
         udp_.send(data);
