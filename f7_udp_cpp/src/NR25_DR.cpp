@@ -16,7 +16,7 @@ RRST NHK2025
 #include "include/UDP.hpp"
 
 // IPアドレスとポートの指定
-std::string udp_ip = "192.168.8.218"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
+std::string udp_ip = "192.168.0.218"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
 
 std::vector<int> data = {0, -1, -1, -1, -1, -1, 0, 0, 0}; // 1~5番を電磁弁制御に転用中（-1 or 1）
@@ -41,11 +41,11 @@ public:
         data[2] = 1;
         data[3] = 1;
         udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(3));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         std::cout << "ストッパ[4]" << std::endl;
         data[4] = 1;
         udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         std::cout << "格納[5]" << std::endl;
         data[5] = 1;
         udp.send(data);
@@ -53,7 +53,7 @@ public:
         std::cout << "サーボ[8]" << std::endl;
         data[8] = 0;
         udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         std::cout << "１段階格納[1]＋２段階格納[2]" << std::endl;
         data[1] = -1;
         data[2] = -1;
@@ -132,12 +132,12 @@ private:
 
         if (TRIANGLE) {
             Action::ready_for_dunk_action(udp_);
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            //std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
 
         if (CIRCLE && Action::ready_for_dunk) {
             Action::dunk_shoot_action(udp_);
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            //std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
 
         udp_.send(data);
