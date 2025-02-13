@@ -1,75 +1,37 @@
-name: build and test
+name: ROS 2 CI
 
 on:
   push:
-    branches: [ master ]
+    branches:
+      - main
   pull_request:
-    branches: [ master ]
-  workflow_dispatch:
-  schedule:
-    - cron: '0 0 * * *'
-  release:
-    types: [published]
+    branches:
+      - main
 
 jobs:
-  build_and_test:
-    strategy:
-      matrix:
-        os:
-          - ubuntu-24.04
-        rosdistro:
-          - jazzy
-
+  build-and-test:
     runs-on: ubuntu-latest
-
-    container:
-      image: ros:${{ matrix.rosdistro }}-ros-base
-
     steps:
-      - name: Setup directories
-        run: mkdir -p ros2_ws/src
-        
-      - name: Check out repository
-        uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup ROS 2
+        uses: ros-tooling/setup-ros@v0.7
         with:
-          path: ros2_ws/src/ros2_topic_sample
+          required-ros-distributions: jazzy  # 使用するROS 2のディストリビューションを指定
 
       - name: Install dependencies
         run: |
-          rosdep update && 
-          apt-get update && 
-          rosdep install --from-path . -i -y --rosdistro ${{ matrix.rosdistro }}
+          sudo apt update
+          sudo apt install -y python3-colcon-common-extensions
 
-      - name: Install diagnostic-updater
-        run: apt-get install ros-${{ matrix.rosdistro }}-diagnostic-updater
-
-      - name: Build tests
-        id: build_test
+      - name: Build workspace
         run: |
-          . /opt/ros/${{ matrix.rosdistro }}/setup.sh && 
-          colcon build
-        continue-on-error: true
-
-      - name: build_test command success
-        if: steps.build_test.outcome == 'success'
-        run: echo "result - success"
-
-      - name: build_test command failure
-        if: steps.build_test.outcome == 'failure'
-        run: echo "result - failure" && exit 1
+          cd ~/ros2_ws
+          colcon build --symlink-install
 
       - name: Run tests
-        id: run_test
         run: |
-          . /opt/ros/${{ matrix.rosdistro }}/setup.sh &&
-          colcon test && 
-          colcon test-result
-        continue-on-error: true
-
-      - name: run_test command success
-        if: steps.run_test.outcome == 'success'
-        run: echo "result - success"
-
-      - name: run_test command failure
-        if: steps.run_test.outcome == 'failure'
-        run: echo "result - failure" && exit 1
+          cd ~/ros2_ws
+          colcon test
+          colcon test-result --verbose
