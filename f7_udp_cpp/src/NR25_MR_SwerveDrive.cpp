@@ -128,10 +128,7 @@ private:
         data[2] = -wheelspeed * R2;
         data[3] = -wheelspeed * R2;
         data[4] = -wheelspeed * R2;
-        data[5] = deg + SERVO1_CAL;
-        data[6] = deg + SERVO2_CAL;
-        data[7] = deg + SERVO3_CAL;
-        data[8] = deg + SERVO4_CAL;
+        
 
         if (LEFT) {
             deg = 45;
@@ -163,7 +160,29 @@ private:
         }
 
         // 独ステが扱えない範囲の変換
-        if ((270 < deg) && (deg < 360)) {
+        if ((345 < deg) && (deg < 360)) {
+            deg = 13*deg - 4320;
+            data[1] = wheelspeed * R2;
+            data[2] = wheelspeed * R2;
+            data[3] = wheelspeed * R2;
+            data[4] = wheelspeed * R2;
+            data[5] = deg + SERVO1_CAL;
+            data[6] = deg + SERVO2_CAL;
+            data[7] = deg + SERVO3_CAL;
+            data[8] = deg + SERVO4_CAL;
+        }
+        if ((270 < deg) && (deg < 285)) {
+            deg = -11*deg + 3240;
+            data[1] = wheelspeed * R2;
+            data[2] = wheelspeed * R2;
+            data[3] = wheelspeed * R2;
+            data[4] = wheelspeed * R2;
+            data[5] = deg + SERVO1_CAL;
+            data[6] = deg + SERVO2_CAL;
+            data[7] = deg + SERVO3_CAL;
+            data[8] = deg + SERVO4_CAL;
+        }
+        if ((285 < deg) && (deg < 345)) {
             deg = deg - 180;
             data[1] = wheelspeed * R2;
             data[2] = wheelspeed * R2;
@@ -174,6 +193,10 @@ private:
             data[7] = deg + SERVO3_CAL;
             data[8] = deg + SERVO4_CAL;
         }
+        data[5] = deg + SERVO1_CAL;
+        data[6] = deg + SERVO2_CAL;
+        data[7] = deg + SERVO3_CAL;
+        data[8] = deg + SERVO4_CAL;
 
         // 時計回りYAW回転
         if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R) {
@@ -197,6 +220,7 @@ private:
             data[3] = yawspeed;
             data[4] = -yawspeed;
         }
+        
 
         // デバッグ用
         // std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4] << ", ";
