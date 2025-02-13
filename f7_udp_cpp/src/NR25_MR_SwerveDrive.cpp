@@ -21,9 +21,15 @@ RRST NHK2025
 // スティックのデッドゾーン
 #define DEADZONE_L 0.7
 #define DEADZONE_R 0.3
-
+//定数k
+#define constant 0.05
+//角度一覧
 int deg;
+int predeg =135;
 int truedeg;
+
+//角度の変位
+int displacement;
 
 // IPアドレスとポートの指定
 std::string udp_ip = "192.168.8.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
@@ -89,6 +95,8 @@ private:
         }
 
         float rad = atan2(LS_Y, LS_X);
+        float s = sin(rad);
+        float c = cos(rad);
         deg = rad * 180 / M_PI;
         // 135度を90度とみなしたときのズレの角度
 
@@ -108,6 +116,7 @@ private:
         } else {
             deg = 225 - deg;
         }
+        displacement = deg -predeg;
 
         // std::cout << deg << std::endl;
 
@@ -124,48 +133,76 @@ private:
             data[8] = deg + SERVO4_CAL;
         }
 
-        data[1] = -wheelspeed * R2;
-        data[2] = -wheelspeed * R2;
-        data[3] = -wheelspeed * R2;
-        data[4] = -wheelspeed * R2;
-        
+        // data[1] = -wheelspeed/(1 + k*displacement) * R2;
+        // data[2] = -wheelspeed/(1 + k*displacement) * R2;
+        // data[3] = -wheelspeed/(1 + k*displacement) * R2;
+        // data[4] = -wheelspeed/(1 + k*displacement) * R2;
+        data[1] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+        data[2] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+        data[3] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+        data[4] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
 
         if (LEFT) {
             deg = 45;
-            data[1] = -wheelspeed * R2;
-            data[2] = -wheelspeed * R2;
-            data[3] = -wheelspeed * R2;
-            data[4] = -wheelspeed * R2;
+            displacement = deg -predeg;
+            // data[1] = -wheelspeed/(1 + k*displacement) * R2;
+            // data[2] = -wheelspeed/(1 + k*displacement) * R2;
+            // data[3] = -wheelspeed/(1 + k*displacement) * R2;
+            // data[4] = -wheelspeed/(1 + k*displacement) * R2;
+            data[1] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+            data[2] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+            data[3] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+            data[4] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
         }
         if (RIGHT) {
             deg = 45;
-            data[1] = wheelspeed * R2;
-            data[2] = wheelspeed * R2;
-            data[3] = wheelspeed * R2;
-            data[4] = wheelspeed * R2;
+            displacement = deg -predeg;
+            // data[1] = wheelspeed/(1 + k*displacement) * R2;
+            // data[2] = wheelspeed/(1 + k*displacement) * R2;
+            // data[3] = wheelspeed/(1 + k*displacement) * R2;
+            // data[4] = wheelspeed/(1 + k*displacement) * R2;
+            data[1] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+            data[2] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+            data[3] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+            data[4] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
         }
         if (UP) {
             deg = 135;
-            data[1] = -wheelspeed * R2;
-            data[2] = -wheelspeed * R2;
-            data[3] = -wheelspeed * R2;
-            data[4] = -wheelspeed * R2;
+            displacement = deg -predeg;
+            // data[1] = -wheelspeed/(1 + k*displacement) * R2;
+            // data[2] = -wheelspeed/(1 + k*displacement) * R2;
+            // data[3] = -wheelspeed/(1 + k*displacement) * R2;
+            // data[4] = -wheelspeed/(1 + k*displacement) * R2;
+            data[1] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+            data[2] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+            data[3] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+            data[4] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
         }
         if (DOWN) {
             deg = 135;
-            data[1] = wheelspeed * R2;
-            data[2] = wheelspeed * R2;
-            data[3] = wheelspeed * R2;
-            data[4] = wheelspeed * R2;
+            displacement = deg -predeg;
+            // data[1] = wheelspeed/(1 + k*displacement) * R2;
+            // data[2] = wheelspeed/(1 + k*displacement) * R2;
+            // data[3] = wheelspeed/(1 + k*displacement) * R2;
+            // data[4] = wheelspeed/(1 + k*displacement) * R2;
+            data[1] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+            data[2] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+            data[3] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+            data[4] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
         }
 
         // 独ステが扱えない範囲の変換
         if ((345 < deg) && (deg < 360)) {
             deg = 13*deg - 4320;
-            data[1] = wheelspeed * R2;
-            data[2] = wheelspeed * R2;
-            data[3] = wheelspeed * R2;
-            data[4] = wheelspeed * R2;
+            displacement = deg -predeg;
+            // data[1] = wheelspeed/(1 + k*displacement) * R2;
+            // data[2] = wheelspeed/(1 + k*displacement) * R2;
+            // data[3] = wheelspeed/(1 + k*displacement) * R2;
+            // data[4] = wheelspeed/(1 + k*displacement) * R2;
+            data[1] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+            data[2] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+            data[3] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+            data[4] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
             data[5] = deg + SERVO1_CAL;
             data[6] = deg + SERVO2_CAL;
             data[7] = deg + SERVO3_CAL;
@@ -173,10 +210,15 @@ private:
         }
         if ((270 < deg) && (deg < 285)) {
             deg = -11*deg + 3240;
-            data[1] = wheelspeed * R2;
-            data[2] = wheelspeed * R2;
-            data[3] = wheelspeed * R2;
-            data[4] = wheelspeed * R2;
+            displacement = deg -predeg;
+            // data[1] = wheelspeed/(1 + k*displacement) * R2;
+            // data[2] = wheelspeed/(1 + k*displacement) * R2;
+            // data[3] = wheelspeed/(1 + k*displacement) * R2;
+            // data[4] = wheelspeed/(1 + k*displacement) * R2;
+            data[1] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+            data[2] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+            data[3] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+            data[4] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
             data[5] = deg + SERVO1_CAL;
             data[6] = deg + SERVO2_CAL;
             data[7] = deg + SERVO3_CAL;
@@ -184,10 +226,15 @@ private:
         }
         if ((285 < deg) && (deg < 345)) {
             deg = deg - 180;
-            data[1] = wheelspeed * R2;
-            data[2] = wheelspeed * R2;
-            data[3] = wheelspeed * R2;
-            data[4] = wheelspeed * R2;
+            displacement = deg -predeg;
+            // data[1] = wheelspeed/(1 + k*displacement) * R2;
+            // data[2] = wheelspeed/(1 + k*displacement) * R2;
+            // data[3] = wheelspeed/(1 + k*displacement) * R2;
+            // data[4] = wheelspeed/(1 + k*displacement) * R2;
+            data[1] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+            data[2] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+            data[3] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+            data[4] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
             data[5] = deg + SERVO1_CAL;
             data[6] = deg + SERVO2_CAL;
             data[7] = deg + SERVO3_CAL;
@@ -220,7 +267,8 @@ private:
             data[3] = yawspeed;
             data[4] = -yawspeed;
         }
-        
+
+        predeg = deg;
 
         // デバッグ用
         // std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4] << ", ";
