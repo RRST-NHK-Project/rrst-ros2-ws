@@ -18,7 +18,7 @@ jobs:
       - name: Setup ROS 2
         uses: ros-tooling/setup-ros@v0.7
         with:
-          required-ros-distributions: jazzy  # 適切なROS 2ディストリビューションを指定
+          required-ros-distributions: jazzy  # 必要に応じて変更
 
       - name: Install dependencies
         run: |
@@ -28,18 +28,20 @@ jobs:
       - name: Create ROS 2 workspace
         run: |
           mkdir -p ros2_ws/src
-          mv $(ls -d */ | grep -v 'ros2_ws') ros2_ws/src/ || true  # 他のディレクトリをsrcに移動
+          mv $(ls -d */ | grep -v 'ros2_ws') ros2_ws/src/ || true
           cd ros2_ws
           rosdep update
           rosdep install --from-paths src --ignore-src -r -y
 
       - name: Build workspace
         run: |
+          source /opt/ros/humble/setup.bash  # ROS 2環境をセットアップ
           cd ros2_ws
           colcon build --symlink-install
 
       - name: Run tests
         run: |
+          source /opt/ros/humble/setup.bash  # ROS 2環境をセットアップ
           cd ros2_ws
           colcon test
           colcon test-result --verbose
