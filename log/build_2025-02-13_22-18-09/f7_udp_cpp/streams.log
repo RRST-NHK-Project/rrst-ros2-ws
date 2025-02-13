@@ -1,0 +1,60 @@
+[0.137s] Invoking command in '/home/ubuntu/ros2_ws/build/f7_udp_cpp': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/f7_udp:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/ros2_ws/build/f7_udp_cpp -- -j12 -l12
+[0.159s] -- Found ament_cmake: 2.5.2 (/opt/ros/jazzy/share/ament_cmake/cmake)
+[0.320s] -- Found rclcpp: 28.1.5 (/opt/ros/jazzy/share/rclcpp/cmake)
+[0.340s] -- Found rosidl_generator_c: 4.6.4 (/opt/ros/jazzy/share/rosidl_generator_c/cmake)
+[0.346s] -- Found rosidl_generator_cpp: 4.6.4 (/opt/ros/jazzy/share/rosidl_generator_cpp/cmake)
+[0.353s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[0.362s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[0.404s] -- Found rmw_implementation_cmake: 7.3.1 (/opt/ros/jazzy/share/rmw_implementation_cmake/cmake)
+[0.405s] -- Found rmw_fastrtps_cpp: 8.4.1 (/opt/ros/jazzy/share/rmw_fastrtps_cpp/cmake)
+[0.456s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[0.501s] -- Found std_msgs: 5.3.5 (/opt/ros/jazzy/share/std_msgs/cmake)
+[0.510s] -- Found sensor_msgs: 5.3.5 (/opt/ros/jazzy/share/sensor_msgs/cmake)
+[0.644s] -- Configuring done (0.5s)
+[0.696s] -- Generating done (0.0s)
+[0.715s] -- Build files have been written to: /home/ubuntu/ros2_ws/build/f7_udp_cpp
+[0.769s] [  9%] Built target nr25_mr_omni
+[0.769s] [ 15%] Built target nr25_enc
+[0.769s] [ 28%] Built target nr25_vel2js
+[0.770s] [ 28%] Built target nr25_pr
+[0.770s] [ 37%] Built target nr25_mr
+[0.773s] [ 46%] Built target nr25_mr_sd
+[0.775s] [ 56%] Built target nr25_dr
+[0.776s] [ 62%] Built target nr25_enc_pid
+[0.777s] [ 81%] Built target nr25_dr_omni
+[0.778s] [ 81%] Built target nr25_dr_sd
+[0.784s] [ 90%] Built target nr25_pid
+[0.784s] [ 93%] [32m[1mLinking CXX executable nr25_dr_c610[0m
+[1.035s] [100%] Built target nr25_dr_c610
+[1.046s] Invoked command in '/home/ubuntu/ros2_ws/build/f7_udp_cpp' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/f7_udp:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/ros2_ws/build/f7_udp_cpp -- -j12 -l12
+[1.054s] Invoking command in '/home/ubuntu/ros2_ws/build/f7_udp_cpp': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/f7_udp:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/ros2_ws/build/f7_udp_cpp
+[1.060s] -- Install configuration: ""
+[1.060s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_mr
+[1.060s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_mr_omni
+[1.060s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_mr_sd
+[1.060s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_dr
+[1.061s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_dr_omni
+[1.061s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_dr_sd
+[1.061s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_enc
+[1.061s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_pr
+[1.061s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_vel2js
+[1.062s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_enc_pid
+[1.062s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_pid
+[1.062s] -- Installing: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_dr_c610
+[1.064s] -- Set non-toolchain portion of runtime path of "/home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_dr_c610" to ""
+[1.064s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/ament_index/resource_index/package_run_dependencies/f7_udp_cpp
+[1.064s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/ament_index/resource_index/parent_prefix_path/f7_udp_cpp
+[1.064s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/environment/ament_prefix_path.sh
+[1.064s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/environment/ament_prefix_path.dsv
+[1.065s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/environment/path.sh
+[1.065s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/environment/path.dsv
+[1.065s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/local_setup.bash
+[1.065s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/local_setup.sh
+[1.065s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/local_setup.zsh
+[1.065s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/local_setup.dsv
+[1.065s] -- Installing: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/package.dsv
+[1.065s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/ament_index/resource_index/packages/f7_udp_cpp
+[1.065s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/cmake/f7_udp_cppConfig.cmake
+[1.065s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/cmake/f7_udp_cppConfig-version.cmake
+[1.065s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/package.xml
+[1.066s] Invoked command in '/home/ubuntu/ros2_ws/build/f7_udp_cpp' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/f7_udp:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/ros2_ws/build/f7_udp_cpp

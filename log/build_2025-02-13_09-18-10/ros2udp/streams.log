@@ -1,0 +1,111 @@
+[1.292s] Invoking command in '/home/ubuntu/ros2_ws/ros2udp': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/ros2udp/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/ros2udp build --build-base /home/ubuntu/ros2_ws/build/ros2udp/build install --record /home/ubuntu/ros2_ws/build/ros2udp/install.log --single-version-externally-managed install_data
+[1.567s] running egg_info
+[1.568s] creating ../build/ros2udp/ros2udp.egg-info
+[1.584s] writing ../build/ros2udp/ros2udp.egg-info/PKG-INFO
+[1.584s] writing dependency_links to ../build/ros2udp/ros2udp.egg-info/dependency_links.txt
+[1.585s] writing entry points to ../build/ros2udp/ros2udp.egg-info/entry_points.txt
+[1.585s] writing requirements to ../build/ros2udp/ros2udp.egg-info/requires.txt
+[1.585s] writing top-level names to ../build/ros2udp/ros2udp.egg-info/top_level.txt
+[1.585s] writing manifest file '../build/ros2udp/ros2udp.egg-info/SOURCES.txt'
+[1.622s] reading manifest file '../build/ros2udp/ros2udp.egg-info/SOURCES.txt'
+[1.622s] adding license file 'LICENSE'
+[1.623s] writing manifest file '../build/ros2udp/ros2udp.egg-info/SOURCES.txt'
+[1.623s] running build
+[1.623s] running build_py
+[1.624s] creating /home/ubuntu/ros2_ws/build/ros2udp/build
+[1.624s] creating /home/ubuntu/ros2_ws/build/ros2udp/build/lib
+[1.624s] creating /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp
+[1.624s] copying ros2udp/NR25_DR_Omni.py -> /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp
+[1.624s] copying ros2udp/NR25_MR.py -> /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp
+[1.624s] copying ros2udp/NR25_DR_SwerveDrive.py -> /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp
+[1.625s] copying ros2udp/enc_obs.py -> /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp
+[1.625s] copying ros2udp/NR25_param_tuner.py -> /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp
+[1.625s] copying ros2udp/__init__.py -> /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp
+[1.625s] copying ros2udp/NR25_MR_SwerveDrive.py -> /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp
+[1.625s] copying ros2udp/NR25_Development.py -> /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp
+[1.625s] copying ros2udp/NR25_DR.py -> /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp
+[1.625s] copying ros2udp/NR25_MR_Omni.py -> /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp
+[1.626s] creating /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp/submodules
+[1.626s] copying ros2udp/submodules/TEST.py -> /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp/submodules
+[1.626s] copying ros2udp/submodules/UDP.py -> /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp/submodules
+[1.626s] copying ros2udp/submodules/UDP16.py -> /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp/submodules
+[1.626s] copying ros2udp/submodules/__init__.py -> /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp/submodules
+[1.626s] running install
+[1.633s] running install_lib
+[1.650s] creating /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp
+[1.651s] creating /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp/submodules
+[1.651s] copying /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp/submodules/TEST.py -> /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp/submodules
+[1.651s] copying /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp/submodules/UDP.py -> /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp/submodules
+[1.651s] copying /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp/submodules/UDP16.py -> /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp/submodules
+[1.651s] copying /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp/submodules/__init__.py -> /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp/submodules
+[1.652s] copying /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp/NR25_DR_Omni.py -> /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp
+[1.652s] copying /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp/NR25_MR.py -> /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp
+[1.652s] copying /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp/NR25_DR_SwerveDrive.py -> /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp
+[1.652s] copying /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp/enc_obs.py -> /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp
+[1.653s] copying /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp/NR25_param_tuner.py -> /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp
+[1.653s] copying /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp/__init__.py -> /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp
+[1.653s] copying /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp/NR25_MR_SwerveDrive.py -> /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp
+[1.653s] copying /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp/NR25_Development.py -> /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp
+[1.653s] copying /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp/NR25_DR.py -> /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp
+[1.653s] copying /home/ubuntu/ros2_ws/build/ros2udp/build/lib/ros2udp/NR25_MR_Omni.py -> /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp
+[1.653s] byte-compiling /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp/submodules/TEST.py to TEST.cpython-312.pyc
+[1.655s] byte-compiling /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp/submodules/UDP.py to UDP.cpython-312.pyc
+[1.655s] byte-compiling /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp/submodules/UDP16.py to UDP16.cpython-312.pyc
+[1.655s] byte-compiling /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp/submodules/__init__.py to __init__.cpython-312.pyc
+[1.655s] byte-compiling /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp/NR25_DR_Omni.py to NR25_DR_Omni.cpython-312.pyc
+[1.655s] byte-compiling /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp/NR25_MR.py to NR25_MR.cpython-312.pyc
+[1.656s] byte-compiling /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp/NR25_DR_SwerveDrive.py to NR25_DR_SwerveDrive.cpython-312.pyc
+[1.656s] byte-compiling /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp/enc_obs.py to enc_obs.cpython-312.pyc
+[1.657s] byte-compiling /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp/NR25_param_tuner.py to NR25_param_tuner.cpython-312.pyc
+[1.660s] byte-compiling /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp/__init__.py to __init__.cpython-312.pyc
+[1.660s] byte-compiling /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp/NR25_MR_SwerveDrive.py to NR25_MR_SwerveDrive.cpython-312.pyc
+[1.661s] byte-compiling /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp/NR25_Development.py to NR25_Development.cpython-312.pyc
+[1.662s] byte-compiling /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp/NR25_DR.py to NR25_DR.cpython-312.pyc
+[1.663s] byte-compiling /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp/NR25_MR_Omni.py to NR25_MR_Omni.cpython-312.pyc
+[1.664s] running install_data
+[1.664s] creating /home/ubuntu/ros2_ws/install/ros2udp/share/ament_index
+[1.664s] creating /home/ubuntu/ros2_ws/install/ros2udp/share/ament_index/resource_index
+[1.664s] creating /home/ubuntu/ros2_ws/install/ros2udp/share/ament_index/resource_index/packages
+[1.664s] copying resource/ros2udp -> /home/ubuntu/ros2_ws/install/ros2udp/share/ament_index/resource_index/packages
+[1.664s] copying package.xml -> /home/ubuntu/ros2_ws/install/ros2udp/share/ros2udp
+[1.665s] running install_egg_info
+[1.684s] Copying ../build/ros2udp/ros2udp.egg-info to /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp-0.0.0-py3.12.egg-info
+[1.685s] running install_scripts
+[1.817s] Installing 4_omni script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.817s] Installing cr24_exh_automatic script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.817s] Installing cr24_exh_gui script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.817s] Installing cr24_exh_manual script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.818s] Installing cr24_exh_yolo script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.818s] Installing cr24_gui script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.818s] Installing cr24_main script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.818s] Installing cr24_main_apk script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.818s] Installing cr24_main_manual script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.819s] Installing cr24_main_manual2 script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.819s] Installing cr24_manual2_apk script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.819s] Installing cr24_pos script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.819s] Installing cr24_test script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.819s] Installing cr24_wlcam script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.819s] Installing dir_plotter script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.820s] Installing enc_obs script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.820s] Installing enc_plotter script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.820s] Installing imu_plotter script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.820s] Installing imu_to_odom script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.820s] Installing listener script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.820s] Installing nr25_dev script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.820s] Installing nr25_dr script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.821s] Installing nr25_dr_omni script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.821s] Installing nr25_dr_sd script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.821s] Installing nr25_mr script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.821s] Installing nr25_mr_omni script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.821s] Installing nr25_mr_sd script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.821s] Installing nr25_ohf script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.821s] Installing nr25_omni script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.822s] Installing nr25_omni_imu script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.822s] Installing nr25_omni_odom script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.822s] Installing nr25_pr_tuner script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.822s] Installing nr25_vc script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.822s] Installing setoshio script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.822s] Installing setoshio_gui script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.823s] Installing yaw_pub script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp
+[1.823s] writing list of installed files to '/home/ubuntu/ros2_ws/build/ros2udp/install.log'
+[1.874s] Invoked command in '/home/ubuntu/ros2_ws/ros2udp' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/ros2udp/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/ros2udp build --build-base /home/ubuntu/ros2_ws/build/ros2udp/build install --record /home/ubuntu/ros2_ws/build/ros2udp/install.log --single-version-externally-managed install_data

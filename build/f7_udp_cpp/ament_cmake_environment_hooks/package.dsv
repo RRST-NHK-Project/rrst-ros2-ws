@@ -1,0 +1,4 @@
+source;share/f7_udp_cpp/local_setup.bash
+source;share/f7_udp_cpp/local_setup.dsv
+source;share/f7_udp_cpp/local_setup.sh
+source;share/f7_udp_cpp/local_setup.zsh

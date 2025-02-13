@@ -1,0 +1,107 @@
+[1.287s] Invoking command in '/home/ubuntu/ros2_ws/f7_udp': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/f7_udp/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/f7_udp build --build-base /home/ubuntu/ros2_ws/build/f7_udp/build install --record /home/ubuntu/ros2_ws/build/f7_udp/install.log --single-version-externally-managed install_data
+[1.569s] running egg_info
+[1.570s] creating ../build/f7_udp/f7_udp.egg-info
+[1.586s] writing ../build/f7_udp/f7_udp.egg-info/PKG-INFO
+[1.587s] writing dependency_links to ../build/f7_udp/f7_udp.egg-info/dependency_links.txt
+[1.587s] writing entry points to ../build/f7_udp/f7_udp.egg-info/entry_points.txt
+[1.587s] writing requirements to ../build/f7_udp/f7_udp.egg-info/requires.txt
+[1.587s] writing top-level names to ../build/f7_udp/f7_udp.egg-info/top_level.txt
+[1.588s] writing manifest file '../build/f7_udp/f7_udp.egg-info/SOURCES.txt'
+[1.624s] reading manifest file '../build/f7_udp/f7_udp.egg-info/SOURCES.txt'
+[1.624s] adding license file 'LICENSE'
+[1.625s] writing manifest file '../build/f7_udp/f7_udp.egg-info/SOURCES.txt'
+[1.625s] running build
+[1.625s] running build_py
+[1.626s] creating /home/ubuntu/ros2_ws/build/f7_udp/build
+[1.626s] creating /home/ubuntu/ros2_ws/build/f7_udp/build/lib
+[1.626s] creating /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp
+[1.626s] copying f7_udp/NR25_SwerveDrive.py -> /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp
+[1.626s] copying f7_udp/NR25_MR.py -> /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp
+[1.627s] copying f7_udp/NR25_Params_flet.py -> /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp
+[1.627s] copying f7_udp/enc_obs.py -> /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp
+[1.627s] copying f7_udp/NR25_MR_Omni_FF_Ad.py -> /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp
+[1.627s] copying f7_udp/NR25_param_tuner.py -> /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp
+[1.627s] copying f7_udp/__init__.py -> /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp
+[1.628s] copying f7_udp/NR25_DR_Omni_FF_Ad.py -> /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp
+[1.628s] copying f7_udp/NR25_DR.py -> /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp
+[1.628s] creating /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp/submodules
+[1.628s] copying f7_udp/submodules/TEST.py -> /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp/submodules
+[1.628s] copying f7_udp/submodules/UDP.py -> /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp/submodules
+[1.628s] copying f7_udp/submodules/UDP16.py -> /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp/submodules
+[1.628s] copying f7_udp/submodules/__init__.py -> /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp/submodules
+[1.628s] running install
+[1.635s] running install_lib
+[1.653s] creating /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp
+[1.653s] copying /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp/NR25_SwerveDrive.py -> /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp
+[1.653s] creating /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp/submodules
+[1.653s] copying /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp/submodules/TEST.py -> /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp/submodules
+[1.653s] copying /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp/submodules/UDP.py -> /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp/submodules
+[1.653s] copying /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp/submodules/UDP16.py -> /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp/submodules
+[1.654s] copying /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp/submodules/__init__.py -> /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp/submodules
+[1.654s] copying /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp/NR25_MR.py -> /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp
+[1.654s] copying /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp/NR25_Params_flet.py -> /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp
+[1.654s] copying /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp/enc_obs.py -> /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp
+[1.654s] copying /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp/NR25_MR_Omni_FF_Ad.py -> /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp
+[1.654s] copying /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp/NR25_param_tuner.py -> /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp
+[1.655s] copying /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp/__init__.py -> /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp
+[1.655s] copying /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp/NR25_DR_Omni_FF_Ad.py -> /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp
+[1.655s] copying /home/ubuntu/ros2_ws/build/f7_udp/build/lib/f7_udp/NR25_DR.py -> /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp
+[1.655s] byte-compiling /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp/NR25_SwerveDrive.py to NR25_SwerveDrive.cpython-312.pyc
+[1.656s] byte-compiling /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp/submodules/TEST.py to TEST.cpython-312.pyc
+[1.656s] byte-compiling /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp/submodules/UDP.py to UDP.cpython-312.pyc
+[1.657s] byte-compiling /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp/submodules/UDP16.py to UDP16.cpython-312.pyc
+[1.658s] byte-compiling /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp/submodules/__init__.py to __init__.cpython-312.pyc
+[1.658s] byte-compiling /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp/NR25_MR.py to NR25_MR.cpython-312.pyc
+[1.660s] byte-compiling /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp/NR25_Params_flet.py to NR25_Params_flet.cpython-312.pyc
+[1.661s] byte-compiling /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp/enc_obs.py to enc_obs.cpython-312.pyc
+[1.662s] byte-compiling /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp/NR25_MR_Omni_FF_Ad.py to NR25_MR_Omni_FF_Ad.cpython-312.pyc
+[1.664s] byte-compiling /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp/NR25_param_tuner.py to NR25_param_tuner.cpython-312.pyc
+[1.666s] byte-compiling /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp/__init__.py to __init__.cpython-312.pyc
+[1.666s] byte-compiling /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp/NR25_DR_Omni_FF_Ad.py to NR25_DR_Omni_FF_Ad.cpython-312.pyc
+[1.668s] byte-compiling /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp/NR25_DR.py to NR25_DR.cpython-312.pyc
+[1.670s] running install_data
+[1.671s] creating /home/ubuntu/ros2_ws/install/f7_udp/share/ament_index
+[1.671s] creating /home/ubuntu/ros2_ws/install/f7_udp/share/ament_index/resource_index
+[1.671s] creating /home/ubuntu/ros2_ws/install/f7_udp/share/ament_index/resource_index/packages
+[1.671s] copying resource/f7_udp -> /home/ubuntu/ros2_ws/install/f7_udp/share/ament_index/resource_index/packages
+[1.671s] copying package.xml -> /home/ubuntu/ros2_ws/install/f7_udp/share/f7_udp
+[1.671s] running install_egg_info
+[1.689s] Copying ../build/f7_udp/f7_udp.egg-info to /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp-0.0.0-py3.12.egg-info
+[1.690s] running install_scripts
+[1.824s] Installing 4_omni script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.824s] Installing cr24_exh_automatic script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.824s] Installing cr24_exh_gui script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.824s] Installing cr24_exh_manual script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.825s] Installing cr24_exh_yolo script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.825s] Installing cr24_gui script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.825s] Installing cr24_main script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.825s] Installing cr24_main_apk script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.825s] Installing cr24_main_manual script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.826s] Installing cr24_main_manual2 script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.826s] Installing cr24_manual2_apk script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.826s] Installing cr24_pos script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.826s] Installing cr24_test script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.826s] Installing cr24_wlcam script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.826s] Installing dir_plotter script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.826s] Installing enc_obs script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.827s] Installing enc_plotter script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.827s] Installing imu_plotter script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.827s] Installing imu_to_odom script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.827s] Installing listener script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.827s] Installing nr25_dr script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.827s] Installing nr25_dr_ff_ad script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.827s] Installing nr25_mr script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.828s] Installing nr25_mr_ff_ad script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.828s] Installing nr25_ohf script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.828s] Installing nr25_omni script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.828s] Installing nr25_omni_imu script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.828s] Installing nr25_omni_odom script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.828s] Installing nr25_pr_flet script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.828s] Installing nr25_pr_tuner script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.828s] Installing nr25_sd script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.829s] Installing nr25_vc script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.829s] Installing setoshio script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.829s] Installing setoshio_gui script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.829s] Installing yaw_pub script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp
+[1.829s] writing list of installed files to '/home/ubuntu/ros2_ws/build/f7_udp/install.log'
+[1.870s] Invoked command in '/home/ubuntu/ros2_ws/f7_udp' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/ubuntu/ros2_ws/build/f7_udp/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/f7_udp build --build-base /home/ubuntu/ros2_ws/build/f7_udp/build install --record /home/ubuntu/ros2_ws/build/f7_udp/install.log --single-version-externally-managed install_data

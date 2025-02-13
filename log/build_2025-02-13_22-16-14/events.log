@@ -1,0 +1,251 @@
+[0.000000] (-) TimerEvent: {}
+[0.000166] (f7_udp) JobQueued: {'identifier': 'f7_udp', 'dependencies': OrderedDict()}
+[0.000211] (f7_udp_cpp) JobQueued: {'identifier': 'f7_udp_cpp', 'dependencies': OrderedDict()}
+[0.000233] (ros2udp) JobQueued: {'identifier': 'ros2udp', 'dependencies': OrderedDict()}
+[0.000251] (f7_udp) JobStarted: {'identifier': 'f7_udp'}
+[0.005134] (f7_udp_cpp) JobStarted: {'identifier': 'f7_udp_cpp'}
+[0.007705] (ros2udp) JobStarted: {'identifier': 'ros2udp'}
+[0.099555] (-) TimerEvent: {}
+[0.137945] (f7_udp_cpp) JobProgress: {'identifier': 'f7_udp_cpp', 'progress': 'cmake'}
+[0.138646] (f7_udp_cpp) JobProgress: {'identifier': 'f7_udp_cpp', 'progress': 'build'}
+[0.138760] (f7_udp_cpp) Command: {'cmd': ['/usr/bin/cmake', '--build', '/home/ubuntu/ros2_ws/build/f7_udp_cpp', '--', '-j12', '-l12'], 'cwd': '/home/ubuntu/ros2_ws/build/f7_udp_cpp', 'env': OrderedDict({'LESSOPEN': '| /usr/bin/lesspipe %s', 'LANGUAGE': 'ja:en', 'USER': 'ubuntu', 'LC_TIME': 'ja_JP.UTF-8', 'XDG_SESSION_TYPE': 'wayland', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/opt/ros/jazzy/opt/rviz_ogre_vendor/lib:/opt/ros/jazzy/lib/x86_64-linux-gnu:/opt/ros/jazzy/opt/gz_math_vendor/lib:/opt/ros/jazzy/opt/gz_utils_vendor/lib:/opt/ros/jazzy/opt/gz_cmake_vendor/lib:/opt/ros/jazzy/lib', 'HOME': '/home/ubuntu', 'OLDPWD': '/home/ubuntu', 'DESKTOP_SESSION': 'ubuntu', 'ROS_PYTHON_VERSION': '3', 'GNOME_SHELL_SESSION_MODE': 'ubuntu', 'GTK_MODULES': 'gail:atk-bridge', 'LC_MONETARY': 'ja_JP.UTF-8', 'SYSTEMD_EXEC_PID': '1619', 'GSM_SKIP_SSH_AGENT_WORKAROUND': 'true', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': 'truecolor', 'DEBUGINFOD_URLS': 'https://debuginfod.ubuntu.com', 'IM_CONFIG_PHASE': '1', 'WAYLAND_DISPLAY': 'wayland-0', 'COLCON_PREFIX_PATH': '/home/ubuntu/ros2_ws/install', 'ROS_DISTRO': 'jazzy', 'LOGNAME': 'ubuntu', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'MEMORY_PRESSURE_WATCH': '/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.Shell@wayland.service/memory.pressure', 'XDG_SESSION_CLASS': 'user', 'USERNAME': 'ubuntu', 'TERM': 'xterm-256color', 'GNOME_DESKTOP_SESSION_ID': 'this-is-deprecated', 'PATH': '/opt/ros/jazzy/bin:/home/ubuntu/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin', 'SESSION_MANAGER': 'local/ubuntu-Surface-Pro-9:@/tmp/.ICE-unix/1575,unix/ubuntu-Surface-Pro-9:/tmp/.ICE-unix/1575', 'PAPERSIZE': 'a4', 'XDG_MENU_PREFIX': 'gnome-', 'LC_ADDRESS': 'ja_JP.UTF-8', 'GNOME_TERMINAL_SCREEN': '/org/gnome/Terminal/screen/9a3ddec5_1c28_4890_8e5f_84ab51ef4c5c', 'GNOME_SETUP_DISPLAY': ':1', 'XDG_RUNTIME_DIR': '/run/user/1000', 'DISPLAY': ':0', 'LANG': 'ja_JP.UTF-8', 'XDG_CURRENT_DESKTOP': 'ubuntu:GNOME', 'LC_TELEPHONE': 'ja_JP.UTF-8', 'XMODIFIERS': '@im=ibus', 'XDG_SESSION_DESKTOP': 'ubuntu', 'XAUTHORITY': '/run/user/1000/.mutter-Xwaylandauth.9IFJ12', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:', 'GNOME_TERMINAL_SERVICE': ':1.244', 'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh', 'AMENT_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/f7_udp_cpp:/home/ubuntu/ros2_ws/install/f7_udp:/opt/ros/jazzy', 'SHELL': '/bin/bash', 'LC_NAME': 'ja_JP.UTF-8', 'QT_ACCESSIBILITY': '1', 'GDMSESSION': 'ubuntu', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'LC_MEASUREMENT': 'ja_JP.UTF-8', 'LC_IDENTIFICATION': 'ja_JP.UTF-8', 'ROS_AUTOMATIC_DISCOVERY_RANGE': 'SUBNET', 'QT_IM_MODULE': 'ibus', 'PWD': '/home/ubuntu/ros2_ws/build/f7_udp_cpp', 'XDG_CONFIG_DIRS': '/etc/xdg/xdg-ubuntu:/etc/xdg', 'XDG_DATA_DIRS': '/usr/share/ubuntu:/usr/share/gnome:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop', 'PYTHONPATH': '/home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages:/home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages:/opt/ros/jazzy/lib/python3.12/site-packages', 'LC_NUMERIC': 'ja_JP.UTF-8', 'LC_PAPER': 'ja_JP.UTF-8', 'COLCON': '1', 'MEMORY_PRESSURE_WRITE': 'c29tZSAyMDAwMDAgMjAwMDAwMAA=', 'VTE_VERSION': '7600', 'CMAKE_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/f7_udp_cpp:/opt/ros/jazzy/opt/gz_math_vendor:/opt/ros/jazzy/opt/gz_utils_vendor:/opt/ros/jazzy/opt/gz_cmake_vendor:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/f7_udp:/opt/ros/jazzy'}), 'shell': False}
+[0.162008] (f7_udp_cpp) StdoutLine: {'line': b'-- Found ament_cmake: 2.5.2 (/opt/ros/jazzy/share/ament_cmake/cmake)\n'}
+[0.199679] (-) TimerEvent: {}
+[0.299950] (-) TimerEvent: {}
+[0.323808] (f7_udp_cpp) StdoutLine: {'line': b'-- Found rclcpp: 28.1.5 (/opt/ros/jazzy/share/rclcpp/cmake)\n'}
+[0.341944] (f7_udp_cpp) StdoutLine: {'line': b'-- Found rosidl_generator_c: 4.6.4 (/opt/ros/jazzy/share/rosidl_generator_c/cmake)\n'}
+[0.347716] (f7_udp_cpp) StdoutLine: {'line': b'-- Found rosidl_generator_cpp: 4.6.4 (/opt/ros/jazzy/share/rosidl_generator_cpp/cmake)\n'}
+[0.355145] (f7_udp_cpp) StdoutLine: {'line': b'-- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c\n'}
+[0.363833] (f7_udp_cpp) StdoutLine: {'line': b'-- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp\n'}
+[0.400077] (-) TimerEvent: {}
+[0.405454] (f7_udp_cpp) StdoutLine: {'line': b'-- Found rmw_implementation_cmake: 7.3.1 (/opt/ros/jazzy/share/rmw_implementation_cmake/cmake)\n'}
+[0.406346] (f7_udp_cpp) StdoutLine: {'line': b'-- Found rmw_fastrtps_cpp: 8.4.1 (/opt/ros/jazzy/share/rmw_fastrtps_cpp/cmake)\n'}
+[0.461423] (f7_udp_cpp) StdoutLine: {'line': b"-- Using RMW implementation 'rmw_fastrtps_cpp' as default\n"}
+[0.500203] (-) TimerEvent: {}
+[0.508807] (f7_udp_cpp) StdoutLine: {'line': b'-- Found std_msgs: 5.3.5 (/opt/ros/jazzy/share/std_msgs/cmake)\n'}
+[0.518059] (f7_udp_cpp) StdoutLine: {'line': b'-- Found sensor_msgs: 5.3.5 (/opt/ros/jazzy/share/sensor_msgs/cmake)\n'}
+[0.600336] (-) TimerEvent: {}
+[0.629223] (f7_udp_cpp) StdoutLine: {'line': b'-- Configuring done (0.5s)\n'}
+[0.636409] (ros2udp) Command: {'cmd': ['/usr/bin/python3', '-W', 'ignore:setup.py install is deprecated', '-W', 'ignore:easy_install command is deprecated', 'setup.py', 'egg_info', '--egg-base', '../build/ros2udp', 'build', '--build-base', '/home/ubuntu/ros2_ws/build/ros2udp/build', 'install', '--record', '/home/ubuntu/ros2_ws/build/ros2udp/install.log', '--single-version-externally-managed', 'install_data'], 'cwd': '/home/ubuntu/ros2_ws/ros2udp', 'env': {'LESSOPEN': '| /usr/bin/lesspipe %s', 'LANGUAGE': 'ja:en', 'USER': 'ubuntu', 'LC_TIME': 'ja_JP.UTF-8', 'XDG_SESSION_TYPE': 'wayland', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/opt/ros/jazzy/opt/rviz_ogre_vendor/lib:/opt/ros/jazzy/lib/x86_64-linux-gnu:/opt/ros/jazzy/opt/gz_math_vendor/lib:/opt/ros/jazzy/opt/gz_utils_vendor/lib:/opt/ros/jazzy/opt/gz_cmake_vendor/lib:/opt/ros/jazzy/lib', 'HOME': '/home/ubuntu', 'OLDPWD': '/home/ubuntu', 'DESKTOP_SESSION': 'ubuntu', 'ROS_PYTHON_VERSION': '3', 'GNOME_SHELL_SESSION_MODE': 'ubuntu', 'GTK_MODULES': 'gail:atk-bridge', 'LC_MONETARY': 'ja_JP.UTF-8', 'SYSTEMD_EXEC_PID': '1619', 'GSM_SKIP_SSH_AGENT_WORKAROUND': 'true', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': 'truecolor', 'DEBUGINFOD_URLS': 'https://debuginfod.ubuntu.com', 'IM_CONFIG_PHASE': '1', 'WAYLAND_DISPLAY': 'wayland-0', 'COLCON_PREFIX_PATH': '/home/ubuntu/ros2_ws/install', 'ROS_DISTRO': 'jazzy', 'LOGNAME': 'ubuntu', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'MEMORY_PRESSURE_WATCH': '/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.Shell@wayland.service/memory.pressure', 'XDG_SESSION_CLASS': 'user', 'USERNAME': 'ubuntu', 'TERM': 'xterm-256color', 'GNOME_DESKTOP_SESSION_ID': 'this-is-deprecated', 'PATH': '/opt/ros/jazzy/bin:/home/ubuntu/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin', 'SESSION_MANAGER': 'local/ubuntu-Surface-Pro-9:@/tmp/.ICE-unix/1575,unix/ubuntu-Surface-Pro-9:/tmp/.ICE-unix/1575', 'PAPERSIZE': 'a4', 'XDG_MENU_PREFIX': 'gnome-', 'LC_ADDRESS': 'ja_JP.UTF-8', 'GNOME_TERMINAL_SCREEN': '/org/gnome/Terminal/screen/9a3ddec5_1c28_4890_8e5f_84ab51ef4c5c', 'GNOME_SETUP_DISPLAY': ':1', 'XDG_RUNTIME_DIR': '/run/user/1000', 'DISPLAY': ':0', 'LANG': 'ja_JP.UTF-8', 'XDG_CURRENT_DESKTOP': 'ubuntu:GNOME', 'LC_TELEPHONE': 'ja_JP.UTF-8', 'XMODIFIERS': '@im=ibus', 'XDG_SESSION_DESKTOP': 'ubuntu', 'XAUTHORITY': '/run/user/1000/.mutter-Xwaylandauth.9IFJ12', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:', 'GNOME_TERMINAL_SERVICE': ':1.244', 'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh', 'AMENT_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/f7_udp_cpp:/home/ubuntu/ros2_ws/install/f7_udp:/opt/ros/jazzy', 'SHELL': '/bin/bash', 'LC_NAME': 'ja_JP.UTF-8', 'QT_ACCESSIBILITY': '1', 'GDMSESSION': 'ubuntu', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'LC_MEASUREMENT': 'ja_JP.UTF-8', 'LC_IDENTIFICATION': 'ja_JP.UTF-8', 'ROS_AUTOMATIC_DISCOVERY_RANGE': 'SUBNET', 'QT_IM_MODULE': 'ibus', 'PWD': '/home/ubuntu/ros2_ws/build/ros2udp', 'XDG_CONFIG_DIRS': '/etc/xdg/xdg-ubuntu:/etc/xdg', 'XDG_DATA_DIRS': '/usr/share/ubuntu:/usr/share/gnome:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop', 'PYTHONPATH': '/home/ubuntu/ros2_ws/build/ros2udp/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages:/home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages:/home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages:/opt/ros/jazzy/lib/python3.12/site-packages', 'LC_NUMERIC': 'ja_JP.UTF-8', 'LC_PAPER': 'ja_JP.UTF-8', 'COLCON': '1', 'MEMORY_PRESSURE_WRITE': 'c29tZSAyMDAwMDAgMjAwMDAwMAA=', 'VTE_VERSION': '7600', 'CMAKE_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/f7_udp_cpp:/opt/ros/jazzy/opt/gz_math_vendor:/opt/ros/jazzy/opt/gz_utils_vendor:/opt/ros/jazzy/opt/gz_cmake_vendor'}, 'shell': False}
+[0.679641] (f7_udp_cpp) StdoutLine: {'line': b'-- Generating done (0.0s)\n'}
+[0.697334] (f7_udp_cpp) StdoutLine: {'line': b'-- Build files have been written to: /home/ubuntu/ros2_ws/build/f7_udp_cpp\n'}
+[0.700408] (-) TimerEvent: {}
+[0.752758] (f7_udp_cpp) StdoutLine: {'line': b'[  3%] \x1b[32mBuilding CXX object CMakeFiles/nr25_dr_c610.dir/src/NR25_DR_C610.cpp.o\x1b[0m\n'}
+[0.769132] (f7_udp_cpp) StdoutLine: {'line': b'[ 21%] Built target nr25_mr\n'}
+[0.769430] (f7_udp_cpp) StdoutLine: {'line': b'[ 21%] Built target nr25_dr_sd\n'}
+[0.770227] (f7_udp_cpp) StdoutLine: {'line': b'[ 28%] Built target nr25_pr\n'}
+[0.770881] (f7_udp_cpp) StdoutLine: {'line': b'[ 34%] Built target nr25_enc_pid\n'}
+[0.771137] (f7_udp_cpp) StdoutLine: {'line': b'[ 43%] Built target nr25_mr_omni\n'}
+[0.771609] (f7_udp_cpp) StdoutLine: {'line': b'[ 53%] Built target nr25_dr_omni\n'}
+[0.771876] (f7_udp_cpp) StdoutLine: {'line': b'[ 59%] Built target nr25_enc\n'}
+[0.773385] (f7_udp_cpp) StdoutLine: {'line': b'[ 62%] \x1b[32mBuilding CXX object CMakeFiles/nr25_dr.dir/src/NR25_DR.cpp.o\x1b[0m\n'}
+[0.774621] (f7_udp_cpp) StdoutLine: {'line': b'[ 71%] Built target nr25_mr_sd\n'}
+[0.775673] (f7_udp_cpp) StdoutLine: {'line': b'[ 78%] Built target nr25_vel2js\n'}
+[0.777848] (f7_udp_cpp) StdoutLine: {'line': b'[ 87%] Built target nr25_pid\n'}
+[0.780772] (f7_udp_cpp) StdoutLine: {'line': b'[ 90%] \x1b[32mBuilding CXX object CMakeFiles/nr25_dr_c610.dir/src/include/UDP.cpp.o\x1b[0m\n'}
+[0.800539] (-) TimerEvent: {}
+[0.842738] (f7_udp) Command: {'cmd': ['/usr/bin/python3', '-W', 'ignore:setup.py install is deprecated', '-W', 'ignore:easy_install command is deprecated', 'setup.py', 'egg_info', '--egg-base', '../build/f7_udp', 'build', '--build-base', '/home/ubuntu/ros2_ws/build/f7_udp/build', 'install', '--record', '/home/ubuntu/ros2_ws/build/f7_udp/install.log', '--single-version-externally-managed', 'install_data'], 'cwd': '/home/ubuntu/ros2_ws/f7_udp', 'env': {'LESSOPEN': '| /usr/bin/lesspipe %s', 'LANGUAGE': 'ja:en', 'USER': 'ubuntu', 'LC_TIME': 'ja_JP.UTF-8', 'XDG_SESSION_TYPE': 'wayland', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/opt/ros/jazzy/opt/rviz_ogre_vendor/lib:/opt/ros/jazzy/lib/x86_64-linux-gnu:/opt/ros/jazzy/opt/gz_math_vendor/lib:/opt/ros/jazzy/opt/gz_utils_vendor/lib:/opt/ros/jazzy/opt/gz_cmake_vendor/lib:/opt/ros/jazzy/lib', 'HOME': '/home/ubuntu', 'OLDPWD': '/home/ubuntu', 'DESKTOP_SESSION': 'ubuntu', 'ROS_PYTHON_VERSION': '3', 'GNOME_SHELL_SESSION_MODE': 'ubuntu', 'GTK_MODULES': 'gail:atk-bridge', 'LC_MONETARY': 'ja_JP.UTF-8', 'SYSTEMD_EXEC_PID': '1619', 'GSM_SKIP_SSH_AGENT_WORKAROUND': 'true', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': 'truecolor', 'DEBUGINFOD_URLS': 'https://debuginfod.ubuntu.com', 'IM_CONFIG_PHASE': '1', 'WAYLAND_DISPLAY': 'wayland-0', 'COLCON_PREFIX_PATH': '/home/ubuntu/ros2_ws/install', 'ROS_DISTRO': 'jazzy', 'LOGNAME': 'ubuntu', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'MEMORY_PRESSURE_WATCH': '/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.Shell@wayland.service/memory.pressure', 'XDG_SESSION_CLASS': 'user', 'USERNAME': 'ubuntu', 'TERM': 'xterm-256color', 'GNOME_DESKTOP_SESSION_ID': 'this-is-deprecated', 'PATH': '/opt/ros/jazzy/bin:/home/ubuntu/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin', 'SESSION_MANAGER': 'local/ubuntu-Surface-Pro-9:@/tmp/.ICE-unix/1575,unix/ubuntu-Surface-Pro-9:/tmp/.ICE-unix/1575', 'PAPERSIZE': 'a4', 'XDG_MENU_PREFIX': 'gnome-', 'LC_ADDRESS': 'ja_JP.UTF-8', 'GNOME_TERMINAL_SCREEN': '/org/gnome/Terminal/screen/9a3ddec5_1c28_4890_8e5f_84ab51ef4c5c', 'GNOME_SETUP_DISPLAY': ':1', 'XDG_RUNTIME_DIR': '/run/user/1000', 'DISPLAY': ':0', 'LANG': 'ja_JP.UTF-8', 'XDG_CURRENT_DESKTOP': 'ubuntu:GNOME', 'LC_TELEPHONE': 'ja_JP.UTF-8', 'XMODIFIERS': '@im=ibus', 'XDG_SESSION_DESKTOP': 'ubuntu', 'XAUTHORITY': '/run/user/1000/.mutter-Xwaylandauth.9IFJ12', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:', 'GNOME_TERMINAL_SERVICE': ':1.244', 'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh', 'AMENT_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/f7_udp_cpp:/home/ubuntu/ros2_ws/install/f7_udp:/opt/ros/jazzy', 'SHELL': '/bin/bash', 'LC_NAME': 'ja_JP.UTF-8', 'QT_ACCESSIBILITY': '1', 'GDMSESSION': 'ubuntu', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'LC_MEASUREMENT': 'ja_JP.UTF-8', 'LC_IDENTIFICATION': 'ja_JP.UTF-8', 'ROS_AUTOMATIC_DISCOVERY_RANGE': 'SUBNET', 'QT_IM_MODULE': 'ibus', 'PWD': '/home/ubuntu/ros2_ws/build/f7_udp', 'XDG_CONFIG_DIRS': '/etc/xdg/xdg-ubuntu:/etc/xdg', 'XDG_DATA_DIRS': '/usr/share/ubuntu:/usr/share/gnome:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop', 'PYTHONPATH': '/home/ubuntu/ros2_ws/build/f7_udp/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages:/home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages:/home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages:/opt/ros/jazzy/lib/python3.12/site-packages', 'LC_NUMERIC': 'ja_JP.UTF-8', 'LC_PAPER': 'ja_JP.UTF-8', 'COLCON': '1', 'MEMORY_PRESSURE_WRITE': 'c29tZSAyMDAwMDAgMjAwMDAwMAA=', 'VTE_VERSION': '7600', 'CMAKE_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/f7_udp_cpp:/opt/ros/jazzy/opt/gz_math_vendor:/opt/ros/jazzy/opt/gz_utils_vendor:/opt/ros/jazzy/opt/gz_cmake_vendor'}, 'shell': False}
+[0.890421] (ros2udp) StdoutLine: {'line': b'running egg_info\n'}
+[0.900659] (-) TimerEvent: {}
+[0.911133] (ros2udp) StdoutLine: {'line': b'writing ../build/ros2udp/ros2udp.egg-info/PKG-INFO\n'}
+[0.911402] (ros2udp) StdoutLine: {'line': b'writing dependency_links to ../build/ros2udp/ros2udp.egg-info/dependency_links.txt\n'}
+[0.911840] (ros2udp) StdoutLine: {'line': b'writing entry points to ../build/ros2udp/ros2udp.egg-info/entry_points.txt\n'}
+[0.911972] (ros2udp) StdoutLine: {'line': b'writing requirements to ../build/ros2udp/ros2udp.egg-info/requires.txt\n'}
+[0.912131] (ros2udp) StdoutLine: {'line': b'writing top-level names to ../build/ros2udp/ros2udp.egg-info/top_level.txt\n'}
+[0.953705] (ros2udp) StdoutLine: {'line': b"reading manifest file '../build/ros2udp/ros2udp.egg-info/SOURCES.txt'\n"}
+[0.954120] (ros2udp) StdoutLine: {'line': b"adding license file 'LICENSE'\n"}
+[0.954773] (ros2udp) StdoutLine: {'line': b"writing manifest file '../build/ros2udp/ros2udp.egg-info/SOURCES.txt'\n"}
+[0.954967] (ros2udp) StdoutLine: {'line': b'running build\n'}
+[0.955073] (ros2udp) StdoutLine: {'line': b'running build_py\n'}
+[0.955891] (ros2udp) StdoutLine: {'line': b'running install\n'}
+[0.961718] (ros2udp) StdoutLine: {'line': b'running install_lib\n'}
+[0.983419] (ros2udp) StdoutLine: {'line': b'running install_data\n'}
+[0.983688] (ros2udp) StdoutLine: {'line': b'running install_egg_info\n'}
+[1.000789] (-) TimerEvent: {}
+[1.005082] (ros2udp) StdoutLine: {'line': b"removing '/home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp-0.0.0-py3.12.egg-info' (and everything under it)\n"}
+[1.005369] (ros2udp) StdoutLine: {'line': b'Copying ../build/ros2udp/ros2udp.egg-info to /home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages/ros2udp-0.0.0-py3.12.egg-info\n'}
+[1.006584] (ros2udp) StdoutLine: {'line': b'running install_scripts\n'}
+[1.016781] (f7_udp) StdoutLine: {'line': b'running egg_info\n'}
+[1.027557] (f7_udp) StdoutLine: {'line': b'writing ../build/f7_udp/f7_udp.egg-info/PKG-INFO\n'}
+[1.027750] (f7_udp) StdoutLine: {'line': b'writing dependency_links to ../build/f7_udp/f7_udp.egg-info/dependency_links.txt\n'}
+[1.028022] (f7_udp) StdoutLine: {'line': b'writing entry points to ../build/f7_udp/f7_udp.egg-info/entry_points.txt\n'}
+[1.028168] (f7_udp) StdoutLine: {'line': b'writing requirements to ../build/f7_udp/f7_udp.egg-info/requires.txt\n'}
+[1.028262] (f7_udp) StdoutLine: {'line': b'writing top-level names to ../build/f7_udp/f7_udp.egg-info/top_level.txt\n'}
+[1.050156] (f7_udp) StdoutLine: {'line': b"reading manifest file '../build/f7_udp/f7_udp.egg-info/SOURCES.txt'\n"}
+[1.050371] (f7_udp) StdoutLine: {'line': b"adding license file 'LICENSE'\n"}
+[1.050767] (f7_udp) StdoutLine: {'line': b"writing manifest file '../build/f7_udp/f7_udp.egg-info/SOURCES.txt'\n"}
+[1.050909] (f7_udp) StdoutLine: {'line': b'running build\n'}
+[1.050993] (f7_udp) StdoutLine: {'line': b'running build_py\n'}
+[1.051371] (f7_udp) StdoutLine: {'line': b'running install\n'}
+[1.055684] (f7_udp) StdoutLine: {'line': b'running install_lib\n'}
+[1.067013] (f7_udp) StdoutLine: {'line': b'running install_data\n'}
+[1.067214] (f7_udp) StdoutLine: {'line': b'running install_egg_info\n'}
+[1.079006] (f7_udp) StdoutLine: {'line': b"removing '/home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp-0.0.0-py3.12.egg-info' (and everything under it)\n"}
+[1.079207] (f7_udp) StdoutLine: {'line': b'Copying ../build/f7_udp/f7_udp.egg-info to /home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages/f7_udp-0.0.0-py3.12.egg-info\n'}
+[1.079644] (f7_udp) StdoutLine: {'line': b'running install_scripts\n'}
+[1.100931] (-) TimerEvent: {}
+[1.144277] (ros2udp) StdoutLine: {'line': b'Installing 4_omni script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.144573] (ros2udp) StdoutLine: {'line': b'Installing cr24_exh_automatic script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.144705] (ros2udp) StdoutLine: {'line': b'Installing cr24_exh_gui script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.144874] (ros2udp) StdoutLine: {'line': b'Installing cr24_exh_manual script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.144993] (ros2udp) StdoutLine: {'line': b'Installing cr24_exh_yolo script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.145166] (ros2udp) StdoutLine: {'line': b'Installing cr24_gui script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.145293] (ros2udp) StdoutLine: {'line': b'Installing cr24_main script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.145611] (ros2udp) StdoutLine: {'line': b'Installing cr24_main_apk script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.145719] (ros2udp) StdoutLine: {'line': b'Installing cr24_main_manual script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.145810] (ros2udp) StdoutLine: {'line': b'Installing cr24_main_manual2 script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.145936] (ros2udp) StdoutLine: {'line': b'Installing cr24_manual2_apk script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.146022] (ros2udp) StdoutLine: {'line': b'Installing cr24_pos script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.146107] (ros2udp) StdoutLine: {'line': b'Installing cr24_test script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.146237] (ros2udp) StdoutLine: {'line': b'Installing cr24_wlcam script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.146321] (ros2udp) StdoutLine: {'line': b'Installing dir_plotter script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.146423] (ros2udp) StdoutLine: {'line': b'Installing enc_obs script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.146525] (ros2udp) StdoutLine: {'line': b'Installing enc_plotter script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.146624] (ros2udp) StdoutLine: {'line': b'Installing imu_plotter script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.146716] (ros2udp) StdoutLine: {'line': b'Installing imu_to_odom script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.146826] (ros2udp) StdoutLine: {'line': b'Installing listener script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.146948] (ros2udp) StdoutLine: {'line': b'Installing nr25_dev script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.147076] (ros2udp) StdoutLine: {'line': b'Installing nr25_dr script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.147219] (ros2udp) StdoutLine: {'line': b'Installing nr25_dr_omni script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.147358] (ros2udp) StdoutLine: {'line': b'Installing nr25_dr_sd script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.147495] (ros2udp) StdoutLine: {'line': b'Installing nr25_mr script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.147629] (ros2udp) StdoutLine: {'line': b'Installing nr25_mr_omni script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.147763] (ros2udp) StdoutLine: {'line': b'Installing nr25_mr_sd script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.147891] (ros2udp) StdoutLine: {'line': b'Installing nr25_ohf script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.148008] (ros2udp) StdoutLine: {'line': b'Installing nr25_omni script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.148127] (ros2udp) StdoutLine: {'line': b'Installing nr25_omni_imu script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.148260] (ros2udp) StdoutLine: {'line': b'Installing nr25_omni_odom script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.148382] (ros2udp) StdoutLine: {'line': b'Installing nr25_pr_tuner script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.148500] (ros2udp) StdoutLine: {'line': b'Installing nr25_vc script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.148626] (ros2udp) StdoutLine: {'line': b'Installing setoshio script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.148748] (ros2udp) StdoutLine: {'line': b'Installing setoshio_gui script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.148871] (ros2udp) StdoutLine: {'line': b'Installing yaw_pub script to /home/ubuntu/ros2_ws/install/ros2udp/lib/ros2udp\n'}
+[1.149444] (ros2udp) StdoutLine: {'line': b"writing list of installed files to '/home/ubuntu/ros2_ws/build/ros2udp/install.log'\n"}
+[1.157891] (f7_udp) StdoutLine: {'line': b'Installing 4_omni script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.158066] (f7_udp) StdoutLine: {'line': b'Installing cr24_exh_automatic script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.158178] (f7_udp) StdoutLine: {'line': b'Installing cr24_exh_gui script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.158301] (f7_udp) StdoutLine: {'line': b'Installing cr24_exh_manual script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.158388] (f7_udp) StdoutLine: {'line': b'Installing cr24_exh_yolo script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.158561] (f7_udp) StdoutLine: {'line': b'Installing cr24_gui script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.158702] (f7_udp) StdoutLine: {'line': b'Installing cr24_main script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.158800] (f7_udp) StdoutLine: {'line': b'Installing cr24_main_apk script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.158890] (f7_udp) StdoutLine: {'line': b'Installing cr24_main_manual script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.158978] (f7_udp) StdoutLine: {'line': b'Installing cr24_main_manual2 script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.159063] (f7_udp) StdoutLine: {'line': b'Installing cr24_manual2_apk script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.159218] (f7_udp) StdoutLine: {'line': b'Installing cr24_pos script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.159344] (f7_udp) StdoutLine: {'line': b'Installing cr24_test script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.159429] (f7_udp) StdoutLine: {'line': b'Installing cr24_wlcam script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.159513] (f7_udp) StdoutLine: {'line': b'Installing dir_plotter script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.159596] (f7_udp) StdoutLine: {'line': b'Installing enc_obs script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.159679] (f7_udp) StdoutLine: {'line': b'Installing enc_plotter script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.159764] (f7_udp) StdoutLine: {'line': b'Installing imu_plotter script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.159856] (f7_udp) StdoutLine: {'line': b'Installing imu_to_odom script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.159948] (f7_udp) StdoutLine: {'line': b'Installing listener script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.160039] (f7_udp) StdoutLine: {'line': b'Installing nr25_dr script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.160133] (f7_udp) StdoutLine: {'line': b'Installing nr25_dr_ff_ad script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.160292] (f7_udp) StdoutLine: {'line': b'Installing nr25_mr script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.160383] (f7_udp) StdoutLine: {'line': b'Installing nr25_mr_ff_ad script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.160469] (f7_udp) StdoutLine: {'line': b'Installing nr25_ohf script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.160551] (f7_udp) StdoutLine: {'line': b'Installing nr25_omni script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.160633] (f7_udp) StdoutLine: {'line': b'Installing nr25_omni_imu script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.160732] (f7_udp) StdoutLine: {'line': b'Installing nr25_omni_odom script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.160825] (f7_udp) StdoutLine: {'line': b'Installing nr25_pr_flet script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.160918] (f7_udp) StdoutLine: {'line': b'Installing nr25_pr_tuner script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.161004] (f7_udp) StdoutLine: {'line': b'Installing nr25_sd script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.161088] (f7_udp) StdoutLine: {'line': b'Installing nr25_vc script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.161185] (f7_udp) StdoutLine: {'line': b'Installing setoshio script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.161273] (f7_udp) StdoutLine: {'line': b'Installing setoshio_gui script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.161354] (f7_udp) StdoutLine: {'line': b'Installing yaw_pub script to /home/ubuntu/ros2_ws/install/f7_udp/lib/f7_udp\n'}
+[1.161432] (f7_udp) StdoutLine: {'line': b"writing list of installed files to '/home/ubuntu/ros2_ws/build/f7_udp/install.log'\n"}
+[1.183573] (ros2udp) CommandEnded: {'returncode': 0}
+[1.193826] (ros2udp) JobEnded: {'identifier': 'ros2udp', 'rc': 0}
+[1.195242] (f7_udp) CommandEnded: {'returncode': 0}
+[1.201023] (-) TimerEvent: {}
+[1.202801] (f7_udp) JobEnded: {'identifier': 'f7_udp', 'rc': 0}
+[1.301146] (-) TimerEvent: {}
+[1.401420] (-) TimerEvent: {}
+[1.501681] (-) TimerEvent: {}
+[1.601952] (-) TimerEvent: {}
+[1.702206] (-) TimerEvent: {}
+[1.802476] (-) TimerEvent: {}
+[1.902749] (-) TimerEvent: {}
+[2.003024] (-) TimerEvent: {}
+[2.103303] (-) TimerEvent: {}
+[2.203569] (-) TimerEvent: {}
+[2.303839] (-) TimerEvent: {}
+[2.404111] (-) TimerEvent: {}
+[2.504397] (-) TimerEvent: {}
+[2.604666] (-) TimerEvent: {}
+[2.704942] (-) TimerEvent: {}
+[2.805212] (-) TimerEvent: {}
+[2.905494] (-) TimerEvent: {}
+[3.005768] (-) TimerEvent: {}
+[3.106045] (-) TimerEvent: {}
+[3.206332] (-) TimerEvent: {}
+[3.306610] (-) TimerEvent: {}
+[3.406997] (-) TimerEvent: {}
+[3.507378] (-) TimerEvent: {}
+[3.607758] (-) TimerEvent: {}
+[3.708149] (-) TimerEvent: {}
+[3.808529] (-) TimerEvent: {}
+[3.908907] (-) TimerEvent: {}
+[4.009291] (-) TimerEvent: {}
+[4.109655] (-) TimerEvent: {}
+[4.210023] (-) TimerEvent: {}
+[4.310393] (-) TimerEvent: {}
+[4.410767] (-) TimerEvent: {}
+[4.511059] (-) TimerEvent: {}
+[4.611440] (-) TimerEvent: {}
+[4.711792] (-) TimerEvent: {}
+[4.812165] (-) TimerEvent: {}
+[4.912517] (-) TimerEvent: {}
+[5.012880] (-) TimerEvent: {}
+[5.113254] (-) TimerEvent: {}
+[5.213623] (-) TimerEvent: {}
+[5.313990] (-) TimerEvent: {}
+[5.414355] (-) TimerEvent: {}
+[5.514716] (-) TimerEvent: {}
+[5.615084] (-) TimerEvent: {}
+[5.715470] (-) TimerEvent: {}
+[5.815849] (-) TimerEvent: {}
+[5.902743] (f7_udp_cpp) StdoutLine: {'line': b'[ 93%] \x1b[32m\x1b[1mLinking CXX executable nr25_dr\x1b[0m\n'}
+[5.915987] (-) TimerEvent: {}
+[5.937919] (f7_udp_cpp) StdoutLine: {'line': b'[ 96%] \x1b[32m\x1b[1mLinking CXX executable nr25_dr_c610\x1b[0m\n'}
+[6.016216] (-) TimerEvent: {}
+[6.116595] (-) TimerEvent: {}
+[6.156785] (f7_udp_cpp) StdoutLine: {'line': b'[ 96%] Built target nr25_dr_c610\n'}
+[6.158102] (f7_udp_cpp) StdoutLine: {'line': b'[100%] Built target nr25_dr\n'}
+[6.167030] (f7_udp_cpp) CommandEnded: {'returncode': 0}
+[6.167657] (f7_udp_cpp) JobProgress: {'identifier': 'f7_udp_cpp', 'progress': 'install'}
+[6.174525] (f7_udp_cpp) Command: {'cmd': ['/usr/bin/cmake', '--install', '/home/ubuntu/ros2_ws/build/f7_udp_cpp'], 'cwd': '/home/ubuntu/ros2_ws/build/f7_udp_cpp', 'env': OrderedDict({'LESSOPEN': '| /usr/bin/lesspipe %s', 'LANGUAGE': 'ja:en', 'USER': 'ubuntu', 'LC_TIME': 'ja_JP.UTF-8', 'XDG_SESSION_TYPE': 'wayland', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/opt/ros/jazzy/opt/rviz_ogre_vendor/lib:/opt/ros/jazzy/lib/x86_64-linux-gnu:/opt/ros/jazzy/opt/gz_math_vendor/lib:/opt/ros/jazzy/opt/gz_utils_vendor/lib:/opt/ros/jazzy/opt/gz_cmake_vendor/lib:/opt/ros/jazzy/lib', 'HOME': '/home/ubuntu', 'OLDPWD': '/home/ubuntu', 'DESKTOP_SESSION': 'ubuntu', 'ROS_PYTHON_VERSION': '3', 'GNOME_SHELL_SESSION_MODE': 'ubuntu', 'GTK_MODULES': 'gail:atk-bridge', 'LC_MONETARY': 'ja_JP.UTF-8', 'SYSTEMD_EXEC_PID': '1619', 'GSM_SKIP_SSH_AGENT_WORKAROUND': 'true', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': 'truecolor', 'DEBUGINFOD_URLS': 'https://debuginfod.ubuntu.com', 'IM_CONFIG_PHASE': '1', 'WAYLAND_DISPLAY': 'wayland-0', 'COLCON_PREFIX_PATH': '/home/ubuntu/ros2_ws/install', 'ROS_DISTRO': 'jazzy', 'LOGNAME': 'ubuntu', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'MEMORY_PRESSURE_WATCH': '/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.Shell@wayland.service/memory.pressure', 'XDG_SESSION_CLASS': 'user', 'USERNAME': 'ubuntu', 'TERM': 'xterm-256color', 'GNOME_DESKTOP_SESSION_ID': 'this-is-deprecated', 'PATH': '/opt/ros/jazzy/bin:/home/ubuntu/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin', 'SESSION_MANAGER': 'local/ubuntu-Surface-Pro-9:@/tmp/.ICE-unix/1575,unix/ubuntu-Surface-Pro-9:/tmp/.ICE-unix/1575', 'PAPERSIZE': 'a4', 'XDG_MENU_PREFIX': 'gnome-', 'LC_ADDRESS': 'ja_JP.UTF-8', 'GNOME_TERMINAL_SCREEN': '/org/gnome/Terminal/screen/9a3ddec5_1c28_4890_8e5f_84ab51ef4c5c', 'GNOME_SETUP_DISPLAY': ':1', 'XDG_RUNTIME_DIR': '/run/user/1000', 'DISPLAY': ':0', 'LANG': 'ja_JP.UTF-8', 'XDG_CURRENT_DESKTOP': 'ubuntu:GNOME', 'LC_TELEPHONE': 'ja_JP.UTF-8', 'XMODIFIERS': '@im=ibus', 'XDG_SESSION_DESKTOP': 'ubuntu', 'XAUTHORITY': '/run/user/1000/.mutter-Xwaylandauth.9IFJ12', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:', 'GNOME_TERMINAL_SERVICE': ':1.244', 'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh', 'AMENT_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/f7_udp_cpp:/home/ubuntu/ros2_ws/install/f7_udp:/opt/ros/jazzy', 'SHELL': '/bin/bash', 'LC_NAME': 'ja_JP.UTF-8', 'QT_ACCESSIBILITY': '1', 'GDMSESSION': 'ubuntu', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'LC_MEASUREMENT': 'ja_JP.UTF-8', 'LC_IDENTIFICATION': 'ja_JP.UTF-8', 'ROS_AUTOMATIC_DISCOVERY_RANGE': 'SUBNET', 'QT_IM_MODULE': 'ibus', 'PWD': '/home/ubuntu/ros2_ws/build/f7_udp_cpp', 'XDG_CONFIG_DIRS': '/etc/xdg/xdg-ubuntu:/etc/xdg', 'XDG_DATA_DIRS': '/usr/share/ubuntu:/usr/share/gnome:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop', 'PYTHONPATH': '/home/ubuntu/ros2_ws/install/ros2udp/lib/python3.12/site-packages:/home/ubuntu/ros2_ws/install/f7_udp/lib/python3.12/site-packages:/opt/ros/jazzy/lib/python3.12/site-packages', 'LC_NUMERIC': 'ja_JP.UTF-8', 'LC_PAPER': 'ja_JP.UTF-8', 'COLCON': '1', 'MEMORY_PRESSURE_WRITE': 'c29tZSAyMDAwMDAgMjAwMDAwMAA=', 'VTE_VERSION': '7600', 'CMAKE_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/f7_udp_cpp:/opt/ros/jazzy/opt/gz_math_vendor:/opt/ros/jazzy/opt/gz_utils_vendor:/opt/ros/jazzy/opt/gz_cmake_vendor:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/f7_udp:/opt/ros/jazzy'}), 'shell': False}
+[6.181730] (f7_udp_cpp) StdoutLine: {'line': b'-- Install configuration: ""\n'}
+[6.182519] (f7_udp_cpp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_mr\n'}
+[6.182997] (f7_udp_cpp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_mr_omni\n'}
+[6.183676] (f7_udp_cpp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_mr_sd\n'}
+[6.184030] (f7_udp_cpp) StdoutLine: {'line': b'-- Installing: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_dr\n'}
+[6.188488] (f7_udp_cpp) StdoutLine: {'line': b'-- Set non-toolchain portion of runtime path of "/home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_dr" to ""\n'}
+[6.188803] (f7_udp_cpp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_dr_omni\n'}
+[6.189490] (f7_udp_cpp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_dr_sd\n'}
+[6.189886] (f7_udp_cpp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_enc\n'}
+[6.190610] (f7_udp_cpp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_pr\n'}
+[6.190953] (f7_udp_cpp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_vel2js\n'}
+[6.191680] (f7_udp_cpp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_enc_pid\n'}
+[6.191940] (f7_udp_cpp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_pid\n'}
+[6.192098] (f7_udp_cpp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/ament_index/resource_index/package_run_dependencies/f7_udp_cpp\n'}
+[6.192285] (f7_udp_cpp) StdoutLine: {'line': b'-- Installing: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/ament_index/resource_index/parent_prefix_path/f7_udp_cpp\n'}
+[6.192423] (f7_udp_cpp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/environment/ament_prefix_path.sh\n'}
+[6.192530] (f7_udp_cpp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/environment/ament_prefix_path.dsv\n'}
+[6.192609] (f7_udp_cpp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/environment/path.sh\n'}
+[6.192685] (f7_udp_cpp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/environment/path.dsv\n'}
+[6.192760] (f7_udp_cpp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/local_setup.bash\n'}
+[6.192852] (f7_udp_cpp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/local_setup.sh\n'}
+[6.192964] (f7_udp_cpp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/local_setup.zsh\n'}
+[6.193037] (f7_udp_cpp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/local_setup.dsv\n'}
+[6.193108] (f7_udp_cpp) StdoutLine: {'line': b'-- Installing: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/package.dsv\n'}
+[6.193190] (f7_udp_cpp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/ament_index/resource_index/packages/f7_udp_cpp\n'}
+[6.193264] (f7_udp_cpp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/cmake/f7_udp_cppConfig.cmake\n'}
+[6.193335] (f7_udp_cpp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/cmake/f7_udp_cppConfig-version.cmake\n'}
+[6.193425] (f7_udp_cpp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/package.xml\n'}
+[6.194281] (f7_udp_cpp) CommandEnded: {'returncode': 0}
+[6.202231] (f7_udp_cpp) JobEnded: {'identifier': 'f7_udp_cpp', 'rc': 0}
+[6.202815] (-) EventReactorShutdown: {}

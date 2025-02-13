@@ -1,0 +1,42 @@
+[0.127s] Invoking command in '/home/ubuntu/ros2_ws/build/f7_udp_cpp': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/ros2_ws/build/f7_udp_cpp -- -j12 -l12
+[0.196s] [  6%] Built target nr25_enc_pid
+[0.198s] [ 13%] Built target nr25_pr
+[0.198s] [ 44%] Built target nr25_mr_sd
+[0.198s] [ 44%] Built target nr25_mr_omni
+[0.198s] [ 44%] Built target nr25_mr
+[0.199s] [ 55%] Built target nr25_dr_omni
+[0.200s] [ 65%] Built target nr25_dr
+[0.201s] [ 75%] Built target nr25_pid
+[0.205s] [ 93%] Built target nr25_vel2js
+[0.205s] [ 93%] Built target nr25_dr_sd
+[0.208s] [100%] Built target nr25_enc
+[0.288s] Invoked command in '/home/ubuntu/ros2_ws/build/f7_udp_cpp' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/ros2_ws/build/f7_udp_cpp -- -j12 -l12
+[0.298s] Invoking command in '/home/ubuntu/ros2_ws/build/f7_udp_cpp': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/ros2_ws/build/f7_udp_cpp
+[0.308s] -- Install configuration: ""
+[0.309s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_mr
+[0.309s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_mr_omni
+[0.309s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_mr_sd
+[0.309s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_dr
+[0.309s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_dr_omni
+[0.309s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_dr_sd
+[0.310s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_enc
+[0.310s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_pr
+[0.310s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_vel2js
+[0.310s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_enc_pid
+[0.311s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/lib/f7_udp_cpp/nr25_pid
+[0.311s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/ament_index/resource_index/package_run_dependencies/f7_udp_cpp
+[0.311s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/ament_index/resource_index/parent_prefix_path/f7_udp_cpp
+[0.311s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/environment/ament_prefix_path.sh
+[0.312s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/environment/ament_prefix_path.dsv
+[0.312s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/environment/path.sh
+[0.312s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/environment/path.dsv
+[0.312s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/local_setup.bash
+[0.313s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/local_setup.sh
+[0.313s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/local_setup.zsh
+[0.313s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/local_setup.dsv
+[0.313s] -- Installing: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/package.dsv
+[0.313s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/ament_index/resource_index/packages/f7_udp_cpp
+[0.313s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/cmake/f7_udp_cppConfig.cmake
+[0.313s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/cmake/f7_udp_cppConfig-version.cmake
+[0.313s] -- Up-to-date: /home/ubuntu/ros2_ws/install/f7_udp_cpp/share/f7_udp_cpp/package.xml
+[0.318s] Invoked command in '/home/ubuntu/ros2_ws/build/f7_udp_cpp' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/ros2_ws/build/f7_udp_cpp
