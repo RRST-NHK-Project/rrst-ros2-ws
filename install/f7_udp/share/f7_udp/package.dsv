@@ -1,6 +1,0 @@
-source;share/f7_udp/hook/pythonpath.ps1
-source;share/f7_udp/hook/pythonpath.dsv
-source;share/f7_udp/hook/pythonpath.sh
-source;share/f7_udp/hook/ament_prefix_path.ps1
-source;share/f7_udp/hook/ament_prefix_path.dsv
-source;share/f7_udp/hook/ament_prefix_path.sh
