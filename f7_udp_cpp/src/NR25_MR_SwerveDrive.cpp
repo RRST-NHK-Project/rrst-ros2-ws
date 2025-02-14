@@ -23,6 +23,15 @@ RRST NHK2025
 #define DEADZONE_R 0.3
 //定数k
 #define k 0.05
+//PIDパラメータ（チューニングが必要）
+#define deg_Kp 0.01      // 角度Pゲイン
+#define deg_Ki 0        //角度Iゲイン
+#define  deg_Kd 0       // 角度Dゲイン
+#define  speed_Kp 0       // 速度Pゲイン
+#define  speed_Ki 0.2        // 速度Iゲイン
+#define  speed_Kd 0        // 速度Dゲイン
+#define speed_limit 30
+#define deg_limit 360
 //角度一覧
 int deg;
 int previous_deg =135;
@@ -30,13 +39,7 @@ int truedeg;
 int desired_deg = deg;
 int measured_deg = previous_deg;
 
-//PIDパラメータ（チューニングが必要）
-double deg_Kp = 0.01;       // 角度Pゲイン
-double deg_Ki = 0.000001;        //角度Iゲイン
-double deg_Kd = 0.001;        // 角度Dゲイン
-double speed_Kp = 0.01;       // 速度Pゲイン
-double speed_Ki = 0.000001;        // 速度Iゲイン
-double speed_Kd = 0.001;        // 速度Dゲイン
+
 
 //PID用の内部変数
 double deg_Error = 0.0;
@@ -105,7 +108,7 @@ private:
         // bool R1 = msg->buttons[5];
 
         // float L2 = (-1 * msg->axes[2] + 1) / 2;
-        float R2 = (-1 * msg->axes[5] + 1) / 2;
+        //float R2 = (-1 * msg->axes[5] + 1) / 2;
 
         // bool SHARE = msg->buttons[8];
         // bool OPTION = msg->buttons[9];
@@ -125,8 +128,8 @@ private:
         }
 
         float rad = atan2(LS_Y, LS_X);
-        float s = sin(rad);
-        float c = cos(rad);
+        // float s = sin(rad);
+        // float c = cos(rad);
         deg = rad * 180 / M_PI;
 
         // PID計算（台形則による積分計算をそのまま使用）
@@ -146,6 +149,8 @@ private:
         // 各サンプリングごとにPID出力を再計算
         deg_Output = (deg_Kp * deg_Error) + (deg_Ki * deg_Integral) + (deg_Kd * deg_Differential);
         deg_last_Error = deg_Error;
+
+
         // 135度を90度とみなしたときのズレの角度
         
         // XY座標での正しい角度truedeg
@@ -164,7 +169,7 @@ private:
         } else {
             deg = 225 - deg;
         }
-        displacement = deg -previous_deg;
+        // displacement = deg -previous_deg;
 
         // std::cout << deg << std::endl;
 
@@ -185,7 +190,7 @@ private:
 
         if (LEFT) {
             deg = 45;
-            displacement = deg -previous_deg;
+            //displacement = deg -previous_deg;
             // data[1] = -wheelspeed/(1 + k*displacement) * R2;
             // data[2] = -wheelspeed/(1 + k*displacement) * R2;
             // data[3] = -wheelspeed/(1 + k*displacement) * R2;
@@ -201,7 +206,7 @@ private:
         }
         if (RIGHT) {
             deg = 45;
-            displacement = deg -previous_deg;
+            //displacement = deg -previous_deg;
             // data[1] = wheelspeed/(1 + k*displacement) * R2;
             // data[2] = wheelspeed/(1 + k*displacement) * R2;
             // data[3] = wheelspeed/(1 + k*displacement) * R2;
@@ -217,7 +222,7 @@ private:
         }
         if (UP) {
             deg = 135;
-            displacement = deg -previous_deg;
+            //displacement = deg -previous_deg;
             // data[1] = -wheelspeed/(1 + k*displacement) * R2;
             // data[2] = -wheelspeed/(1 + k*displacement) * R2;
             // data[3] = -wheelspeed/(1 + k*displacement) * R2;
@@ -233,7 +238,7 @@ private:
         }
         if (DOWN) {
             deg = 135;
-            displacement = deg -previous_deg;
+            //displacement = deg -previous_deg;
             // data[1] = wheelspeed/(1 + k*displacement) * R2;
             // data[2] = wheelspeed/(1 + k*displacement) * R2;
             // data[3] = wheelspeed/(1 + k*displacement) * R2;
@@ -251,7 +256,7 @@ private:
         // 独ステが扱えない範囲の変換
         if ((345 < deg) && (deg < 360)) {
             deg = 13*deg - 4320;
-            displacement = deg -previous_deg;
+            //displacement = deg -previous_deg;
             // data[1] = wheelspeed/(1 + k*displacement) * R2;
             // data[2] = wheelspeed/(1 + k*displacement) * R2;
             // data[3] = wheelspeed/(1 + k*displacement) * R2;
@@ -271,7 +276,7 @@ private:
         }
         if ((270 < deg) && (deg < 285)) {
             deg = -11*deg + 3240;
-            displacement = deg -previous_deg;
+            //displacement = deg -previous_deg;
             // data[1] = wheelspeed/(1 + k*displacement) * R2;
             // data[2] = wheelspeed/(1 + k*displacement) * R2;
             // data[3] = wheelspeed/(1 + k*displacement) * R2;
@@ -291,7 +296,7 @@ private:
         }
         if ((285 < deg) && (deg < 345)) {
             deg = deg - 180;
-            displacement = deg -previous_deg;
+            //displacement = deg -previous_deg;
             // data[1] = wheelspeed/(1 + k*displacement) * R2;
             // data[2] = wheelspeed/(1 + k*displacement) * R2;
             // data[3] = wheelspeed/(1 + k*displacement) * R2;
@@ -337,9 +342,27 @@ private:
             data[4] = -yawspeed;
         }
 
+
+        // 安全のため、出力値に対して上限を設ける
+        if (deg_Output > deg_limit) {
+            deg_Output = deg_limit;
+        } else if (deg_Output < -deg_limit) {
+            deg_Output = -deg_limit;
+        }
+        // 安全のため、出力値に対して上限を設ける
+        if (speed_Output > speed_limit) {
+            speed_Output = speed_limit;
+        } else if (speed_Output < -speed_limit) {
+            speed_Output = -speed_limit;
+        }
+        previous_deg = deg;
+
         // deadzone追加
         if ((fabs(LS_X) <= DEADZONE_R) && (fabs(LS_Y) <= DEADZONE_R) && (fabs(RS_X) <= DEADZONE_L)) {
             deg = 135;
+            desired_speed = 0;
+            speed_Integral = 0;
+            speed_last_Error = 0;
             data[1] = 0;
             data[2] = 0;
             data[3] = 0;
@@ -348,14 +371,15 @@ private:
             data[6] = deg + SERVO2_CAL;
             data[7] = deg + SERVO3_CAL;
             data[8] = deg + SERVO4_CAL;
+        }else{
+            desired_speed = 30;
         }
-        previous_deg = deg;
 
         // デバッグ用
         // std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4] << ", ";
         // std::cout << data[5] << ", " << data[6] << ", " << data[7] << ", " << data[8] << ", " << std::endl;
 
-        // std::cout << data << std::endl;
+        std::cout << speed_Output << std::endl;
         udp_.send(data);
     }
 
