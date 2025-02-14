@@ -8,5 +8,5 @@ ROS 2とマイコンをUDP経由で通信するパッケージ群です。現状
 f7_udpのC++移植版、NHKロボコン2025で使用予定。
 ### ros2udp
 Picoマイコンへの移行のためにかいたやつ、C++で書き換えてf7_udp_cppに統合予定。
-### ビルド
+### ビルド状況
 [![build and test](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main.yml)
