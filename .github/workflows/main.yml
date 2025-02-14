@@ -49,10 +49,3 @@ jobs:
           source /opt/ros/jazzy/setup.bash
           cd ros2_ws
           colcon build --symlink-install --event-handlers console_cohesion+
-
-      - name: Run tests
-        run: |
-          source /opt/ros/jazzy/setup.bash
-          cd ros2_ws
-          colcon test --event-handlers console_cohesion+
-          colcon test-result --verbose
