@@ -3,14 +3,19 @@ RRST NHK2025
 汎用機独ステ
 */
 
-#include "include/UDP.hpp"
+// 標準
+#include <chrono>
+#include <cmath>
+#include <thread>
+
+// ROS
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/int32.hpp"
-#include <chrono>
-#include <cmath>
 #include <std_msgs/msg/int32_multi_array.hpp>
-#include <thread>
+
+// 自作クラス
+#include "include/UDP_vector_int.hpp"
 
 // サーボの組み付け時のズレを補正（度数法）
 #define SERVO1_CAL 0 // 7
@@ -26,7 +31,7 @@ int deg;
 int truedeg;
 
 // IPアドレスとポートの指定
-std::string udp_ip = "192.168.8.217"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
+std::string udp_ip = "192.168.0.217"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
 
 std::vector<int> data = {0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -207,7 +212,7 @@ private:
     }
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
-    UDP udp_;
+    UDP_vector_int udp_;
 };
 
 class Servo_Deg_Publisher : public rclcpp::Node {
@@ -215,7 +220,7 @@ public:
     Servo_Deg_Publisher()
         : Node("servo_deg_publisher") {
         // Publisherの作成
-        publisher_ = this->create_publisher<std_msgs::msg::Int32MultiArray>("dr_servo_deg", 10);
+        publisher_ = this->create_publisher<std_msgs::msg::Int32MultiArray>("mr_servo_deg", 10);
 
         // タイマーを使って定期的にメッセージをpublish
         timer_ = this->create_wall_timer(
