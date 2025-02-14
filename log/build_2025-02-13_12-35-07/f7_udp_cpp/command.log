@@ -1,0 +1,4 @@
+Invoking command in '/home/ubuntu/ros2_ws/build/f7_udp_cpp': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/ros2_ws/build/f7_udp_cpp -- -j12 -l12
+Invoked command in '/home/ubuntu/ros2_ws/build/f7_udp_cpp' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/ros2_ws/build/f7_udp_cpp -- -j12 -l12
+Invoking command in '/home/ubuntu/ros2_ws/build/f7_udp_cpp': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/ros2_ws/build/f7_udp_cpp
+Invoked command in '/home/ubuntu/ros2_ws/build/f7_udp_cpp' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/ros2_ws/build/f7_udp_cpp

@@ -43,6 +43,7 @@ public:
         data[2] = 1;
         data[3] = 1;
         udp.send(data);
+
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
         std::cout << "ストッパ[4]" << std::endl;
