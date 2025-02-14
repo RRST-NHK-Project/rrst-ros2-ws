@@ -1,0 +1,65 @@
+name: ROS 2 Jazzy Build & Test
+
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup ROS 2
+        uses: ros-tooling/setup-ros@v0.7
+        with:
+          required-ros-distributions: jazzy
+
+      - name: Upgrade CMake
+        run: |
+          sudo apt update
+          sudo apt install -y cmake
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y python3-colcon-common-extensions
+
+      - name: Install pytest dependencies
+        run: |
+          pip install --upgrade pip
+          pip install --force-reinstall pytest pytest-repeat
+
+      - name: Create ROS 2 workspace
+        run: |
+          mkdir -p ros2_ws/src
+          mv $(ls -d */ | grep -v 'ros2_ws') ros2_ws/src/ || true
+          cd ros2_ws
+          source /opt/ros/jazzy/setup.bash
+          rosdep update
+          rosdep install --from-paths src --ignore-src -r -y
+
+      - name: Build workspace
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          cd ros2_ws
+          colcon build --symlink-install --event-handlers console_cohesion+
+
+      - name: Run tests
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          cd ros2_ws
+          colcon test
+          colcon test-result --verbose
+
+          

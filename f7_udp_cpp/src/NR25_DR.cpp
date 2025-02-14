@@ -6,6 +6,7 @@ RRST NHK2025
 // 標準
 #include <chrono>
 #include <thread>
+#include <unistd.h>
 
 // ROS
 #include "rclcpp/rclcpp.hpp"
@@ -37,23 +38,26 @@ public:
 
     static void dunk_shoot_action(UDP &udp) {
         std::cout << "<ダンクシーケンス開始>" << std::endl;
+
         std::cout << "２段階展開[2]＋トリガー[3]" << std::endl;
         data[2] = 1;
         data[3] = 1;
         udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(30));
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
         std::cout << "ストッパ[4]" << std::endl;
         data[4] = 1;
         udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
         std::cout << "格納[5]" << std::endl;
         data[5] = 1;
-        udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
         std::cout << "サーボ[8]" << std::endl;
         data[8] = 0;
         udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
+
         std::cout << "１段階格納[1]＋２段階格納[2]" << std::endl;
         data[1] = -1;
         data[2] = -1;
@@ -132,12 +136,12 @@ private:
 
         if (TRIANGLE) {
             Action::ready_for_dunk_action(udp_);
-            // std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
 
         if (CIRCLE && Action::ready_for_dunk) {
             Action::dunk_shoot_action(udp_);
-            // std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
 
         udp_.send(data);
