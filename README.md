@@ -12,5 +12,5 @@ Picoマイコンへの移行のために書いたやつ、C++で書き換えてf
 [![ROS 2 Humble Build](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_humble_build.yml/badge.svg?branch=main)](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_humble_build.yml)  
 [![ROS 2 Jazzy Build](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build.yml/badge.svg?branch=main)](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build.yml)
 ## Build & Run Status
-[![ROS 2 Jazzy BUild & Run](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_run.yml/badge.svg?branch=main)](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_run.yml)
+[![ROS 2 Jazzy Build & Run](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_run.yml/badge.svg?branch=main)](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_run.yml)
 
