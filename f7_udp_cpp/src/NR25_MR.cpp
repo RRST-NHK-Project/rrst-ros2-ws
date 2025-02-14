@@ -24,7 +24,7 @@ Dribble State: 0
 // 自作クラス
 #include "include/UDP.hpp"
 
-// 各ローラーの速度を指定(%)、Parameter_Tunerで変更可能
+// 各ローラーの速度を指定(%)
 int roller_speed_dribble_ab = 30;
 int roller_speed_dribble_cd = 30;
 int roller_speed_shoot_ab = 50;

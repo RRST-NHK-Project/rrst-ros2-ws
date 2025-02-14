@@ -3,14 +3,19 @@ RRST NHK2025
 汎用機独ステ
 */
 
-#include "include/UDP.hpp"
+// 標準
+#include <chrono>
+#include <cmath>
+#include <thread>
+
+// ROS
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/int32.hpp"
-#include <chrono>
-#include <cmath>
 #include <std_msgs/msg/int32_multi_array.hpp>
-#include <thread>
+
+// 自作クラス
+#include "include/UDP.hpp"
 
 // サーボの組み付け時のズレを補正（度数法）
 #define SERVO1_CAL 0 // 7

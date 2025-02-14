@@ -3,11 +3,11 @@ RRST NHK2025
 UDPで送信するクラス
 */
 
-#include "UDP.hpp"
+#include "UDP_vector_int.hpp"
 
-int max = 999; // 最大値を3桁に制限
+int max = 9999; // 最大値を4桁に制限
 
-UDP::UDP(const std::string &ip_address, int port) {
+UDP_vector_int::UDP_vector_int(const std::string &ip_address, int port) {
     try {
         udp_socket = socket(AF_INET, SOCK_DGRAM, 0);
         if (udp_socket < 0) {
@@ -29,7 +29,7 @@ UDP::UDP(const std::string &ip_address, int port) {
     }
 }
 
-void UDP::send(std::vector<int> &data) {
+void UDP_vector_int::send(std::vector<int> &data) {
     for (auto &value : data) {
         if (value > max) {
             value = max;
@@ -38,17 +38,16 @@ void UDP::send(std::vector<int> &data) {
         }
     }
 
-    // カンマ区切りで文字列に変換
-    std::ostringstream oss;
-    for (size_t i = 1; i < data.size(); ++i) {
-        oss << data[i];
-        if (i != data.size() - 1) {
-            oss << ",";
-        }
-    }
+    // int配列をそのまま送信
+    ssize_t sent_bytes = sendto(
+        udp_socket,
+        data.data(),               // 送信データのポインタ
+        data.size() * sizeof(int), // バイトサイズ
+        0,
+        (struct sockaddr *)&dst_addr,
+        sizeof(dst_addr));
 
-    std::string str_data = oss.str();
-    if (sendto(udp_socket, str_data.c_str(), str_data.length(), 0, (struct sockaddr *)&dst_addr, sizeof(dst_addr)) < 0) {
+    if (sent_bytes < 0) {
         std::cerr << "Failed to send data." << std::endl;
     }
 }
