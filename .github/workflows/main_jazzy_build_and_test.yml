@@ -59,7 +59,7 @@ jobs:
         run: |
           source /opt/ros/jazzy/setup.bash
           cd ros2_ws
-          colcon test --pytest-args "--ignore=ros2udp/ros2udp/archived", "--ignore=f7_udp/f7_udp/archived"
+          colcon test
           colcon test-result --verbose
 
           
