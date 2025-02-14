@@ -1,8 +1,0 @@
-Metadata-Version: 2.1
-Name: ros2udp
-Version: 0.0.0
-Summary: ROS 2 と マイコンをUDPで通信するパッケージ / ROS 2 Package for connecting ROS 2 and Microcontrollers over UDP 
-Maintainer: K.Tashiro
-Maintainer-email: tashikou1682@gmail.com
-License: Apache-2.0
-License-File: LICENSE

@@ -1,7 +1,0 @@
-[31mCMake Error at /opt/ros/jazzy/share/ament_cmake_target_dependencies/cmake/ament_target_dependencies.cmake:42 (message):
-  ament_target_dependencies() the first argument must be a valid target name
-Call Stack (most recent call first):
-  CMakeLists.txt:46 (ament_target_dependencies)
-
-[0m
-gmake: *** [Makefile:722: cmake_check_build_system] エラー 1
