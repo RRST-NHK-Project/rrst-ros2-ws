@@ -1,4 +1,4 @@
-name: ROS 2 Jazzy BUild & Run
+name: ROS 2 Jazzy Build & Run
 
 on:
   push:
