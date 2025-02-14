@@ -1,12 +1,17 @@
 name: ROS 2 Jazzy Build & Run
 
+
 on:
   push:
     branches:
       - main
+    paths-ignore:
+      - 'README.md'
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - 'README.md'
 
 jobs:
   build-and-test:
