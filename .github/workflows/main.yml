@@ -35,13 +35,13 @@ jobs:
 
       - name: Build workspace
         run: |
-          source /opt/ros/humble/setup.bash  # ROS 2環境をセットアップ
+          source /opt/ros/jazzy/setup.bash  # ROS 2環境をセットアップ
           cd ros2_ws
           colcon build --symlink-install
 
       - name: Run tests
         run: |
-          source /opt/ros/humble/setup.bash  # ROS 2環境をセットアップ
+          source /opt/ros/jazzy/setup.bash  # ROS 2環境をセットアップ
           cd ros2_ws
           colcon test
           colcon test-result --verbose
