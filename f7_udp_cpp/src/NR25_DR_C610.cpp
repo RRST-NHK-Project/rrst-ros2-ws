@@ -65,6 +65,12 @@ public:
         std::cout << "完了." << std::endl;
         std::cout << "<ダンクシーケンス終了>" << std::endl;
     }
+
+    static void dribble_action(UDP &udp) {
+        std::cout << "<ロボマス回転>" << std::endl;
+        data[6] = 100;
+        udp.send(data);
+    }    
 };
 bool Action::ready_for_dunk = false;
 
@@ -89,7 +95,7 @@ private:
         //  float RS_X = -1 * msg->axes[3];
         //  float RS_Y = msg->axes[4];
 
-        // bool CROSS = msg->buttons[0];
+        bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
         bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
@@ -140,6 +146,11 @@ private:
 
         if (CIRCLE && Action::ready_for_dunk) {
             Action::dunk_shoot_action(udp_);
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+
+        if (CROSS) {
+            Action::dribble_action(udp_);
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
 
