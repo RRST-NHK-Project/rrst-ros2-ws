@@ -69,7 +69,12 @@ public:
 
     static void dribble_action(UDP &udp) {
         std::cout << "<ロボマス回転>" << std::endl;
-        data[6] = 100;
+        data[6] = 50;
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
+
+        std::cout << "<回転終了>" << std::endl;
+         data[6]= 0;
         udp.send(data);
     }    
 };
@@ -80,7 +85,7 @@ public:
     PS4_Listener(const std::string &ip, int port)
         : Node("nhk25_dr"), udp_(ip, port) {
         subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
-            "joy1", 10,
+            "joy", 10,
             std::bind(&PS4_Listener::ps4_listener_callback, this,
                       std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(),
@@ -152,7 +157,7 @@ private:
         }
 
         if (CROSS) {
-           std::cout << "<ロボマス回転>" << std::endl;
+          // std::cout << "<ロボマス回転>" << std::endl;
             Action::dribble_action(udp_);
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
