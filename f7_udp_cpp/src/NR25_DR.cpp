@@ -93,7 +93,7 @@ private:
         // bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
         bool TRIANGLE = msg->buttons[2];
-        bool SQUARE = msg->buttons[3];
+        // bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
         // bool RIGHT = msg->axes[6] == -1.0;
@@ -147,7 +147,7 @@ private:
         // if (SQUARE) {
         //     data[8] = 45;
         //     udp_.send(data);
-        //     //std::cout << "S" << std::endl; 
+        //     //std::cout << "S" << std::endl;
         //     std::this_thread::sleep_for(std::chrono::milliseconds(500));
         // }
 
