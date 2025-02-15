@@ -20,8 +20,8 @@ RRST NHK2025
 // サーボの組み付け時のズレを補正（度数法）
 #define SERVO1_CAL 0
 #define SERVO2_CAL 0
-#define SERVO3_CAL 0 
-#define SERVO4_CAL 0 
+#define SERVO3_CAL 0
+#define SERVO4_CAL 0
 
 // スティックのデッドゾーン
 #define DEADZONE_L 0.7
@@ -47,6 +47,9 @@ public:
             "joy1", 10,
             std::bind(&PS4_Listener::ps4_listener_callback, this,
                       std::placeholders::_1));
+        // figletでノード名を表示
+        std::string figletout = "figlet DR SwerveDrive";
+        std::system(figletout.c_str());
         RCLCPP_INFO(this->get_logger(),
                     "NHK2025 DR SD initialized with IP: %s, Port: %d", ip.c_str(),
                     port);
@@ -203,9 +206,9 @@ private:
             data[4] = -yawspeed;
         }
 
-        //デバッグ用
-        // std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4] << ", ";
-        // std::cout << data[5] << ", " << data[6] << ", " << data[7] << ", " << data[8] << ", " << std::endl;
+        // デバッグ用
+        //  std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4] << ", ";
+        //  std::cout << data[5] << ", " << data[6] << ", " << data[7] << ", " << data[8] << ", " << std::endl;
 
         // std::cout << data << std::endl;
         udp_.send(data);

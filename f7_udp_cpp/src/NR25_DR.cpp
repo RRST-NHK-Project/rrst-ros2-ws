@@ -76,6 +76,9 @@ public:
             "joy1", 10,
             std::bind(&PS4_Listener::ps4_listener_callback, this,
                       std::placeholders::_1));
+        // figletでノード名を表示
+        std::string figletout = "figlet DR";
+        std::system(figletout.c_str());
         RCLCPP_INFO(this->get_logger(),
                     "NHK2025 DR initialized with IP: %s, Port: %d", ip.c_str(),
                     port);
@@ -94,6 +97,7 @@ private:
         bool CIRCLE = msg->buttons[1];
         bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
+
         // bool LEFT = msg->axes[6] == 1.0;
         // bool RIGHT = msg->axes[6] == -1.0;
         // bool UP = msg->axes[7] == 1.0;
@@ -157,32 +161,6 @@ private:
     UDP udp_;
 };
 
-// class Params_Listener : public rclcpp::Node {
-// public:
-//     Params_Listener()
-//         : Node("nhk25_pr_listener") {
-//         subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
-//             "parameter_array", 10,
-//             std::bind(&Params_Listener::params_listener_callback, this,
-//                       std::placeholders::_1));
-//         RCLCPP_INFO(this->get_logger(),
-//                     "NHK2025 Parameter Listener");
-//     }
-
-// private:
-//     void params_listener_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
-//         roller_speed_dribble_ab = msg->data[0];
-//         roller_speed_dribble_cd = msg->data[1];
-//         roller_speed_shoot_ab = msg->data[2];
-//         roller_speed_shoot_cd = msg->data[3];
-//         std::cout << roller_speed_dribble_ab;
-//         std::cout << roller_speed_dribble_cd;
-//         std::cout << roller_speed_shoot_ab;
-//         std::cout << roller_speed_shoot_cd << std::endl;
-//     }
-
-//     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
-// };
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
