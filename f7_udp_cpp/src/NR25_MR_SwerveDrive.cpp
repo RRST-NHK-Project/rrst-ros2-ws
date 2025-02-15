@@ -18,7 +18,7 @@ RRST NHK2025
 #include "include/UDP.hpp"
 
 // サーボの組み付け時のズレを補正（度数法）
-#define SERVO1_CAL -7 
+#define SERVO1_CAL -7
 #define SERVO2_CAL 2
 #define SERVO3_CAL -7
 #define SERVO4_CAL -16
@@ -47,6 +47,9 @@ public:
             "joy0", 10,
             std::bind(&PS4_Listener::ps4_listener_callback, this,
                       std::placeholders::_1));
+        // figletでノード名を表示
+        std::string figletout = "figlet MR SwerveDrive";
+        std::system(figletout.c_str());
         RCLCPP_INFO(this->get_logger(),
                     "NHK2025 MR SD initialized with IP: %s, Port: %d", ip.c_str(),
                     port);

@@ -17,6 +17,11 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/nlohmann/json.git
   GIT_TAG v3.11.3
 )
+FetchContent_Declare(
+  figlet
+  GIT_REPOSITORY https://github.com/cmatsuoka/figlet.git
+  GIT_TAG 2.2.5
+)
 FetchContent_MakeAvailable(nlohmann_json)
 
 find_package(ament_cmake REQUIRED)
