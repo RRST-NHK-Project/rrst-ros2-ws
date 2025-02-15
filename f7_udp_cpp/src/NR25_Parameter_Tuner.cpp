@@ -19,6 +19,7 @@ JSONファイルに最後のパラメータを保存・次回起動時に読み�
 #include <mutex>
 #include <nlohmann/json.hpp> //C++でJSON読み取り
 #include <rclcpp/rclcpp.hpp>
+#include <sstream>
 #include <std_msgs/msg/int32_multi_array.hpp>
 #include <string>
 #include <thread>
@@ -27,6 +28,8 @@ JSONファイルに最後のパラメータを保存・次回起動時に読み�
 using json = nlohmann::json;
 //保存用のファイル
 const std::string PARAM_FILE = "mr_parameter.json";
+
+const std::string CSV_FILE = "mr_parameter.csv";
 
 class ParameterNode : public rclcpp::Node {
 public:
@@ -45,6 +48,7 @@ public:
   ~ParameterNode() {
     //セーブ
     save_parameters();
+    save_logs();
     running = false;
     if (publish_thread.joinable())
       publish_thread.join();
@@ -100,6 +104,21 @@ private:
       params = {50, 50, 50, 50};
       std::cout
           << "パラメータファイルのロードに失敗。デフォルト値を適用します。\n";
+    }
+  }
+
+  void save_logs() {
+    std::ofstream file(CSV_FILE, std::ios::app);
+    if (file.is_open()) {
+      auto now = std::chrono::system_clock::now();
+      auto time_t_now = std::chrono::system_clock::to_time_t(now);
+      file << std::ctime(&time_t_now) << params[0] << "," << params[1] << ","
+           << params[2] << "," << params[3] << "," << shoot_state.load() << ","
+           << dribble_state.load() << "\n";
+      file.close();
+      std::cout << "ログを保存しました\n";
+    } else {
+      std::cout << "ログの保存に失敗。\n";
     }
   }
 
