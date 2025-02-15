@@ -9,6 +9,5 @@ f7_udpのC++移植版、NHKロボコン2025で使用予定。
 ### ros2udp
 Picoマイコンへの移行のために書いたやつ、C++で書き換えてf7_udp_cppに統合予定。
 ## Build & Test Status
-[![ROS 2 Hamble Build & Test](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_humble_build_and_test.yml/badge.svg?branch=main)](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_humble_build_and_test.yml)  
 [![ROS 2 Jazzy Build & Test](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_test.yml/badge.svg?branch=main)](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_test.yml)
 

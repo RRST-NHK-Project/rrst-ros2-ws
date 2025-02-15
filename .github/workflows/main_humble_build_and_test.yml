@@ -14,7 +14,7 @@ on:
       - 'README.md'
 
 jobs:
-  build-and-test:
+  humble-build-and-test:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
