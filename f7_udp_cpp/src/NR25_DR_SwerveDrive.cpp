@@ -204,8 +204,8 @@ private:
         }
 
         //デバッグ用
-        std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4] << ", ";
-        std::cout << data[5] << ", " << data[6] << ", " << data[7] << ", " << data[8] << ", " << std::endl;
+        // std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4] << ", ";
+        // std::cout << data[5] << ", " << data[6] << ", " << data[7] << ", " << data[8] << ", " << std::endl;
 
         // std::cout << data << std::endl;
         udp_.send(data);
