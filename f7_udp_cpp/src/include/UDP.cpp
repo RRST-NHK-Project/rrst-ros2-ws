@@ -51,5 +51,5 @@ void UDP::send(std::vector<int> &data) {
     if (sendto(udp_socket, str_data.c_str(), str_data.length(), 0, (struct sockaddr *)&dst_addr, sizeof(dst_addr)) < 0) {
         std::cerr << "Failed to send data." << std::endl;
     }
-    std::cout << str_data << std::endl;
+   // std::cout << str_data << std::endl;
 }

@@ -148,9 +148,11 @@ private:
         if (CIRCLE && Action::ready_for_dunk) {
             Action::dunk_shoot_action(udp_);
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            
         }
 
         if (CROSS) {
+           std::cout << "<ロボマス回転>" << std::endl;
             Action::dribble_action(udp_);
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
