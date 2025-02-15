@@ -94,7 +94,6 @@ private:
         bool CIRCLE = msg->buttons[1];
         bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
-
         // bool LEFT = msg->axes[6] == 1.0;
         // bool RIGHT = msg->axes[6] == -1.0;
         // bool UP = msg->axes[7] == 1.0;
