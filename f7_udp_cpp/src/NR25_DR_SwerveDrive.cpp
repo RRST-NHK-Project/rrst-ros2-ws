@@ -18,10 +18,10 @@ RRST NHK2025
 #include "include/UDP_vector_int.hpp"
 
 // サーボの組み付け時のズレを補正（度数法）
-#define SERVO1_CAL 0 // 7
+#define SERVO1_CAL 0
 #define SERVO2_CAL 0
-#define SERVO3_CAL 0 // 0
-#define SERVO4_CAL 0 //-5
+#define SERVO3_CAL 0 
+#define SERVO4_CAL 0 
 
 // スティックのデッドゾーン
 #define DEADZONE_L 0.7
@@ -203,7 +203,7 @@ private:
             data[4] = -yawspeed;
         }
 
-        // デバッグ用
+        //デバッグ用
         // std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4] << ", ";
         // std::cout << data[5] << ", " << data[6] << ", " << data[7] << ", " << data[8] << ", " << std::endl;
 

@@ -18,10 +18,10 @@ RRST NHK2025
 #include "include/UDP.hpp"
 
 // サーボの組み付け時のズレを補正（度数法）
-#define SERVO1_CAL 0 // 7
-#define SERVO2_CAL 0
-#define SERVO3_CAL 0 // 0
-#define SERVO4_CAL 0 //-5
+#define SERVO1_CAL -7 
+#define SERVO2_CAL 2
+#define SERVO3_CAL -7
+#define SERVO4_CAL -16
 
 // スティックのデッドゾーン
 #define DEADZONE_L 0.7

@@ -84,6 +84,7 @@ public:
 private:
     // コントローラーの入力を取得、使わない入力はコメントアウト推奨
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
+
         //  float LS_X = -1 * msg->axes[0];
         //  float LS_Y = msg->axes[1];
         //  float RS_X = -1 * msg->axes[3];
@@ -93,7 +94,6 @@ private:
         bool CIRCLE = msg->buttons[1];
         bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
-
         // bool LEFT = msg->axes[6] == 1.0;
         // bool RIGHT = msg->axes[6] == -1.0;
         // bool UP = msg->axes[7] == 1.0;
@@ -142,6 +142,13 @@ private:
             Action::dunk_shoot_action(udp_);
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
+
+        // if (SQUARE) {
+        //     data[8] = 45;
+        //     udp_.send(data);
+        //     //std::cout << "S" << std::endl;
+        //     std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        // }
 
         udp_.send(data);
     }
