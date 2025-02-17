@@ -29,10 +29,6 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
-find_package(tf2 REQUIRED)
-find_package(tf2_ros REQUIRED)
-find_package(tf2_geometry_msgs REQUIRED)
-find_package(visualization_msgs REQUIRED)
 
 # ターゲットの定義と依存関係の追加
 add_executable(nr25_mr src/NR25_MR.cpp src/include/UDP.cpp)
@@ -72,13 +68,6 @@ ament_target_dependencies(nr25_pid rclcpp std_msgs sensor_msgs geometry_msgs)
 add_executable(nr25_dr_c610 src/NR25_DR_C610.cpp src/include/UDP.cpp)
 ament_target_dependencies(nr25_dr_c610 rclcpp std_msgs sensor_msgs geometry_msgs)
 
-
-add_executable(nr25_imu2yaw src/NR25_Iimu_to_yaw.cpp)
-ament_target_dependencies(nr25_imu2yaw rclcpp std_msgs sensor_msgs geometry_msgs tf2 tf2_ros visualization_msgs)
-
-add_executable(nr25_mr_sd_imu src/NR25_MR_SwerveDrive_imu.cpp src/include/UDP.cpp)
-ament_target_dependencies(nr25_mr_sd_imu rclcpp std_msgs sensor_msgs geometry_msgs tf2 tf2_ros visualization_msgs tf2_geometry_msgs)
-
 add_executable(nr25_mr_servo_cal src/NR25_MR_Servo_Calibrator.cpp)
 ament_target_dependencies(nr25_mr_servo_cal rclcpp std_msgs sensor_msgs geometry_msgs)
 target_include_directories(nr25_mr_servo_cal PRIVATE ${nlohmann_json_SOURCE_DIR}/single_include)
@@ -97,8 +86,6 @@ install(TARGETS
   nr25_enc_pid
   nr25_pid
   nr25_dr_c610
-  nr25_imu2yaw
-  nr25_mr_sd_imu
   nr25_mr_servo_cal
   DESTINATION lib/${PROJECT_NAME})
 
