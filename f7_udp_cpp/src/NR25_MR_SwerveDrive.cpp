@@ -47,6 +47,9 @@ public:
             "joy0", 10,
             std::bind(&PS4_Listener::ps4_listener_callback, this,
                       std::placeholders::_1));
+        // figletでノード名を表示
+        std::string figletout = "figlet MR SwerveDrive";
+        std::system(figletout.c_str());
         RCLCPP_INFO(this->get_logger(),
                     "NHK2025 MR SD initialized with IP: %s, Port: %d", ip.c_str(),
                     port);
