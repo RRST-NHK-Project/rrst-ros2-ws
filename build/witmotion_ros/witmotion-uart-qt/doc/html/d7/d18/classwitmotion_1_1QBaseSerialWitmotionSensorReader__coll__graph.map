@@ -1,0 +1,15 @@
+<map id="witmotion::QBaseSerialWitmotionSensorReader" name="witmotion::QBaseSerialWitmotionSensorReader">
+<area shape="rect" id="Node000001" title=" " alt="" coords="318,431,553,860"/>
+<area shape="rect" id="Node000002" href="$d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html" title="Abstract base class to program convenience classes for the sensors." alt="" coords="5,248,225,368"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="183,376,320,519,316,523,179,380"/>
+<area shape="rect" id="Node000003" title=" " alt="" coords="82,63,149,128"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="118,142,118,248,113,248,113,142"/>
+<area shape="rect" id="Node000004" href="$d3/dd3/classwitmotion_1_1witmotion__typed__packets.html" title=" " alt="" coords="250,268,405,348"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="342,348,364,414,359,416,337,349"/>
+<area shape="rect" id="Node000005" href="$d0/d33/classwitmotion_1_1witmotion__typed__bytecounts.html" title=" " alt="" coords="429,258,657,358"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="530,359,512,416,507,414,525,358"/>
+<area shape="rect" id="Node000006" title=" " alt="" coords="681,268,880,348"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="743,350,566,521,563,517,739,346"/>
+<area shape="rect" id="Node000007" href="$d1/d6d/structwitmotion_1_1witmotion__config__packet.html" title="Generic structure respresenting the standard 5&#45;byte configuration command defined in Witmotion protoc..." alt="" coords="703,5,858,185"/>
+<area shape="poly" id="edge6_Node000006_Node000007" title=" " alt="" coords="783,186,783,252,778,252,778,186"/>
+</map>

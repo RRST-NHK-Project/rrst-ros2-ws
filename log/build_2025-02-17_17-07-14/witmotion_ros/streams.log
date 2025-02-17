@@ -1,0 +1,576 @@
+[0.011s] Invoking command in '/home/dev/ros2_ws/src/build/witmotion_ros': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/dev/ros2_ws/install/ros2udp:/home/dev/ros2_ws/install/f7_udp:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake /home/dev/ros2_ws/src/witmotion_ros -DCMAKE_INSTALL_PREFIX=/home/dev/ros2_ws/src/install/witmotion_ros
+[0.137s] -- The C compiler identification is GNU 13.3.0
+[0.211s] -- The CXX compiler identification is GNU 13.3.0
+[0.232s] -- Detecting C compiler ABI info
+[0.334s] -- Detecting C compiler ABI info - done
+[0.346s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.346s] -- Detecting C compile features
+[0.347s] -- Detecting C compile features - done
+[0.361s] -- Detecting CXX compiler ABI info
+[0.456s] -- Detecting CXX compiler ABI info - done
+[0.467s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.467s] -- Detecting CXX compile features
+[0.467s] -- Detecting CXX compile features - done
+[0.468s] [0mCMake Deprecation Warning at witmotion-uart-qt/CMakeLists.txt:1 (cmake_minimum_required):
+[0.468s]   Compatibility with CMake < 3.5 will be removed from a future version of
+[0.468s]   CMake.
+[0.468s] 
+[0.468s]   Update the VERSION argument <min> value or use a ...<max> suffix to tell
+[0.468s]   CMake that the project does not need compatibility with older versions.
+[0.469s] 
+[0.469s] [0m
+[0.471s] -- Building version 1.2.28~dev_5c2e86d
+[0.472s] -- Looking for inttypes.h
+[0.551s] -- Looking for inttypes.h - found
+[0.793s] -- Found Doxygen: /usr/bin/doxygen (found version "1.9.8") found components: doxygen dot 
+[0.831s] -- Found ament_cmake: 2.5.3 (/opt/ros/jazzy/share/ament_cmake/cmake)
+[0.963s] -- Found Python3: /usr/bin/python3 (found version "3.12.3") found components: Interpreter 
+[1.130s] -- Found tf2: 0.36.8 (/opt/ros/jazzy/share/tf2/cmake)
+[1.176s] -- Found rosidl_generator_c: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_c/cmake)
+[1.189s] -- Found rosidl_generator_cpp: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_cpp/cmake)
+[1.208s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[1.227s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[1.310s] -- Found tf2_geometry_msgs: 0.36.8 (/opt/ros/jazzy/share/tf2_geometry_msgs/cmake)
+[1.328s] -- Found eigen3_cmake_module: 0.3.0 (/opt/ros/jazzy/share/eigen3_cmake_module/cmake)
+[1.330s] -- Found Eigen3: TRUE (found version "3.4.0") 
+[1.330s] -- Ensuring Eigen3 include directory is part of orocos-kdl CMake target
+[1.462s] -- Found rmw_implementation_cmake: 7.3.1 (/opt/ros/jazzy/share/rmw_implementation_cmake/cmake)
+[1.467s] -- Found rmw_fastrtps_cpp: 8.4.1 (/opt/ros/jazzy/share/rmw_fastrtps_cpp/cmake)
+[1.572s] -- Found OpenSSL: /usr/lib/x86_64-linux-gnu/libcrypto.so (found version "3.0.13")  
+[1.598s] -- Found FastRTPS: /opt/ros/jazzy/include (Required is at least version "2.13") 
+[1.628s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[1.855s] -- Found std_srvs: 5.3.5 (/opt/ros/jazzy/share/std_srvs/cmake)
+[1.879s] -- Found sensor_msgs: 5.3.5 (/opt/ros/jazzy/share/sensor_msgs/cmake)
+[1.912s] -- Found nav_msgs: 5.3.5 (/opt/ros/jazzy/share/nav_msgs/cmake)
+[1.952s] -- Found rclcpp_lifecycle: 28.1.6 (/opt/ros/jazzy/share/rclcpp_lifecycle/cmake)
+[1.997s] [33mCMake Warning at CMakeLists.txt:51 (message):
+[1.997s]   tf2_geometry_msgs include dir:
+[1.997s]   /opt/ros/jazzy/include/tf2_geometry_msgs;/opt/ros/jazzy/include/geometry_msgs;/usr/include/eigen3;/opt/ros/jazzy/include/tf2;/opt/ros/jazzy/include/tf2_ros
+[1.997s] 
+[1.997s] [0m
+[2.003s] -- Found ament_cmake_auto: 2.5.3 (/opt/ros/jazzy/share/ament_cmake_auto/cmake)
+[2.918s] -- Found ament_lint_auto: 0.17.1 (/opt/ros/jazzy/share/ament_lint_auto/cmake)
+[2.960s] -- Added test 'cppcheck' to perform static code analysis on C / C++ code
+[2.961s] -- Configured cppcheck include dirs: /home/dev/ros2_ws/src/witmotion_ros/include;/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include
+[2.961s] -- Configured cppcheck exclude dirs and/or files: 
+[2.963s] -- Added test 'flake8' to check Python code syntax and style conventions
+[2.963s] -- Configured 'flake8' exclude dirs and/or files: 
+[2.966s] -- Added test 'lint_cmake' to check CMake code style
+[2.968s] -- Added test 'pep257' to check Python code against some of the docstring style conventions in PEP 257
+[2.978s] -- Added test 'uncrustify' to check C / C++ code style
+[2.979s] -- Configured uncrustify additional arguments: 
+[2.981s] -- Added test 'xmllint' to check XML markup files
+[2.983s] -- Configuring done (3.0s)
+[3.876s] -- Generating done (0.5s)
+[3.896s] -- Build files have been written to: /home/dev/ros2_ws/src/build/witmotion_ros
+[3.922s] Invoked command in '/home/dev/ros2_ws/src/build/witmotion_ros' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/dev/ros2_ws/install/ros2udp:/home/dev/ros2_ws/install/f7_udp:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake /home/dev/ros2_ws/src/witmotion_ros -DCMAKE_INSTALL_PREFIX=/home/dev/ros2_ws/src/install/witmotion_ros
+[3.928s] Invoking command in '/home/dev/ros2_ws/src/build/witmotion_ros': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/dev/ros2_ws/install/ros2udp:/home/dev/ros2_ws/install/f7_udp:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/dev/ros2_ws/src/build/witmotion_ros -- -j12 -l12
+[4.018s] [  1%] [34m[1mGenerating documentation with Doxygen[0m
+[4.020s] [  1%] Built target wt31n-standalone-decoder_autogen_timestamp_deps
+[4.020s] [  1%] Built target witmotion-uart_autogen_timestamp_deps
+[4.026s] [  1%] Built target wt31n-calibration_autogen_timestamp_deps
+[4.054s] [  2%] [34m[1mAutomatic MOC for target witmotion-uart[0m
+[4.054s] warning: Tag 'OUTPUT_TEXT_DIRECTION' at line 102 of file '/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/Doxyfile' has become obsolete.
+[4.055s]          To avoid this warning please remove this line from your configuration file or upgrade it using "doxygen -u"
+[4.055s] warning: Tag 'HTML_TIMESTAMP' at line 1288 of file '/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/Doxyfile' has become obsolete.
+[4.056s]          To avoid this warning please remove this line from your configuration file or upgrade it using "doxygen -u"
+[4.056s] warning: Tag 'FORMULA_TRANSPARENT' at line 1580 of file '/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/Doxyfile' has become obsolete.
+[4.057s]          To avoid this warning please remove this line from your configuration file or upgrade it using "doxygen -u"
+[4.057s] warning: Tag 'LATEX_SOURCE_CODE' at line 1888 of file '/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/Doxyfile' has become obsolete.
+[4.057s]          To avoid this warning please remove this line from your configuration file or upgrade it using "doxygen -u"
+[4.057s] warning: Tag 'LATEX_TIMESTAMP' at line 1904 of file '/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/Doxyfile' has become obsolete.
+[4.057s]          To avoid this warning please remove this line from your configuration file or upgrade it using "doxygen -u"
+[4.057s] warning: Tag 'RTF_SOURCE_CODE' at line 1978 of file '/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/Doxyfile' has become obsolete.
+[4.057s]          To avoid this warning please remove this line from your configuration file or upgrade it using "doxygen -u"
+[4.058s] warning: Tag 'DOCBOOK_PROGRAMLISTING' at line 2083 of file '/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/Doxyfile' has become obsolete.
+[4.058s]          To avoid this warning please remove this line from your configuration file or upgrade it using "doxygen -u"
+[4.058s] warning: Tag 'CLASS_DIAGRAMS' at line 2270 of file '/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/Doxyfile' has become obsolete.
+[4.058s]          To avoid this warning please remove this line from your configuration file or upgrade it using "doxygen -u"
+[4.058s] warning: Tag 'DOT_FONTNAME' at line 2312 of file '/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/Doxyfile' has become obsolete.
+[4.059s]          To avoid this warning please remove this line from your configuration file or upgrade it using "doxygen -u"
+[4.059s] warning: Tag 'DOT_FONTSIZE' at line 2319 of file '/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/Doxyfile' has become obsolete.
+[4.059s]          To avoid this warning please remove this line from your configuration file or upgrade it using "doxygen -u"
+[4.059s] warning: Tag 'DOT_TRANSPARENT' at line 2545 of file '/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/Doxyfile' has become obsolete.
+[4.059s]          To avoid this warning please remove this line from your configuration file or upgrade it using "doxygen -u"
+[4.060s] [  3%] [34m[1mAutomatic MOC for target wt31n-standalone-decoder[0m
+[4.062s] [  5%] [34m[1mAutomatic MOC for target wt31n-calibration[0m
+[4.064s] warning: source '/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/doc/img' is not a readable file or directory... skipping.
+[4.131s] [  5%] Built target witmotion-uart_autogen
+[4.144s] [  5%] Built target wt31n-calibration_autogen
+[4.149s] [  7%] [34m[1mGenerating include/witmotion/moc_serial.cpp[0m
+[4.150s] [  7%] [34m[1mGenerating include/witmotion/moc_types.cpp[0m
+[4.184s] [  8%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/wt31n-calibration.dir/wt31n-calibration_autogen/mocs_compilation.cpp.o[0m
+[4.188s] [ 10%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/witmotion-uart.dir/include/witmotion/moc_types.cpp.o[0m
+[4.191s] [ 11%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/wt31n-calibration.dir/examples/wt31n/calibration-standalone.cpp.o[0m
+[4.193s] [ 12%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/witmotion-uart.dir/include/witmotion/moc_serial.cpp.o[0m
+[4.194s] [ 16%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/witmotion-uart.dir/src/serial.cpp.o[0m
+[4.194s] [ 16%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/witmotion-uart.dir/src/util.cpp.o[0m
+[4.194s] [ 16%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/witmotion-uart.dir/witmotion-uart_autogen/mocs_compilation.cpp.o[0m
+[5.059s] [ 16%] Built target wt31n-standalone-decoder_autogen
+[5.172s] [ 17%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/wt31n-standalone-decoder.dir/examples/wt31n/witmotion-wt31n-uart-test.cpp.o[0m
+[5.181s] [ 18%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/wt31n-standalone-decoder.dir/wt31n-standalone-decoder_autogen/mocs_compilation.cpp.o[0m
+[6.294s] error: /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/jy901-uart.h:4:10: fatal error: 'QSerialPort' file not found [clang]
+[7.983s] error: /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/jy901-uart.h:4:10: fatal error: 'QSerialPort' file not found [clang]
+[8.952s] error: /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/message-enumerator.h:4:10: fatal error: 'QCommandLineParser' file not found [clang]
+[9.492s] In file included from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/types.h:18[m[K,
+[9.493s]                  from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/util.h:9[m[K,
+[9.493s]                  from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:1[m[K:
+[9.493s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/version.h:4:26:[m[K [01;35m[Kwarning: [m[K‘[01m[Kconst std::string witmotion::[01;32m[Klibrary_version[m[K()[m[K’ defined but not used [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-function-Wunused-function]8;;[m[K]
+[9.494s]     4 | static const std::string [01;35m[Klibrary_version[m[K()
+[9.494s]       |                          [01;35m[K^~~~~~~~~~~~~~~[m[K
+[10.028s] error: /usr/include/stdlib.h:32:10: fatal error: 'stddef.h' file not found [clang]
+[10.367s] [ 20%] [32m[1mLinking CXX executable wt31n-calibration[0m
+[10.404s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/examples/wt31n/witmotion-wt31n-uart-test.cpp:[m[K In function ‘[01m[Kvoid[01;32m[K handle_shutdown[m[K(int)[m[K’:
+[10.404s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/examples/wt31n/witmotion-wt31n-uart-test.cpp:253:26:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Ks[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[10.405s]   253 | void handle_shutdown([01;35m[Kint s[m[K)
+[10.405s]       |                      [01;35m[K~~~~^[m[K
+[10.659s] error: /usr/include/stdlib.h:32:10: fatal error: 'stddef.h' file not found [clang]
+[10.952s] [ 21%] Built target wt31n-calibration
+[10.995s] In file included from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/types.h:18[m[K,
+[10.996s]                  from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:4[m[K,
+[10.997s]                  from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/serial.cpp:1[m[K:
+[10.997s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/version.h:4:26:[m[K [01;35m[Kwarning: [m[K‘[01m[Kconst std::string witmotion::[01;32m[Klibrary_version[m[K()[m[K’ defined but not used [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-function-Wunused-function]8;;[m[K]
+[10.998s]     4 | static const std::string [01;35m[Klibrary_version[m[K()
+[10.999s]       |                          [01;35m[K^~~~~~~~~~~~~~~[m[K
+[11.109s] In file included from [01m[K/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/include/witmotion/../../../../../witmotion_ros/witmotion-uart-qt/include/witmotion/types.h:18[m[K,
+[11.110s]                  from [01m[K/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/include/witmotion/moc_types.cpp:10[m[K:
+[11.111s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/version.h:4:26:[m[K [01;35m[Kwarning: [m[K‘[01m[Kconst std::string witmotion::[01;32m[Klibrary_version[m[K()[m[K’ defined but not used [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-function-Wunused-function]8;;[m[K]
+[11.111s]     4 | static const std::string [01;35m[Klibrary_version[m[K()
+[11.112s]       |                          [01;35m[K^~~~~~~~~~~~~~~[m[K
+[11.439s] In file included from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/types.h:18[m[K,
+[11.440s]                  from [01m[K/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/include/witmotion/../../../../../witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:4[m[K,
+[11.440s]                  from [01m[K/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/include/witmotion/moc_serial.cpp:10[m[K:
+[11.441s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/version.h:4:26:[m[K [01;35m[Kwarning: [m[K‘[01m[Kconst std::string witmotion::[01;32m[Klibrary_version[m[K()[m[K’ defined but not used [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-function-Wunused-function]8;;[m[K]
+[11.441s]     4 | static const std::string [01;35m[Klibrary_version[m[K()
+[11.442s]       |                          [01;35m[K^~~~~~~~~~~~~~~[m[K
+[11.777s] [ 22%] [32m[1mLinking CXX executable wt31n-standalone-decoder[0m
+[11.867s] [ 23%] [32m[1mLinking CXX shared library libwitmotion-uart.so[0m
+[11.882s] error: /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt31n-uart.h:4:10: fatal error: 'QSerialPort' file not found [clang]
+[12.099s] [ 25%] Built target wt31n-standalone-decoder
+[12.236s] [ 26%] Built target witmotion-uart
+[12.288s] [ 26%] Built target witmotion-wt31n_autogen_timestamp_deps
+[12.293s] [ 26%] Built target message-enumerator_autogen_timestamp_deps
+[12.294s] [ 26%] Built target witmotion-wt901_autogen_timestamp_deps
+[12.294s] [ 26%] Built target witmotion_ros_autogen_timestamp_deps
+[12.338s] [ 27%] [34m[1mAutomatic MOC for target witmotion-wt901[0m
+[12.345s] [ 28%] [34m[1mAutomatic MOC for target witmotion-wt31n[0m
+[12.350s] [ 30%] [34m[1mAutomatic MOC for target message-enumerator[0m
+[12.357s] [ 31%] [34m[1mAutomatic MOC for target witmotion_ros[0m
+[12.453s] [ 31%] Built target witmotion-wt901_autogen
+[12.463s] [ 31%] Built target witmotion-wt31n_autogen
+[12.480s] [ 31%] Built target message-enumerator_autogen
+[12.484s] [ 31%] Built target witmotion_ros_autogen
+[12.486s] [ 32%] [34m[1mGenerating include/witmotion/moc_wt901-uart.cpp[0m
+[12.490s] [ 33%] [34m[1mGenerating include/witmotion/moc_wt31n-uart.cpp[0m
+[12.507s] [ 35%] [34m[1mGenerating include/witmotion/moc_message-enumerator.cpp[0m
+[12.517s] [ 36%] [34m[1mGenerating include/moc_witmotion_ros.cpp[0m
+[12.553s] [ 37%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/witmotion-wt31n.dir/include/witmotion/moc_wt31n-uart.cpp.o[0m
+[12.560s] [ 40%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/witmotion-wt31n.dir/witmotion-wt31n_autogen/mocs_compilation.cpp.o[0m
+[12.561s] [ 40%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/witmotion-wt901.dir/include/witmotion/moc_wt901-uart.cpp.o[0m
+[12.563s] [ 41%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/witmotion-wt31n.dir/src/wt31n-uart.cpp.o[0m
+[12.567s] [ 42%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/witmotion-wt901.dir/src/wt901-uart.cpp.o[0m
+[12.570s] [ 43%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/witmotion-wt901.dir/witmotion-wt901_autogen/mocs_compilation.cpp.o[0m
+[12.588s] [ 45%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/message-enumerator.dir/message-enumerator_autogen/mocs_compilation.cpp.o[0m
+[12.592s] [ 46%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/message-enumerator.dir/include/witmotion/moc_message-enumerator.cpp.o[0m
+[12.592s] [ 47%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/message-enumerator.dir/src/message-enumerator.cpp.o[0m
+[12.650s] [ 48%] [32mBuilding CXX object CMakeFiles/witmotion_ros.dir/include/moc_witmotion_ros.cpp.o[0m
+[12.657s] [ 50%] [32mBuilding CXX object CMakeFiles/witmotion_ros.dir/src/witmotion_ros.cpp.o[0m
+[12.660s] [ 51%] [32mBuilding CXX object CMakeFiles/witmotion_ros.dir/witmotion_ros_autogen/mocs_compilation.cpp.o[0m
+[13.346s] error: /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt31n-uart.h:4:10: fatal error: 'QSerialPort' file not found [clang]
+[15.683s] error: /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:4:10: fatal error: 'QSerialPort' file not found [clang]
+[17.854s] error: /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:4:10: fatal error: 'QSerialPort' file not found [clang]
+[17.959s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:62: warning: Compound witmotion::QAbstractWitmotionSensorController is not documented.
+[17.961s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:15: warning: Compound witmotion::QBaseSerialWitmotionSensorReader is not documented.
+[17.961s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/message-enumerator.h:22: warning: Compound witmotion::QGeneralSensorController is not documented.
+[17.966s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/jy901-uart.h:23: warning: Compound witmotion::jy901::QWitmotionJY901Sensor is not documented.
+[17.966s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/util.h:22: warning: Compound witmotion::witmotion_typed_bytecounts is not documented.
+[17.967s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/util.h:14: warning: Compound witmotion::witmotion_typed_packets is not documented.
+[17.967s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt31n-uart.h:21: warning: Compound witmotion::wt31n::QWitmotionWT31NSensor is not documented.
+[17.967s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:23: warning: Compound witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[17.982s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/doc/index.md:1: warning: multiple use of section label 'index' for main page, (first occurrence: /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/doc/index.md, line 1)
+[18.046s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/types.h:76: warning: unable to resolve reference to 'message-enumerator' for \ref command
+[19.813s] In file included from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/types.h:18[m[K,
+[19.816s]                  from [01m[K/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/include/witmotion/../../../../../witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:14[m[K,
+[19.817s]                  from [01m[K/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/include/witmotion/moc_wt901-uart.cpp:10[m[K:
+[19.817s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/version.h:4:26:[m[K [01;35m[Kwarning: [m[K‘[01m[Kconst std::string witmotion::[01;32m[Klibrary_version[m[K()[m[K’ defined but not used [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-function-Wunused-function]8;;[m[K]
+[19.818s]     4 | static const std::string [01;35m[Klibrary_version[m[K()
+[19.819s]       |                          [01;35m[K^~~~~~~~~~~~~~~[m[K
+[19.922s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/message-enumerator.cpp:[m[K In function ‘[01m[Kvoid[01;32m[K handle_shutdown[m[K(int)[m[K’:
+[19.922s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/message-enumerator.cpp:121:26:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Ks[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[19.923s]   121 | void handle_shutdown([01;35m[Kint s[m[K)
+[19.925s]       |                      [01;35m[K~~~~^[m[K
+[20.934s] In file included from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/types.h:18[m[K,
+[20.935s]                  from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:4[m[K,
+[20.935s]                  from [01m[K/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/include/witmotion/../../../../../witmotion_ros/witmotion-uart-qt/include/witmotion/message-enumerator.h:17[m[K,
+[20.935s]                  from [01m[K/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/include/witmotion/moc_message-enumerator.cpp:10[m[K:
+[20.936s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/version.h:4:26:[m[K [01;35m[Kwarning: [m[K‘[01m[Kconst std::string witmotion::[01;32m[Klibrary_version[m[K()[m[K’ defined but not used [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-function-Wunused-function]8;;[m[K]
+[20.936s]     4 | static const std::string [01;35m[Klibrary_version[m[K()
+[20.936s]       |                          [01;35m[K^~~~~~~~~~~~~~~[m[K
+[21.010s] In file included from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/types.h:18[m[K,
+[21.010s]                  from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:14[m[K,
+[21.011s]                  from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/wt901-uart.cpp:1[m[K:
+[21.011s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/version.h:4:26:[m[K [01;35m[Kwarning: [m[K‘[01m[Kconst std::string witmotion::[01;32m[Klibrary_version[m[K()[m[K’ defined but not used [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-function-Wunused-function]8;;[m[K]
+[21.011s]     4 | static const std::string [01;35m[Klibrary_version[m[K()
+[21.011s]       |                          [01;35m[K^~~~~~~~~~~~~~~[m[K
+[21.544s] In file included from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/types.h:18[m[K,
+[21.545s]                  from [01m[K/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/include/witmotion/../../../../../witmotion_ros/witmotion-uart-qt/include/witmotion/wt31n-uart.h:12[m[K,
+[21.546s]                  from [01m[K/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/include/witmotion/moc_wt31n-uart.cpp:10[m[K:
+[21.546s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/version.h:4:26:[m[K [01;35m[Kwarning: [m[K‘[01m[Kconst std::string witmotion::[01;32m[Klibrary_version[m[K()[m[K’ defined but not used [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-function-Wunused-function]8;;[m[K]
+[21.546s]     4 | static const std::string [01;35m[Klibrary_version[m[K()
+[21.547s]       |                          [01;35m[K^~~~~~~~~~~~~~~[m[K
+[21.782s] In file included from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/types.h:18[m[K,
+[21.783s]                  from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:4[m[K,
+[21.783s]                  from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/message-enumerator.h:17[m[K,
+[21.784s]                  from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/message-enumerator.cpp:1[m[K:
+[21.786s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/version.h:[m[K At global scope:
+[21.786s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/version.h:4:26:[m[K [01;35m[Kwarning: [m[K‘[01m[Kconst std::string witmotion::[01;32m[Klibrary_version[m[K()[m[K’ defined but not used [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-function-Wunused-function]8;;[m[K]
+[21.786s]     4 | static const std::string [01;35m[Klibrary_version[m[K()
+[21.786s]       |                          [01;35m[K^~~~~~~~~~~~~~~[m[K
+[21.895s] In file included from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/types.h:18[m[K,
+[21.896s]                  from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt31n-uart.h:12[m[K,
+[21.896s]                  from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/wt31n-uart.cpp:1[m[K:
+[21.896s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/version.h:4:26:[m[K [01;35m[Kwarning: [m[K‘[01m[Kconst std::string witmotion::[01;32m[Klibrary_version[m[K()[m[K’ defined but not used [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-function-Wunused-function]8;;[m[K]
+[21.897s]     4 | static const std::string [01;35m[Klibrary_version[m[K()
+[21.897s]       |                          [01;35m[K^~~~~~~~~~~~~~~[m[K
+[22.041s] [ 52%] [32m[1mLinking CXX shared library libwitmotion-wt901.so[0m
+[22.855s] [ 53%] Built target witmotion-wt901
+[22.938s] [ 53%] Built target witmotion-jy901_autogen_timestamp_deps
+[22.943s] error: /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/jy901-uart.h:4:10: fatal error: 'QSerialPort' file not found [clang]
+[22.946s] [ 53%] Built target witmotionctl-wt901_autogen_timestamp_deps
+[22.952s] [ 55%] [32m[1mLinking CXX shared library libwitmotion-wt31n.so[0m
+[23.038s] [ 56%] [34m[1mAutomatic MOC for target witmotion-jy901[0m
+[23.048s] [ 57%] [34m[1mAutomatic MOC for target witmotionctl-wt901[0m
+[23.187s] [ 58%] [32m[1mLinking CXX executable message-enumerator[0m
+[23.215s] [ 58%] Built target witmotion-jy901_autogen
+[23.243s] [ 58%] Built target witmotionctl-wt901_autogen
+[23.313s] [ 60%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/witmotion-jy901.dir/witmotion-jy901_autogen/mocs_compilation.cpp.o[0m
+[23.325s] [ 61%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/witmotionctl-wt901.dir/include/witmotion/moc_wt901-uart.cpp.o[0m
+[23.331s] [ 62%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/witmotion-jy901.dir/src/jy901-uart.cpp.o[0m
+[23.341s] [ 63%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/witmotionctl-wt901.dir/src/wt901-control.cpp.o[0m
+[23.351s] [ 65%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/witmotionctl-wt901.dir/witmotionctl-wt901_autogen/mocs_compilation.cpp.o[0m
+[23.480s] [ 66%] Built target witmotion-wt31n
+[23.617s] [ 66%] Built target witmotionctl-wt31n_autogen_timestamp_deps
+[23.719s] [ 67%] [34m[1mAutomatic MOC for target witmotionctl-wt31n[0m
+[23.789s] [ 68%] Built target message-enumerator
+[23.886s] [ 68%] Built target witmotionctl-wt31n_autogen
+[23.972s] [ 70%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/witmotionctl-wt31n.dir/src/wt31n-control.cpp.o[0m
+[23.983s] [ 71%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/witmotionctl-wt31n.dir/include/witmotion/moc_wt31n-uart.cpp.o[0m
+[23.988s] [ 72%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/witmotionctl-wt31n.dir/witmotionctl-wt31n_autogen/mocs_compilation.cpp.o[0m
+[24.791s] error: /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/message-enumerator.h:4:10: fatal error: 'QCommandLineParser' file not found [clang]
+[25.543s] error: /usr/include/stdlib.h:32:10: fatal error: 'stddef.h' file not found [clang]
+[26.066s] error: /usr/include/stdlib.h:32:10: fatal error: 'stddef.h' file not found [clang]
+[26.860s] error: /usr/include/stdlib.h:32:10: fatal error: 'stddef.h' file not found [clang]
+[26.881s] error: /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/version.h:4:14: error: use of undeclared identifier 'std' [clang]
+[26.881s] error: /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/version.h:6:12: error: cannot initialize return object of type 'const int' with an lvalue of type 'const char[19]' [clang]
+[26.882s] error: /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/version.h:11:10: fatal error: 'QtGlobal' file not found [clang]
+[27.581s] error: /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt31n-uart.h:4:10: fatal error: 'QSerialPort' file not found [clang]
+[28.209s] In file included from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/types.h:18[m[K,
+[28.210s]                  from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/jy901-uart.h:13[m[K,
+[28.211s]                  from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/jy901-uart.cpp:1[m[K:
+[28.211s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/version.h:4:26:[m[K [01;35m[Kwarning: [m[K‘[01m[Kconst std::string witmotion::[01;32m[Klibrary_version[m[K()[m[K’ defined but not used [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-function-Wunused-function]8;;[m[K]
+[28.211s]     4 | static const std::string [01;35m[Klibrary_version[m[K()
+[28.213s]       |                          [01;35m[K^~~~~~~~~~~~~~~[m[K
+[28.504s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/wt901-control.cpp:[m[K In function ‘[01m[Kvoid[01;32m[K handle_shutdown[m[K(int)[m[K’:
+[28.505s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/wt901-control.cpp:22:26:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Ks[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[28.506s]    22 | void handle_shutdown([01;35m[Kint s[m[K)
+[28.506s]       |                      [01;35m[K~~~~^[m[K
+[28.523s] error: /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:4:10: fatal error: 'QSerialPort' file not found [clang]
+[28.875s] [ 73%] [32m[1mLinking CXX shared library libwitmotion-jy901.so[0m
+[29.198s] [ 75%] Built target witmotion-jy901
+[29.284s] [ 75%] Built target witmotionctl-jy901_autogen_timestamp_deps
+[29.377s] [ 76%] [34m[1mAutomatic MOC for target witmotionctl-jy901[0m
+[29.517s] error: /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/jy901-uart.h:4:10: fatal error: 'QSerialPort' file not found [clang]
+[29.534s] [ 76%] Built target witmotionctl-jy901_autogen
+[29.571s] [ 77%] [34m[1mGenerating include/witmotion/moc_jy901-uart.cpp[0m
+[29.658s] [ 78%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/witmotionctl-jy901.dir/witmotionctl-jy901_autogen/mocs_compilation.cpp.o[0m
+[29.672s] [ 80%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/witmotionctl-jy901.dir/include/witmotion/moc_jy901-uart.cpp.o[0m
+[29.684s] [ 81%] [32mBuilding CXX object witmotion-uart-qt/CMakeFiles/witmotionctl-jy901.dir/src/jy901-control.cpp.o[0m
+[29.790s] In file included from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/types.h:18[m[K,
+[29.791s]                  from [01m[K/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/include/witmotion/../../../../../witmotion_ros/witmotion-uart-qt/include/witmotion/wt31n-uart.h:12[m[K,
+[29.791s]                  from [01m[K/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/include/witmotion/moc_wt31n-uart.cpp:10[m[K:
+[29.791s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/version.h:4:26:[m[K [01;35m[Kwarning: [m[K‘[01m[Kconst std::string witmotion::[01;32m[Klibrary_version[m[K()[m[K’ defined but not used [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-function-Wunused-function]8;;[m[K]
+[29.791s]     4 | static const std::string [01;35m[Klibrary_version[m[K()
+[29.792s]       |                          [01;35m[K^~~~~~~~~~~~~~~[m[K
+[29.829s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/wt31n-control.cpp:[m[K In function ‘[01m[Kvoid[01;32m[K handle_shutdown[m[K(int)[m[K’:
+[29.829s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/wt31n-control.cpp:31:26:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Ks[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[29.830s]    31 | void handle_shutdown([01;35m[Kint s[m[K)
+[29.830s]       |                      [01;35m[K~~~~^[m[K
+[29.867s] In file included from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/types.h:18[m[K,
+[29.868s]                  from [01m[K/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/include/witmotion/../../../../../witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:14[m[K,
+[29.869s]                  from [01m[K/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/include/witmotion/moc_wt901-uart.cpp:10[m[K:
+[29.869s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/version.h:4:26:[m[K [01;35m[Kwarning: [m[K‘[01m[Kconst std::string witmotion::[01;32m[Klibrary_version[m[K()[m[K’ defined but not used [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-function-Wunused-function]8;;[m[K]
+[29.870s]     4 | static const std::string [01;35m[Klibrary_version[m[K()
+[29.870s]       |                          [01;35m[K^~~~~~~~~~~~~~~[m[K
+[31.194s] error: /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/jy901-uart.h:4:10: fatal error: 'QSerialPort' file not found [clang]
+[31.496s] [ 82%] [32m[1mLinking CXX executable witmotionctl-wt901[0m
+[32.101s] [ 85%] Built target witmotionctl-wt901
+[32.426s] [ 86%] [32m[1mLinking CXX executable witmotionctl-wt31n[0m
+[32.827s] error: /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/message-enumerator.h:4:10: fatal error: 'QCommandLineParser' file not found [clang]
+[32.854s] [ 88%] Built target witmotionctl-wt31n
+[33.578s] error: /usr/include/stdlib.h:32:10: fatal error: 'stddef.h' file not found [clang]
+[34.327s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/jy901-control.cpp:[m[K In function ‘[01m[Kvoid[01;32m[K handle_shutdown[m[K(int)[m[K’:
+[34.327s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/jy901-control.cpp:22:26:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Ks[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[34.328s]    22 | void handle_shutdown([01;35m[Kint s[m[K)
+[34.328s]       |                      [01;35m[K~~~~^[m[K
+[34.606s] error: /usr/include/stdlib.h:32:10: fatal error: 'stddef.h' file not found [clang]
+[34.885s] In file included from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/types.h:18[m[K,
+[34.885s]                  from [01m[K/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/include/witmotion/../../../../../witmotion_ros/witmotion-uart-qt/include/witmotion/jy901-uart.h:13[m[K,
+[34.885s]                  from [01m[K/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/include/witmotion/moc_jy901-uart.cpp:10[m[K:
+[34.886s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/version.h:4:26:[m[K [01;35m[Kwarning: [m[K‘[01m[Kconst std::string witmotion::[01;32m[Klibrary_version[m[K()[m[K’ defined but not used [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-function-Wunused-function]8;;[m[K]
+[34.886s]     4 | static const std::string [01;35m[Klibrary_version[m[K()
+[34.886s]       |                          [01;35m[K^~~~~~~~~~~~~~~[m[K
+[35.555s] error: /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt31n-uart.h:4:10: fatal error: 'QSerialPort' file not found [clang]
+[35.855s] In file included from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/types.h:18[m[K,
+[35.855s]                  from [01m[K/home/dev/ros2_ws/src/build/witmotion_ros/include/../../../witmotion_ros/include/witmotion_ros.h:11[m[K,
+[35.855s]                  from [01m[K/home/dev/ros2_ws/src/build/witmotion_ros/include/moc_witmotion_ros.cpp:10[m[K:
+[35.855s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/version.h:4:26:[m[K [01;35m[Kwarning: [m[K‘[01m[Kconst std::string witmotion::[01;32m[Klibrary_version[m[K()[m[K’ defined but not used [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-function-Wunused-function]8;;[m[K]
+[35.855s]     4 | static const std::string [01;35m[Klibrary_version[m[K()
+[35.856s]       |                          [01;35m[K^~~~~~~~~~~~~~~[m[K
+[36.353s] error: /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt31n-uart.h:4:10: fatal error: 'QSerialPort' file not found [clang]
+[36.711s] [ 90%] [32m[1mLinking CXX executable witmotionctl-jy901[0m
+[37.089s] [ 91%] Built target witmotionctl-jy901
+[37.262s] error: /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:4:10: fatal error: 'QSerialPort' file not found [clang]
+[37.712s] error: /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:4:10: fatal error: 'QSerialPort' file not found [clang]
+[37.719s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/types.h:76: warning: unable to resolve reference to 'message-enumerator' for \ref command
+[37.720s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:65: warning: Member witmotion_baud_rate(const QSerialPort::BaudRate rate) (function) of namespace witmotion is not documented.
+[37.720s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:8: warning: Member id_registered(const size_t id) (function) of namespace witmotion is not documented.
+[37.721s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:89: warning: Member decode_acceleration(const int16_t *value) (function) of namespace witmotion is not documented.
+[37.721s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:94: warning: Member decode_angular_velocity(const int16_t *value) (function) of namespace witmotion is not documented.
+[37.721s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:99: warning: Member decode_angle(const int16_t *value) (function) of namespace witmotion is not documented.
+[37.721s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:104: warning: Member decode_temperature(const int16_t *value) (function) of namespace witmotion is not documented.
+[37.721s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:109: warning: Member decode_orientation(const int16_t *value) (function) of namespace witmotion is not documented.
+[37.722s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:114: warning: Member decode_gps_coord(const int32_t *value, double &deg, double &min) (function) of namespace witmotion is not documented.
+[37.722s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:241: warning: Member decode_realtime_clock(const witmotion_datapacket &packet, uint8_t &year, uint8_t &month, uint8_t &day, uint8_t &hour, uint8_t &minute, uint8_t &second, uint16_t &millisecond) (function) of namespace witmotion is not documented.
+[37.722s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:123: warning: Member decode_accelerations(const witmotion_datapacket &packet, float &x, float &y, float &z, float &t) (function) of namespace witmotion is not documented.
+[37.722s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:137: warning: Member decode_angular_velocities(const witmotion_datapacket &packet, float &x, float &y, float &z, float &t) (function) of namespace witmotion is not documented.
+[37.722s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:151: warning: Member decode_angles(const witmotion_datapacket &packet, float &roll, float &pitch, float &yaw, float &t) (function) of namespace witmotion is not documented.
+[37.722s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:165: warning: Member decode_magnetometer(const witmotion_datapacket &packet, float &x, float &y, float &z, float &t) (function) of namespace witmotion is not documented.
+[37.723s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:179: warning: Member decode_altimeter(const witmotion_datapacket &packet, double &pressure, double &height) (function) of namespace witmotion is not documented.
+[37.723s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:189: warning: Member decode_gps(const witmotion_datapacket &packet, double &longitude_deg, double &longitude_min, double &latitude_deg, double &latitude_min) (function) of namespace witmotion is not documented.
+[37.723s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:201: warning: Member decode_gps_ground_speed(const witmotion_datapacket &packet, float &altitude, float &angular_velocity, double &ground_speed) (function) of namespace witmotion is not documented.
+[37.723s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:213: warning: Member decode_orientation(const witmotion_datapacket &packet, float &x, float &y, float &z, float &w) (function) of namespace witmotion is not documented.
+[37.723s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:227: warning: Member decode_gps_accuracy(const witmotion_datapacket &packet, size_t &satellites, float &local_accuracy, float &horizontal_accuracy, float &vertical_accuracy) (function) of namespace witmotion is not documented.
+[37.723s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/util.h:113: warning: Member variance(const std::vector< T > &array) (function) of namespace witmotion is not documented.
+[37.723s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/doc/acceleration-bias.md:7: warning: unable to resolve reference to 'witmotion_config_packet' for \ref command
+[37.730s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:65: warning: Member witmotion_baud_rate(const QSerialPort::BaudRate rate) (function) of namespace witmotion is not documented.
+[37.730s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:8: warning: Member id_registered(const size_t id) (function) of namespace witmotion is not documented.
+[37.730s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:89: warning: Member decode_acceleration(const int16_t *value) (function) of namespace witmotion is not documented.
+[37.730s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:94: warning: Member decode_angular_velocity(const int16_t *value) (function) of namespace witmotion is not documented.
+[37.730s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:99: warning: Member decode_angle(const int16_t *value) (function) of namespace witmotion is not documented.
+[37.730s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:104: warning: Member decode_temperature(const int16_t *value) (function) of namespace witmotion is not documented.
+[37.731s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:109: warning: Member decode_orientation(const int16_t *value) (function) of namespace witmotion is not documented.
+[37.731s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:114: warning: Member decode_gps_coord(const int32_t *value, double &deg, double &min) (function) of namespace witmotion is not documented.
+[37.731s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:241: warning: Member decode_realtime_clock(const witmotion_datapacket &packet, uint8_t &year, uint8_t &month, uint8_t &day, uint8_t &hour, uint8_t &minute, uint8_t &second, uint16_t &millisecond) (function) of namespace witmotion is not documented.
+[37.731s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:123: warning: Member decode_accelerations(const witmotion_datapacket &packet, float &x, float &y, float &z, float &t) (function) of namespace witmotion is not documented.
+[37.731s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:137: warning: Member decode_angular_velocities(const witmotion_datapacket &packet, float &x, float &y, float &z, float &t) (function) of namespace witmotion is not documented.
+[37.731s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:151: warning: Member decode_angles(const witmotion_datapacket &packet, float &roll, float &pitch, float &yaw, float &t) (function) of namespace witmotion is not documented.
+[37.731s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:165: warning: Member decode_magnetometer(const witmotion_datapacket &packet, float &x, float &y, float &z, float &t) (function) of namespace witmotion is not documented.
+[37.732s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:179: warning: Member decode_altimeter(const witmotion_datapacket &packet, double &pressure, double &height) (function) of namespace witmotion is not documented.
+[37.732s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:189: warning: Member decode_gps(const witmotion_datapacket &packet, double &longitude_deg, double &longitude_min, double &latitude_deg, double &latitude_min) (function) of namespace witmotion is not documented.
+[37.732s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:201: warning: Member decode_gps_ground_speed(const witmotion_datapacket &packet, float &altitude, float &angular_velocity, double &ground_speed) (function) of namespace witmotion is not documented.
+[37.732s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:213: warning: Member decode_orientation(const witmotion_datapacket &packet, float &x, float &y, float &z, float &w) (function) of namespace witmotion is not documented.
+[37.732s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/util.cpp:227: warning: Member decode_gps_accuracy(const witmotion_datapacket &packet, size_t &satellites, float &local_accuracy, float &horizontal_accuracy, float &vertical_accuracy) (function) of namespace witmotion is not documented.
+[37.732s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/util.h:113: warning: Member variance(const std::vector< T > &array) (function) of namespace witmotion is not documented.
+[37.732s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/version.h:4: warning: Member library_version() (function) of namespace witmotion is not documented.
+[37.733s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/types.h:76: warning: unable to resolve reference to 'message-enumerator' for \ref command
+[37.733s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/types.h:170: warning: unable to resolve reference to 'witmotion_baud_rate' for \ref command
+[37.744s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/types.h:78: warning: unable to resolve reference to 'message-enumerator' for \ref command
+[37.746s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:81: warning: Member Packet(const witmotion_datapacket &packet) (slot) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.746s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:82: warning: Member Error(const QString &description) (slot) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.746s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:84: warning: Member RunReader() (signal) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.747s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:85: warning: Member ErrorOccurred(const QString &description) (signal) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.747s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:86: warning: Member Acquired(const witmotion_datapacket &packet) (signal) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.747s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:87: warning: Member SendConfig(const witmotion_config_packet &packet) (signal) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.747s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:73: warning: Member RegisteredPacketTypes()=0 (function) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.747s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:74: warning: Member QAbstractWitmotionSensorController(const QString tty_name, const QSerialPort::BaudRate rate) (function) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.748s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:75: warning: Member Start()=0 (function) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.748s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:77: warning: Member Calibrate()=0 (function) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.748s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:78: warning: Member SetBaudRate(const QSerialPort::BaudRate &rate)=0 (function) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.748s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:79: warning: Member SetValidation(const bool validate) (function) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.748s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:68: warning: Member port_name (variable) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.748s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:69: warning: Member port_rate (variable) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.748s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:70: warning: Member reader (variable) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.748s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:71: warning: Member ttyout (variable) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.750s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:52: warning: Member SetBaudRate(const QSerialPort::BaudRate &rate) (function) of class witmotion::QBaseSerialWitmotionSensorReader is not documented.
+[37.751s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:53: warning: Member QBaseSerialWitmotionSensorReader(const QString device, const QSerialPort::BaudRate rate) (function) of class witmotion::QBaseSerialWitmotionSensorReader is not documented.
+[37.751s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:56: warning: Member Suspend() (function) of class witmotion::QBaseSerialWitmotionSensorReader is not documented.
+[37.751s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:57: warning: Member ValidatePackets(const bool value) (function) of class witmotion::QBaseSerialWitmotionSensorReader is not documented.
+[37.751s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:58: warning: Member SetSensorPollInterval(const uint32_t ms) (function) of class witmotion::QBaseSerialWitmotionSensorReader is not documented.
+[37.751s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:59: warning: Member SetSensorTimeout(const uint32_t ms) (function) of class witmotion::QBaseSerialWitmotionSensorReader is not documented.
+[37.751s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:36: warning: Member read_state_t (enumeration) of class witmotion::QBaseSerialWitmotionSensorReader is not documented.
+[37.751s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:49: warning: Member Configure() (function) of class witmotion::QBaseSerialWitmotionSensorReader is not documented.
+[37.752s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:32: warning: Member ttyout (variable) of class witmotion::QBaseSerialWitmotionSensorReader is not documented.
+[37.752s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:33: warning: Member poll_timer (variable) of class witmotion::QBaseSerialWitmotionSensorReader is not documented.
+[37.752s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:34: warning: Member timer_connection (variable) of class witmotion::QBaseSerialWitmotionSensorReader is not documented.
+[37.752s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:35: warning: Member config_connection (variable) of class witmotion::QBaseSerialWitmotionSensorReader is not documented.
+[37.752s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:41: warning: Member read_state (variable) of class witmotion::QBaseSerialWitmotionSensorReader is not documented.
+[37.752s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:42: warning: Member packets (variable) of class witmotion::QBaseSerialWitmotionSensorReader is not documented.
+[37.752s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:43: warning: Member counts (variable) of class witmotion::QBaseSerialWitmotionSensorReader is not documented.
+[37.753s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:44: warning: Member read_cell (variable) of class witmotion::QBaseSerialWitmotionSensorReader is not documented.
+[37.753s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:46: warning: Member configuring (variable) of class witmotion::QBaseSerialWitmotionSensorReader is not documented.
+[37.753s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:47: warning: Member configuration (variable) of class witmotion::QBaseSerialWitmotionSensorReader is not documented.
+[37.753s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/message-enumerator.h:49: warning: Member Packet(const witmotion_datapacket &packet) (slot) of class witmotion::QGeneralSensorController is not documented.
+[37.753s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/message-enumerator.h:50: warning: Member Error(const QString &description) (slot) of class witmotion::QGeneralSensorController is not documented.
+[37.753s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/message-enumerator.h:52: warning: Member RunReader() (signal) of class witmotion::QGeneralSensorController is not documented.
+[37.753s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/message-enumerator.h:42: warning: Member QGeneralSensorController(const QString port, const QSerialPort::BaudRate rate) (function) of class witmotion::QGeneralSensorController is not documented.
+[37.754s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/message-enumerator.h:44: warning: Member Start() (function) of class witmotion::QGeneralSensorController is not documented.
+[37.754s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/message-enumerator.h:45: warning: Member SetLog(const QString name) (function) of class witmotion::QGeneralSensorController is not documented.
+[37.754s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/message-enumerator.h:46: warning: Member SetInterval(uint32_t ms) (function) of class witmotion::QGeneralSensorController is not documented.
+[37.754s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/message-enumerator.h:47: warning: Member SetTimeout(uint32_t ms) (function) of class witmotion::QGeneralSensorController is not documented.
+[37.756s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/util.h:28: warning: Member operator[](const witmotion_packet_id id) (function) of class witmotion::witmotion_typed_bytecounts is not documented.
+[37.757s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/util.h:19: warning: Member operator[](const witmotion_packet_id id) (function) of class witmotion::witmotion_typed_packets is not documented.
+[37.759s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/jy901-uart.h:28: warning: Member RegisteredPacketTypes() (function) of class witmotion::jy901::QWitmotionJY901Sensor is not documented.
+[37.759s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/jy901-uart.h:29: warning: Member SetMeasurements(const bool realtime_clock=false, const bool acceleration=true, const bool angular_velocity=true, const bool euler_angles=true, const bool magnetometer=true, const bool orientation=false, const bool port_status=false, const bool altimeter=true) (function) of class witmotion::jy901::QWitmotionJY901Sensor is not documented.
+[37.759s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/jy901-uart.h:37: warning: Member QWitmotionJY901Sensor(const QString device, const QSerialPort::BaudRate rate, const uint32_t polling_period=50) (function) of class witmotion::jy901::QWitmotionJY901Sensor is not documented.
+[37.760s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:32: warning: Member Start() (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.760s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:33: warning: Member UnlockConfiguration() (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.760s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:34: warning: Member Calibrate() (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.760s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:35: warning: Member CalibrateMagnetometer() (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.760s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:36: warning: Member SetBaudRate(const QSerialPort::BaudRate &rate) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.760s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:37: warning: Member SetPollingRate(const int32_t hz) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.761s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:38: warning: Member SetOrientation(const bool vertical=false) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.761s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:39: warning: Member ToggleDormant() (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.761s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:40: warning: Member SetGyroscopeAutoRecalibration(const bool recalibrate=true) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.761s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:41: warning: Member SetAxisTransition(const bool axis9=true) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.761s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:42: warning: Member SetLED(const bool on=true) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.761s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:43: warning: Member SetMeasurements(const bool realtime_clock=false, const bool acceleration=true, const bool angular_velocity=true, const bool euler_angles=true, const bool magnetometer=true, const bool orientation=false, const bool port_status=false) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.761s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:50: warning: Member SetAccelerationBias(float x, float y, float z) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.761s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:53: warning: Member SetI2CAddress(const uint8_t address) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.762s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:54: warning: Member SetRTC(const QDateTime datetime) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.762s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:55: warning: Member ConfirmConfiguration() (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.762s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:56: warning: Member QWitmotionWT901Sensor(const QString device, const QSerialPort::BaudRate rate, const uint32_t polling_period=50) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.762s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:74: warning: Member QAbstractWitmotionSensorController(const QString tty_name, const QSerialPort::BaudRate rate) (function) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.762s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:79: warning: Member SetValidation(const bool validate) (function) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.762s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:81: warning: Member Packet(const witmotion_datapacket &packet) (slot) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.763s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:82: warning: Member Error(const QString &description) (slot) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.763s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:84: warning: Member RunReader() (signal) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.763s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:85: warning: Member ErrorOccurred(const QString &description) (signal) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.763s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:86: warning: Member Acquired(const witmotion_datapacket &packet) (signal) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.763s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:87: warning: Member SendConfig(const witmotion_config_packet &packet) (signal) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.763s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:29: warning: Member CalculateAccelerationBias(witmotion_config_packet &packet, const float bias) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.763s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:68: warning: Member port_name (variable) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.764s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:69: warning: Member port_rate (variable) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.764s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:70: warning: Member reader (variable) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.764s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:71: warning: Member ttyout (variable) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.764s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt31n-uart.h:27: warning: Member RegisteredPacketTypes() (function) of class witmotion::wt31n::QWitmotionWT31NSensor is not documented.
+[37.764s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt31n-uart.h:28: warning: Member Start() (function) of class witmotion::wt31n::QWitmotionWT31NSensor is not documented.
+[37.765s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt31n-uart.h:29: warning: Member Calibrate() (function) of class witmotion::wt31n::QWitmotionWT31NSensor is not documented.
+[37.765s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt31n-uart.h:30: warning: Member SetBaudRate(const QSerialPort::BaudRate &rate) (function) of class witmotion::wt31n::QWitmotionWT31NSensor is not documented.
+[37.765s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt31n-uart.h:31: warning: Member SetPollingRate(const uint32_t hz) (function) of class witmotion::wt31n::QWitmotionWT31NSensor is not documented.
+[37.765s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt31n-uart.h:32: warning: Member QWitmotionWT31NSensor(const QString device, const QSerialPort::BaudRate rate, const uint32_t polling_period=50) (function) of class witmotion::wt31n::QWitmotionWT31NSensor is not documented.
+[37.766s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:74: warning: Member QAbstractWitmotionSensorController(const QString tty_name, const QSerialPort::BaudRate rate) (function) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.766s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:79: warning: Member SetValidation(const bool validate) (function) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.766s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:81: warning: Member Packet(const witmotion_datapacket &packet) (slot) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.766s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:82: warning: Member Error(const QString &description) (slot) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.766s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:84: warning: Member RunReader() (signal) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.767s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:85: warning: Member ErrorOccurred(const QString &description) (signal) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.767s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:86: warning: Member Acquired(const witmotion_datapacket &packet) (signal) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.767s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:87: warning: Member SendConfig(const witmotion_config_packet &packet) (signal) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.767s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:68: warning: Member port_name (variable) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.767s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:69: warning: Member port_rate (variable) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.768s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:70: warning: Member reader (variable) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.768s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:71: warning: Member ttyout (variable) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.768s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:31: warning: Member RegisteredPacketTypes() (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.768s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:32: warning: Member Start() (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.768s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:33: warning: Member UnlockConfiguration() (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.768s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:34: warning: Member Calibrate() (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.769s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:35: warning: Member CalibrateMagnetometer() (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.769s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:36: warning: Member SetBaudRate(const QSerialPort::BaudRate &rate) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.769s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:37: warning: Member SetPollingRate(const int32_t hz) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.769s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:38: warning: Member SetOrientation(const bool vertical=false) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.769s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:39: warning: Member ToggleDormant() (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.769s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:40: warning: Member SetGyroscopeAutoRecalibration(const bool recalibrate=true) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.769s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:41: warning: Member SetAxisTransition(const bool axis9=true) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.769s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:42: warning: Member SetLED(const bool on=true) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.769s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:43: warning: Member SetMeasurements(const bool realtime_clock=false, const bool acceleration=true, const bool angular_velocity=true, const bool euler_angles=true, const bool magnetometer=true, const bool orientation=false, const bool port_status=false) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.769s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:50: warning: Member SetAccelerationBias(float x, float y, float z) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.769s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:53: warning: Member SetI2CAddress(const uint8_t address) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.770s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:54: warning: Member SetRTC(const QDateTime datetime) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.770s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:55: warning: Member ConfirmConfiguration() (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.770s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:56: warning: Member QWitmotionWT901Sensor(const QString device, const QSerialPort::BaudRate rate, const uint32_t polling_period=50) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.770s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:74: warning: Member QAbstractWitmotionSensorController(const QString tty_name, const QSerialPort::BaudRate rate) (function) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.770s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:79: warning: Member SetValidation(const bool validate) (function) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.770s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h:29: warning: Member CalculateAccelerationBias(witmotion_config_packet &packet, const float bias) (function) of class witmotion::wt901::QWitmotionWT901Sensor is not documented.
+[37.770s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:81: warning: Member Packet(const witmotion_datapacket &packet) (slot) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.770s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:82: warning: Member Error(const QString &description) (slot) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.770s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:84: warning: Member RunReader() (signal) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.770s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:85: warning: Member ErrorOccurred(const QString &description) (signal) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.770s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:86: warning: Member Acquired(const witmotion_datapacket &packet) (signal) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.770s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:87: warning: Member SendConfig(const witmotion_config_packet &packet) (signal) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.771s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:68: warning: Member port_name (variable) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.771s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:69: warning: Member port_rate (variable) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.771s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:70: warning: Member reader (variable) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.771s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h:71: warning: Member ttyout (variable) of class witmotion::QAbstractWitmotionSensorController is not documented.
+[37.771s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/doc/index.md:10: warning: unable to resolve reference to 'api_structure' for \ref command
+[37.771s] /home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/doc/index.md:10: warning: unable to resolve reference to 'api_structure' for \ref command
+[39.954s] [ 91%] Built target doc-witmotion-uart-qt
+[39.992s] [ 91%] Built target docs
+[49.833s] [ 92%] [32m[1mLinking CXX static library libwitmotion_ros.a[0m
+[50.097s] [ 93%] Built target witmotion_ros
+[50.126s] [ 93%] Built target witmotion_ros_node_autogen_timestamp_deps
+[50.150s] [ 95%] [34m[1mAutomatic MOC for target witmotion_ros_node[0m
+[50.199s] [ 95%] Built target witmotion_ros_node_autogen
+[50.244s] [ 97%] [32mBuilding CXX object CMakeFiles/witmotion_ros_node.dir/witmotion_ros_node_autogen/mocs_compilation.cpp.o[0m
+[50.244s] [ 97%] [32mBuilding CXX object CMakeFiles/witmotion_ros_node.dir/src/witmotion_ros_node.cpp.o[0m
+[55.119s] In file included from [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/types.h:18[m[K,
+[55.119s]                  from [01m[K/home/dev/ros2_ws/src/witmotion_ros/include/witmotion_ros.h:11[m[K,
+[55.119s]                  from [01m[K/home/dev/ros2_ws/src/witmotion_ros/src/witmotion_ros_node.cpp:1[m[K:
+[55.119s] [01m[K/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/version.h:4:26:[m[K [01;35m[Kwarning: [m[K‘[01m[Kconst std::string witmotion::[01;32m[Klibrary_version[m[K()[m[K’ defined but not used [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-function-Wunused-function]8;;[m[K]
+[55.119s]     4 | static const std::string [01;35m[Klibrary_version[m[K()
+[55.119s]       |                          [01;35m[K^~~~~~~~~~~~~~~[m[K
+[55.310s] [ 98%] [32m[1mLinking CXX executable witmotion_ros_node[0m
+[56.972s] [100%] Built target witmotion_ros_node
+[56.986s] Invoked command in '/home/dev/ros2_ws/src/build/witmotion_ros' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/dev/ros2_ws/install/ros2udp:/home/dev/ros2_ws/install/f7_udp:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/dev/ros2_ws/src/build/witmotion_ros -- -j12 -l12
+[57.002s] Invoking command in '/home/dev/ros2_ws/src/build/witmotion_ros': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/dev/ros2_ws/install/ros2udp:/home/dev/ros2_ws/install/f7_udp:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/dev/ros2_ws/src/build/witmotion_ros
+[57.013s] -- Install configuration: ""
+[57.014s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/environment/library_path.sh
+[57.014s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/environment/library_path.dsv
+[57.014s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/lib/libwitmotion-uart.so
+[57.014s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/lib/libwitmotion_ros.a
+[57.026s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/lib/witmotion_ros/witmotion_ros_node
+[57.033s] -- Set non-toolchain portion of runtime path of "/home/dev/ros2_ws/src/install/witmotion_ros/lib/witmotion_ros/witmotion_ros_node" to ""
+[57.033s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/launch
+[57.033s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/launch/witmotion.launch.py
+[57.033s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/launch/wt31n_launch.py
+[57.034s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/launch/witmotion_launch.py
+[57.034s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/launch/yahboom10x_launch.py
+[57.034s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/launch/wt901.launch.py
+[57.034s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/launch/wt61c_launch.py
+[57.034s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/launch/wt905_launch.py
+[57.034s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/launch/yahboom10x.launch.py
+[57.035s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/launch/wt61c.launch.py
+[57.035s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/launch/wt901_launch.py
+[57.035s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/launch/wt31n.launch.py
+[57.035s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/launch/wt905.launch.py
+[57.035s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/launch/__pycache__
+[57.035s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/launch/__pycache__/wt31n.cpython-310.pyc
+[57.036s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/config
+[57.036s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/config/wt31n.yml
+[57.036s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/config/wt905.yml
+[57.036s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/config/wt61c.yml
+[57.036s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/config/wt901.yml
+[57.036s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/config/config.yml
+[57.037s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/config/yahboom10x.yml
+[57.037s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/ament_index/resource_index/package_run_dependencies/witmotion_ros
+[57.037s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/ament_index/resource_index/parent_prefix_path/witmotion_ros
+[57.037s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/environment/ament_prefix_path.sh
+[57.037s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/environment/ament_prefix_path.dsv
+[57.037s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/environment/path.sh
+[57.037s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/environment/path.dsv
+[57.038s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/local_setup.bash
+[57.038s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/local_setup.sh
+[57.038s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/local_setup.zsh
+[57.038s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/local_setup.dsv
+[57.038s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/package.dsv
+[57.039s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/ament_index/resource_index/packages/witmotion_ros
+[57.039s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/cmake/export_witmotion_rosExport.cmake
+[57.039s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/cmake/export_witmotion_rosExport-noconfig.cmake
+[57.039s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/cmake/export_witmotion-uartExport.cmake
+[57.039s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/cmake/export_witmotion-uartExport-noconfig.cmake
+[57.040s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/cmake/ament_cmake_export_dependencies-extras.cmake
+[57.040s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/cmake/ament_cmake_export_targets-extras.cmake
+[57.040s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/cmake/ament_cmake_export_libraries-extras.cmake
+[57.040s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/cmake/witmotion_rosConfig.cmake
+[57.041s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/cmake/witmotion_rosConfig-version.cmake
+[57.041s] -- Installing: /home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/package.xml
+[57.041s] Invoked command in '/home/dev/ros2_ws/src/build/witmotion_ros' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/dev/ros2_ws/install/ros2udp:/home/dev/ros2_ws/install/f7_udp:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/dev/ros2_ws/src/build/witmotion_ros

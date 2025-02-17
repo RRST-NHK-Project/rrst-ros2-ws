@@ -1,0 +1,108 @@
+.TH "util.h" 3 "Mon Feb 17 2025 17:07:52" "Version 1.2.28~dev_5c2e86d" "Witmotion IMU Library" \" -*- nroff -*-
+.ad l
+.nh
+.SH NAME
+util.h \- Helper and utility functions to decode and represent the data\&.  
+
+.SH SYNOPSIS
+.br
+.PP
+\fC#include 'witmotion/types\&.h'\fP
+.br
+
+.SS "Classes"
+
+.in +1c
+.ti -1c
+.RI "class \fBwitmotion::witmotion_typed_packets\fP"
+.br
+.ti -1c
+.RI "class \fBwitmotion::witmotion_typed_bytecounts\fP"
+.br
+.in -1c
+.SS "Namespaces"
+
+.in +1c
+.ti -1c
+.RI "namespace \fBwitmotion\fP"
+.br
+.RI "Main namespace of Witmotion UART connection library\&. "
+.in -1c
+.SS "Functions"
+
+.in +1c
+.ti -1c
+.RI "uint8_t \fBwitmotion::witmotion_output_frequency\fP (const int hertz)"
+.br
+.RI "Converts the frequency value in Hertz to subsequent Witmotion opcode\&. "
+.ti -1c
+.RI "uint8_t \fBwitmotion::witmotion_baud_rate\fP (const QSerialPort::BaudRate rate)"
+.br
+.ti -1c
+.RI "bool \fBwitmotion::id_registered\fP (const size_t id)"
+.br
+.ti -1c
+.RI "float \fBwitmotion::decode_acceleration\fP (const int16_t *value)"
+.br
+.ti -1c
+.RI "float \fBwitmotion::decode_angular_velocity\fP (const int16_t *value)"
+.br
+.ti -1c
+.RI "float \fBwitmotion::decode_angle\fP (const int16_t *value)"
+.br
+.ti -1c
+.RI "float \fBwitmotion::decode_temperature\fP (const int16_t *value)"
+.br
+.ti -1c
+.RI "float \fBwitmotion::decode_orientation\fP (const int16_t *value)"
+.br
+.ti -1c
+.RI "void \fBwitmotion::decode_gps_coord\fP (const int32_t *value, double &deg, double &min)"
+.br
+.ti -1c
+.RI "void \fBwitmotion::decode_realtime_clock\fP (const \fBwitmotion_datapacket\fP &packet, uint8_t &year, uint8_t &month, uint8_t &day, uint8_t &hour, uint8_t &minute, uint8_t &second, uint16_t &millisecond)"
+.br
+.ti -1c
+.RI "void \fBwitmotion::decode_accelerations\fP (const \fBwitmotion_datapacket\fP &packet, float &x, float &y, float &z, float &t)"
+.br
+.ti -1c
+.RI "void \fBwitmotion::decode_angular_velocities\fP (const \fBwitmotion_datapacket\fP &packet, float &x, float &y, float &z, float &t)"
+.br
+.ti -1c
+.RI "void \fBwitmotion::decode_angles\fP (const \fBwitmotion_datapacket\fP &packet, float &roll, float &pitch, float &yaw, float &t)"
+.br
+.ti -1c
+.RI "void \fBwitmotion::decode_magnetometer\fP (const \fBwitmotion_datapacket\fP &packet, float &x, float &y, float &z, float &t)"
+.br
+.ti -1c
+.RI "void \fBwitmotion::decode_altimeter\fP (const \fBwitmotion_datapacket\fP &packet, double &pressure, double &height)"
+.br
+.ti -1c
+.RI "void \fBwitmotion::decode_gps\fP (const \fBwitmotion_datapacket\fP &packet, double &longitude_deg, double &longitude_min, double &latitude_deg, double &latitude_min)"
+.br
+.ti -1c
+.RI "void \fBwitmotion::decode_gps_ground_speed\fP (const \fBwitmotion_datapacket\fP &packet, float &altitude, float &angular_velocity, double &ground_speed)"
+.br
+.ti -1c
+.RI "void \fBwitmotion::decode_orientation\fP (const \fBwitmotion_datapacket\fP &packet, float &x, float &y, float &z, float &w)"
+.br
+.ti -1c
+.RI "void \fBwitmotion::decode_gps_accuracy\fP (const \fBwitmotion_datapacket\fP &packet, size_t &satellites, float &local_accuracy, float &horizontal_accuracy, float &vertical_accuracy)"
+.br
+.ti -1c
+.RI "template<typename T > T \fBwitmotion::variance\fP (const std::vector< T > &array)"
+.br
+.in -1c
+.SH "Detailed Description"
+.PP 
+
+.PP
+\fBAuthor\fP
+.RS 4
+Andrey Vukolov andrey.vukolov@elettra.eu 
+.RE
+.PP
+
+.SH "Author"
+.PP 
+Generated automatically by Doxygen for Witmotion IMU Library from the source code\&.

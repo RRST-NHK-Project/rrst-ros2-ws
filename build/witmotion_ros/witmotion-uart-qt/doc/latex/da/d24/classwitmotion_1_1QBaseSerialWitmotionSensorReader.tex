@@ -1,0 +1,154 @@
+\doxysection{witmotion\+::QBase\+Serial\+Witmotion\+Sensor\+Reader Class Reference}
+\hypertarget{classwitmotion_1_1QBaseSerialWitmotionSensorReader}{}\label{classwitmotion_1_1QBaseSerialWitmotionSensorReader}\index{witmotion::QBaseSerialWitmotionSensorReader@{witmotion::QBaseSerialWitmotionSensorReader}}
+
+
+Inheritance diagram for witmotion\+::QBase\+Serial\+Witmotion\+Sensor\+Reader\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[height=550pt]{dd/d26/classwitmotion_1_1QBaseSerialWitmotionSensorReader__inherit__graph}
+\end{center}
+\end{figure}
+
+
+Collaboration diagram for witmotion\+::QBase\+Serial\+Witmotion\+Sensor\+Reader\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{d7/d18/classwitmotion_1_1QBaseSerialWitmotionSensorReader__coll__graph}
+\end{center}
+\end{figure}
+\doxysubsubsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\Hypertarget{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a66b48a8f3cd3804c753955169ad02df2}\label{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a66b48a8f3cd3804c753955169ad02df2} 
+void {\bfseries Set\+Baud\+Rate} (const QSerial\+Port\+::\+Baud\+Rate \&rate)
+\item 
+\Hypertarget{classwitmotion_1_1QBaseSerialWitmotionSensorReader_aae67855df3bd51cdb0e36d02ec554620}\label{classwitmotion_1_1QBaseSerialWitmotionSensorReader_aae67855df3bd51cdb0e36d02ec554620} 
+{\bfseries QBase\+Serial\+Witmotion\+Sensor\+Reader} (const QString device, const QSerial\+Port\+::\+Baud\+Rate rate)
+\item 
+virtual void \mbox{\hyperlink{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a9af65f5936da60c51148e0668f89e5b7}{Run\+Poll}} ()
+\begin{DoxyCompactList}\small\item\em Public abstract slot to be implemented in the derived class. The common use is to start the polling timer thread for the sensors after Qt event loop is started. \end{DoxyCompactList}\item 
+\Hypertarget{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a81fa5dcc6b799d759e9a2a5ade22e7e7}\label{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a81fa5dcc6b799d759e9a2a5ade22e7e7} 
+virtual void {\bfseries Suspend} ()
+\item 
+\Hypertarget{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a2ce064c377f7c72b3aaa38de7cfeeaf9}\label{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a2ce064c377f7c72b3aaa38de7cfeeaf9} 
+void {\bfseries Validate\+Packets} (const bool value)
+\item 
+\Hypertarget{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a72dbbc65fe5d4a4935db8314e4623a0e}\label{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a72dbbc65fe5d4a4935db8314e4623a0e} 
+void {\bfseries Set\+Sensor\+Poll\+Interval} (const uint32\+\_\+t ms)
+\item 
+\Hypertarget{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a98ce21f8ee6bfcab1775bab7a625aed6}\label{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a98ce21f8ee6bfcab1775bab7a625aed6} 
+void {\bfseries Set\+Sensor\+Timeout} (const uint32\+\_\+t ms)
+\end{DoxyCompactItemize}
+\doxysubsubsection*{Protected Types}
+\begin{DoxyCompactItemize}
+\item 
+\Hypertarget{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a958610a2e395394be5bb490f23a25734}\label{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a958610a2e395394be5bb490f23a25734} 
+enum {\bfseries read\+\_\+state\+\_\+t} \{ \newline
+{\bfseries rs\+Unknown}
+, \newline
+{\bfseries rs\+Clear}
+, \newline
+{\bfseries rs\+Read}
+ \}
+\end{DoxyCompactItemize}
+\doxysubsubsection*{Protected Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+virtual void \mbox{\hyperlink{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a86aeebe95a926a29cbc9c6d6fb3fb9a2}{Read\+Data}} ()
+\begin{DoxyCompactList}\small\item\em Protected abstract slot to be implemented in the derived class. The common usage is as a callback for the polling timer thread. \end{DoxyCompactList}\item 
+\Hypertarget{classwitmotion_1_1QBaseSerialWitmotionSensorReader_ae7796ed6f20f9d389eb262667b3c0d20}\label{classwitmotion_1_1QBaseSerialWitmotionSensorReader_ae7796ed6f20f9d389eb262667b3c0d20} 
+virtual void {\bfseries Configure} ()
+\item 
+virtual void \mbox{\hyperlink{classwitmotion_1_1QBaseSerialWitmotionSensorReader_adef9d17620ca9e47ee507f7eaa61b417}{Send\+Config}} (const \mbox{\hyperlink{structwitmotion_1_1witmotion__config__packet}{witmotion\+\_\+config\+\_\+packet}} \&packet)
+\begin{DoxyCompactList}\small\item\em Public abstract slot to be implemented in the derived class. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\doxysubsubsection*{Protected Attributes}
+\begin{DoxyCompactItemize}
+\item 
+\Hypertarget{classwitmotion_1_1QBaseSerialWitmotionSensorReader_ad9df3496583b676a0e52e97c42faa29a}\label{classwitmotion_1_1QBaseSerialWitmotionSensorReader_ad9df3496583b676a0e52e97c42faa29a} 
+QText\+Stream {\bfseries ttyout}
+\item 
+\Hypertarget{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a56ecc35cfa2a1067572889ebeef8c456}\label{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a56ecc35cfa2a1067572889ebeef8c456} 
+QTimer \texorpdfstring{$\ast$}{*} {\bfseries poll\+\_\+timer}
+\item 
+\Hypertarget{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a7f249b88333767f7541825cdcbcf1347}\label{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a7f249b88333767f7541825cdcbcf1347} 
+QMeta\+Object\+::\+Connection {\bfseries timer\+\_\+connection}
+\item 
+\Hypertarget{classwitmotion_1_1QBaseSerialWitmotionSensorReader_ad0fcae4aaea5a94f3bcf61c1ab7514e9}\label{classwitmotion_1_1QBaseSerialWitmotionSensorReader_ad0fcae4aaea5a94f3bcf61c1ab7514e9} 
+QMeta\+Object\+::\+Connection {\bfseries config\+\_\+connection}
+\item 
+\Hypertarget{classwitmotion_1_1QBaseSerialWitmotionSensorReader_ab06d1ac8ccb01f340155d99e12e1591d}\label{classwitmotion_1_1QBaseSerialWitmotionSensorReader_ab06d1ac8ccb01f340155d99e12e1591d} 
+enum witmotion\+::\+QBase\+Serial\+Witmotion\+Sensor\+Reader\+::read\+\_\+state\+\_\+t {\bfseries read\+\_\+state}
+\item 
+\Hypertarget{classwitmotion_1_1QBaseSerialWitmotionSensorReader_aa678a6c295340c73164818cf8992f2d2}\label{classwitmotion_1_1QBaseSerialWitmotionSensorReader_aa678a6c295340c73164818cf8992f2d2} 
+\mbox{\hyperlink{classwitmotion_1_1witmotion__typed__packets}{witmotion\+\_\+typed\+\_\+packets}} {\bfseries packets}
+\item 
+\Hypertarget{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a00ee69036b07f0563e4ac5dafc5fbf62}\label{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a00ee69036b07f0563e4ac5dafc5fbf62} 
+\mbox{\hyperlink{classwitmotion_1_1witmotion__typed__bytecounts}{witmotion\+\_\+typed\+\_\+bytecounts}} {\bfseries counts}
+\item 
+\Hypertarget{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a9f95a04cb2fdd29694391ab65c31d782}\label{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a9f95a04cb2fdd29694391ab65c31d782} 
+\mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3}{witmotion\+\_\+packet\+\_\+id}} {\bfseries read\+\_\+cell}
+\item 
+\Hypertarget{classwitmotion_1_1QBaseSerialWitmotionSensorReader_afae8168d91e654c6300d8fb94c42cbc7}\label{classwitmotion_1_1QBaseSerialWitmotionSensorReader_afae8168d91e654c6300d8fb94c42cbc7} 
+volatile bool {\bfseries configuring}
+\item 
+\Hypertarget{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a310561c7a189213b4f5278cef104789f}\label{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a310561c7a189213b4f5278cef104789f} 
+std\+::list$<$ \mbox{\hyperlink{structwitmotion_1_1witmotion__config__packet}{witmotion\+\_\+config\+\_\+packet}} $>$ {\bfseries configuration}
+\end{DoxyCompactItemize}
+\doxysubsubsection*{Additional Inherited Members}
+\doxysubsection*{Public Slots inherited from \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader}{witmotion\+::\+QAbstract\+Witmotion\+Sensor\+Reader}}}
+\doxysubsection*{Signals inherited from \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader}{witmotion\+::\+QAbstract\+Witmotion\+Sensor\+Reader}}}
+\begin{DoxyCompactItemize}
+\item 
+void {\bfseries Acquired} (const \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\+\_\+datapacket}} \&packet)
+\begin{DoxyCompactList}\small\item\em Signal function to be emitted when the data packet is acquired by the polling thread or process. Can only be redefined, not overridden in the class hierarchy. \end{DoxyCompactList}\item 
+void {\bfseries Error} (const QString \&description)
+\begin{DoxyCompactList}\small\item\em Signal function to be emitted when the internal error reported in the polling thread or process. Can only be redefined, not overridden in the class hierarchy. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\doxysubsection*{Protected Slots inherited from \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader}{witmotion\+::\+QAbstract\+Witmotion\+Sensor\+Reader}}}
+
+
+\doxysubsection{Member Function Documentation}
+\Hypertarget{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a86aeebe95a926a29cbc9c6d6fb3fb9a2}\label{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a86aeebe95a926a29cbc9c6d6fb3fb9a2} 
+\index{witmotion::QBaseSerialWitmotionSensorReader@{witmotion::QBaseSerialWitmotionSensorReader}!ReadData@{ReadData}}
+\index{ReadData@{ReadData}!witmotion::QBaseSerialWitmotionSensorReader@{witmotion::QBaseSerialWitmotionSensorReader}}
+\doxysubsubsection{\texorpdfstring{ReadData()}{ReadData()}}
+{\footnotesize\ttfamily void witmotion\+::\+QBase\+Serial\+Witmotion\+Sensor\+Reader\+::\+Read\+Data (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [protected]}, {\ttfamily [virtual]}}
+
+
+
+Implements \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader_a26dec3c2e06eb2953bbbc6fe9f826c65}{witmotion\+::\+QAbstract\+Witmotion\+Sensor\+Reader}}.
+
+\Hypertarget{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a9af65f5936da60c51148e0668f89e5b7}\label{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a9af65f5936da60c51148e0668f89e5b7} 
+\index{witmotion::QBaseSerialWitmotionSensorReader@{witmotion::QBaseSerialWitmotionSensorReader}!RunPoll@{RunPoll}}
+\index{RunPoll@{RunPoll}!witmotion::QBaseSerialWitmotionSensorReader@{witmotion::QBaseSerialWitmotionSensorReader}}
+\doxysubsubsection{\texorpdfstring{RunPoll()}{RunPoll()}}
+{\footnotesize\ttfamily void witmotion\+::\+QBase\+Serial\+Witmotion\+Sensor\+Reader\+::\+Run\+Poll (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [virtual]}}
+
+
+
+Implements \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader_a01b7550252964d3e01cf3a5e4f6527c0}{witmotion\+::\+QAbstract\+Witmotion\+Sensor\+Reader}}.
+
+\Hypertarget{classwitmotion_1_1QBaseSerialWitmotionSensorReader_adef9d17620ca9e47ee507f7eaa61b417}\label{classwitmotion_1_1QBaseSerialWitmotionSensorReader_adef9d17620ca9e47ee507f7eaa61b417} 
+\index{witmotion::QBaseSerialWitmotionSensorReader@{witmotion::QBaseSerialWitmotionSensorReader}!SendConfig@{SendConfig}}
+\index{SendConfig@{SendConfig}!witmotion::QBaseSerialWitmotionSensorReader@{witmotion::QBaseSerialWitmotionSensorReader}}
+\doxysubsubsection{\texorpdfstring{SendConfig()}{SendConfig()}}
+{\footnotesize\ttfamily void witmotion\+::\+QBase\+Serial\+Witmotion\+Sensor\+Reader\+::\+Send\+Config (\begin{DoxyParamCaption}\item[{const \mbox{\hyperlink{structwitmotion_1_1witmotion__config__packet}{witmotion\+\_\+config\+\_\+packet}} \&}]{packet }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [protected]}, {\ttfamily [virtual]}}
+
+
+\begin{DoxyParams}{Parameters}
+{\em packet} & accepts the \doxylink{structwitmotion_1_1witmotion__config__packet}{witmotion\+\_\+config\+\_\+packet} object for being sent to the sensor configuration registers. \\
+\hline
+\end{DoxyParams}
+
+
+Implements \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader_afee4af791a65ff196f79b01977df3f98}{witmotion\+::\+QAbstract\+Witmotion\+Sensor\+Reader}}.
+
+
+
+The documentation for this class was generated from the following files\+:\begin{DoxyCompactItemize}
+\item 
+serial.\+h\item 
+serial.\+cpp\end{DoxyCompactItemize}

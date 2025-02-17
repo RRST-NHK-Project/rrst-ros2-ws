@@ -1,0 +1,49 @@
+\doxysection{witmotion\+::witmotion\+\_\+datapacket Struct Reference}
+\hypertarget{structwitmotion_1_1witmotion__datapacket}{}\label{structwitmotion_1_1witmotion__datapacket}\index{witmotion::witmotion\_datapacket@{witmotion::witmotion\_datapacket}}
+
+
+Generic structure respresenting the standard 11-\/byte datapacket defined in Witmotion protocol.  
+
+
+
+
+{\ttfamily \#include $<$types.\+h$>$}
+
+
+
+Collaboration diagram for witmotion\+::witmotion\+\_\+datapacket\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=196pt]{d4/dbc/structwitmotion_1_1witmotion__datapacket__coll__graph}
+\end{center}
+\end{figure}
+\doxysubsubsection*{Public Attributes}
+\begin{DoxyCompactItemize}
+\item 
+\Hypertarget{structwitmotion_1_1witmotion__datapacket_ae8bad5985e98addb6c113d0c73becbab}\label{structwitmotion_1_1witmotion__datapacket_ae8bad5985e98addb6c113d0c73becbab} 
+uint8\+\_\+t {\bfseries header\+\_\+byte}
+\begin{DoxyCompactList}\small\item\em Header byte, set constantly to \doxylink{namespacewitmotion_a637c861a28f4015a1b57d8bd9ef08cbf}{WITMOTION\+\_\+\+HEADER\+\_\+\+BYTE}. \end{DoxyCompactList}\item 
+\Hypertarget{structwitmotion_1_1witmotion__datapacket_a987f58271cf9d474aa989d2edc6c5802}\label{structwitmotion_1_1witmotion__datapacket_a987f58271cf9d474aa989d2edc6c5802} 
+uint8\+\_\+t {\bfseries id\+\_\+byte}
+\begin{DoxyCompactList}\small\item\em Packet type ID, referring to \doxylink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3}{witmotion\+\_\+packet\+\_\+id}, otherwise the packet is considered of unknown type. \end{DoxyCompactList}\item 
+\Hypertarget{structwitmotion_1_1witmotion__datapacket_afe7c14394c5d2ed9328c6ed610f46191}\label{structwitmotion_1_1witmotion__datapacket_afe7c14394c5d2ed9328c6ed610f46191} 
+\begin{tabbing}
+xx\=xx\=xx\=xx\=xx\=xx\=xx\=xx\=xx\=\kill
+union \{\\
+\>int8\_t {\bfseries raw\_signed} \mbox{[}8\mbox{]}\\
+\>uint8\_t {\bfseries raw} \mbox{[}8\mbox{]}\\
+\>int16\_t {\bfseries raw\_cells} \mbox{[}4\mbox{]}\\
+\>int32\_t {\bfseries raw\_large} \mbox{[}2\mbox{]}\\
+\} {\bfseries datastore}\\
+
+\end{tabbing}\begin{DoxyCompactList}\small\item\em 8-\/byte internal data storage array represented as C-\/style memory union. The stored data represented as {\ttfamily int8\+\_\+t\texorpdfstring{$\ast$}{*}}, {\ttfamily uint8\+\_\+t\texorpdfstring{$\ast$}{*}}, {\ttfamily int16\+\_\+t\texorpdfstring{$\ast$}{*}} or {\ttfamily int32\+\_\+t\texorpdfstring{$\ast$}{*}} array head pointer. \end{DoxyCompactList}\item 
+\Hypertarget{structwitmotion_1_1witmotion__datapacket_ab6cca4fa4201a4c4b5380b84e46dc47e}\label{structwitmotion_1_1witmotion__datapacket_ab6cca4fa4201a4c4b5380b84e46dc47e} 
+uint8\+\_\+t {\bfseries crc}
+\begin{DoxyCompactList}\small\item\em Validation CRC for the packet. Calculated as an equivalent to the following operation\+: $ crc = \sum_{i=0}^{i < 10}\times${\ttfamily reinterpret\+\_\+cast\texorpdfstring{$<$}{<}uint8\+\_\+t\texorpdfstring{$\ast$}{*}\texorpdfstring{$>$}{>}(this) + i} \end{DoxyCompactList}\end{DoxyCompactItemize}
+
+
+The documentation for this struct was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+\mbox{\hyperlink{types_8h}{types.\+h}}\end{DoxyCompactItemize}

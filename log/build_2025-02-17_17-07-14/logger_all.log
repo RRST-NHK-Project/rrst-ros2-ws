@@ -1,0 +1,170 @@
+[0.163s] DEBUG:colcon:Command line arguments: ['/usr/bin/colcon', 'build', '--packages-select', 'witmotion_ros']
+[0.163s] DEBUG:colcon:Parsed command line arguments: Namespace(log_base=None, log_level=None, verb_name='build', build_base='build', install_base='install', merge_install=False, symlink_install=False, test_result_base=None, continue_on_error=False, executor='parallel', parallel_workers=12, event_handlers=None, ignore_user_meta=False, metas=['./colcon.meta'], base_paths=['.'], packages_ignore=None, packages_ignore_regex=None, paths=None, packages_up_to=None, packages_up_to_regex=None, packages_above=None, packages_above_and_dependencies=None, packages_above_depth=None, packages_select_by_dep=None, packages_skip_by_dep=None, packages_skip_up_to=None, packages_select_build_failed=False, packages_skip_build_finished=False, packages_select_test_failures=False, packages_skip_test_passed=False, packages_select=['witmotion_ros'], packages_skip=None, packages_select_regex=None, packages_skip_regex=None, packages_start=None, packages_end=None, allow_overriding=[], cmake_args=None, cmake_target=None, cmake_target_skip_unavailable=False, cmake_clean_cache=False, cmake_clean_first=False, cmake_force_configure=False, ament_cmake_args=None, catkin_cmake_args=None, catkin_skip_building_tests=False, verb_parser=<colcon_defaults.argument_parser.defaults.DefaultArgumentsDecorator object at 0x708a2fcc8710>, verb_extension=<colcon_core.verb.build.BuildVerb object at 0x708a2fdefe30>, main=<bound method BuildVerb.main of <colcon_core.verb.build.BuildVerb object at 0x708a2fdefe30>>)
+[0.212s] Level 1:colcon.colcon_core.package_discovery:discover_packages(colcon_meta) check parameters
+[0.213s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) check parameters
+[0.213s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) check parameters
+[0.213s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) check parameters
+[0.213s] Level 1:colcon.colcon_core.package_discovery:discover_packages(colcon_meta) discover
+[0.213s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) discover
+[0.213s] INFO:colcon.colcon_core.package_discovery:Crawling recursively for packages in '/home/dev/ros2_ws/src'
+[0.213s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['ignore', 'ignore_ament_install']
+[0.213s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ignore'
+[0.213s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ignore_ament_install'
+[0.213s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['colcon_pkg']
+[0.213s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'colcon_pkg'
+[0.213s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['colcon_meta']
+[0.213s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'colcon_meta'
+[0.213s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['ros']
+[0.213s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ros'
+[0.247s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['cmake', 'python']
+[0.247s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'cmake'
+[0.247s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'python'
+[0.247s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['python_setup_py']
+[0.247s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'python_setup_py'
+[0.247s] Level 1:colcon.colcon_core.package_identification:_identify(build) by extensions ['ignore', 'ignore_ament_install']
+[0.247s] Level 1:colcon.colcon_core.package_identification:_identify(build) by extension 'ignore'
+[0.247s] Level 1:colcon.colcon_core.package_identification:_identify(build) ignored
+[0.247s] Level 1:colcon.colcon_core.package_identification:_identify(f7_udp) by extensions ['ignore', 'ignore_ament_install']
+[0.247s] Level 1:colcon.colcon_core.package_identification:_identify(f7_udp) by extension 'ignore'
+[0.248s] Level 1:colcon.colcon_core.package_identification:_identify(f7_udp) by extension 'ignore_ament_install'
+[0.248s] Level 1:colcon.colcon_core.package_identification:_identify(f7_udp) by extensions ['colcon_pkg']
+[0.248s] Level 1:colcon.colcon_core.package_identification:_identify(f7_udp) by extension 'colcon_pkg'
+[0.248s] Level 1:colcon.colcon_core.package_identification:_identify(f7_udp) by extensions ['colcon_meta']
+[0.248s] Level 1:colcon.colcon_core.package_identification:_identify(f7_udp) by extension 'colcon_meta'
+[0.248s] Level 1:colcon.colcon_core.package_identification:_identify(f7_udp) by extensions ['ros']
+[0.248s] Level 1:colcon.colcon_core.package_identification:_identify(f7_udp) by extension 'ros'
+[0.252s] DEBUG:colcon.colcon_core.package_identification:Package 'f7_udp' with type 'ros.ament_python' and name 'f7_udp'
+[0.252s] Level 1:colcon.colcon_core.package_identification:_identify(f7_udp_cpp) by extensions ['ignore', 'ignore_ament_install']
+[0.252s] Level 1:colcon.colcon_core.package_identification:_identify(f7_udp_cpp) by extension 'ignore'
+[0.252s] Level 1:colcon.colcon_core.package_identification:_identify(f7_udp_cpp) by extension 'ignore_ament_install'
+[0.252s] Level 1:colcon.colcon_core.package_identification:_identify(f7_udp_cpp) by extensions ['colcon_pkg']
+[0.252s] Level 1:colcon.colcon_core.package_identification:_identify(f7_udp_cpp) by extension 'colcon_pkg'
+[0.252s] Level 1:colcon.colcon_core.package_identification:_identify(f7_udp_cpp) by extensions ['colcon_meta']
+[0.252s] Level 1:colcon.colcon_core.package_identification:_identify(f7_udp_cpp) by extension 'colcon_meta'
+[0.252s] Level 1:colcon.colcon_core.package_identification:_identify(f7_udp_cpp) by extensions ['ros']
+[0.252s] Level 1:colcon.colcon_core.package_identification:_identify(f7_udp_cpp) by extension 'ros'
+[0.253s] DEBUG:colcon.colcon_core.package_identification:Package 'f7_udp_cpp' with type 'ros.ament_cmake' and name 'f7_udp_cpp'
+[0.253s] Level 1:colcon.colcon_core.package_identification:_identify(install) by extensions ['ignore', 'ignore_ament_install']
+[0.253s] Level 1:colcon.colcon_core.package_identification:_identify(install) by extension 'ignore'
+[0.254s] Level 1:colcon.colcon_core.package_identification:_identify(install) ignored
+[0.254s] Level 1:colcon.colcon_core.package_identification:_identify(log) by extensions ['ignore', 'ignore_ament_install']
+[0.254s] Level 1:colcon.colcon_core.package_identification:_identify(log) by extension 'ignore'
+[0.254s] Level 1:colcon.colcon_core.package_identification:_identify(log) ignored
+[0.254s] Level 1:colcon.colcon_core.package_identification:_identify(ros2udp) by extensions ['ignore', 'ignore_ament_install']
+[0.254s] Level 1:colcon.colcon_core.package_identification:_identify(ros2udp) by extension 'ignore'
+[0.254s] Level 1:colcon.colcon_core.package_identification:_identify(ros2udp) by extension 'ignore_ament_install'
+[0.254s] Level 1:colcon.colcon_core.package_identification:_identify(ros2udp) by extensions ['colcon_pkg']
+[0.254s] Level 1:colcon.colcon_core.package_identification:_identify(ros2udp) by extension 'colcon_pkg'
+[0.254s] Level 1:colcon.colcon_core.package_identification:_identify(ros2udp) by extensions ['colcon_meta']
+[0.254s] Level 1:colcon.colcon_core.package_identification:_identify(ros2udp) by extension 'colcon_meta'
+[0.254s] Level 1:colcon.colcon_core.package_identification:_identify(ros2udp) by extensions ['ros']
+[0.254s] Level 1:colcon.colcon_core.package_identification:_identify(ros2udp) by extension 'ros'
+[0.255s] DEBUG:colcon.colcon_core.package_identification:Package 'ros2udp' with type 'ros.ament_python' and name 'ros2udp'
+[0.255s] Level 1:colcon.colcon_core.package_identification:_identify(witmotion_ros) by extensions ['ignore', 'ignore_ament_install']
+[0.255s] Level 1:colcon.colcon_core.package_identification:_identify(witmotion_ros) by extension 'ignore'
+[0.255s] Level 1:colcon.colcon_core.package_identification:_identify(witmotion_ros) by extension 'ignore_ament_install'
+[0.255s] Level 1:colcon.colcon_core.package_identification:_identify(witmotion_ros) by extensions ['colcon_pkg']
+[0.255s] Level 1:colcon.colcon_core.package_identification:_identify(witmotion_ros) by extension 'colcon_pkg'
+[0.255s] Level 1:colcon.colcon_core.package_identification:_identify(witmotion_ros) by extensions ['colcon_meta']
+[0.255s] Level 1:colcon.colcon_core.package_identification:_identify(witmotion_ros) by extension 'colcon_meta'
+[0.255s] Level 1:colcon.colcon_core.package_identification:_identify(witmotion_ros) by extensions ['ros']
+[0.255s] Level 1:colcon.colcon_core.package_identification:_identify(witmotion_ros) by extension 'ros'
+[0.257s] DEBUG:colcon.colcon_core.package_identification:Package 'witmotion_ros' with type 'ros.ament_cmake' and name 'witmotion_ros'
+[0.257s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) using defaults
+[0.257s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) discover
+[0.257s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) using defaults
+[0.257s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) discover
+[0.257s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) using defaults
+[0.299s] INFO:colcon.colcon_core.package_selection:Skipping not selected package 'f7_udp' in 'f7_udp'
+[0.299s] INFO:colcon.colcon_core.package_selection:Skipping not selected package 'f7_udp_cpp' in 'f7_udp_cpp'
+[0.299s] INFO:colcon.colcon_core.package_selection:Skipping not selected package 'ros2udp' in 'ros2udp'
+[0.300s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) check parameters
+[0.300s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) discover
+[0.303s] DEBUG:colcon.colcon_installed_package_information.package_discovery:Found 3 installed packages in /home/dev/ros2_ws/install
+[0.304s] DEBUG:colcon.colcon_installed_package_information.package_discovery:Found 285 installed packages in /opt/ros/jazzy
+[0.305s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) using defaults
+[0.350s] Level 5:colcon.colcon_core.verb:set package 'witmotion_ros' build argument 'cmake_args' from command line to 'None'
+[0.350s] Level 5:colcon.colcon_core.verb:set package 'witmotion_ros' build argument 'cmake_target' from command line to 'None'
+[0.350s] Level 5:colcon.colcon_core.verb:set package 'witmotion_ros' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.350s] Level 5:colcon.colcon_core.verb:set package 'witmotion_ros' build argument 'cmake_clean_cache' from command line to 'False'
+[0.350s] Level 5:colcon.colcon_core.verb:set package 'witmotion_ros' build argument 'cmake_clean_first' from command line to 'False'
+[0.350s] Level 5:colcon.colcon_core.verb:set package 'witmotion_ros' build argument 'cmake_force_configure' from command line to 'False'
+[0.350s] Level 5:colcon.colcon_core.verb:set package 'witmotion_ros' build argument 'ament_cmake_args' from command line to 'None'
+[0.350s] Level 5:colcon.colcon_core.verb:set package 'witmotion_ros' build argument 'catkin_cmake_args' from command line to 'None'
+[0.350s] Level 5:colcon.colcon_core.verb:set package 'witmotion_ros' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.350s] DEBUG:colcon.colcon_core.verb:Building package 'witmotion_ros' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/dev/ros2_ws/src/build/witmotion_ros', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/dev/ros2_ws/src/install/witmotion_ros', 'merge_install': False, 'path': '/home/dev/ros2_ws/src/witmotion_ros', 'symlink_install': False, 'test_result_base': None}
+[0.350s] INFO:colcon.colcon_core.executor:Executing jobs using 'parallel' executor
+[0.351s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:run_until_complete
+[0.351s] INFO:colcon.colcon_ros.task.ament_cmake.build:Building ROS package in '/home/dev/ros2_ws/src/witmotion_ros' with build type 'ament_cmake'
+[0.351s] INFO:colcon.colcon_cmake.task.cmake.build:Building CMake package in '/home/dev/ros2_ws/src/witmotion_ros'
+[0.356s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_core.shell.bat': Not used on non-Windows systems
+[0.356s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.356s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.363s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/dev/ros2_ws/src/build/witmotion_ros': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/dev/ros2_ws/install/ros2udp:/home/dev/ros2_ws/install/f7_udp:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake /home/dev/ros2_ws/src/witmotion_ros -DCMAKE_INSTALL_PREFIX=/home/dev/ros2_ws/src/install/witmotion_ros
+[4.273s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/dev/ros2_ws/src/build/witmotion_ros' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/dev/ros2_ws/install/ros2udp:/home/dev/ros2_ws/install/f7_udp:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake /home/dev/ros2_ws/src/witmotion_ros -DCMAKE_INSTALL_PREFIX=/home/dev/ros2_ws/src/install/witmotion_ros
+[4.280s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/dev/ros2_ws/src/build/witmotion_ros': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/dev/ros2_ws/install/ros2udp:/home/dev/ros2_ws/install/f7_udp:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/dev/ros2_ws/src/build/witmotion_ros -- -j12 -l12
+[57.338s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/dev/ros2_ws/src/build/witmotion_ros' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/dev/ros2_ws/install/ros2udp:/home/dev/ros2_ws/install/f7_udp:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/dev/ros2_ws/src/build/witmotion_ros -- -j12 -l12
+[57.354s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/dev/ros2_ws/src/build/witmotion_ros': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/dev/ros2_ws/install/ros2udp:/home/dev/ros2_ws/install/f7_udp:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/dev/ros2_ws/src/build/witmotion_ros
+[57.392s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(witmotion_ros)
+[57.393s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/dev/ros2_ws/src/build/witmotion_ros' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/dev/ros2_ws/install/ros2udp:/home/dev/ros2_ws/install/f7_udp:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/dev/ros2_ws/src/build/witmotion_ros
+[57.404s] Level 1:colcon.colcon_core.environment:checking '/home/dev/ros2_ws/src/install/witmotion_ros' for CMake module files
+[57.405s] Level 1:colcon.colcon_core.environment:checking '/home/dev/ros2_ws/src/install/witmotion_ros' for CMake config files
+[57.405s] Level 1:colcon.colcon_core.shell:create_environment_hook('witmotion_ros', 'cmake_prefix_path')
+[57.406s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/hook/cmake_prefix_path.ps1'
+[57.407s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/hook/cmake_prefix_path.dsv'
+[57.408s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/hook/cmake_prefix_path.sh'
+[57.409s] Level 1:colcon.colcon_core.environment:checking '/home/dev/ros2_ws/src/install/witmotion_ros/lib'
+[57.410s] Level 1:colcon.colcon_core.shell:create_environment_hook('witmotion_ros', 'ld_library_path_lib')
+[57.410s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/hook/ld_library_path_lib.ps1'
+[57.411s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/hook/ld_library_path_lib.dsv'
+[57.411s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/hook/ld_library_path_lib.sh'
+[57.412s] Level 1:colcon.colcon_core.environment:checking '/home/dev/ros2_ws/src/install/witmotion_ros/bin'
+[57.412s] Level 1:colcon.colcon_core.environment:checking '/home/dev/ros2_ws/src/install/witmotion_ros/lib/pkgconfig/witmotion_ros.pc'
+[57.412s] Level 1:colcon.colcon_core.environment:checking '/home/dev/ros2_ws/src/install/witmotion_ros/lib/python3.12/site-packages'
+[57.412s] Level 1:colcon.colcon_core.environment:checking '/home/dev/ros2_ws/src/install/witmotion_ros/bin'
+[57.413s] INFO:colcon.colcon_core.shell:Creating package script '/home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/package.ps1'
+[57.414s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/package.dsv'
+[57.414s] INFO:colcon.colcon_core.shell:Creating package script '/home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/package.sh'
+[57.415s] INFO:colcon.colcon_core.shell:Creating package script '/home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/package.bash'
+[57.416s] INFO:colcon.colcon_core.shell:Creating package script '/home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/package.zsh'
+[57.418s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/dev/ros2_ws/src/install/witmotion_ros/share/colcon-core/packages/witmotion_ros)
+[57.418s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(witmotion_ros)
+[57.418s] Level 1:colcon.colcon_core.environment:checking '/home/dev/ros2_ws/src/install/witmotion_ros' for CMake module files
+[57.419s] Level 1:colcon.colcon_core.environment:checking '/home/dev/ros2_ws/src/install/witmotion_ros' for CMake config files
+[57.419s] Level 1:colcon.colcon_core.shell:create_environment_hook('witmotion_ros', 'cmake_prefix_path')
+[57.419s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/hook/cmake_prefix_path.ps1'
+[57.420s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/hook/cmake_prefix_path.dsv'
+[57.420s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/hook/cmake_prefix_path.sh'
+[57.420s] Level 1:colcon.colcon_core.environment:checking '/home/dev/ros2_ws/src/install/witmotion_ros/lib'
+[57.420s] Level 1:colcon.colcon_core.shell:create_environment_hook('witmotion_ros', 'ld_library_path_lib')
+[57.421s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/hook/ld_library_path_lib.ps1'
+[57.421s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/hook/ld_library_path_lib.dsv'
+[57.421s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/hook/ld_library_path_lib.sh'
+[57.422s] Level 1:colcon.colcon_core.environment:checking '/home/dev/ros2_ws/src/install/witmotion_ros/bin'
+[57.422s] Level 1:colcon.colcon_core.environment:checking '/home/dev/ros2_ws/src/install/witmotion_ros/lib/pkgconfig/witmotion_ros.pc'
+[57.422s] Level 1:colcon.colcon_core.environment:checking '/home/dev/ros2_ws/src/install/witmotion_ros/lib/python3.12/site-packages'
+[57.422s] Level 1:colcon.colcon_core.environment:checking '/home/dev/ros2_ws/src/install/witmotion_ros/bin'
+[57.423s] INFO:colcon.colcon_core.shell:Creating package script '/home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/package.ps1'
+[57.423s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/package.dsv'
+[57.424s] INFO:colcon.colcon_core.shell:Creating package script '/home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/package.sh'
+[57.424s] INFO:colcon.colcon_core.shell:Creating package script '/home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/package.bash'
+[57.424s] INFO:colcon.colcon_core.shell:Creating package script '/home/dev/ros2_ws/src/install/witmotion_ros/share/witmotion_ros/package.zsh'
+[57.425s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/dev/ros2_ws/src/install/witmotion_ros/share/colcon-core/packages/witmotion_ros)
+[57.425s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:closing loop
+[57.425s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:loop closed
+[57.425s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:run_until_complete finished with '0'
+[57.425s] DEBUG:colcon.colcon_core.event_reactor:joining thread
+[57.446s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_notification.desktop_notification.terminal_notifier': Not used on non-Darwin systems
+[57.446s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_notification.desktop_notification.win32': Not used on non-Windows systems
+[57.447s] INFO:colcon.colcon_notification.desktop_notification:Sending desktop notification using 'notify2'
+[57.479s] DEBUG:colcon.colcon_core.event_reactor:joined thread
+[57.479s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/dev/ros2_ws/src/install/local_setup.ps1'
+[57.481s] INFO:colcon.colcon_core.shell:Creating prefix util module '/home/dev/ros2_ws/src/install/_local_setup_util_ps1.py'
+[57.483s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/dev/ros2_ws/src/install/setup.ps1'
+[57.485s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/dev/ros2_ws/src/install/local_setup.sh'
+[57.485s] INFO:colcon.colcon_core.shell:Creating prefix util module '/home/dev/ros2_ws/src/install/_local_setup_util_sh.py'
+[57.486s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/dev/ros2_ws/src/install/setup.sh'
+[57.487s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/dev/ros2_ws/src/install/local_setup.bash'
+[57.487s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/dev/ros2_ws/src/install/setup.bash'
+[57.488s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/dev/ros2_ws/src/install/local_setup.zsh'
+[57.489s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/dev/ros2_ws/src/install/setup.zsh'

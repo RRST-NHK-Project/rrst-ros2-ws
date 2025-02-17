@@ -1,0 +1,107 @@
+\chapter{Unified Witmotion communication protocol}
+\hypertarget{witmotion_protocol}{}\label{witmotion_protocol}\index{Unified Witmotion communication protocol@{Unified Witmotion communication protocol}}
+The communication protocol for all known Witmotion IMU sensor devices is unified. It bases on TTL UART communication circuits. Please refer to \doxysectlink{witmotion_docs}{official documentation}{0} for complete description. UART initiates connection on the baudrate which should be already set in the sensor\textquotesingle{}s memory.\hypertarget{witmotion_protocol_autotoc_md8}{}\doxysection{\texorpdfstring{Connection mode}{Connection mode}}\label{witmotion_protocol_autotoc_md8}
+\tabulinesep=1mm
+\begin{longtabu}spread 0pt [c]{*{3}{|X[-1]}|}
+\hline
+\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Parameter   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Value   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ {\ttfamily QSerial\+Port} config constant    }\\\cline{1-3}
+\endfirsthead
+\hline
+\endfoot
+\hline
+\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Parameter   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Value   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ {\ttfamily QSerial\+Port} config constant    }\\\cline{1-3}
+\endhead
+{\bfseries{Port mode}}   &Full Duplex   &{\ttfamily QSerial\+Port\+::\+Direction\+::\+All\+Directions}    \\\cline{1-3}
+{\bfseries{Start Bit}}   &0   &{\ttfamily 0x00}    \\\cline{1-3}
+{\bfseries{Stop Bit}}   &1   &{\ttfamily QSerial\+Port\+::\+One\+Stop}    \\\cline{1-3}
+{\bfseries{Hardware Flow Control}}   &Off   &{\ttfamily QSerial\+Port\+::\+Flow\+Control\+::\+No\+Flow\+Control}   \\\cline{1-3}
+\end{longtabu}
+\hypertarget{witmotion_protocol_autotoc_md9}{}\doxysubsection{\texorpdfstring{Supported baud rates}{Supported baud rates}}\label{witmotion_protocol_autotoc_md9}
+The known sensors support the following baud rates (the non-\/standard rates unsupported in {\ttfamily QSerial\+Port} are noticed with {\itshape italic})\+:
+\begin{DoxyItemize}
+\item 2400
+\item 4800
+\item 9600 (default for open-\/circuit devices),
+\item 19200
+\item 38400
+\item 57600
+\item 115200 (default for enclosed devices with built-\/in USB/\+TTL transceiver)
+\item {\itshape 230400}
+\item {\itshape 256000}
+\item {\itshape 460800}
+\item {\itshape 921600} \begin{DoxyNote}{Note}
+The non-\/standard baudrated are not supported officially by {\ttfamily QSerial\+Port} backend. However, the \href{https://github.com/ElettraSciComp/witmotion_IMU_ros/issues/20\#issuecomment-1369174406}{\texttt{ official Windows controller application}} by Witmotion allows to set up the device with these values. If this would be occasionally done, the Qt backend cannot connect to the device, and the user is strongly advised to reduce baud rate via the same Windows controller application to 115200 baud manually before proceed.
+\end{DoxyNote}
+
+\end{DoxyItemize}\hypertarget{witmotion_protocol_autotoc_md10}{}\doxysection{\texorpdfstring{Packet structures}{Packet structures}}\label{witmotion_protocol_autotoc_md10}
+The device throws out the {\itshape data packets} containing the measured values and accepts {\itshape configuration packets} to set up the parameters on-\/the-\/fly. The internal data representations for both types of packets are unified. For actual declarations refer to \doxylink{types_8h}{types.\+h} header file.\hypertarget{witmotion_protocol_autotoc_md11}{}\doxysubsection{\texorpdfstring{Output data packet}{Output data packet}}\label{witmotion_protocol_autotoc_md11}
+The output data are organized in 11-\/byte sequential packets by the following principle\+: \tabulinesep=1mm
+\begin{longtabu}spread 0pt [c]{*{3}{|X[-1]}|}
+\hline
+\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Offset   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Length   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Description    }\\\cline{1-3}
+\endfirsthead
+\hline
+\endfoot
+\hline
+\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Offset   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Length   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Description    }\\\cline{1-3}
+\endhead
+{\ttfamily 0x00}   &1   &Magic header key, \doxylink{namespacewitmotion_a637c861a28f4015a1b57d8bd9ef08cbf}{WITMOTION\+\_\+\+HEADER\+\_\+\+BYTE}    \\\cline{1-3}
+{\ttfamily 0x01}   &1   &Data type ID, as defined in \doxylink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3}{witmotion\+\_\+packet\+\_\+id}. All supported packet IDs should be enumerated in \doxylink{namespacewitmotion_a90712081209bb40591c1666a5a5362e5}{witmotion\+\_\+registered\+\_\+ids} list and described in \doxylink{namespacewitmotion_a4af000309f5694300ababe3086c486fc}{witmotion\+\_\+packet\+\_\+descriptions} map in \doxylink{types_8h}{types.\+h} header file, otherwise the library will not consider it as available to support.    \\\cline{1-3}
+{\ttfamily 0x02}   &8   &Payload. The payload is organized as sequential byte array wrapped into C-\/style union. It can store\+: ~\newline
+ -\/ 8 8-\/bit {\itshape signed} integers $ \left[ -127 ... 128 \right] $ ~\newline
+ -\/ 8 8-\/bit {\itshape unsigned} integers $ \left[ 0 ... 255 \right] $ ~\newline
+ -\/ 4 16-\/bit {\itshape signed} integers ~\newline
+ -\/ 2 32-\/bit {\itshape signed} integers    \\\cline{1-3}
+{\ttfamily 0x0A}   &1   &Validation CRC. Calculated as a result of summation over all the {\bfseries{bytes}}, not elements, as {\itshape unsigned} integers\+: ~\newline
+ $ crc = \sum_{i=0}^{i < 10}\times${\ttfamily reinterpret\+\_\+cast\texorpdfstring{$<$}{<}uint8\+\_\+t\texorpdfstring{$\ast$}{*}\texorpdfstring{$>$}{>}(payload) + i}   \\\cline{1-3}
+\end{longtabu}
+
+
+The data packet structure is internally represented by \doxylink{structwitmotion_1_1witmotion__datapacket}{witmotion\+\_\+datapacket} structure.\hypertarget{witmotion_protocol_autotoc_md12}{}\doxysubsection{\texorpdfstring{Configuration data packet}{Configuration data packet}}\label{witmotion_protocol_autotoc_md12}
+Configuration packets are 5-\/bytes sequential structures organized as it is shown in the following table. CRC check is not implemented on the device. \tabulinesep=1mm
+\begin{longtabu}spread 0pt [c]{*{3}{|X[-1]}|}
+\hline
+\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Offset   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Length   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Description    }\\\cline{1-3}
+\endfirsthead
+\hline
+\endfoot
+\hline
+\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Offset   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Length   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Description    }\\\cline{1-3}
+\endhead
+{\ttfamily 0x00}   &1   &Magic header key, \doxylink{namespacewitmotion_a856c58401c1ba5c7d8a9f58f31f2b83f}{WITMOTION\+\_\+\+CONFIG\+\_\+\+HEADER}    \\\cline{1-3}
+{\ttfamily 0x01}   &1   &Magic configuration packet ID, \doxylink{namespacewitmotion_aac88381210eb4ab56eba64da7ae8c29c}{WITMOTION\+\_\+\+CONFIG\+\_\+\+KEY}    \\\cline{1-3}
+{\ttfamily 0x02}   &1   &Register ID, as defined in \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3}{witmotion\+\_\+config\+\_\+register\+\_\+id}    \\\cline{1-3}
+{\ttfamily 0x03}   &2   &Payload. The set of 1 or 2 values that should be set on the device, represented as two 8-\/bit or one 16-\/bit unsigned integer   \\\cline{1-3}
+\end{longtabu}
+
+
+The configuration packet has an internal representation in \doxylink{structwitmotion_1_1witmotion__config__packet}{witmotion\+\_\+config\+\_\+packet} structure.\hypertarget{witmotion_protocol_autotoc_md13}{}\doxysection{\texorpdfstring{Data decoding algorithms and decoder functions}{Data decoding algorithms and decoder functions}}\label{witmotion_protocol_autotoc_md13}
+The type-\/specific descriptions for payload components encapsulated in output data packet, are placed in \doxylink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3}{witmotion\+\_\+packet\+\_\+id} enumeration documentation. The component decoder functions and packet parsers are located in \doxylink{util_8h}{util.\+h} header file. In the following table the actual measurements are enumerated with corresponding decoding rules and output types. The rules are defined here only for the cases when the special decoding is needed. Otherwise the values should be interpreted exactly as they are defined in \doxylink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3}{witmotion\+\_\+packet\+\_\+id} via direct copy.
+
+Here and below, $ V $ is the {\bfseries{measured}} value obtained from the device, $ D $ -\/ {\bfseries{decoded}} value, de-\/normalized from the sensor output. \tabulinesep=1mm
+\begin{longtabu}spread 0pt [c]{*{4}{|X[-1]}|}
+\hline
+\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Value   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Unit   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Decoding rule   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Output type    }\\\cline{1-4}
+\endfirsthead
+\hline
+\endfoot
+\hline
+\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Value   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Unit   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Decoding rule   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Output type    }\\\cline{1-4}
+\endhead
+Acceleration   &$ m/s^2 $   &$ D = 16\frac{V}{32768} \times 9.81 $   &float    \\\cline{1-4}
+Angular velocity   &$ rad/s $   &$ D = \frac{V}{32768} \times 2000 $   &float    \\\cline{1-4}
+Euler angle   &$ deg $   &$ D = \frac{V}{32768} \times 180 $   &float    \\\cline{1-4}
+Temperature   &$ ^{\circ}C $   &$ D = \frac{V}{100} $   &float    \\\cline{1-4}
+Quaternion component   &&$ D = \frac{V}{32768} $   &float    \\\cline{1-4}
+Altimetry   &$ m $   &$ D = \frac{V}{100} $   &float    \\\cline{1-4}
+GPS coordinate, rough/degrees part   &$ deg $   &$ D = \frac{V}{10^8} $   &double-\/precision float    \\\cline{1-4}
+GPS coordinate, fine/minute part   &$ min $   &$ D = \frac{V \mod 10^7}{10^5} $   &double-\/precision float    \\\cline{1-4}
+GPS altimetry   &$ m $   &$ D = \frac{V}{10} $   &float    \\\cline{1-4}
+GPS angular velocity   &$ rad/s $   &$ D = \frac{V}{10} $   &float    \\\cline{1-4}
+GPS ground speed   &$ m/s $   &$ D = \frac{V}{10^3} $   &double-\/precision float   \\\cline{1-4}
+\end{longtabu}
+
+
+\begin{DoxyNote}{Note}
+Some values like temperature, require different coefficients on different sensors. These values require linear calibration. If you encounter this situation, please do not hesitate to open an \href{https://github.com/ElettraSciComp/witmotion_IMU_QT/issues}{\texttt{ issue}}. 
+\end{DoxyNote}

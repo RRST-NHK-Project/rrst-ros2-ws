@@ -1,0 +1,1 @@
+/usr/bin/c++ -rdynamic "CMakeFiles/wt31n-standalone-decoder.dir/wt31n-standalone-decoder_autogen/mocs_compilation.cpp.o" "CMakeFiles/wt31n-standalone-decoder.dir/examples/wt31n/witmotion-wt31n-uart-test.cpp.o" -o wt31n-standalone-decoder  /usr/lib/x86_64-linux-gnu/libQt5SerialPort.so.5.15.13 /usr/lib/x86_64-linux-gnu/libQt5Core.so.5.15.13 

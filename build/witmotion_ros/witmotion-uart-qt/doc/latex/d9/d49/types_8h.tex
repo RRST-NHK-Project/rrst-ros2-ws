@@ -1,0 +1,245 @@
+\doxysection{types.\+h File Reference}
+\hypertarget{types_8h}{}\label{types_8h}\index{types.h@{types.h}}
+
+
+Abstract types collection for Witmotion sensor library.  
+
+
+{\ttfamily \#include $<$cmath$>$}\newline
+{\ttfamily \#include $<$set$>$}\newline
+{\ttfamily \#include $<$inttypes.\+h$>$}\newline
+{\ttfamily \#include $<$Qt\+Core$>$}\newline
+{\ttfamily \#include $<$QSerial\+Port$>$}\newline
+{\ttfamily \#include "{}witmotion/version.\+h"{}}\newline
+Include dependency graph for types.\+h\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{d2/d1f/types_8h__incl}
+\end{center}
+\end{figure}
+This graph shows which files directly or indirectly include this file\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{dc/d56/types_8h__dep__incl}
+\end{center}
+\end{figure}
+\doxysubsubsection*{Classes}
+\begin{DoxyCompactItemize}
+\item 
+struct \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\+::witmotion\+\_\+datapacket}}
+\begin{DoxyCompactList}\small\item\em Generic structure respresenting the standard 11-\/byte datapacket defined in Witmotion protocol. \end{DoxyCompactList}\item 
+struct \mbox{\hyperlink{structwitmotion_1_1witmotion__config__packet}{witmotion\+::witmotion\+\_\+config\+\_\+packet}}
+\begin{DoxyCompactList}\small\item\em Generic structure respresenting the standard 5-\/byte configuration command defined in Witmotion protocol. \end{DoxyCompactList}\item 
+class \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader}{witmotion\+::\+QAbstract\+Witmotion\+Sensor\+Reader}}
+\begin{DoxyCompactList}\small\item\em Abstract base class to program convenience classes for the sensors. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\doxysubsubsection*{Namespaces}
+\begin{DoxyCompactItemize}
+\item 
+namespace \mbox{\hyperlink{namespacewitmotion}{witmotion}}
+\begin{DoxyCompactList}\small\item\em Main namespace of Witmotion UART connection library. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\doxysubsubsection*{Enumerations}
+\begin{DoxyCompactItemize}
+\item 
+enum \mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3}{witmotion\+::witmotion\+\_\+packet\+\_\+id}} \{ \newline
+\mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a0eec2c5dacef2bfea50757ef63fd2735}{witmotion\+::pid\+RTC}} = 0x50
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3aa55a0844425f2c57978b43ba96f9d14f}{witmotion\+::pid\+Acceleration}} = 0x51
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3afb633ed3118253ba87c8560a203f4f44}{witmotion\+::pid\+Angular\+Velocity}} = 0x52
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a2d5f569560d2a29fee1f179a4c46f143}{witmotion\+::pid\+Angles}} = 0x53
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3aa410e8a4ad06356282c0a7eaa0b7edb3}{witmotion\+::pid\+Magnetometer}} = 0x54
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a854420a4a97ec9a21e338aa236769f11}{witmotion\+::pid\+Data\+Port\+Status}} = 0x55
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a8ca47e826186715b57327ffbd91cada8}{witmotion\+::pid\+Altimeter}} = 0x56
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a7b05a239d11dcb700ddf67f6ea1b90b5}{witmotion\+::pid\+GPSCoordinates}} = 0x57
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a7ecc187fe112b76a5135278dcd6b8bd5}{witmotion\+::pid\+GPSGround\+Speed}} = 0x58
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a791db4f6c4cfa2ca9db09f6dac7c6011}{witmotion\+::pid\+Orientation}} = 0x59
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a24c950fa7ba2faa32301bd4e72716487}{witmotion\+::pid\+GPSAccuracy}} = 0x5A
+ \}
+\begin{DoxyCompactList}\small\item\em Packet type IDs from the vendor-\/defined protocol. \end{DoxyCompactList}\item 
+enum \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3}{witmotion\+::witmotion\+\_\+config\+\_\+register\+\_\+id}} \{ \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a3215288a3e8615b0a2e7357497376599}{witmotion\+::rid\+Save\+Settings}} = 0x00
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab64e4385bdf96a2e49bcf1c173c73b77}{witmotion\+::rid\+Calibrate}} = 0x01
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4}{witmotion\+::rid\+Output\+Value\+Set}} = 0x02
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6b05a7147ce284d6ef2e1ea5fca0dc4b}{witmotion\+::rid\+Output\+Frequency}} = 0x03
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aafbc4c89aee2087c5861bfacfada9890}{witmotion\+::rid\+Port\+Baud\+Rate}} = 0x04
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aaeb88672e563afdddb49835ba4edfe77}{witmotion\+::rid\+Acceleration\+BiasX}} = 0x05
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab2756158adfc87940d20e88f893c76b2}{witmotion\+::rid\+Acceleration\+BiasY}} = 0x06
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa0c369dc8c319ec347e455df3aa17841}{witmotion\+::rid\+Acceleration\+BiasZ}} = 0x07
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a9d6558877f66d098496618b351ff4bcd}{witmotion\+::rid\+Angular\+Velocity\+BiasX}} = 0x08
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a03f8192885870ac4bd2b5f85974cdda9}{witmotion\+::rid\+Angular\+Velocity\+BiasY}} = 0x09
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3afee27b00865d07184c037f11bbef5c2c}{witmotion\+::rid\+Angular\+Velocity\+BiasZ}} = 0x0A
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a2eb9faa753c4adc79364c2a595e67c00}{witmotion\+::rid\+Magnetometer\+BiasX}} = 0x0B
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a5031a10e865baa17a8862672e8c331fc}{witmotion\+::rid\+Magnetometer\+BiasY}} = 0x0C
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ac3ec01a7f731efde639b384694a31ae1}{witmotion\+::rid\+Magnetometer\+BiasZ}} = 0x0D
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ad6b6872cc2b474d57b2198ec898bdf7e}{witmotion\+::rid\+Port\+Mode\+D0}} = 0x0E
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a8df58e95b92f3957a5ae90f973db1e7a}{witmotion\+::rid\+Port\+Mode\+D1}} = 0x0F
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6e04a02620b6fedcb9bca62e6f24edad}{witmotion\+::rid\+Port\+Mode\+D2}} = 0x10
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a7c6e7a8e914dcf903d320ad9cd77a4b8}{witmotion\+::rid\+Port\+Mode\+D3}} = 0x11
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a20aaaca8b65cffe1b02ae5bf5d3f5651}{witmotion\+::rid\+Port\+PWMLevel\+D0}} = 0x12
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a53111db6e031f93344a5db57932e1381}{witmotion\+::rid\+Port\+PWMLevel\+D1}} = 0x13
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3adda87b6ba01b1562e80aa9a7eb6be6ff}{witmotion\+::rid\+Port\+PWMLevel\+D2}} = 0x14
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a0182d7ce399242f31a6f07b08df3e679}{witmotion\+::rid\+Port\+PWMLevel\+D3}} = 0x15
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a84b92f91c231e44aeff92282dc2dabba}{witmotion\+::rid\+Port\+PWMPeriod\+D0}} = 0x16
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a1be747000dc85b55ae66b160151a5350}{witmotion\+::rid\+Port\+PWMPeriod\+D1}} = 0x17
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a73ec16b82c6b5e8b78c57e6c1e031a7a}{witmotion\+::rid\+Port\+PWMPeriod\+D2}} = 0x18
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a298fdc22d7023239c80591435b6968a3}{witmotion\+::rid\+Port\+PWMPeriod\+D3}} = 0x19
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a391ab4478ec408ab553bac43152e9a46}{witmotion\+::rid\+IICAddress}} = 0x1A
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a2e3a09081461e24c7c065f9bd7e51810}{witmotion\+::rid\+LED}} = 0x1B
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a23e1f7b2e0d48ed03f0ce21d7ce8e85b}{witmotion\+::rid\+GPSBaud\+Rate}} = 0x1C
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ac5b2c95e986d8cd87b47f8475c2e3d45}{witmotion\+::rid\+Filter\+Bandwidth}} = 0x1F
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a0c94f5df4e6ba10377b5619238080ff1}{witmotion\+::rid\+Gyroscope\+Range}} = 0x20
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a7a6ad3e464e638d7b8c700176a6198e1}{witmotion\+::rid\+Accelerometer\+Range}} = 0x21
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa0c382b1bbd92e110cf05656fca68846}{witmotion\+::rid\+Standby\+Mode}} = 0x22
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a9e91fab01aac11db869b2c3469197951}{witmotion\+::rid\+Installation\+Direction}} = 0x23
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6ed4aff9ef5db46614283f3137b7a33c}{witmotion\+::rid\+Transition\+Algorithm}} = 0x24
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a3613237d9a04da1a69ab6233bdff6c87}{witmotion\+::rid\+Instruction\+Start}} = 0x2D
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a901d4a2268382df03b1842a23a03b4df}{witmotion\+::rid\+Time\+Year\+Month}} = 0x30
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a0ba92dbc353204d35aec965eae613c96}{witmotion\+::rid\+Time\+Day\+Hour}} = 0x31
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aac4180796c112f8a59c40acff749f705}{witmotion\+::rid\+Time\+Minute\+Second}} = 0x32
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a98c1d3facc2a8a35a0e98af60665466f}{witmotion\+::rid\+Time\+Milliseconds}} = 0x33
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a42a6e8a6f354bcd6b2b778c05d8e9f9f}{witmotion\+::rid\+Set\+AccelerationX}} = 0x34
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3afbd52bd0fe49f0b4291552768d483423}{witmotion\+::rid\+Set\+AccelerationY}} = 0x35
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a7192ad42de7160e89f67385d2a952d29}{witmotion\+::rid\+Set\+AccelerationZ}} = 0x36
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6509ae8041180b68bcd65a225416eb9e}{witmotion\+::rid\+Set\+Angular\+VelocityX}} = 0x37
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a48508295f9f23d01dce584675ec6c9f0}{witmotion\+::rid\+Set\+Angular\+VelocityY}} = 0x38
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a7a1193aab35e38c7cb2d50b1b070c802}{witmotion\+::rid\+Set\+Angular\+VelocityZ}} = 0x39
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a586b93305e288dce9d13924b4e2b7497}{witmotion\+::rid\+Set\+MagnetometerX}} = 0x3A
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a086061ec42a34429d4ecc87426bd16db}{witmotion\+::rid\+Set\+MagnetometerY}} = 0x3B
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a3f7aacc3707d990356df81934205ce7d}{witmotion\+::rid\+Set\+MagnetometerZ}} = 0x3C
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a1e415569387a08b9bf79e77790470763}{witmotion\+::rid\+Set\+Angle\+Roll}} = 0x3D
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aba447e38147a544790c590f9f039eaf6}{witmotion\+::rid\+Set\+Angle\+Pitch}} = 0x3E
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ad6cc9ede4fe5cc3b81076bd3e3ddbb0f}{witmotion\+::rid\+Set\+Angle\+Yaw}} = 0x3F
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a2e2274acd5298a1422864030e2b320ba}{witmotion\+::rid\+Set\+Temperature}} = 0x40
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a4ebad711060439819f73aa07943481c7}{witmotion\+::rid\+Set\+Port\+Status\+D0}} = 0x41
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab8368acbca776c26bf211a60fad166f0}{witmotion\+::rid\+Set\+Port\+Status\+D1}} = 0x42
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a24351f6f11569108042150dd3cd1d7c2}{witmotion\+::rid\+Set\+Port\+Status\+D2}} = 0x43
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa336be9ed7dec9fdf579dae59838f2bb}{witmotion\+::rid\+Set\+Port\+Status\+D3}} = 0x44
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a5179834f2969bb85dbe566aca70e4f72}{witmotion\+::rid\+Set\+Pressure\+Low}} = 0x45
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a4fa41cd61ddd08decf7e373786324fe4}{witmotion\+::rid\+Set\+Pressure\+High}} = 0x46
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a2999f436df440eb4e4a16c04c93de615}{witmotion\+::rid\+Set\+Altitude\+Low}} = 0x47
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a1a93aa388d3de727709b6d34452d0934}{witmotion\+::rid\+Set\+Altitude\+High}} = 0x48
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ae19e9989db5b1b14bfae18fe5ace37fa}{witmotion\+::rid\+Set\+Longitude\+Low}} = 0x49
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a69a1045e79d9ef5870f1f71747d10ae4}{witmotion\+::rid\+Set\+Longitude\+High}} = 0x4A
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aee7f477a2446d716bdca937fc4911959}{witmotion\+::rid\+Set\+Latitude\+Low}} = 0x4B
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a34515bb412a5bd623d77bdf020f9b5e9}{witmotion\+::rid\+Set\+Latitude\+High}} = 0x4C
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a84759181f9ff6bd2a318c9f8b1ed1f39}{witmotion\+::rid\+Set\+GPSAltitude}} = 0x4D
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a549727f96698c8e2e7afbf20b4f286d0}{witmotion\+::rid\+Set\+GPSYaw}} = 0x4E
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa8dc66482e5afdb4831e8602b2e89d58}{witmotion\+::rid\+Set\+GPSGround\+Speed\+Low}} = 0x4F
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa3bc5016e03de006cf633420ac34e25f}{witmotion\+::rid\+Set\+GPSGround\+Speed\+High}} = 0x50
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a77da818475b1904a4e7ef051d14e063d}{witmotion\+::rid\+Set\+OrientationX}} = 0x51
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a49c73008955b9fa89f9b4cba3dd37d9d}{witmotion\+::rid\+Set\+OrientationY}} = 0x52
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a3e1d48defa5dbaea479ee1498cf3db7a}{witmotion\+::rid\+Set\+OrientationZ}} = 0x53
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6b12d4a88aa5b9477ad6acae3af6bb83}{witmotion\+::rid\+Set\+OrientationW}} = 0x54
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a83987c4864f06244dab4f5ef6f12af7f}{witmotion\+::rid\+Gyroscope\+Auto\+Calibrate}} = 0x63
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ae3b36162b2662cc9c637436bca5c8172}{witmotion\+::rid\+Unlock\+Configuration}} = 0x69
+ \}
+\begin{DoxyCompactList}\small\item\em List of configuration slots (registers) available for the library. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\doxysubsubsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+\Hypertarget{namespacewitmotion_a637c861a28f4015a1b57d8bd9ef08cbf}\label{namespacewitmotion_a637c861a28f4015a1b57d8bd9ef08cbf} 
+static const uint8\+\_\+t {\bfseries witmotion\+::\+WITMOTION\+\_\+\+HEADER\+\_\+\+BYTE} = 0x55
+\begin{DoxyCompactList}\small\item\em Packet header byte value (vendor protocol-\/specific) \end{DoxyCompactList}\item 
+\Hypertarget{namespacewitmotion_a856c58401c1ba5c7d8a9f58f31f2b83f}\label{namespacewitmotion_a856c58401c1ba5c7d8a9f58f31f2b83f} 
+static const uint8\+\_\+t {\bfseries witmotion\+::\+WITMOTION\+\_\+\+CONFIG\+\_\+\+HEADER} = 0x\+FF
+\begin{DoxyCompactList}\small\item\em Configuration header byte value (vendor protocol-\/specific) \end{DoxyCompactList}\item 
+\Hypertarget{namespacewitmotion_aac88381210eb4ab56eba64da7ae8c29c}\label{namespacewitmotion_aac88381210eb4ab56eba64da7ae8c29c} 
+static const uint8\+\_\+t {\bfseries witmotion\+::\+WITMOTION\+\_\+\+CONFIG\+\_\+\+KEY} = 0x\+AA
+\begin{DoxyCompactList}\small\item\em Configuration marker key byte value (vendor protocol-\/specific) \end{DoxyCompactList}\item 
+static const std\+::set$<$ size\+\_\+t $>$ \mbox{\hyperlink{namespacewitmotion_a90712081209bb40591c1666a5a5362e5}{witmotion\+::witmotion\+\_\+registered\+\_\+ids}}
+\begin{DoxyCompactList}\small\item\em Packet ID set to retrieve descriptions via \doxylink{namespacewitmotion_a4af000309f5694300ababe3086c486fc}{witmotion\+\_\+packet\+\_\+descriptions}. \end{DoxyCompactList}\item 
+static const std\+::map$<$ uint8\+\_\+t, std\+::string $>$ \mbox{\hyperlink{namespacewitmotion_a4af000309f5694300ababe3086c486fc}{witmotion\+::witmotion\+\_\+packet\+\_\+descriptions}}
+\begin{DoxyCompactList}\small\item\em Packet ID string set to store built-\/in descriptions for message-\/enumerator. \end{DoxyCompactList}\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+\begin{DoxyAuthor}{Author}
+Andrey Vukolov \href{mailto:andrey.vukolov@elettra.eu}{\texttt{ andrey.\+vukolov@elettra.\+eu}}
+\end{DoxyAuthor}
+This header file contains all abstract types and hardware-\/defined constants to operate Witmotion sensor device. 

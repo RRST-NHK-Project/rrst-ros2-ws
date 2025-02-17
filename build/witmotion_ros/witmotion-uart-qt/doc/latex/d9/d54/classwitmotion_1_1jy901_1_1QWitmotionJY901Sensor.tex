@@ -1,0 +1,131 @@
+\doxysection{witmotion\+::jy901\+::QWitmotion\+JY901\+Sensor Class Reference}
+\hypertarget{classwitmotion_1_1jy901_1_1QWitmotionJY901Sensor}{}\label{classwitmotion_1_1jy901_1_1QWitmotionJY901Sensor}\index{witmotion::jy901::QWitmotionJY901Sensor@{witmotion::jy901::QWitmotionJY901Sensor}}
+
+
+Inheritance diagram for witmotion\+::jy901\+::QWitmotion\+JY901\+Sensor\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[height=550pt]{db/d3d/classwitmotion_1_1jy901_1_1QWitmotionJY901Sensor__inherit__graph}
+\end{center}
+\end{figure}
+
+
+Collaboration diagram for witmotion\+::jy901\+::QWitmotion\+JY901\+Sensor\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[height=550pt]{d4/d89/classwitmotion_1_1jy901_1_1QWitmotionJY901Sensor__coll__graph}
+\end{center}
+\end{figure}
+\doxysubsubsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+virtual const std\+::set$<$ \mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3}{witmotion\+\_\+packet\+\_\+id}} $>$ \texorpdfstring{$\ast$}{*} \mbox{\hyperlink{classwitmotion_1_1jy901_1_1QWitmotionJY901Sensor_a44736a504f2277dfcc3d39136b506425}{Registered\+Packet\+Types}} ()
+\item 
+\Hypertarget{classwitmotion_1_1jy901_1_1QWitmotionJY901Sensor_a09e6f964e1e35d9107bcbc6b75b2e268}\label{classwitmotion_1_1jy901_1_1QWitmotionJY901Sensor_a09e6f964e1e35d9107bcbc6b75b2e268} 
+virtual void {\bfseries Set\+Measurements} (const bool realtime\+\_\+clock=false, const bool acceleration=true, const bool angular\+\_\+velocity=true, const bool euler\+\_\+angles=true, const bool magnetometer=true, const bool orientation=false, const bool port\+\_\+status=false, const bool altimeter=true)
+\item 
+\Hypertarget{classwitmotion_1_1jy901_1_1QWitmotionJY901Sensor_a93cfcd42b8c36a044a2fdaad6c892b7c}\label{classwitmotion_1_1jy901_1_1QWitmotionJY901Sensor_a93cfcd42b8c36a044a2fdaad6c892b7c} 
+{\bfseries QWitmotion\+JY901\+Sensor} (const QString device, const QSerial\+Port\+::\+Baud\+Rate rate, const uint32\+\_\+t polling\+\_\+period=50)
+\end{DoxyCompactItemize}
+\doxysubsection*{Public Member Functions inherited from \mbox{\hyperlink{classwitmotion_1_1wt901_1_1QWitmotionWT901Sensor}{witmotion\+::wt901\+::\+QWitmotion\+WT901\+Sensor}}}
+\begin{DoxyCompactItemize}
+\item 
+virtual void \mbox{\hyperlink{classwitmotion_1_1wt901_1_1QWitmotionWT901Sensor_af963be171b13cd4b30979b8f6508c533}{Start}} ()
+\item 
+virtual void {\bfseries Unlock\+Configuration} ()
+\item 
+virtual void \mbox{\hyperlink{classwitmotion_1_1wt901_1_1QWitmotionWT901Sensor_ae73394880cc6516ea8ddc6850e3c1306}{Calibrate}} ()
+\item 
+virtual void {\bfseries Calibrate\+Magnetometer} ()
+\item 
+virtual void \mbox{\hyperlink{classwitmotion_1_1wt901_1_1QWitmotionWT901Sensor_ace17fe8e8e38b18fd3a979aaf86f7f91}{Set\+Baud\+Rate}} (const QSerial\+Port\+::\+Baud\+Rate \&rate)
+\item 
+virtual void {\bfseries Set\+Polling\+Rate} (const int32\+\_\+t hz)
+\item 
+virtual void {\bfseries Set\+Orientation} (const bool vertical=false)
+\item 
+virtual void {\bfseries Toggle\+Dormant} ()
+\item 
+virtual void {\bfseries Set\+Gyroscope\+Auto\+Recalibration} (const bool recalibrate=true)
+\item 
+virtual void {\bfseries Set\+Axis\+Transition} (const bool axis9=true)
+\item 
+virtual void {\bfseries Set\+LED} (const bool on=true)
+\item 
+virtual void {\bfseries Set\+Measurements} (const bool realtime\+\_\+clock=false, const bool acceleration=true, const bool angular\+\_\+velocity=true, const bool euler\+\_\+angles=true, const bool magnetometer=true, const bool orientation=false, const bool port\+\_\+status=false)
+\item 
+virtual void {\bfseries Set\+Acceleration\+Bias} (float x, float y, float z)
+\item 
+virtual void {\bfseries Set\+I2\+CAddress} (const uint8\+\_\+t address)
+\item 
+virtual void {\bfseries Set\+RTC} (const QDate\+Time datetime)
+\item 
+virtual void {\bfseries Confirm\+Configuration} ()
+\item 
+{\bfseries QWitmotion\+WT901\+Sensor} (const QString device, const QSerial\+Port\+::\+Baud\+Rate rate, const uint32\+\_\+t polling\+\_\+period=50)
+\end{DoxyCompactItemize}
+\doxysubsection*{Public Member Functions inherited from \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorController}{witmotion\+::\+QAbstract\+Witmotion\+Sensor\+Controller}}}
+\begin{DoxyCompactItemize}
+\item 
+{\bfseries QAbstract\+Witmotion\+Sensor\+Controller} (const QString tty\+\_\+name, const QSerial\+Port\+::\+Baud\+Rate rate)
+\item 
+void {\bfseries Set\+Validation} (const bool validate)
+\end{DoxyCompactItemize}
+\doxysubsubsection*{Additional Inherited Members}
+\doxysubsection*{Public Slots inherited from \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorController}{witmotion\+::\+QAbstract\+Witmotion\+Sensor\+Controller}}}
+\begin{DoxyCompactItemize}
+\item 
+virtual void {\bfseries Packet} (const \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\+\_\+datapacket}} \&packet)
+\item 
+virtual void {\bfseries Error} (const QString \&description)
+\end{DoxyCompactItemize}
+\doxysubsection*{Signals inherited from \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorController}{witmotion\+::\+QAbstract\+Witmotion\+Sensor\+Controller}}}
+\begin{DoxyCompactItemize}
+\item 
+void {\bfseries Run\+Reader} ()
+\item 
+void {\bfseries Error\+Occurred} (const QString \&description)
+\item 
+void {\bfseries Acquired} (const \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\+\_\+datapacket}} \&packet)
+\item 
+void {\bfseries Send\+Config} (const \mbox{\hyperlink{structwitmotion_1_1witmotion__config__packet}{witmotion\+\_\+config\+\_\+packet}} \&packet)
+\end{DoxyCompactItemize}
+\doxysubsection*{Protected Member Functions inherited from \mbox{\hyperlink{classwitmotion_1_1wt901_1_1QWitmotionWT901Sensor}{witmotion\+::wt901\+::\+QWitmotion\+WT901\+Sensor}}}
+\begin{DoxyCompactItemize}
+\item 
+virtual void {\bfseries Calculate\+Acceleration\+Bias} (\mbox{\hyperlink{structwitmotion_1_1witmotion__config__packet}{witmotion\+\_\+config\+\_\+packet}} \&packet, const float bias)
+\end{DoxyCompactItemize}
+\doxysubsection*{Protected Attributes inherited from \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorController}{witmotion\+::\+QAbstract\+Witmotion\+Sensor\+Controller}}}
+\begin{DoxyCompactItemize}
+\item 
+QString {\bfseries port\+\_\+name}
+\item 
+QSerial\+Port\+::\+Baud\+Rate {\bfseries port\+\_\+rate}
+\item 
+\mbox{\hyperlink{classwitmotion_1_1QBaseSerialWitmotionSensorReader}{QBase\+Serial\+Witmotion\+Sensor\+Reader}} \texorpdfstring{$\ast$}{*} {\bfseries reader}
+\item 
+QText\+Stream {\bfseries ttyout}
+\end{DoxyCompactItemize}
+
+
+\doxysubsection{Member Function Documentation}
+\Hypertarget{classwitmotion_1_1jy901_1_1QWitmotionJY901Sensor_a44736a504f2277dfcc3d39136b506425}\label{classwitmotion_1_1jy901_1_1QWitmotionJY901Sensor_a44736a504f2277dfcc3d39136b506425} 
+\index{witmotion::jy901::QWitmotionJY901Sensor@{witmotion::jy901::QWitmotionJY901Sensor}!RegisteredPacketTypes@{RegisteredPacketTypes}}
+\index{RegisteredPacketTypes@{RegisteredPacketTypes}!witmotion::jy901::QWitmotionJY901Sensor@{witmotion::jy901::QWitmotionJY901Sensor}}
+\doxysubsubsection{\texorpdfstring{RegisteredPacketTypes()}{RegisteredPacketTypes()}}
+{\footnotesize\ttfamily const std\+::set$<$ \mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3}{witmotion\+\_\+packet\+\_\+id}} $>$ \texorpdfstring{$\ast$}{*} witmotion\+::jy901\+::\+QWitmotion\+JY901\+Sensor\+::\+Registered\+Packet\+Types (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [virtual]}}
+
+
+
+Reimplemented from \mbox{\hyperlink{classwitmotion_1_1wt901_1_1QWitmotionWT901Sensor}{witmotion\+::wt901\+::\+QWitmotion\+WT901\+Sensor}}.
+
+
+
+The documentation for this class was generated from the following files\+:\begin{DoxyCompactItemize}
+\item 
+jy901-\/uart.\+h\item 
+jy901-\/uart.\+cpp\end{DoxyCompactItemize}

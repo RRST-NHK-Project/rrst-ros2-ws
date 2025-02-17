@@ -1,0 +1,98 @@
+\doxysection{witmotion\+::QAbstract\+Witmotion\+Sensor\+Reader Class Reference}
+\hypertarget{classwitmotion_1_1QAbstractWitmotionSensorReader}{}\label{classwitmotion_1_1QAbstractWitmotionSensorReader}\index{witmotion::QAbstractWitmotionSensorReader@{witmotion::QAbstractWitmotionSensorReader}}
+
+
+Abstract base class to program convenience classes for the sensors.  
+
+
+
+
+{\ttfamily \#include $<$types.\+h$>$}
+
+
+
+Inheritance diagram for witmotion\+::QAbstract\+Witmotion\+Sensor\+Reader\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[height=550pt]{d1/ddb/classwitmotion_1_1QAbstractWitmotionSensorReader__inherit__graph}
+\end{center}
+\end{figure}
+
+
+Collaboration diagram for witmotion\+::QAbstract\+Witmotion\+Sensor\+Reader\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=245pt]{d3/dc9/classwitmotion_1_1QAbstractWitmotionSensorReader__coll__graph}
+\end{center}
+\end{figure}
+\doxysubsubsection*{Public Slots}
+\begin{DoxyCompactItemize}
+\item 
+virtual void \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader_afee4af791a65ff196f79b01977df3f98}{Send\+Config}} (const \mbox{\hyperlink{structwitmotion_1_1witmotion__config__packet}{witmotion\+\_\+config\+\_\+packet}} \&packet)=0
+\begin{DoxyCompactList}\small\item\em Public abstract slot to be implemented in the derived class. \end{DoxyCompactList}\item 
+virtual void \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader_a01b7550252964d3e01cf3a5e4f6527c0}{Run\+Poll}} ()=0
+\begin{DoxyCompactList}\small\item\em Public abstract slot to be implemented in the derived class. The common use is to start the polling timer thread for the sensors after Qt event loop is started. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\doxysubsubsection*{Signals}
+\begin{DoxyCompactItemize}
+\item 
+\Hypertarget{classwitmotion_1_1QAbstractWitmotionSensorReader_af716461f427c9e7fa37b00a6089fd24e}\label{classwitmotion_1_1QAbstractWitmotionSensorReader_af716461f427c9e7fa37b00a6089fd24e} 
+void {\bfseries Acquired} (const \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\+\_\+datapacket}} \&packet)
+\begin{DoxyCompactList}\small\item\em Signal function to be emitted when the data packet is acquired by the polling thread or process. Can only be redefined, not overridden in the class hierarchy. \end{DoxyCompactList}\item 
+\Hypertarget{classwitmotion_1_1QAbstractWitmotionSensorReader_ae1b6fa6897d0ae605904c5a79219dea5}\label{classwitmotion_1_1QAbstractWitmotionSensorReader_ae1b6fa6897d0ae605904c5a79219dea5} 
+void {\bfseries Error} (const QString \&description)
+\begin{DoxyCompactList}\small\item\em Signal function to be emitted when the internal error reported in the polling thread or process. Can only be redefined, not overridden in the class hierarchy. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\doxysubsubsection*{Protected Slots}
+\begin{DoxyCompactItemize}
+\item 
+virtual void \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader_a26dec3c2e06eb2953bbbc6fe9f826c65}{Read\+Data}} ()=0
+\begin{DoxyCompactList}\small\item\em Protected abstract slot to be implemented in the derived class. The common usage is as a callback for the polling timer thread. \end{DoxyCompactList}\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+This class allows the developer to write handler functions for multithreaded polling timer control, sensor configuration request and data decoding event. It also provides predefined signals to allow the end user to react on actual data acquisition and error occurence events. The common use case for this class is to provide a base interface for the family of sensors supporting the same protocol. Please refer to \doxylink{classwitmotion_1_1QBaseSerialWitmotionSensorReader}{QBase\+Serial\+Witmotion\+Sensor\+Reader} class for actual implementation of the currently supported UART-\/based protocol. 
+
+\doxysubsection{Member Function Documentation}
+\Hypertarget{classwitmotion_1_1QAbstractWitmotionSensorReader_a26dec3c2e06eb2953bbbc6fe9f826c65}\label{classwitmotion_1_1QAbstractWitmotionSensorReader_a26dec3c2e06eb2953bbbc6fe9f826c65} 
+\index{witmotion::QAbstractWitmotionSensorReader@{witmotion::QAbstractWitmotionSensorReader}!ReadData@{ReadData}}
+\index{ReadData@{ReadData}!witmotion::QAbstractWitmotionSensorReader@{witmotion::QAbstractWitmotionSensorReader}}
+\doxysubsubsection{\texorpdfstring{ReadData}{ReadData}}
+{\footnotesize\ttfamily virtual void witmotion\+::\+QAbstract\+Witmotion\+Sensor\+Reader\+::\+Read\+Data (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [protected]}, {\ttfamily [pure virtual]}, {\ttfamily [slot]}}
+
+
+
+Implemented in \mbox{\hyperlink{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a86aeebe95a926a29cbc9c6d6fb3fb9a2}{witmotion\+::\+QBase\+Serial\+Witmotion\+Sensor\+Reader}}.
+
+\Hypertarget{classwitmotion_1_1QAbstractWitmotionSensorReader_a01b7550252964d3e01cf3a5e4f6527c0}\label{classwitmotion_1_1QAbstractWitmotionSensorReader_a01b7550252964d3e01cf3a5e4f6527c0} 
+\index{witmotion::QAbstractWitmotionSensorReader@{witmotion::QAbstractWitmotionSensorReader}!RunPoll@{RunPoll}}
+\index{RunPoll@{RunPoll}!witmotion::QAbstractWitmotionSensorReader@{witmotion::QAbstractWitmotionSensorReader}}
+\doxysubsubsection{\texorpdfstring{RunPoll}{RunPoll}}
+{\footnotesize\ttfamily virtual void witmotion\+::\+QAbstract\+Witmotion\+Sensor\+Reader\+::\+Run\+Poll (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [pure virtual]}, {\ttfamily [slot]}}
+
+
+
+Implemented in \mbox{\hyperlink{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a9af65f5936da60c51148e0668f89e5b7}{witmotion\+::\+QBase\+Serial\+Witmotion\+Sensor\+Reader}}.
+
+\Hypertarget{classwitmotion_1_1QAbstractWitmotionSensorReader_afee4af791a65ff196f79b01977df3f98}\label{classwitmotion_1_1QAbstractWitmotionSensorReader_afee4af791a65ff196f79b01977df3f98} 
+\index{witmotion::QAbstractWitmotionSensorReader@{witmotion::QAbstractWitmotionSensorReader}!SendConfig@{SendConfig}}
+\index{SendConfig@{SendConfig}!witmotion::QAbstractWitmotionSensorReader@{witmotion::QAbstractWitmotionSensorReader}}
+\doxysubsubsection{\texorpdfstring{SendConfig}{SendConfig}}
+{\footnotesize\ttfamily virtual void witmotion\+::\+QAbstract\+Witmotion\+Sensor\+Reader\+::\+Send\+Config (\begin{DoxyParamCaption}\item[{const \mbox{\hyperlink{structwitmotion_1_1witmotion__config__packet}{witmotion\+\_\+config\+\_\+packet}} \&}]{packet }\end{DoxyParamCaption})\hspace{0.3cm}{\ttfamily [pure virtual]}, {\ttfamily [slot]}}
+
+
+\begin{DoxyParams}{Parameters}
+{\em packet} & accepts the \doxylink{structwitmotion_1_1witmotion__config__packet}{witmotion\+\_\+config\+\_\+packet} object for being sent to the sensor configuration registers. \\
+\hline
+\end{DoxyParams}
+
+
+Implemented in \mbox{\hyperlink{classwitmotion_1_1QBaseSerialWitmotionSensorReader_adef9d17620ca9e47ee507f7eaa61b417}{witmotion\+::\+QBase\+Serial\+Witmotion\+Sensor\+Reader}}.
+
+
+
+The documentation for this class was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+\mbox{\hyperlink{types_8h}{types.\+h}}\end{DoxyCompactItemize}

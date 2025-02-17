@@ -1,0 +1,88 @@
+\doxysection{witmotion\+::QAbstract\+Witmotion\+Sensor\+Controller Class Reference}
+\hypertarget{classwitmotion_1_1QAbstractWitmotionSensorController}{}\label{classwitmotion_1_1QAbstractWitmotionSensorController}\index{witmotion::QAbstractWitmotionSensorController@{witmotion::QAbstractWitmotionSensorController}}
+
+
+Inheritance diagram for witmotion\+::QAbstract\+Witmotion\+Sensor\+Controller\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[height=550pt]{d7/d18/classwitmotion_1_1QAbstractWitmotionSensorController__inherit__graph}
+\end{center}
+\end{figure}
+
+
+Collaboration diagram for witmotion\+::QAbstract\+Witmotion\+Sensor\+Controller\+:
+\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=350pt]{d0/d87/classwitmotion_1_1QAbstractWitmotionSensorController__coll__graph}
+\end{center}
+\end{figure}
+\doxysubsubsection*{Public Slots}
+\begin{DoxyCompactItemize}
+\item 
+\Hypertarget{classwitmotion_1_1QAbstractWitmotionSensorController_a34d2cb630ca922da4ca13646f33d6f37}\label{classwitmotion_1_1QAbstractWitmotionSensorController_a34d2cb630ca922da4ca13646f33d6f37} 
+virtual void {\bfseries Packet} (const \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\+\_\+datapacket}} \&packet)
+\item 
+\Hypertarget{classwitmotion_1_1QAbstractWitmotionSensorController_a7b9f2e3022393ff949b7f77bbfe26256}\label{classwitmotion_1_1QAbstractWitmotionSensorController_a7b9f2e3022393ff949b7f77bbfe26256} 
+virtual void {\bfseries Error} (const QString \&description)
+\end{DoxyCompactItemize}
+\doxysubsubsection*{Signals}
+\begin{DoxyCompactItemize}
+\item 
+\Hypertarget{classwitmotion_1_1QAbstractWitmotionSensorController_a3aa2a90c2dd8321739c9fde55da2d534}\label{classwitmotion_1_1QAbstractWitmotionSensorController_a3aa2a90c2dd8321739c9fde55da2d534} 
+void {\bfseries Run\+Reader} ()
+\item 
+\Hypertarget{classwitmotion_1_1QAbstractWitmotionSensorController_a22c32cac6f003ea7b9c6b84f69d4af31}\label{classwitmotion_1_1QAbstractWitmotionSensorController_a22c32cac6f003ea7b9c6b84f69d4af31} 
+void {\bfseries Error\+Occurred} (const QString \&description)
+\item 
+\Hypertarget{classwitmotion_1_1QAbstractWitmotionSensorController_a1de6fc499f3e7967d9b72fb8ab5ba551}\label{classwitmotion_1_1QAbstractWitmotionSensorController_a1de6fc499f3e7967d9b72fb8ab5ba551} 
+void {\bfseries Acquired} (const \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\+\_\+datapacket}} \&packet)
+\item 
+\Hypertarget{classwitmotion_1_1QAbstractWitmotionSensorController_a75e949aaec7260a5d6cf013827d23e08}\label{classwitmotion_1_1QAbstractWitmotionSensorController_a75e949aaec7260a5d6cf013827d23e08} 
+void {\bfseries Send\+Config} (const \mbox{\hyperlink{structwitmotion_1_1witmotion__config__packet}{witmotion\+\_\+config\+\_\+packet}} \&packet)
+\end{DoxyCompactItemize}
+\doxysubsubsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\Hypertarget{classwitmotion_1_1QAbstractWitmotionSensorController_af1ef6cac66fa5e33389527acbd4ce60a}\label{classwitmotion_1_1QAbstractWitmotionSensorController_af1ef6cac66fa5e33389527acbd4ce60a} 
+virtual const std\+::set$<$ \mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3}{witmotion\+\_\+packet\+\_\+id}} $>$ \texorpdfstring{$\ast$}{*} {\bfseries Registered\+Packet\+Types} ()=0
+\item 
+\Hypertarget{classwitmotion_1_1QAbstractWitmotionSensorController_aa8ff11cbd791d0aa2e01117d9f829002}\label{classwitmotion_1_1QAbstractWitmotionSensorController_aa8ff11cbd791d0aa2e01117d9f829002} 
+{\bfseries QAbstract\+Witmotion\+Sensor\+Controller} (const QString tty\+\_\+name, const QSerial\+Port\+::\+Baud\+Rate rate)
+\item 
+\Hypertarget{classwitmotion_1_1QAbstractWitmotionSensorController_ad7c95faca000f11bde730a518e803f45}\label{classwitmotion_1_1QAbstractWitmotionSensorController_ad7c95faca000f11bde730a518e803f45} 
+virtual void {\bfseries Start} ()=0
+\item 
+\Hypertarget{classwitmotion_1_1QAbstractWitmotionSensorController_a16ade0e842fd54e43d944203cddb059a}\label{classwitmotion_1_1QAbstractWitmotionSensorController_a16ade0e842fd54e43d944203cddb059a} 
+virtual void {\bfseries Calibrate} ()=0
+\item 
+\Hypertarget{classwitmotion_1_1QAbstractWitmotionSensorController_a5a2e6ae3afc19a1591bcee8eeb74930f}\label{classwitmotion_1_1QAbstractWitmotionSensorController_a5a2e6ae3afc19a1591bcee8eeb74930f} 
+virtual void {\bfseries Set\+Baud\+Rate} (const QSerial\+Port\+::\+Baud\+Rate \&rate)=0
+\item 
+\Hypertarget{classwitmotion_1_1QAbstractWitmotionSensorController_aa6164d3ccbc0c856c732faa91f5309cc}\label{classwitmotion_1_1QAbstractWitmotionSensorController_aa6164d3ccbc0c856c732faa91f5309cc} 
+void {\bfseries Set\+Validation} (const bool validate)
+\end{DoxyCompactItemize}
+\doxysubsubsection*{Protected Attributes}
+\begin{DoxyCompactItemize}
+\item 
+\Hypertarget{classwitmotion_1_1QAbstractWitmotionSensorController_aff113ad42edb0873ee87d4448abfdc36}\label{classwitmotion_1_1QAbstractWitmotionSensorController_aff113ad42edb0873ee87d4448abfdc36} 
+QString {\bfseries port\+\_\+name}
+\item 
+\Hypertarget{classwitmotion_1_1QAbstractWitmotionSensorController_a49858485b344df819261c475b7e1a429}\label{classwitmotion_1_1QAbstractWitmotionSensorController_a49858485b344df819261c475b7e1a429} 
+QSerial\+Port\+::\+Baud\+Rate {\bfseries port\+\_\+rate}
+\item 
+\Hypertarget{classwitmotion_1_1QAbstractWitmotionSensorController_a8106597d82ba1a1a489a42be4bcee6dd}\label{classwitmotion_1_1QAbstractWitmotionSensorController_a8106597d82ba1a1a489a42be4bcee6dd} 
+\mbox{\hyperlink{classwitmotion_1_1QBaseSerialWitmotionSensorReader}{QBase\+Serial\+Witmotion\+Sensor\+Reader}} \texorpdfstring{$\ast$}{*} {\bfseries reader}
+\item 
+\Hypertarget{classwitmotion_1_1QAbstractWitmotionSensorController_aab819fe79a48b7b1297ed68fd08f9197}\label{classwitmotion_1_1QAbstractWitmotionSensorController_aab819fe79a48b7b1297ed68fd08f9197} 
+QText\+Stream {\bfseries ttyout}
+\end{DoxyCompactItemize}
+
+
+The documentation for this class was generated from the following files\+:\begin{DoxyCompactItemize}
+\item 
+serial.\+h\item 
+serial.\+cpp\end{DoxyCompactItemize}

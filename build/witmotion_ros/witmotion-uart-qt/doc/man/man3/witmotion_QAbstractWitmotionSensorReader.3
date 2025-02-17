@@ -1,0 +1,75 @@
+.TH "witmotion::QAbstractWitmotionSensorReader" 3 "Mon Feb 17 2025 17:07:52" "Version 1.2.28~dev_5c2e86d" "Witmotion IMU Library" \" -*- nroff -*-
+.ad l
+.nh
+.SH NAME
+witmotion::QAbstractWitmotionSensorReader \- Abstract base class to program convenience classes for the sensors\&.  
+
+.SH SYNOPSIS
+.br
+.PP
+.PP
+\fC#include <types\&.h>\fP
+.PP
+Inherits QObject\&.
+.PP
+Inherited by \fBwitmotion::QBaseSerialWitmotionSensorReader\fP\&.
+.SS "Public Slots"
+
+.in +1c
+.ti -1c
+.RI "virtual void \fBSendConfig\fP (const \fBwitmotion_config_packet\fP &packet)=0"
+.br
+.RI "Public abstract slot to be implemented in the derived class\&. "
+.ti -1c
+.RI "virtual void \fBRunPoll\fP ()=0"
+.br
+.RI "Public abstract slot to be implemented in the derived class\&. The common use is to start the polling timer thread for the sensors after Qt event loop is started\&. "
+.in -1c
+.SS "Signals"
+
+.in +1c
+.ti -1c
+.RI "void \fBAcquired\fP (const \fBwitmotion_datapacket\fP &packet)"
+.br
+.RI "Signal function to be emitted when the data packet is acquired by the polling thread or process\&. Can only be redefined, not overridden in the class hierarchy\&. "
+.ti -1c
+.RI "void \fBError\fP (const QString &description)"
+.br
+.RI "Signal function to be emitted when the internal error reported in the polling thread or process\&. Can only be redefined, not overridden in the class hierarchy\&. "
+.in -1c
+.SS "Protected Slots"
+
+.in +1c
+.ti -1c
+.RI "virtual void \fBReadData\fP ()=0"
+.br
+.RI "Protected abstract slot to be implemented in the derived class\&. The common usage is as a callback for the polling timer thread\&. "
+.in -1c
+.SH "Detailed Description"
+.PP 
+This class allows the developer to write handler functions for multithreaded polling timer control, sensor configuration request and data decoding event\&. It also provides predefined signals to allow the end user to react on actual data acquisition and error occurence events\&. The common use case for this class is to provide a base interface for the family of sensors supporting the same protocol\&. Please refer to \fBQBaseSerialWitmotionSensorReader\fP class for actual implementation of the currently supported UART-based protocol\&. 
+.SH "Member Function Documentation"
+.PP 
+.SS "virtual void witmotion::QAbstractWitmotionSensorReader::ReadData ()\fC [protected]\fP, \fC [pure virtual]\fP, \fC [slot]\fP"
+
+.PP
+Implemented in \fBwitmotion::QBaseSerialWitmotionSensorReader\fP\&.
+.SS "virtual void witmotion::QAbstractWitmotionSensorReader::RunPoll ()\fC [pure virtual]\fP, \fC [slot]\fP"
+
+.PP
+Implemented in \fBwitmotion::QBaseSerialWitmotionSensorReader\fP\&.
+.SS "virtual void witmotion::QAbstractWitmotionSensorReader::SendConfig (const \fBwitmotion_config_packet\fP & packet)\fC [pure virtual]\fP, \fC [slot]\fP"
+
+.PP
+\fBParameters\fP
+.RS 4
+\fIpacket\fP accepts the \fBwitmotion_config_packet\fP object for being sent to the sensor configuration registers\&. 
+.RE
+.PP
+
+.PP
+Implemented in \fBwitmotion::QBaseSerialWitmotionSensorReader\fP\&.
+
+.SH "Author"
+.PP 
+Generated automatically by Doxygen for Witmotion IMU Library from the source code\&.

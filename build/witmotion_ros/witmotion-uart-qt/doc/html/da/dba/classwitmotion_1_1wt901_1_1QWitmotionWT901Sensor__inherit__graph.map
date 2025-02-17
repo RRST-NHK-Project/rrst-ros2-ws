@@ -1,0 +1,9 @@
+<map id="witmotion::wt901::QWitmotionWT901Sensor" name="witmotion::wt901::QWitmotionWT901Sensor">
+<area shape="rect" id="Node000001" title=" " alt="" coords="5,496,251,796"/>
+<area shape="rect" id="Node000004" href="$d9/d54/classwitmotion_1_1jy901_1_1QWitmotionJY901Sensor.html" title=" " alt="" coords="23,844,233,964"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="131,810,131,843,125,843,125,810"/>
+<area shape="rect" id="Node000002" href="$d0/d9d/classwitmotion_1_1QAbstractWitmotionSensorController.html" title=" " alt="" coords="18,119,238,448"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="131,462,131,496,125,496,125,462"/>
+<area shape="rect" id="Node000003" title=" " alt="" coords="95,5,161,71"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="131,85,131,119,125,119,125,85"/>
+</map>

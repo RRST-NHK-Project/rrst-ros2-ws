@@ -1,0 +1,939 @@
+\doxysection{witmotion Namespace Reference}
+\hypertarget{namespacewitmotion}{}\label{namespacewitmotion}\index{witmotion@{witmotion}}
+
+
+Main namespace of Witmotion UART connection library.  
+
+
+\doxysubsubsection*{Classes}
+\begin{DoxyCompactItemize}
+\item 
+class \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorController}{QAbstract\+Witmotion\+Sensor\+Controller}}
+\item 
+class \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader}{QAbstract\+Witmotion\+Sensor\+Reader}}
+\begin{DoxyCompactList}\small\item\em Abstract base class to program convenience classes for the sensors. \end{DoxyCompactList}\item 
+class \mbox{\hyperlink{classwitmotion_1_1QBaseSerialWitmotionSensorReader}{QBase\+Serial\+Witmotion\+Sensor\+Reader}}
+\item 
+class \mbox{\hyperlink{classwitmotion_1_1QGeneralSensorController}{QGeneral\+Sensor\+Controller}}
+\item 
+struct \mbox{\hyperlink{structwitmotion_1_1witmotion__config__packet}{witmotion\+\_\+config\+\_\+packet}}
+\begin{DoxyCompactList}\small\item\em Generic structure respresenting the standard 5-\/byte configuration command defined in Witmotion protocol. \end{DoxyCompactList}\item 
+struct \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\+\_\+datapacket}}
+\begin{DoxyCompactList}\small\item\em Generic structure respresenting the standard 11-\/byte datapacket defined in Witmotion protocol. \end{DoxyCompactList}\item 
+class \mbox{\hyperlink{classwitmotion_1_1witmotion__typed__bytecounts}{witmotion\+\_\+typed\+\_\+bytecounts}}
+\item 
+class \mbox{\hyperlink{classwitmotion_1_1witmotion__typed__packets}{witmotion\+\_\+typed\+\_\+packets}}
+\end{DoxyCompactItemize}
+\doxysubsubsection*{Enumerations}
+\begin{DoxyCompactItemize}
+\item 
+enum \mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3}{witmotion\+\_\+packet\+\_\+id}} \{ \newline
+\mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a0eec2c5dacef2bfea50757ef63fd2735}{pid\+RTC}} = 0x50
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3aa55a0844425f2c57978b43ba96f9d14f}{pid\+Acceleration}} = 0x51
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3afb633ed3118253ba87c8560a203f4f44}{pid\+Angular\+Velocity}} = 0x52
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a2d5f569560d2a29fee1f179a4c46f143}{pid\+Angles}} = 0x53
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3aa410e8a4ad06356282c0a7eaa0b7edb3}{pid\+Magnetometer}} = 0x54
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a854420a4a97ec9a21e338aa236769f11}{pid\+Data\+Port\+Status}} = 0x55
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a8ca47e826186715b57327ffbd91cada8}{pid\+Altimeter}} = 0x56
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a7b05a239d11dcb700ddf67f6ea1b90b5}{pid\+GPSCoordinates}} = 0x57
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a7ecc187fe112b76a5135278dcd6b8bd5}{pid\+GPSGround\+Speed}} = 0x58
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a791db4f6c4cfa2ca9db09f6dac7c6011}{pid\+Orientation}} = 0x59
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a24c950fa7ba2faa32301bd4e72716487}{pid\+GPSAccuracy}} = 0x5A
+ \}
+\begin{DoxyCompactList}\small\item\em Packet type IDs from the vendor-\/defined protocol. \end{DoxyCompactList}\item 
+enum \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3}{witmotion\+\_\+config\+\_\+register\+\_\+id}} \{ \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a3215288a3e8615b0a2e7357497376599}{rid\+Save\+Settings}} = 0x00
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab64e4385bdf96a2e49bcf1c173c73b77}{rid\+Calibrate}} = 0x01
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4}{rid\+Output\+Value\+Set}} = 0x02
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6b05a7147ce284d6ef2e1ea5fca0dc4b}{rid\+Output\+Frequency}} = 0x03
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aafbc4c89aee2087c5861bfacfada9890}{rid\+Port\+Baud\+Rate}} = 0x04
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aaeb88672e563afdddb49835ba4edfe77}{rid\+Acceleration\+BiasX}} = 0x05
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab2756158adfc87940d20e88f893c76b2}{rid\+Acceleration\+BiasY}} = 0x06
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa0c369dc8c319ec347e455df3aa17841}{rid\+Acceleration\+BiasZ}} = 0x07
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a9d6558877f66d098496618b351ff4bcd}{rid\+Angular\+Velocity\+BiasX}} = 0x08
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a03f8192885870ac4bd2b5f85974cdda9}{rid\+Angular\+Velocity\+BiasY}} = 0x09
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3afee27b00865d07184c037f11bbef5c2c}{rid\+Angular\+Velocity\+BiasZ}} = 0x0A
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a2eb9faa753c4adc79364c2a595e67c00}{rid\+Magnetometer\+BiasX}} = 0x0B
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a5031a10e865baa17a8862672e8c331fc}{rid\+Magnetometer\+BiasY}} = 0x0C
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ac3ec01a7f731efde639b384694a31ae1}{rid\+Magnetometer\+BiasZ}} = 0x0D
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ad6b6872cc2b474d57b2198ec898bdf7e}{rid\+Port\+Mode\+D0}} = 0x0E
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a8df58e95b92f3957a5ae90f973db1e7a}{rid\+Port\+Mode\+D1}} = 0x0F
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6e04a02620b6fedcb9bca62e6f24edad}{rid\+Port\+Mode\+D2}} = 0x10
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a7c6e7a8e914dcf903d320ad9cd77a4b8}{rid\+Port\+Mode\+D3}} = 0x11
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a20aaaca8b65cffe1b02ae5bf5d3f5651}{rid\+Port\+PWMLevel\+D0}} = 0x12
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a53111db6e031f93344a5db57932e1381}{rid\+Port\+PWMLevel\+D1}} = 0x13
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3adda87b6ba01b1562e80aa9a7eb6be6ff}{rid\+Port\+PWMLevel\+D2}} = 0x14
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a0182d7ce399242f31a6f07b08df3e679}{rid\+Port\+PWMLevel\+D3}} = 0x15
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a84b92f91c231e44aeff92282dc2dabba}{rid\+Port\+PWMPeriod\+D0}} = 0x16
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a1be747000dc85b55ae66b160151a5350}{rid\+Port\+PWMPeriod\+D1}} = 0x17
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a73ec16b82c6b5e8b78c57e6c1e031a7a}{rid\+Port\+PWMPeriod\+D2}} = 0x18
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a298fdc22d7023239c80591435b6968a3}{rid\+Port\+PWMPeriod\+D3}} = 0x19
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a391ab4478ec408ab553bac43152e9a46}{rid\+IICAddress}} = 0x1A
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a2e3a09081461e24c7c065f9bd7e51810}{rid\+LED}} = 0x1B
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a23e1f7b2e0d48ed03f0ce21d7ce8e85b}{rid\+GPSBaud\+Rate}} = 0x1C
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ac5b2c95e986d8cd87b47f8475c2e3d45}{rid\+Filter\+Bandwidth}} = 0x1F
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a0c94f5df4e6ba10377b5619238080ff1}{rid\+Gyroscope\+Range}} = 0x20
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a7a6ad3e464e638d7b8c700176a6198e1}{rid\+Accelerometer\+Range}} = 0x21
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa0c382b1bbd92e110cf05656fca68846}{rid\+Standby\+Mode}} = 0x22
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a9e91fab01aac11db869b2c3469197951}{rid\+Installation\+Direction}} = 0x23
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6ed4aff9ef5db46614283f3137b7a33c}{rid\+Transition\+Algorithm}} = 0x24
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a3613237d9a04da1a69ab6233bdff6c87}{rid\+Instruction\+Start}} = 0x2D
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a901d4a2268382df03b1842a23a03b4df}{rid\+Time\+Year\+Month}} = 0x30
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a0ba92dbc353204d35aec965eae613c96}{rid\+Time\+Day\+Hour}} = 0x31
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aac4180796c112f8a59c40acff749f705}{rid\+Time\+Minute\+Second}} = 0x32
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a98c1d3facc2a8a35a0e98af60665466f}{rid\+Time\+Milliseconds}} = 0x33
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a42a6e8a6f354bcd6b2b778c05d8e9f9f}{rid\+Set\+AccelerationX}} = 0x34
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3afbd52bd0fe49f0b4291552768d483423}{rid\+Set\+AccelerationY}} = 0x35
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a7192ad42de7160e89f67385d2a952d29}{rid\+Set\+AccelerationZ}} = 0x36
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6509ae8041180b68bcd65a225416eb9e}{rid\+Set\+Angular\+VelocityX}} = 0x37
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a48508295f9f23d01dce584675ec6c9f0}{rid\+Set\+Angular\+VelocityY}} = 0x38
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a7a1193aab35e38c7cb2d50b1b070c802}{rid\+Set\+Angular\+VelocityZ}} = 0x39
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a586b93305e288dce9d13924b4e2b7497}{rid\+Set\+MagnetometerX}} = 0x3A
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a086061ec42a34429d4ecc87426bd16db}{rid\+Set\+MagnetometerY}} = 0x3B
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a3f7aacc3707d990356df81934205ce7d}{rid\+Set\+MagnetometerZ}} = 0x3C
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a1e415569387a08b9bf79e77790470763}{rid\+Set\+Angle\+Roll}} = 0x3D
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aba447e38147a544790c590f9f039eaf6}{rid\+Set\+Angle\+Pitch}} = 0x3E
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ad6cc9ede4fe5cc3b81076bd3e3ddbb0f}{rid\+Set\+Angle\+Yaw}} = 0x3F
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a2e2274acd5298a1422864030e2b320ba}{rid\+Set\+Temperature}} = 0x40
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a4ebad711060439819f73aa07943481c7}{rid\+Set\+Port\+Status\+D0}} = 0x41
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab8368acbca776c26bf211a60fad166f0}{rid\+Set\+Port\+Status\+D1}} = 0x42
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a24351f6f11569108042150dd3cd1d7c2}{rid\+Set\+Port\+Status\+D2}} = 0x43
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa336be9ed7dec9fdf579dae59838f2bb}{rid\+Set\+Port\+Status\+D3}} = 0x44
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a5179834f2969bb85dbe566aca70e4f72}{rid\+Set\+Pressure\+Low}} = 0x45
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a4fa41cd61ddd08decf7e373786324fe4}{rid\+Set\+Pressure\+High}} = 0x46
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a2999f436df440eb4e4a16c04c93de615}{rid\+Set\+Altitude\+Low}} = 0x47
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a1a93aa388d3de727709b6d34452d0934}{rid\+Set\+Altitude\+High}} = 0x48
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ae19e9989db5b1b14bfae18fe5ace37fa}{rid\+Set\+Longitude\+Low}} = 0x49
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a69a1045e79d9ef5870f1f71747d10ae4}{rid\+Set\+Longitude\+High}} = 0x4A
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aee7f477a2446d716bdca937fc4911959}{rid\+Set\+Latitude\+Low}} = 0x4B
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a34515bb412a5bd623d77bdf020f9b5e9}{rid\+Set\+Latitude\+High}} = 0x4C
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a84759181f9ff6bd2a318c9f8b1ed1f39}{rid\+Set\+GPSAltitude}} = 0x4D
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a549727f96698c8e2e7afbf20b4f286d0}{rid\+Set\+GPSYaw}} = 0x4E
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa8dc66482e5afdb4831e8602b2e89d58}{rid\+Set\+GPSGround\+Speed\+Low}} = 0x4F
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa3bc5016e03de006cf633420ac34e25f}{rid\+Set\+GPSGround\+Speed\+High}} = 0x50
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a77da818475b1904a4e7ef051d14e063d}{rid\+Set\+OrientationX}} = 0x51
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a49c73008955b9fa89f9b4cba3dd37d9d}{rid\+Set\+OrientationY}} = 0x52
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a3e1d48defa5dbaea479ee1498cf3db7a}{rid\+Set\+OrientationZ}} = 0x53
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6b12d4a88aa5b9477ad6acae3af6bb83}{rid\+Set\+OrientationW}} = 0x54
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a83987c4864f06244dab4f5ef6f12af7f}{rid\+Gyroscope\+Auto\+Calibrate}} = 0x63
+, \newline
+\mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ae3b36162b2662cc9c637436bca5c8172}{rid\+Unlock\+Configuration}} = 0x69
+ \}
+\begin{DoxyCompactList}\small\item\em List of configuration slots (registers) available for the library. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\doxysubsubsection*{Functions}
+\begin{DoxyCompactItemize}
+\item 
+uint8\+\_\+t \mbox{\hyperlink{namespacewitmotion_a90e09a9e4f3d24ab522bee3aa9bf9c78}{witmotion\+\_\+output\+\_\+frequency}} (const int hertz)
+\begin{DoxyCompactList}\small\item\em Converts the frequency value in Hertz to subsequent Witmotion opcode. \end{DoxyCompactList}\item 
+\Hypertarget{namespacewitmotion_aa64033cd618824f00115327e69a3bb42}\label{namespacewitmotion_aa64033cd618824f00115327e69a3bb42} 
+uint8\+\_\+t {\bfseries witmotion\+\_\+baud\+\_\+rate} (const QSerial\+Port\+::\+Baud\+Rate rate)
+\item 
+\Hypertarget{namespacewitmotion_ab49e6a9a3a0c6ab04e93d5ffd517005c}\label{namespacewitmotion_ab49e6a9a3a0c6ab04e93d5ffd517005c} 
+bool {\bfseries id\+\_\+registered} (const size\+\_\+t id)
+\item 
+\Hypertarget{namespacewitmotion_a666ad852d53d7cc42a332d54cff41ff7}\label{namespacewitmotion_a666ad852d53d7cc42a332d54cff41ff7} 
+float {\bfseries decode\+\_\+acceleration} (const int16\+\_\+t \texorpdfstring{$\ast$}{*}value)
+\item 
+\Hypertarget{namespacewitmotion_aba5de5fce4ee440af8596639a843f540}\label{namespacewitmotion_aba5de5fce4ee440af8596639a843f540} 
+float {\bfseries decode\+\_\+angular\+\_\+velocity} (const int16\+\_\+t \texorpdfstring{$\ast$}{*}value)
+\item 
+\Hypertarget{namespacewitmotion_aa4788214273089341e8508b3acc96f02}\label{namespacewitmotion_aa4788214273089341e8508b3acc96f02} 
+float {\bfseries decode\+\_\+angle} (const int16\+\_\+t \texorpdfstring{$\ast$}{*}value)
+\item 
+\Hypertarget{namespacewitmotion_a65158c64d105f591caf303aac84887e6}\label{namespacewitmotion_a65158c64d105f591caf303aac84887e6} 
+float {\bfseries decode\+\_\+temperature} (const int16\+\_\+t \texorpdfstring{$\ast$}{*}value)
+\item 
+\Hypertarget{namespacewitmotion_a3841341d7a1ffeb9f081c7311c91b23f}\label{namespacewitmotion_a3841341d7a1ffeb9f081c7311c91b23f} 
+float {\bfseries decode\+\_\+orientation} (const int16\+\_\+t \texorpdfstring{$\ast$}{*}value)
+\item 
+\Hypertarget{namespacewitmotion_a15e81f1bfa1dd0dfe8a72b42483571df}\label{namespacewitmotion_a15e81f1bfa1dd0dfe8a72b42483571df} 
+void {\bfseries decode\+\_\+gps\+\_\+coord} (const int32\+\_\+t \texorpdfstring{$\ast$}{*}value, double \&deg, double \&min)
+\item 
+\Hypertarget{namespacewitmotion_a67f1c192cda738463176a2135200879d}\label{namespacewitmotion_a67f1c192cda738463176a2135200879d} 
+void {\bfseries decode\+\_\+realtime\+\_\+clock} (const \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\+\_\+datapacket}} \&packet, uint8\+\_\+t \&year, uint8\+\_\+t \&month, uint8\+\_\+t \&day, uint8\+\_\+t \&hour, uint8\+\_\+t \&minute, uint8\+\_\+t \&second, uint16\+\_\+t \&millisecond)
+\item 
+\Hypertarget{namespacewitmotion_aecdd27c98285af74d20acf3a4d989c5d}\label{namespacewitmotion_aecdd27c98285af74d20acf3a4d989c5d} 
+void {\bfseries decode\+\_\+accelerations} (const \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\+\_\+datapacket}} \&packet, float \&x, float \&y, float \&z, float \&t)
+\item 
+\Hypertarget{namespacewitmotion_adb29dabdb732ed9cade687c3b0a9db65}\label{namespacewitmotion_adb29dabdb732ed9cade687c3b0a9db65} 
+void {\bfseries decode\+\_\+angular\+\_\+velocities} (const \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\+\_\+datapacket}} \&packet, float \&x, float \&y, float \&z, float \&t)
+\item 
+\Hypertarget{namespacewitmotion_a3c753fafaa1b6feb5a48a0dbd12d43e4}\label{namespacewitmotion_a3c753fafaa1b6feb5a48a0dbd12d43e4} 
+void {\bfseries decode\+\_\+angles} (const \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\+\_\+datapacket}} \&packet, float \&roll, float \&pitch, float \&yaw, float \&t)
+\item 
+\Hypertarget{namespacewitmotion_ac9287cb7b3c16632922fc3390a1befc8}\label{namespacewitmotion_ac9287cb7b3c16632922fc3390a1befc8} 
+void {\bfseries decode\+\_\+magnetometer} (const \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\+\_\+datapacket}} \&packet, float \&x, float \&y, float \&z, float \&t)
+\item 
+\Hypertarget{namespacewitmotion_a738acdf141b364f2e4bce20435889856}\label{namespacewitmotion_a738acdf141b364f2e4bce20435889856} 
+void {\bfseries decode\+\_\+altimeter} (const \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\+\_\+datapacket}} \&packet, double \&pressure, double \&height)
+\item 
+\Hypertarget{namespacewitmotion_a47096e9de8adfbc1db77fd2e65178c5d}\label{namespacewitmotion_a47096e9de8adfbc1db77fd2e65178c5d} 
+void {\bfseries decode\+\_\+gps} (const \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\+\_\+datapacket}} \&packet, double \&longitude\+\_\+deg, double \&longitude\+\_\+min, double \&latitude\+\_\+deg, double \&latitude\+\_\+min)
+\item 
+\Hypertarget{namespacewitmotion_a957344bbd681032d58ef0b89366576f4}\label{namespacewitmotion_a957344bbd681032d58ef0b89366576f4} 
+void {\bfseries decode\+\_\+gps\+\_\+ground\+\_\+speed} (const \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\+\_\+datapacket}} \&packet, float \&altitude, float \&angular\+\_\+velocity, double \&ground\+\_\+speed)
+\item 
+\Hypertarget{namespacewitmotion_a8bd1944b9577dda0aed4ee7b0d1e39cb}\label{namespacewitmotion_a8bd1944b9577dda0aed4ee7b0d1e39cb} 
+void {\bfseries decode\+\_\+orientation} (const \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\+\_\+datapacket}} \&packet, float \&x, float \&y, float \&z, float \&w)
+\item 
+\Hypertarget{namespacewitmotion_a4be797c32dcd7ad4344bba8c554c185d}\label{namespacewitmotion_a4be797c32dcd7ad4344bba8c554c185d} 
+void {\bfseries decode\+\_\+gps\+\_\+accuracy} (const \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\+\_\+datapacket}} \&packet, size\+\_\+t \&satellites, float \&local\+\_\+accuracy, float \&horizontal\+\_\+accuracy, float \&vertical\+\_\+accuracy)
+\item 
+\Hypertarget{namespacewitmotion_aed55238d28a5db79d2c64c3f34428a02}\label{namespacewitmotion_aed55238d28a5db79d2c64c3f34428a02} 
+{\footnotesize template$<$typename T $>$ }\\T {\bfseries variance} (const std\+::vector$<$ T $>$ \&array)
+\item 
+\Hypertarget{namespacewitmotion_ae8283612f260b655a2f22b0935964cfb}\label{namespacewitmotion_ae8283612f260b655a2f22b0935964cfb} 
+static const std\+::string {\bfseries library\+\_\+version} ()
+\end{DoxyCompactItemize}
+\doxysubsubsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+\Hypertarget{namespacewitmotion_a637c861a28f4015a1b57d8bd9ef08cbf}\label{namespacewitmotion_a637c861a28f4015a1b57d8bd9ef08cbf} 
+static const uint8\+\_\+t {\bfseries WITMOTION\+\_\+\+HEADER\+\_\+\+BYTE} = 0x55
+\begin{DoxyCompactList}\small\item\em Packet header byte value (vendor protocol-\/specific) \end{DoxyCompactList}\item 
+\Hypertarget{namespacewitmotion_a856c58401c1ba5c7d8a9f58f31f2b83f}\label{namespacewitmotion_a856c58401c1ba5c7d8a9f58f31f2b83f} 
+static const uint8\+\_\+t {\bfseries WITMOTION\+\_\+\+CONFIG\+\_\+\+HEADER} = 0x\+FF
+\begin{DoxyCompactList}\small\item\em Configuration header byte value (vendor protocol-\/specific) \end{DoxyCompactList}\item 
+\Hypertarget{namespacewitmotion_aac88381210eb4ab56eba64da7ae8c29c}\label{namespacewitmotion_aac88381210eb4ab56eba64da7ae8c29c} 
+static const uint8\+\_\+t {\bfseries WITMOTION\+\_\+\+CONFIG\+\_\+\+KEY} = 0x\+AA
+\begin{DoxyCompactList}\small\item\em Configuration marker key byte value (vendor protocol-\/specific) \end{DoxyCompactList}\item 
+static const std\+::set$<$ size\+\_\+t $>$ \mbox{\hyperlink{namespacewitmotion_a90712081209bb40591c1666a5a5362e5}{witmotion\+\_\+registered\+\_\+ids}}
+\begin{DoxyCompactList}\small\item\em Packet ID set to retrieve descriptions via \doxylink{namespacewitmotion_a4af000309f5694300ababe3086c486fc}{witmotion\+\_\+packet\+\_\+descriptions}. \end{DoxyCompactList}\item 
+static const std\+::map$<$ uint8\+\_\+t, std\+::string $>$ \mbox{\hyperlink{namespacewitmotion_a4af000309f5694300ababe3086c486fc}{witmotion\+\_\+packet\+\_\+descriptions}}
+\begin{DoxyCompactList}\small\item\em Packet ID string set to store built-\/in descriptions for message-\/enumerator. \end{DoxyCompactList}\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+Upper level namespace containing all the declared constants, parameters, classes, functions.
+
+\begin{DoxyNote}{Note}
+It is strictly NOT RECOMMENDED to use this namespace implicitly through {\ttfamily using namespace} directive. 
+\end{DoxyNote}
+
+
+\doxysubsection{Enumeration Type Documentation}
+\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3} 
+\index{witmotion@{witmotion}!witmotion\_config\_register\_id@{witmotion\_config\_register\_id}}
+\index{witmotion\_config\_register\_id@{witmotion\_config\_register\_id}!witmotion@{witmotion}}
+\doxysubsubsection{\texorpdfstring{witmotion\_config\_register\_id}{witmotion\_config\_register\_id}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3}{witmotion\+::witmotion\+\_\+config\+\_\+register\+\_\+id}}}
+
+List of configuration slots (registers) available for the library. The actual availability depends from the actual sensor and installation circuit. Please refer to the official documentation for detailed explanation. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSaveSettings@{ridSaveSettings}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSaveSettings@{ridSaveSettings}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a3215288a3e8615b0a2e7357497376599}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a3215288a3e8615b0a2e7357497376599} 
+rid\+Save\+Settings&Saves the settings uploaded in the current bringup session, or resets it to default (if supported). To make factory reset of the sensor, set {\ttfamily raw\mbox{[}0\mbox{]} = 0x01} in \doxylink{structwitmotion_1_1witmotion__config__packet}{witmotion\+\_\+config\+\_\+packet} instance used. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridCalibrate@{ridCalibrate}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridCalibrate@{ridCalibrate}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab64e4385bdf96a2e49bcf1c173c73b77}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab64e4385bdf96a2e49bcf1c173c73b77} 
+rid\+Calibrate&Sets the sensor to calibration mode. The value stored in \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}0\mbox{]}\`{} determines device selection\+:
+\begin{DoxyItemize}
+\item {\ttfamily 0x00} -\/ End calibration
+\item {\ttfamily 0x01} -\/ Accelerometer calibration
+\item {\ttfamily 0x03} -\/ Altitude reset (only for barometric altimeter)
+\item {\ttfamily 0x04} -\/ Yaw \mbox{[}Z\mbox{]} Euler angle origin point reset
+\item {\ttfamily 0x07} -\/ Magnetometer calibration
+\item {\ttfamily 0x08} -\/ Angle reference reset 
+\end{DoxyItemize}\\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridOutputValueSet@{ridOutputValueSet}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridOutputValueSet@{ridOutputValueSet}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4} 
+rid\+Output\+Value\+Set&Regulates sensor output. The value stored in \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\`{} determines packet ID selection to output from low to high bits by offset. {\ttfamily 0} means disabling of the selected data packet output.
+
+\tabulinesep=1mm
+\begin{longtabu}spread 0pt [c]{*{4}{|X[-1]}|}
+\hline
+\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ {\ttfamily raw\mbox{[}0\mbox{]}} offset   }&\PBS\raggedleft \cellcolor{\tableheadbgcolor}\textbf{ Packet type   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ {\ttfamily raw\mbox{[}1\mbox{]}} offset   }&\PBS\raggedleft \cellcolor{\tableheadbgcolor}\textbf{ Packet type    }\\\cline{1-4}
+\endfirsthead
+\hline
+\endfoot
+\hline
+\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ {\ttfamily raw\mbox{[}0\mbox{]}} offset   }&\PBS\raggedleft \cellcolor{\tableheadbgcolor}\textbf{ Packet type   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ {\ttfamily raw\mbox{[}1\mbox{]}} offset   }&\PBS\raggedleft \cellcolor{\tableheadbgcolor}\textbf{ Packet type    }\\\cline{1-4}
+\endhead
+\PBS\centering 0   &\PBS\raggedleft \doxylink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a0eec2c5dacef2bfea50757ef63fd2735}{pid\+RTC}   &\PBS\centering 0   &\PBS\raggedleft \doxylink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a7ecc187fe112b76a5135278dcd6b8bd5}{pid\+GPSGround\+Speed}    \\\cline{1-4}
+\PBS\centering 1   &\PBS\raggedleft \doxylink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3aa55a0844425f2c57978b43ba96f9d14f}{pid\+Acceleration}   &\PBS\centering 1   &\PBS\raggedleft \doxylink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a791db4f6c4cfa2ca9db09f6dac7c6011}{pid\+Orientation}    \\\cline{1-4}
+\PBS\centering 2   &\PBS\raggedleft \doxylink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3afb633ed3118253ba87c8560a203f4f44}{pid\+Angular\+Velocity}   &\PBS\centering 2   &\PBS\raggedleft \doxylink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a24c950fa7ba2faa32301bd4e72716487}{pid\+GPSAccuracy}    \\\cline{1-4}
+\PBS\centering 3   &\PBS\raggedleft \doxylink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a2d5f569560d2a29fee1f179a4c46f143}{pid\+Angles}   &\PBS\centering 3   &\PBS\raggedleft Reserved    \\\cline{1-4}
+\PBS\centering 4   &\PBS\raggedleft \doxylink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3aa410e8a4ad06356282c0a7eaa0b7edb3}{pid\+Magnetometer}   &\PBS\centering 4   &\PBS\raggedleft Reserved    \\\cline{1-4}
+\PBS\centering 5   &\PBS\raggedleft \doxylink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a854420a4a97ec9a21e338aa236769f11}{pid\+Data\+Port\+Status}   &\PBS\centering 5   &\PBS\raggedleft Reserved    \\\cline{1-4}
+\PBS\centering 6   &\PBS\raggedleft \doxylink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a8ca47e826186715b57327ffbd91cada8}{pid\+Altimeter}   &\PBS\centering 6   &\PBS\raggedleft Reserved    \\\cline{1-4}
+\PBS\centering 7   &\PBS\raggedleft \doxylink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a7b05a239d11dcb700ddf67f6ea1b90b5}{pid\+GPSCoordinates}   &\PBS\centering 7   &\PBS\raggedleft Reserved   \\\cline{1-4}
+\end{longtabu}
+\\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridOutputFrequency@{ridOutputFrequency}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridOutputFrequency@{ridOutputFrequency}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6b05a7147ce284d6ef2e1ea5fca0dc4b}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6b05a7147ce284d6ef2e1ea5fca0dc4b} 
+rid\+Output\+Frequency&Regulates output frequency. {\bfseries{NOTE}}\+: the maximum available frequency is determined internally by the available bandwidth obtained from \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aafbc4c89aee2087c5861bfacfada9890}{rid\+Port\+Baud\+Rate}. The actual value stored in \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}0\mbox{]}\`{} can be determined from the following table. \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}1\mbox{]}\`{} is set to {\ttfamily 0x00}. Also the table contains argument value for \doxylink{namespacewitmotion_a90e09a9e4f3d24ab522bee3aa9bf9c78}{witmotion\+\_\+output\+\_\+frequency} helper function which is used by the controller applications.
+
+\tabulinesep=1mm
+\begin{longtabu}spread 0pt [c]{*{3}{|X[-1]}|}
+\hline
+\cellcolor{\tableheadbgcolor}\textbf{ Frequency, Hz   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Value   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Argument    }\\\cline{1-3}
+\endfirsthead
+\hline
+\endfoot
+\hline
+\cellcolor{\tableheadbgcolor}\textbf{ Frequency, Hz   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Value   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Argument    }\\\cline{1-3}
+\endhead
+0 (shutdown)   &\PBS\centering {\ttfamily 0x0D}   &\PBS\centering 0    \\\cline{1-3}
+0 (single measurement)   &\PBS\centering {\ttfamily 0x0C}   &\PBS\centering -\/1    \\\cline{1-3}
+0.\+1   &\PBS\centering {\ttfamily 0x01}   &\PBS\centering -\/10    \\\cline{1-3}
+0.\+5   &\PBS\centering {\ttfamily 0x02}   &\PBS\centering -\/2    \\\cline{1-3}
+1   &\PBS\centering {\ttfamily 0x03}   &\PBS\centering 1    \\\cline{1-3}
+2   &\PBS\centering {\ttfamily 0x04}   &\PBS\centering 2    \\\cline{1-3}
+5   &\PBS\centering {\ttfamily 0x05}   &\PBS\centering 5    \\\cline{1-3}
+10 (default)   &\PBS\centering {\ttfamily 0x06}   &\PBS\centering 10    \\\cline{1-3}
+20   &\PBS\centering {\ttfamily 0x07}   &\PBS\centering 20    \\\cline{1-3}
+50   &\PBS\centering {\ttfamily 0x08}   &\PBS\centering 50    \\\cline{1-3}
+100   &\PBS\centering {\ttfamily 0x09}   &\PBS\centering 100    \\\cline{1-3}
+125   &\PBS\centering {\ttfamily 0x0A}   &\PBS\centering 125    \\\cline{1-3}
+200   &\PBS\centering {\ttfamily 0x0B}   &\PBS\centering 200    \\\cline{1-3}
+Maximal available by hardware   &\PBS\centering {\ttfamily 0x0C}   &\PBS\centering Not supported   \\\cline{1-3}
+\end{longtabu}
+\\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridPortBaudRate@{ridPortBaudRate}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridPortBaudRate@{ridPortBaudRate}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aafbc4c89aee2087c5861bfacfada9890}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aafbc4c89aee2087c5861bfacfada9890} 
+rid\+Port\+Baud\+Rate&Regulates port baud rate. {\bfseries{NOTE}}\+: the sensor has no possibility of hardware flow control and it cannot report to the system what baud rate should be explicitly used! The actual value stored in \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}0\mbox{]}\`{} can be determined from the following table. \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}1\mbox{]}\`{} is set to {\ttfamily 0x00}. The witmotion\+\_\+baud\+\_\+rate helper function argument is accepted as {\ttfamily QSerial\+Port\+::\+Baud\+Rate} enumeration member, so only the speed inticated in that enumeration are explicitly supported. \tabulinesep=1mm
+\begin{longtabu}spread 0pt [c]{*{8}{|X[-1]}|}
+\hline
+\cellcolor{\tableheadbgcolor}\textbf{ {\bfseries{Rate, baud}}   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 1200/1400   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 4800   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 9600   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 19200   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 38400   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 57600   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 115200    }\\\cline{1-8}
+\endfirsthead
+\hline
+\endfoot
+\hline
+\cellcolor{\tableheadbgcolor}\textbf{ {\bfseries{Rate, baud}}   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 1200/1400   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 4800   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 9600   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 19200   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 38400   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 57600   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 115200    }\\\cline{1-8}
+\endhead
+{\bfseries{Value}}   &\PBS\centering {\ttfamily 0x00}   &\PBS\centering {\ttfamily 0x01}   &\PBS\centering {\ttfamily 0x02}   &\PBS\centering {\ttfamily 0x03}   &\PBS\centering {\ttfamily 0x04}   &\PBS\centering {\ttfamily 0x05}   &\PBS\centering {\ttfamily 0x06}   \\\cline{1-8}
+\end{longtabu}
+
+
+This parameter also implicitly sets \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6b05a7147ce284d6ef2e1ea5fca0dc4b}{rid\+Output\+Frequency} to the maximal feasible value for the available bandwidth. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridAccelerationBiasX@{ridAccelerationBiasX}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridAccelerationBiasX@{ridAccelerationBiasX}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aaeb88672e563afdddb49835ba4edfe77}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aaeb88672e563afdddb49835ba4edfe77} 
+rid\+Acceleration\+BiasX&Sets acceleration zero point bias for X axis, refer to \doxysectlink{acceleration-bias}{Acceleration bias calculation}{0} page for explanation. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridAccelerationBiasY@{ridAccelerationBiasY}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridAccelerationBiasY@{ridAccelerationBiasY}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab2756158adfc87940d20e88f893c76b2}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab2756158adfc87940d20e88f893c76b2} 
+rid\+Acceleration\+BiasY&Sets acceleration zero point bias for Y axis, refer to \doxysectlink{acceleration-bias}{Acceleration bias calculation}{0} page for explanation. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridAccelerationBiasZ@{ridAccelerationBiasZ}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridAccelerationBiasZ@{ridAccelerationBiasZ}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa0c369dc8c319ec347e455df3aa17841}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa0c369dc8c319ec347e455df3aa17841} 
+rid\+Acceleration\+BiasZ&Sets acceleration zero point bias for Z axis, refer to \doxysectlink{acceleration-bias}{Acceleration bias calculation}{0} page for explanation. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridAngularVelocityBiasX@{ridAngularVelocityBiasX}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridAngularVelocityBiasX@{ridAngularVelocityBiasX}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a9d6558877f66d098496618b351ff4bcd}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a9d6558877f66d098496618b351ff4bcd} 
+rid\+Angular\+Velocity\+BiasX&Sets angular velocity zero point bias for X axis. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridAngularVelocityBiasY@{ridAngularVelocityBiasY}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridAngularVelocityBiasY@{ridAngularVelocityBiasY}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a03f8192885870ac4bd2b5f85974cdda9}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a03f8192885870ac4bd2b5f85974cdda9} 
+rid\+Angular\+Velocity\+BiasY&Sets angular velocity zero point bias for Y axis. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridAngularVelocityBiasZ@{ridAngularVelocityBiasZ}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridAngularVelocityBiasZ@{ridAngularVelocityBiasZ}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3afee27b00865d07184c037f11bbef5c2c}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3afee27b00865d07184c037f11bbef5c2c} 
+rid\+Angular\+Velocity\+BiasZ&Sets angular velocity zero point bias for Z axis. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridMagnetometerBiasX@{ridMagnetometerBiasX}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridMagnetometerBiasX@{ridMagnetometerBiasX}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a2eb9faa753c4adc79364c2a595e67c00}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a2eb9faa753c4adc79364c2a595e67c00} 
+rid\+Magnetometer\+BiasX&Sets magnetometer zero point bias for X axis. {\bfseries{MAY BLOCK THE MEASUREMENTS}} \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridMagnetometerBiasY@{ridMagnetometerBiasY}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridMagnetometerBiasY@{ridMagnetometerBiasY}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a5031a10e865baa17a8862672e8c331fc}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a5031a10e865baa17a8862672e8c331fc} 
+rid\+Magnetometer\+BiasY&Sets magnetometer zero point bias for Y axis. {\bfseries{MAY BLOCK THE MEASUREMENTS}} \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridMagnetometerBiasZ@{ridMagnetometerBiasZ}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridMagnetometerBiasZ@{ridMagnetometerBiasZ}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ac3ec01a7f731efde639b384694a31ae1}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ac3ec01a7f731efde639b384694a31ae1} 
+rid\+Magnetometer\+BiasZ&Sets magnetometer zero point bias for Z axis. {\bfseries{MAY BLOCK THE MEASUREMENTS}} \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridPortModeD0@{ridPortModeD0}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridPortModeD0@{ridPortModeD0}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ad6b6872cc2b474d57b2198ec898bdf7e}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ad6b6872cc2b474d57b2198ec898bdf7e} 
+rid\+Port\+Mode\+D0&Digital port D0 mode. The values are set only via \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}0\mbox{]}\`{} whilst \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}1\mbox{]}\`{} is set to 0. Please refer to the following table to determine the exact value needed.
+
+\tabulinesep=1mm
+\begin{longtabu}spread 0pt [c]{*{6}{|X[-1]}|}
+\hline
+\cellcolor{\tableheadbgcolor}\textbf{ {\bfseries{Description}}   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Analog input (default)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital input   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital output (high)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital output (low)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ PWM output    }\\\cline{1-6}
+\endfirsthead
+\hline
+\endfoot
+\hline
+\cellcolor{\tableheadbgcolor}\textbf{ {\bfseries{Description}}   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Analog input (default)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital input   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital output (high)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital output (low)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ PWM output    }\\\cline{1-6}
+\endhead
+{\bfseries{Value}}   &\PBS\centering {\ttfamily 0x00}   &\PBS\centering {\ttfamily 0x01}   &\PBS\centering {\ttfamily 0x02}   &\PBS\centering {\ttfamily 0x03}   &\PBS\centering {\ttfamily 0x04}   \\\cline{1-6}
+\end{longtabu}
+\\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridPortModeD1@{ridPortModeD1}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridPortModeD1@{ridPortModeD1}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a8df58e95b92f3957a5ae90f973db1e7a}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a8df58e95b92f3957a5ae90f973db1e7a} 
+rid\+Port\+Mode\+D1&Digital port D1 mode. The values are set only via \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}0\mbox{]}\`{} whilst \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}1\mbox{]}\`{} is set to 0. Please refer to the following table to determine the exact value needed.
+
+\tabulinesep=1mm
+\begin{longtabu}spread 0pt [c]{*{6}{|X[-1]}|}
+\hline
+\cellcolor{\tableheadbgcolor}\textbf{ {\bfseries{Description}}   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Analog input (default)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital input   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital output (high)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital output (low)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ PWM output    }\\\cline{1-6}
+\endfirsthead
+\hline
+\endfoot
+\hline
+\cellcolor{\tableheadbgcolor}\textbf{ {\bfseries{Description}}   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Analog input (default)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital input   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital output (high)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital output (low)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ PWM output    }\\\cline{1-6}
+\endhead
+{\bfseries{Value}}   &\PBS\centering {\ttfamily 0x00}   &\PBS\centering {\ttfamily 0x01}   &\PBS\centering {\ttfamily 0x02}   &\PBS\centering {\ttfamily 0x03}   &\PBS\centering {\ttfamily 0x04}   \\\cline{1-6}
+\end{longtabu}
+
+
+\begin{DoxyNote}{Note}
+If the external GPS receiver is used to obtain world time, and it is compatible with Witmotion serial protocol, the port D1 should be connected to its {\bfseries{TX}} pin and turned into GPS receiver port by the special value {\ttfamily 0x05} set for this register. The baud rate on which GPS receiver communicates with the sensor, is set via \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a23e1f7b2e0d48ed03f0ce21d7ce8e85b}{rid\+GPSBaud\+Rate} register. 
+\end{DoxyNote}
+\\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridPortModeD2@{ridPortModeD2}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridPortModeD2@{ridPortModeD2}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6e04a02620b6fedcb9bca62e6f24edad}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6e04a02620b6fedcb9bca62e6f24edad} 
+rid\+Port\+Mode\+D2&Digital port D2 mode. The values are set only via \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}0\mbox{]}\`{} whilst \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}1\mbox{]}\`{} is set to 0. Please refer to the following table to determine the exact value needed.
+
+\tabulinesep=1mm
+\begin{longtabu}spread 0pt [c]{*{6}{|X[-1]}|}
+\hline
+\cellcolor{\tableheadbgcolor}\textbf{ {\bfseries{Description}}   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Analog input (default)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital input   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital output (high)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital output (low)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ PWM output    }\\\cline{1-6}
+\endfirsthead
+\hline
+\endfoot
+\hline
+\cellcolor{\tableheadbgcolor}\textbf{ {\bfseries{Description}}   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Analog input (default)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital input   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital output (high)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital output (low)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ PWM output    }\\\cline{1-6}
+\endhead
+{\bfseries{Value}}   &\PBS\centering {\ttfamily 0x00}   &\PBS\centering {\ttfamily 0x01}   &\PBS\centering {\ttfamily 0x02}   &\PBS\centering {\ttfamily 0x03}   &\PBS\centering {\ttfamily 0x04}   \\\cline{1-6}
+\end{longtabu}
+\\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridPortModeD3@{ridPortModeD3}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridPortModeD3@{ridPortModeD3}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a7c6e7a8e914dcf903d320ad9cd77a4b8}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a7c6e7a8e914dcf903d320ad9cd77a4b8} 
+rid\+Port\+Mode\+D3&Digital port D3 mode. The values are set only via \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}0\mbox{]}\`{} whilst \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}1\mbox{]}\`{} is set to 0. Please refer to the following table to determine the exact value needed.
+
+\tabulinesep=1mm
+\begin{longtabu}spread 0pt [c]{*{6}{|X[-1]}|}
+\hline
+\cellcolor{\tableheadbgcolor}\textbf{ {\bfseries{Description}}   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Analog input (default)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital input   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital output (high)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital output (low)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ PWM output    }\\\cline{1-6}
+\endfirsthead
+\hline
+\endfoot
+\hline
+\cellcolor{\tableheadbgcolor}\textbf{ {\bfseries{Description}}   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Analog input (default)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital input   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital output (high)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Digital output (low)   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ PWM output    }\\\cline{1-6}
+\endhead
+{\bfseries{Value}}   &\PBS\centering {\ttfamily 0x00}   &\PBS\centering {\ttfamily 0x01}   &\PBS\centering {\ttfamily 0x02}   &\PBS\centering {\ttfamily 0x03}   &\PBS\centering {\ttfamily 0x04}   \\\cline{1-6}
+\end{longtabu}
+\\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridPortPWMLevelD0@{ridPortPWMLevelD0}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridPortPWMLevelD0@{ridPortPWMLevelD0}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a20aaaca8b65cffe1b02ae5bf5d3f5651}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a20aaaca8b65cffe1b02ae5bf5d3f5651} 
+rid\+Port\+PWMLevel\+D0&Digital port D0 PWM high level pulse width, microseconds, 16-\/bit unsigned integer. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridPortPWMLevelD1@{ridPortPWMLevelD1}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridPortPWMLevelD1@{ridPortPWMLevelD1}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a53111db6e031f93344a5db57932e1381}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a53111db6e031f93344a5db57932e1381} 
+rid\+Port\+PWMLevel\+D1&Digital port D1 PWM high level pulse width, microseconds, 16-\/bit unsigned integer. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridPortPWMLevelD2@{ridPortPWMLevelD2}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridPortPWMLevelD2@{ridPortPWMLevelD2}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3adda87b6ba01b1562e80aa9a7eb6be6ff}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3adda87b6ba01b1562e80aa9a7eb6be6ff} 
+rid\+Port\+PWMLevel\+D2&Digital port D2 PWM high level pulse width, microseconds, 16-\/bit unsigned integer. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridPortPWMLevelD3@{ridPortPWMLevelD3}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridPortPWMLevelD3@{ridPortPWMLevelD3}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a0182d7ce399242f31a6f07b08df3e679}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a0182d7ce399242f31a6f07b08df3e679} 
+rid\+Port\+PWMLevel\+D3&Digital port D3 PWM high level pulse width, microseconds, 16-\/bit unsigned integer. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridPortPWMPeriodD0@{ridPortPWMPeriodD0}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridPortPWMPeriodD0@{ridPortPWMPeriodD0}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a84b92f91c231e44aeff92282dc2dabba}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a84b92f91c231e44aeff92282dc2dabba} 
+rid\+Port\+PWMPeriod\+D0&Digital port D0 PWM period length, microseconds, 16-\/bit unsigned integer. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridPortPWMPeriodD1@{ridPortPWMPeriodD1}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridPortPWMPeriodD1@{ridPortPWMPeriodD1}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a1be747000dc85b55ae66b160151a5350}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a1be747000dc85b55ae66b160151a5350} 
+rid\+Port\+PWMPeriod\+D1&Digital port D1 PWM period length, microseconds, 16-\/bit unsigned integer. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridPortPWMPeriodD2@{ridPortPWMPeriodD2}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridPortPWMPeriodD2@{ridPortPWMPeriodD2}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a73ec16b82c6b5e8b78c57e6c1e031a7a}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a73ec16b82c6b5e8b78c57e6c1e031a7a} 
+rid\+Port\+PWMPeriod\+D2&Digital port D2 PWM period length, microseconds, 16-\/bit unsigned integer. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridPortPWMPeriodD3@{ridPortPWMPeriodD3}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridPortPWMPeriodD3@{ridPortPWMPeriodD3}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a298fdc22d7023239c80591435b6968a3}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a298fdc22d7023239c80591435b6968a3} 
+rid\+Port\+PWMPeriod\+D3&Digital port D3 PWM period length, microseconds, 16-\/bit unsigned integer. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridIICAddress@{ridIICAddress}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridIICAddress@{ridIICAddress}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a391ab4478ec408ab553bac43152e9a46}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a391ab4478ec408ab553bac43152e9a46} 
+rid\+IICAddress&Sets up I2C address of the sensor. Default value is {\ttfamily 0x50}, 7-\/bit unsigned integer in \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}0\mbox{]}\`{} whilst \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}1\mbox{]}\`{} is set to 0. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridLED@{ridLED}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridLED@{ridLED}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a2e3a09081461e24c7c065f9bd7e51810}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a2e3a09081461e24c7c065f9bd7e51810} 
+rid\+LED&Toggles on/off LED indication (for enclosed sensors only). \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridGPSBaudRate@{ridGPSBaudRate}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridGPSBaudRate@{ridGPSBaudRate}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a23e1f7b2e0d48ed03f0ce21d7ce8e85b}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a23e1f7b2e0d48ed03f0ce21d7ce8e85b} 
+rid\+GPSBaud\+Rate&Regulates GPS receiver baud rate on port D1 (see \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a8df58e95b92f3957a5ae90f973db1e7a}{rid\+Port\+Mode\+D1}). The following table contains value set for \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}0\mbox{]}\`{} representing the different baud rates. \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}1\mbox{]}\`{} should be set to 0. \tabulinesep=1mm
+\begin{longtabu}spread 0pt [c]{*{11}{|X[-1]}|}
+\hline
+\cellcolor{\tableheadbgcolor}\textbf{ {\bfseries{Rate, baud}}   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 1200/1400   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 4800   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 9600   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 19200   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 38400   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 57600   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 115200   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 230400   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 460800   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 921600    }\\\cline{1-11}
+\endfirsthead
+\hline
+\endfoot
+\hline
+\cellcolor{\tableheadbgcolor}\textbf{ {\bfseries{Rate, baud}}   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 1200/1400   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 4800   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 9600   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 19200   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 38400   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 57600   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 115200   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 230400   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 460800   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ 921600    }\\\cline{1-11}
+\endhead
+{\bfseries{Value}}   &\PBS\centering {\ttfamily 0x00}   &\PBS\centering {\ttfamily 0x01}   &\PBS\centering {\ttfamily 0x02}   &\PBS\centering {\ttfamily 0x03}   &\PBS\centering {\ttfamily 0x04}   &\PBS\centering {\ttfamily 0x05}   &\PBS\centering {\ttfamily 0x06}   &\PBS\centering {\ttfamily 0x07}   &\PBS\centering {\ttfamily 0x08}   &\PBS\centering {\ttfamily 0x09}   \\\cline{1-11}
+\end{longtabu}
+\begin{DoxyNote}{Note}
+Baud rates over 256000 baud should not be considered standard. 
+\end{DoxyNote}
+\\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridFilterBandwidth@{ridFilterBandwidth}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridFilterBandwidth@{ridFilterBandwidth}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ac5b2c95e986d8cd87b47f8475c2e3d45}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ac5b2c95e986d8cd87b47f8475c2e3d45} 
+rid\+Filter\+Bandwidth&Regulates internal filter bandwidth according to \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}. \`{}raw\mbox{[}0\mbox{]}\`{} value. Please refer to the following table for details. \tabulinesep=1mm
+\begin{longtabu}spread 0pt [c]{*{2}{|X[-1]}|}
+\hline
+\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Value   }&\PBS\raggedleft \cellcolor{\tableheadbgcolor}\textbf{ Bandwidth, Hz    }\\\cline{1-2}
+\endfirsthead
+\hline
+\endfoot
+\hline
+\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Value   }&\PBS\raggedleft \cellcolor{\tableheadbgcolor}\textbf{ Bandwidth, Hz    }\\\cline{1-2}
+\endhead
+\PBS\centering {\ttfamily 0x00}   &\PBS\raggedleft 256    \\\cline{1-2}
+\PBS\centering {\ttfamily 0x01}   &\PBS\raggedleft 184    \\\cline{1-2}
+\PBS\centering {\ttfamily 0x02}   &\PBS\raggedleft 94    \\\cline{1-2}
+\PBS\centering {\ttfamily 0x03}   &\PBS\raggedleft 44    \\\cline{1-2}
+\PBS\centering {\ttfamily 0x04}   &\PBS\raggedleft 21    \\\cline{1-2}
+\PBS\centering {\ttfamily 0x05}   &\PBS\raggedleft 10    \\\cline{1-2}
+\PBS\centering {\ttfamily 0x06}   &\PBS\raggedleft 5   \\\cline{1-2}
+\end{longtabu}
+
+
+\doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}1\mbox{]}\`{} should be set to 0. NOT YET PROVEN AS WORKING \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridGyroscopeRange@{ridGyroscopeRange}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridGyroscopeRange@{ridGyroscopeRange}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a0c94f5df4e6ba10377b5619238080ff1}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a0c94f5df4e6ba10377b5619238080ff1} 
+rid\+Gyroscope\+Range&Regulates gyroscope value range according to \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}. \`{}raw\mbox{[}0\mbox{]}\`{} value. Please refer to the following table for details. \tabulinesep=1mm
+\begin{longtabu}spread 0pt [c]{*{2}{|X[-1]}|}
+\hline
+\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Value   }&\PBS\raggedleft \cellcolor{\tableheadbgcolor}\textbf{ Range, $ deg/s $    }\\\cline{1-2}
+\endfirsthead
+\hline
+\endfoot
+\hline
+\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Value   }&\PBS\raggedleft \cellcolor{\tableheadbgcolor}\textbf{ Range, $ deg/s $    }\\\cline{1-2}
+\endhead
+\PBS\centering {\ttfamily 0x00}   &\PBS\raggedleft 250    \\\cline{1-2}
+\PBS\centering {\ttfamily 0x01}   &\PBS\raggedleft 500    \\\cline{1-2}
+\PBS\centering {\ttfamily 0x02}   &\PBS\raggedleft 1000    \\\cline{1-2}
+\PBS\centering {\ttfamily 0x03}   &\PBS\raggedleft 2000   \\\cline{1-2}
+\end{longtabu}
+
+
+\doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}1\mbox{]}\`{} should be set to 0. NOT YET PROVEN AS WORKING \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridAccelerometerRange@{ridAccelerometerRange}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridAccelerometerRange@{ridAccelerometerRange}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a7a6ad3e464e638d7b8c700176a6198e1}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a7a6ad3e464e638d7b8c700176a6198e1} 
+rid\+Accelerometer\+Range&Regulates accelerometer value range according to \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}. \`{}raw\mbox{[}0\mbox{]}\`{} value. Please refer to the following table for details. \tabulinesep=1mm
+\begin{longtabu}spread 0pt [c]{*{2}{|X[-1]}|}
+\hline
+\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Value   }&\PBS\raggedleft \cellcolor{\tableheadbgcolor}\textbf{ Range, $ m/s^2 $    }\\\cline{1-2}
+\endfirsthead
+\hline
+\endfoot
+\hline
+\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Value   }&\PBS\raggedleft \cellcolor{\tableheadbgcolor}\textbf{ Range, $ m/s^2 $    }\\\cline{1-2}
+\endhead
+\PBS\centering {\ttfamily 0x00}   &\PBS\raggedleft $ 2 \cdot g$    \\\cline{1-2}
+\PBS\centering {\ttfamily 0x01}   &\PBS\raggedleft $ 4 \cdot g$    \\\cline{1-2}
+\PBS\centering {\ttfamily 0x02}   &\PBS\raggedleft $ 8 \cdot g$    \\\cline{1-2}
+\PBS\centering {\ttfamily 0x03}   &\PBS\raggedleft $ 16 \cdot g$   \\\cline{1-2}
+\end{longtabu}
+
+
+Here $ g = 9.81 m/s^2 $. \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}1\mbox{]}\`{} should be set to 0. NOT YET PROVEN AS WORKING \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridStandbyMode@{ridStandbyMode}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridStandbyMode@{ridStandbyMode}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa0c382b1bbd92e110cf05656fca68846}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa0c382b1bbd92e110cf05656fca68846} 
+rid\+Standby\+Mode&Toggles dormant mode. \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}0\mbox{]}\`{} should be set to {\ttfamily 0x01}, \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}1\mbox{]}\`{} to 0. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridInstallationDirection@{ridInstallationDirection}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridInstallationDirection@{ridInstallationDirection}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a9e91fab01aac11db869b2c3469197951}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a9e91fab01aac11db869b2c3469197951} 
+rid\+Installation\+Direction&Toggles on/off internal rotation transform for vertical installation. \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}1\mbox{]}\`{} should be set to 0, \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}0\mbox{]}\`{} being to {\ttfamily 0x01} allows vertical installation, to {\ttfamily 0x00} -\/ horizontal installation. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridTransitionAlgorithm@{ridTransitionAlgorithm}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridTransitionAlgorithm@{ridTransitionAlgorithm}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6ed4aff9ef5db46614283f3137b7a33c}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6ed4aff9ef5db46614283f3137b7a33c} 
+rid\+Transition\+Algorithm&Regulates whether 9-\/axis ({\ttfamily 0x01} in \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}0\mbox{]}\`{}) or 6-\/axis ({\ttfamily 0x00}) transition algorithm should be used. \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}1\mbox{]}\`{} should be set to 0. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridInstructionStart@{ridInstructionStart}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridInstructionStart@{ridInstructionStart}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a3613237d9a04da1a69ab6233bdff6c87}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a3613237d9a04da1a69ab6233bdff6c87} 
+rid\+Instruction\+Start&Instruction mode. {\ttfamily 0x00} in \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}0\mbox{]}\`{} means starting instruction mode, {\ttfamily 0x01} toggles it off whilst \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}1\mbox{]}\`{} is set explicitly to 0. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridTimeYearMonth@{ridTimeYearMonth}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridTimeYearMonth@{ridTimeYearMonth}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a901d4a2268382df03b1842a23a03b4df}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a901d4a2268382df03b1842a23a03b4df} 
+rid\+Time\+Year\+Month&Sets RTC to the given year (\doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}0\mbox{]}\`{}) and month (\doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}1\mbox{]}\`{}). Year is a signed 8-\/bit integer with zero origin point set to 2000 year Gregorian calendar. Month is digitized to 1-\/12, unsigned 8-\/bit integer. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridTimeDayHour@{ridTimeDayHour}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridTimeDayHour@{ridTimeDayHour}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a0ba92dbc353204d35aec965eae613c96}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a0ba92dbc353204d35aec965eae613c96} 
+rid\+Time\+Day\+Hour&Sets RTC to the given day of the month (\doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}0\mbox{]}\`{}) and hour (\doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}1\mbox{]}\`{}) in 24H system. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridTimeMinuteSecond@{ridTimeMinuteSecond}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridTimeMinuteSecond@{ridTimeMinuteSecond}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aac4180796c112f8a59c40acff749f705}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aac4180796c112f8a59c40acff749f705} 
+rid\+Time\+Minute\+Second&Sets RTC to the given minute (\doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}0\mbox{]}\`{}) and second (\doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}1\mbox{]}\`{}) in 24H system. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridTimeMilliseconds@{ridTimeMilliseconds}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridTimeMilliseconds@{ridTimeMilliseconds}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a98c1d3facc2a8a35a0e98af60665466f}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a98c1d3facc2a8a35a0e98af60665466f} 
+rid\+Time\+Milliseconds&Sets RTC to the given milliseconds exposed as 16-\/bit unsigned integer. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetAccelerationX@{ridSetAccelerationX}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetAccelerationX@{ridSetAccelerationX}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a42a6e8a6f354bcd6b2b778c05d8e9f9f}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a42a6e8a6f354bcd6b2b778c05d8e9f9f} 
+rid\+Set\+AccelerationX&Sets up origin point or impostor value (needed when the measurement is forced for output by \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4}{rid\+Output\+Value\+Set} but not actually supported by the sensor) for acceleration on X axis. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetAccelerationY@{ridSetAccelerationY}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetAccelerationY@{ridSetAccelerationY}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3afbd52bd0fe49f0b4291552768d483423}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3afbd52bd0fe49f0b4291552768d483423} 
+rid\+Set\+AccelerationY&Sets up origin point or impostor value (needed when the measurement is forced for output by \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4}{rid\+Output\+Value\+Set} but not actually supported by the sensor) for acceleration on Y axis. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetAccelerationZ@{ridSetAccelerationZ}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetAccelerationZ@{ridSetAccelerationZ}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a7192ad42de7160e89f67385d2a952d29}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a7192ad42de7160e89f67385d2a952d29} 
+rid\+Set\+AccelerationZ&Sets up origin point or impostor value (needed when the measurement is forced for output by \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4}{rid\+Output\+Value\+Set} but not actually supported by the sensor) for acceleration on Z axis. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetAngularVelocityX@{ridSetAngularVelocityX}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetAngularVelocityX@{ridSetAngularVelocityX}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6509ae8041180b68bcd65a225416eb9e}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6509ae8041180b68bcd65a225416eb9e} 
+rid\+Set\+Angular\+VelocityX&Sets up origin point or impostor value (needed when the measurement is forced for output by \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4}{rid\+Output\+Value\+Set} but not actually supported by the sensor) for angular velocity on X axis. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetAngularVelocityY@{ridSetAngularVelocityY}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetAngularVelocityY@{ridSetAngularVelocityY}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a48508295f9f23d01dce584675ec6c9f0}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a48508295f9f23d01dce584675ec6c9f0} 
+rid\+Set\+Angular\+VelocityY&Sets up origin point or impostor value (needed when the measurement is forced for output by \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4}{rid\+Output\+Value\+Set} but not actually supported by the sensor) for angular velocity on Y axis. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetAngularVelocityZ@{ridSetAngularVelocityZ}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetAngularVelocityZ@{ridSetAngularVelocityZ}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a7a1193aab35e38c7cb2d50b1b070c802}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a7a1193aab35e38c7cb2d50b1b070c802} 
+rid\+Set\+Angular\+VelocityZ&Sets up origin point or impostor value (needed when the measurement is forced for output by \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4}{rid\+Output\+Value\+Set} but not actually supported by the sensor) for angular velocity on Z axis. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetMagnetometerX@{ridSetMagnetometerX}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetMagnetometerX@{ridSetMagnetometerX}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a586b93305e288dce9d13924b4e2b7497}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a586b93305e288dce9d13924b4e2b7497} 
+rid\+Set\+MagnetometerX&Sets up origin point or impostor value (needed when the measurement is forced for output by \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4}{rid\+Output\+Value\+Set} but not actually supported by the sensor) for magnetometer on X axis. {\bfseries{MAY BLOCK THE MEASUREMENTS}} \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetMagnetometerY@{ridSetMagnetometerY}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetMagnetometerY@{ridSetMagnetometerY}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a086061ec42a34429d4ecc87426bd16db}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a086061ec42a34429d4ecc87426bd16db} 
+rid\+Set\+MagnetometerY&Sets up origin point or impostor value (needed when the measurement is forced for output by \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4}{rid\+Output\+Value\+Set} but not actually supported by the sensor) for magnetometer on Y axis. {\bfseries{MAY BLOCK THE MEASUREMENTS}} \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetMagnetometerZ@{ridSetMagnetometerZ}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetMagnetometerZ@{ridSetMagnetometerZ}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a3f7aacc3707d990356df81934205ce7d}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a3f7aacc3707d990356df81934205ce7d} 
+rid\+Set\+MagnetometerZ&Sets up origin point or impostor value (needed when the measurement is forced for output by \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4}{rid\+Output\+Value\+Set} but not actually supported by the sensor) for magnetometer on Z axis. {\bfseries{MAY BLOCK THE MEASUREMENTS}} \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetAngleRoll@{ridSetAngleRoll}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetAngleRoll@{ridSetAngleRoll}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a1e415569387a08b9bf79e77790470763}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a1e415569387a08b9bf79e77790470763} 
+rid\+Set\+Angle\+Roll&Sets up origin point or impostor value (needed when the measurement is forced for output by \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4}{rid\+Output\+Value\+Set} but not actually supported by the sensor) for Euler angle (roll) over X axis. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetAnglePitch@{ridSetAnglePitch}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetAnglePitch@{ridSetAnglePitch}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aba447e38147a544790c590f9f039eaf6}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aba447e38147a544790c590f9f039eaf6} 
+rid\+Set\+Angle\+Pitch&Sets up origin point or impostor value (needed when the measurement is forced for output by \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4}{rid\+Output\+Value\+Set} but not actually supported by the sensor) for Euler angle (pitch) over Y axis. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetAngleYaw@{ridSetAngleYaw}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetAngleYaw@{ridSetAngleYaw}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ad6cc9ede4fe5cc3b81076bd3e3ddbb0f}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ad6cc9ede4fe5cc3b81076bd3e3ddbb0f} 
+rid\+Set\+Angle\+Yaw&Sets up origin point or impostor value (needed when the measurement is forced for output by \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4}{rid\+Output\+Value\+Set} but not actually supported by the sensor) for Euler angle (yaw) over Z axis. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetTemperature@{ridSetTemperature}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetTemperature@{ridSetTemperature}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a2e2274acd5298a1422864030e2b320ba}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a2e2274acd5298a1422864030e2b320ba} 
+rid\+Set\+Temperature&Sets up origin point or impostor value (needed when the corresponding spatial measurement is forced for output by \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4}{rid\+Output\+Value\+Set} but not actually supported by the sensor) for temperature. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetPortStatusD0@{ridSetPortStatusD0}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetPortStatusD0@{ridSetPortStatusD0}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a4ebad711060439819f73aa07943481c7}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a4ebad711060439819f73aa07943481c7} 
+rid\+Set\+Port\+Status\+D0&Action unknown, not yet documented by Witmotion. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetPortStatusD1@{ridSetPortStatusD1}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetPortStatusD1@{ridSetPortStatusD1}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab8368acbca776c26bf211a60fad166f0}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab8368acbca776c26bf211a60fad166f0} 
+rid\+Set\+Port\+Status\+D1&Action unknown, not yet documented by Witmotion. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetPortStatusD2@{ridSetPortStatusD2}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetPortStatusD2@{ridSetPortStatusD2}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a24351f6f11569108042150dd3cd1d7c2}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a24351f6f11569108042150dd3cd1d7c2} 
+rid\+Set\+Port\+Status\+D2&Action unknown, not yet documented by Witmotion. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetPortStatusD3@{ridSetPortStatusD3}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetPortStatusD3@{ridSetPortStatusD3}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa336be9ed7dec9fdf579dae59838f2bb}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa336be9ed7dec9fdf579dae59838f2bb} 
+rid\+Set\+Port\+Status\+D3&Action unknown, not yet documented by Witmotion. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetPressureLow@{ridSetPressureLow}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetPressureLow@{ridSetPressureLow}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a5179834f2969bb85dbe566aca70e4f72}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a5179834f2969bb85dbe566aca70e4f72} 
+rid\+Set\+Pressure\+Low&Sets up low part of initial value for 32-\/bit pressure measurement register. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetPressureHigh@{ridSetPressureHigh}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetPressureHigh@{ridSetPressureHigh}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a4fa41cd61ddd08decf7e373786324fe4}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a4fa41cd61ddd08decf7e373786324fe4} 
+rid\+Set\+Pressure\+High&Sets up high part of initial value for 32-\/bit pressure measurement register. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetAltitudeLow@{ridSetAltitudeLow}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetAltitudeLow@{ridSetAltitudeLow}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a2999f436df440eb4e4a16c04c93de615}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a2999f436df440eb4e4a16c04c93de615} 
+rid\+Set\+Altitude\+Low&Sets up low part of initial value for 32-\/bit altitude measurement register. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetAltitudeHigh@{ridSetAltitudeHigh}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetAltitudeHigh@{ridSetAltitudeHigh}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a1a93aa388d3de727709b6d34452d0934}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a1a93aa388d3de727709b6d34452d0934} 
+rid\+Set\+Altitude\+High&Sets up high part of initial value for 32-\/bit altitude measurement register. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetLongitudeLow@{ridSetLongitudeLow}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetLongitudeLow@{ridSetLongitudeLow}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ae19e9989db5b1b14bfae18fe5ace37fa}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ae19e9989db5b1b14bfae18fe5ace37fa} 
+rid\+Set\+Longitude\+Low&Sets up low part of initial value for 32-\/bit longitude measurement register. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetLongitudeHigh@{ridSetLongitudeHigh}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetLongitudeHigh@{ridSetLongitudeHigh}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a69a1045e79d9ef5870f1f71747d10ae4}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a69a1045e79d9ef5870f1f71747d10ae4} 
+rid\+Set\+Longitude\+High&Sets up high part of initial value for 32-\/bit longitude measurement register. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetLatitudeLow@{ridSetLatitudeLow}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetLatitudeLow@{ridSetLatitudeLow}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aee7f477a2446d716bdca937fc4911959}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aee7f477a2446d716bdca937fc4911959} 
+rid\+Set\+Latitude\+Low&Sets up low part of initial value for 32-\/bit latitude measurement register. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetLatitudeHigh@{ridSetLatitudeHigh}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetLatitudeHigh@{ridSetLatitudeHigh}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a34515bb412a5bd623d77bdf020f9b5e9}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a34515bb412a5bd623d77bdf020f9b5e9} 
+rid\+Set\+Latitude\+High&Sets up high part of initial value for 32-\/bit latitude measurement register. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetGPSAltitude@{ridSetGPSAltitude}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetGPSAltitude@{ridSetGPSAltitude}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a84759181f9ff6bd2a318c9f8b1ed1f39}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a84759181f9ff6bd2a318c9f8b1ed1f39} 
+rid\+Set\+GPSAltitude&Sets up initial or impostor value (needed when the measurement is forced for output by \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4}{rid\+Output\+Value\+Set} but not actually supported by the sensor) for GPS altitude measurement. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetGPSYaw@{ridSetGPSYaw}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetGPSYaw@{ridSetGPSYaw}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a549727f96698c8e2e7afbf20b4f286d0}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a549727f96698c8e2e7afbf20b4f286d0} 
+rid\+Set\+GPSYaw&Sets up initial or impostor value (needed when the measurement is forced for output by \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4}{rid\+Output\+Value\+Set} but not actually supported by the sensor) for GPS orientation angle measurement. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetGPSGroundSpeedLow@{ridSetGPSGroundSpeedLow}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetGPSGroundSpeedLow@{ridSetGPSGroundSpeedLow}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa8dc66482e5afdb4831e8602b2e89d58}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa8dc66482e5afdb4831e8602b2e89d58} 
+rid\+Set\+GPSGround\+Speed\+Low&Sets up low part of initial value for 32-\/bit GPS ground speed measurement register. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetGPSGroundSpeedHigh@{ridSetGPSGroundSpeedHigh}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetGPSGroundSpeedHigh@{ridSetGPSGroundSpeedHigh}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa3bc5016e03de006cf633420ac34e25f}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa3bc5016e03de006cf633420ac34e25f} 
+rid\+Set\+GPSGround\+Speed\+High&Sets up high part of initial value for 32-\/bit GPS ground speed measurement register. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetOrientationX@{ridSetOrientationX}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetOrientationX@{ridSetOrientationX}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a77da818475b1904a4e7ef051d14e063d}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a77da818475b1904a4e7ef051d14e063d} 
+rid\+Set\+OrientationX&Sets up origin point or impostor value (needed when the measurement is forced for output by \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4}{rid\+Output\+Value\+Set} but not actually supported by the sensor) for orientation quaternion, X component. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetOrientationY@{ridSetOrientationY}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetOrientationY@{ridSetOrientationY}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a49c73008955b9fa89f9b4cba3dd37d9d}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a49c73008955b9fa89f9b4cba3dd37d9d} 
+rid\+Set\+OrientationY&Sets up origin point or impostor value (needed when the measurement is forced for output by \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4}{rid\+Output\+Value\+Set} but not actually supported by the sensor) for orientation quaternion, Y component. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetOrientationZ@{ridSetOrientationZ}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetOrientationZ@{ridSetOrientationZ}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a3e1d48defa5dbaea479ee1498cf3db7a}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a3e1d48defa5dbaea479ee1498cf3db7a} 
+rid\+Set\+OrientationZ&Sets up origin point or impostor value (needed when the measurement is forced for output by \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4}{rid\+Output\+Value\+Set} but not actually supported by the sensor) for orientation quaternion, Z component. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridSetOrientationW@{ridSetOrientationW}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridSetOrientationW@{ridSetOrientationW}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6b12d4a88aa5b9477ad6acae3af6bb83}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6b12d4a88aa5b9477ad6acae3af6bb83} 
+rid\+Set\+OrientationW&Sets up origin point or impostor value (needed when the measurement is forced for output by \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4}{rid\+Output\+Value\+Set} but not actually supported by the sensor) for orientation quaternion, W component. NOT YET PROVEN AS WORKING. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridGyroscopeAutoCalibrate@{ridGyroscopeAutoCalibrate}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridGyroscopeAutoCalibrate@{ridGyroscopeAutoCalibrate}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a83987c4864f06244dab4f5ef6f12af7f}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a83987c4864f06244dab4f5ef6f12af7f} 
+rid\+Gyroscope\+Auto\+Calibrate&Toggles on/off automatic precalibration of the gyroscope. \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}1\mbox{]}\`{} should be set to 0. {\ttfamily 0x01} in \doxylink{structwitmotion_1_1witmotion__config__packet_a71914524d0042340923901e6788fd711}{witmotion\+\_\+config\+\_\+packet\+::setting}.\`{}raw\mbox{[}0\mbox{]}\`{} turns gyroscope automatic precalibration {\bfseries{OFF}}. To turn it {\bfseries{ON}} the value should be {\ttfamily 0x00}. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{ridUnlockConfiguration@{ridUnlockConfiguration}!witmotion@{witmotion}}\index{witmotion@{witmotion}!ridUnlockConfiguration@{ridUnlockConfiguration}}}\Hypertarget{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ae3b36162b2662cc9c637436bca5c8172}\label{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ae3b36162b2662cc9c637436bca5c8172} 
+rid\+Unlock\+Configuration&"{}\+Magic"{} vendor-\/defined value for configuration unlock packet {\ttfamily 0x\+FF 0x\+AA 0x69 0x88 0x\+B5}. \\
+\hline
+
+\end{DoxyEnumFields}
+\Hypertarget{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3}\label{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3} 
+\index{witmotion@{witmotion}!witmotion\_packet\_id@{witmotion\_packet\_id}}
+\index{witmotion\_packet\_id@{witmotion\_packet\_id}!witmotion@{witmotion}}
+\doxysubsubsection{\texorpdfstring{witmotion\_packet\_id}{witmotion\_packet\_id}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3}{witmotion\+::witmotion\+\_\+packet\+\_\+id}}}
+
+If one of the packet type IDs defined here is registered after \doxylink{namespacewitmotion_a637c861a28f4015a1b57d8bd9ef08cbf}{WITMOTION\+\_\+\+HEADER\+\_\+\+BYTE} in the data flow received from the sensor, the packet header is considered found and the remaining bytes are considered as body of the packet. See \doxylink{util_8h}{util.\+h} for decoder function reference. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{pidRTC@{pidRTC}!witmotion@{witmotion}}\index{witmotion@{witmotion}!pidRTC@{pidRTC}}}\Hypertarget{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a0eec2c5dacef2bfea50757ef63fd2735}\label{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a0eec2c5dacef2bfea50757ef63fd2735} 
+pid\+RTC&Real-\/\+Time-\/\+Clock\+: Year from 2000, Month, Day, Hour, Minute, Second (8-\/bit unsigned integers) + Millisecond (16-\/bit unsigned integer), representing time passed since last time set up in the \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a901d4a2268382df03b1842a23a03b4df}{rid\+Time\+Year\+Month}, \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a0ba92dbc353204d35aec965eae613c96}{rid\+Time\+Day\+Hour}, \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aac4180796c112f8a59c40acff749f705}{rid\+Time\+Minute\+Second} and \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a98c1d3facc2a8a35a0e98af60665466f}{rid\+Time\+Milliseconds} registers. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{pidAcceleration@{pidAcceleration}!witmotion@{witmotion}}\index{witmotion@{witmotion}!pidAcceleration@{pidAcceleration}}}\Hypertarget{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3aa55a0844425f2c57978b43ba96f9d14f}\label{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3aa55a0844425f2c57978b43ba96f9d14f} 
+pid\+Acceleration&Linear accelerations + temperature/reserved field \mbox{[}X-\/\+Y-\/Z\mbox{]} (16-\/bit binary normalized quasi-\/floats) \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{pidAngularVelocity@{pidAngularVelocity}!witmotion@{witmotion}}\index{witmotion@{witmotion}!pidAngularVelocity@{pidAngularVelocity}}}\Hypertarget{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3afb633ed3118253ba87c8560a203f4f44}\label{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3afb633ed3118253ba87c8560a203f4f44} 
+pid\+Angular\+Velocity&Angular velocities + temperature/reserved field \mbox{[}Roll-\/\+Pitch-\/\+Yaw\mbox{]} (16-\/bit binary normalized quasi-\/floats) \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{pidAngles@{pidAngles}!witmotion@{witmotion}}\index{witmotion@{witmotion}!pidAngles@{pidAngles}}}\Hypertarget{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a2d5f569560d2a29fee1f179a4c46f143}\label{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a2d5f569560d2a29fee1f179a4c46f143} 
+pid\+Angles&Euler angles + temperature/reserved field \mbox{[}Roll-\/\+Pitch-\/\+Yaw\mbox{]} (16-\/bit binary normalized quasi-\/floats) \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{pidMagnetometer@{pidMagnetometer}!witmotion@{witmotion}}\index{witmotion@{witmotion}!pidMagnetometer@{pidMagnetometer}}}\Hypertarget{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3aa410e8a4ad06356282c0a7eaa0b7edb3}\label{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3aa410e8a4ad06356282c0a7eaa0b7edb3} 
+pid\+Magnetometer&Magnetic field tensity + temperature/reserved field \mbox{[}world X-\/\+Y-\/Z\mbox{]} (16-\/bit binary normalized quasi-\/floats) \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{pidDataPortStatus@{pidDataPortStatus}!witmotion@{witmotion}}\index{witmotion@{witmotion}!pidDataPortStatus@{pidDataPortStatus}}}\Hypertarget{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a854420a4a97ec9a21e338aa236769f11}\label{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a854420a4a97ec9a21e338aa236769f11} 
+pid\+Data\+Port\+Status&Data port status packet, vendor-\/defined value. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{pidAltimeter@{pidAltimeter}!witmotion@{witmotion}}\index{witmotion@{witmotion}!pidAltimeter@{pidAltimeter}}}\Hypertarget{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a8ca47e826186715b57327ffbd91cada8}\label{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a8ca47e826186715b57327ffbd91cada8} 
+pid\+Altimeter&Altimeter + Barometer output (32-\/bit binary normalized quasi-\/floats) \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{pidGPSCoordinates@{pidGPSCoordinates}!witmotion@{witmotion}}\index{witmotion@{witmotion}!pidGPSCoordinates@{pidGPSCoordinates}}}\Hypertarget{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a7b05a239d11dcb700ddf67f6ea1b90b5}\label{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a7b05a239d11dcb700ddf67f6ea1b90b5} 
+pid\+GPSCoordinates&GPS\+: longitude + latitude, if supported by hardware (32-\/bit binary normalized quasi-\/floats) \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{pidGPSGroundSpeed@{pidGPSGroundSpeed}!witmotion@{witmotion}}\index{witmotion@{witmotion}!pidGPSGroundSpeed@{pidGPSGroundSpeed}}}\Hypertarget{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a7ecc187fe112b76a5135278dcd6b8bd5}\label{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a7ecc187fe112b76a5135278dcd6b8bd5} 
+pid\+GPSGround\+Speed&GPS\+: ground speed (32-\/bit binary normalized quasi-\/float) + altitude + angular velocity around vertical axis (16-\/bit binary normalized quasi-\/floats), if supported by hardware. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{pidOrientation@{pidOrientation}!witmotion@{witmotion}}\index{witmotion@{witmotion}!pidOrientation@{pidOrientation}}}\Hypertarget{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a791db4f6c4cfa2ca9db09f6dac7c6011}\label{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a791db4f6c4cfa2ca9db09f6dac7c6011} 
+pid\+Orientation&Orientation defined as quaternion \mbox{[}X-\/\+Y-\/\+Z-\/W\mbox{]}, when available from the sensor firmware (16-\/bit binary normalized quasi-\/floats) \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{pidGPSAccuracy@{pidGPSAccuracy}!witmotion@{witmotion}}\index{witmotion@{witmotion}!pidGPSAccuracy@{pidGPSAccuracy}}}\Hypertarget{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a24c950fa7ba2faa32301bd4e72716487}\label{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a24c950fa7ba2faa32301bd4e72716487} 
+pid\+GPSAccuracy&GPS\+: visible satellites + variance vector \mbox{[}East-\/\+North-\/\+Up\mbox{]} (16-\/bit binary normalized quasi-\/floats) \\
+\hline
+
+\end{DoxyEnumFields}
+
+
+\doxysubsection{Function Documentation}
+\Hypertarget{namespacewitmotion_a90e09a9e4f3d24ab522bee3aa9bf9c78}\label{namespacewitmotion_a90e09a9e4f3d24ab522bee3aa9bf9c78} 
+\index{witmotion@{witmotion}!witmotion\_output\_frequency@{witmotion\_output\_frequency}}
+\index{witmotion\_output\_frequency@{witmotion\_output\_frequency}!witmotion@{witmotion}}
+\doxysubsubsection{\texorpdfstring{witmotion\_output\_frequency()}{witmotion\_output\_frequency()}}
+{\footnotesize\ttfamily uint8\+\_\+t witmotion\+::witmotion\+\_\+output\+\_\+frequency (\begin{DoxyParamCaption}\item[{const int}]{hertz }\end{DoxyParamCaption})}
+
+Special values for the {\ttfamily hertz} argument are\+: \tabulinesep=1mm
+\begin{longtabu}spread 0pt [c]{*{2}{|X[-1]}|}
+\hline
+\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Value   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Description    }\\\cline{1-2}
+\endfirsthead
+\hline
+\endfoot
+\hline
+\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Value   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Description    }\\\cline{1-2}
+\endhead
+{\ttfamily 0}   &Shuts down the measurements but does not turn the device into \doxylink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa0c382b1bbd92e110cf05656fca68846}{dormant mode}    \\\cline{1-2}
+{\ttfamily -\/1}   &Orders the single-\/shot measurement, then shutdown    \\\cline{1-2}
+{\ttfamily -\/2}   &1 measurement in 2 seconds    \\\cline{1-2}
+{\ttfamily -\/10}   &1 measurement in 10 seconds   \\\cline{1-2}
+\end{longtabu}
+
+\begin{DoxyParams}{Parameters}
+{\em hertz} & -\/ frequency in Hertz, or a special value as it is described above \\
+\hline
+\end{DoxyParams}
+\begin{DoxyReturn}{Returns}
+Witmotion opcode value as a byte, {\ttfamily 0x06} (10 Hz) by default is the argument is inacceptable 
+\end{DoxyReturn}
+
+
+\doxysubsection{Variable Documentation}
+\Hypertarget{namespacewitmotion_a4af000309f5694300ababe3086c486fc}\label{namespacewitmotion_a4af000309f5694300ababe3086c486fc} 
+\index{witmotion@{witmotion}!witmotion\_packet\_descriptions@{witmotion\_packet\_descriptions}}
+\index{witmotion\_packet\_descriptions@{witmotion\_packet\_descriptions}!witmotion@{witmotion}}
+\doxysubsubsection{\texorpdfstring{witmotion\_packet\_descriptions}{witmotion\_packet\_descriptions}}
+{\footnotesize\ttfamily const std\+::map$<$uint8\+\_\+t, std\+::string$>$ witmotion\+::witmotion\+\_\+packet\+\_\+descriptions\hspace{0.3cm}{\ttfamily [static]}}
+
+{\bfseries Initial value\+:}
+\begin{DoxyCode}{0}
+\DoxyCodeLine{=\ \{}
+\DoxyCodeLine{\ \ \ \ \{0x50,\ \textcolor{stringliteral}{"{}Real\ Time\ Clock"{}}\},}
+\DoxyCodeLine{\ \ \ \ \{0x51,\ \textcolor{stringliteral}{"{}Accelerations"{}}\},}
+\DoxyCodeLine{\ \ \ \ \{0x52,\ \textcolor{stringliteral}{"{}Angular\ velocities"{}}\},}
+\DoxyCodeLine{\ \ \ \ \{0x53,\ \textcolor{stringliteral}{"{}Spatial\ orientation\ (Euler\ angles)"{}}\},}
+\DoxyCodeLine{\ \ \ \ \{0x54,\ \textcolor{stringliteral}{"{}Magnetometer/Magnetic\ orientation"{}}\},}
+\DoxyCodeLine{\ \ \ \ \{0x55,\ \textcolor{stringliteral}{"{}Data\ ports\ (D0-\/D3)\ status"{}}\},}
+\DoxyCodeLine{\ \ \ \ \{0x56,\ \textcolor{stringliteral}{"{}Barometry/Altimeter"{}}\},}
+\DoxyCodeLine{\ \ \ \ \{0x57,\ \textcolor{stringliteral}{"{}GPS\ Coordinates"{}}\},}
+\DoxyCodeLine{\ \ \ \ \{0x58,\ \textcolor{stringliteral}{"{}GPS\ Ground\ Speed"{}}\},}
+\DoxyCodeLine{\ \ \ \ \{0x59,\ \textcolor{stringliteral}{"{}Spatial\ orientation\ (Quaternion)"{}}\},}
+\DoxyCodeLine{\ \ \ \ \{0x5A,\ \textcolor{stringliteral}{"{}GPS\ accuracy\ estimation"{}}\}}
+\DoxyCodeLine{\}}
+
+\end{DoxyCode}
+Contains values referenced in \doxylink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3}{witmotion\+\_\+packet\+\_\+id} enumeration with corresponding description strings used by message-\/enumerator application. \Hypertarget{namespacewitmotion_a90712081209bb40591c1666a5a5362e5}\label{namespacewitmotion_a90712081209bb40591c1666a5a5362e5} 
+\index{witmotion@{witmotion}!witmotion\_registered\_ids@{witmotion\_registered\_ids}}
+\index{witmotion\_registered\_ids@{witmotion\_registered\_ids}!witmotion@{witmotion}}
+\doxysubsubsection{\texorpdfstring{witmotion\_registered\_ids}{witmotion\_registered\_ids}}
+{\footnotesize\ttfamily const std\+::set$<$size\+\_\+t$>$ witmotion\+::witmotion\+\_\+registered\+\_\+ids\hspace{0.3cm}{\ttfamily [static]}}
+
+{\bfseries Initial value\+:}
+\begin{DoxyCode}{0}
+\DoxyCodeLine{=\ \{}
+\DoxyCodeLine{\ \ \ \ 0x50,}
+\DoxyCodeLine{\ \ \ \ 0x51,}
+\DoxyCodeLine{\ \ \ \ 0x52,}
+\DoxyCodeLine{\ \ \ \ 0x53,}
+\DoxyCodeLine{\ \ \ \ 0x54,}
+\DoxyCodeLine{\ \ \ \ 0x55,}
+\DoxyCodeLine{\ \ \ \ 0x56,}
+\DoxyCodeLine{\ \ \ \ 0x57,}
+\DoxyCodeLine{\ \ \ \ 0x58,}
+\DoxyCodeLine{\ \ \ \ 0x59,}
+\DoxyCodeLine{\ \ \ \ 0x5A}
+\DoxyCodeLine{\}}
+
+\end{DoxyCode}
+Contains values referenced in \doxylink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3}{witmotion\+\_\+packet\+\_\+id} enumeration to explicitly determine a set of currently supported packet IDs. The packet IDs not referenced here sould not be considered supported. 

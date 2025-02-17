@@ -1,0 +1,48 @@
+\chapter{Witmotion Sensors UART Library}
+\hypertarget{index}{}\label{index}\index{Witmotion Sensors UART Library@{Witmotion Sensors UART Library}}
+\label{index_index}%
+\Hypertarget{index_index}%
+Core library allowing the external programs to read the data and control the parameters from the TTL/\+UART-\/compatible Inertial Measurement Units (IMU), manufactured by \href{https://www.wit-motion.com/}{\texttt{ Wit\+Motion Shenzhen Co.,Ltd}}.
+
+The library implements the C++ API to program applications accessing Witmotion sensor devices supporting unified communication protocol. The class structure is defined to stay able to implement also any other protocol for the different hardware communication interface. In the current state, the library uses \href{https://qt.io}{\texttt{ Qt}} backend for UART/\+TTL serial interface through \href{https://doc.qt.io/qt-5/qtserialport-index.html}{\texttt{ Qt5 Serial Port}} internal API. Thus the {\bfseries{Qt library}} installation of version 5.\+1 or newer is the only system requirement for the library.\hypertarget{index_autotoc_md3}{}\doxysection{\texorpdfstring{Contents}{Contents}}\label{index_autotoc_md3}
+
+\begin{DoxyItemize}
+\item \doxylink{index_index}{Overview}
+\item \doxysectlink{witmotion_docs}{List of official documentation and mirrors}{0}
+\item \doxysectlink{witmotion_protocol}{Communication protocol description}{0}
+\item C++ API structure
+\item \doxysectlink{installation}{Installation}{0}
+\item \doxysectlink{unified_applications}{Unified controller applications}{0}
+\item \doxysectlink{index_support_policy}{Support policy for new devices}{1}
+\item \doxysectlink{index_devices}{Currently supported devices}{2}
+\item \doxysectlink{index_contrib}{Contribution}{1}
+\end{DoxyItemize}\hypertarget{index_support_policy}{}\doxysection{\texorpdfstring{Device support policy}{Device support policy}}\label{index_support_policy}
+The project strives to provide the following tools for every supported Witmotion device\+:
+\begin{DoxyItemize}
+\item Single-\/class based C++ API with dedicated dynamic library and set of header files;
+\item Dedicated controller tool allowing the user to set the device parameters and view the produced data through convenient command-\/line interface.
+\end{DoxyItemize}\hypertarget{index_devices}{}\doxysubsection{\texorpdfstring{Supported devices}{Supported devices}}\label{index_devices}
+In its current state the library supports any Witmotion device using the \doxysectlink{witmotion_protocol}{unified Witmotion communication protocol}{0}. The following table enumerates devices which are currently tested and {\bfseries{fully}} supported.
+
+\tabulinesep=1mm
+\begin{longtabu}spread 0pt [c]{*{3}{|X[-1]}|}
+\hline
+\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Device/\+Part ID   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Description   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Testing status    }\\\cline{1-3}
+\endfirsthead
+\hline
+\endfoot
+\hline
+\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Device/\+Part ID   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Description   }&\PBS\centering \cellcolor{\tableheadbgcolor}\textbf{ Testing status    }\\\cline{1-3}
+\endhead
+{\bfseries{WT31N}}   &3-\/Axis Accelerometer/\+Gyroscope (linear accelerations + 2-\/axis Euler angles gravity tracking)   &Tested on baud rates 9600 and 115200 baud, polling frequencies up to 100 Hz    \\\cline{1-3}
+{\bfseries{JY901B}}   &9-\/Axis Combined IMU/\+Magnetometer/\+Altimeter (linear accelerations, angular velocities, Euler angles, magnetic field, barometry, altitude)   &Tested on baud rates from 2400 to 115200 baud, polling frequencies up to 150 Hz    \\\cline{1-3}
+{\bfseries{WT901}}   &9-\/Axis Combined Open Circuit IMU/\+Magnetometer (linear accelerations, angular velocities, Euler angles, magnetic field)   &Tested on baud rates from 2400 to 115200 baud, polling frequencies up to \texorpdfstring{$\sim$}{\string~}180 Hz   \\\cline{1-3}
+\end{longtabu}
+\hypertarget{index_contrib}{}\doxysection{\texorpdfstring{Contribution}{Contribution}}\label{index_contrib}
+The library is still a project under active development, so any user contribution is encouraged. Please do not hesitate to create pull requests \href{https://github.com/ElettraSciComp/witmotion_IMU_QT/pulls}{\texttt{ here}}. Here below is the list of currently incompleted tasks presented with the corresponding Github issues.\hypertarget{index_autotoc_md4}{}\doxysubsection{\texorpdfstring{List of incompleted development tasks}{List of incompleted development tasks}}\label{index_autotoc_md4}
+
+\begin{DoxyItemize}
+\item Writing documentation (ANY help is encouraged)
+\item \href{https://github.com/ElettraSciComp/witmotion_IMU_QT/issues/5}{\texttt{ Create installation/packaging scripts for system-\/wide installation of the library}}
+\item \href{https://github.com/ElettraSciComp/witmotion_IMU_QT/issues/6}{\texttt{ Implementation of the subdirectory-\/based or submodule-\/based link for the existing projects}} 
+\end{DoxyItemize}

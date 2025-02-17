@@ -1,0 +1,131 @@
+\doxysection{util.\+h}
+\hypertarget{util_8h_source}{}\label{util_8h_source}\index{util.h@{util.h}}
+\mbox{\hyperlink{util_8h}{Go to the documentation of this file.}}
+\begin{DoxyCode}{0}
+\DoxyCodeLine{00001\ \textcolor{comment}{/*!}}
+\DoxyCodeLine{00002\ \textcolor{comment}{\ \ \ \ \(\backslash\)file\ util.h}}
+\DoxyCodeLine{00003\ \textcolor{comment}{\ \ \ \ \(\backslash\)brief\ Helper\ and\ utility\ functions\ to\ decode\ and\ represent\ the\ data}}
+\DoxyCodeLine{00004\ \textcolor{comment}{\ \ \ \ \(\backslash\)author\ Andrey\ Vukolov\ andrey.vukolov@elettra.eu}}
+\DoxyCodeLine{00005\ \textcolor{comment}{*/}}
+\DoxyCodeLine{00006\ }
+\DoxyCodeLine{00007\ \textcolor{preprocessor}{\#}\textcolor{preprocessor}{ifndef}\ \textcolor{preprocessor}{WITMOTION\_UTIL}}
+\DoxyCodeLine{00008\ \textcolor{preprocessor}{\#}\textcolor{preprocessor}{define}\ \textcolor{preprocessor}{WITMOTION\_UTIL}}
+\DoxyCodeLine{00009\ \textcolor{preprocessor}{\#}\textcolor{preprocessor}{include}\ \textcolor{preprocessor}{"{}witmotion/types.h"{}}}
+\DoxyCodeLine{00010\ }
+\DoxyCodeLine{00011\ \textcolor{keyword}{namespace}\ \mbox{\hyperlink{namespacewitmotion}{witmotion}}}
+\DoxyCodeLine{00012\ \{}
+\DoxyCodeLine{00013\ }
+\DoxyCodeLine{00014\ \textcolor{keyword}{class}\ \mbox{\hyperlink{classwitmotion_1_1witmotion__typed__packets}{witmotion\_typed\_packets}}}
+\DoxyCodeLine{00015\ \{}
+\DoxyCodeLine{00016\ \textcolor{keyword}{private}:}
+\DoxyCodeLine{00017\ \ \ \ \ \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\_datapacket}}\ array[32];}
+\DoxyCodeLine{00018\ \textcolor{keyword}{public}:}
+\DoxyCodeLine{00019\ \ \ \ \ \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\_datapacket}}\&\ operator[](\textcolor{keyword}{const}\ \mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3}{witmotion\_packet\_id}}\ id);}
+\DoxyCodeLine{00020\ \};}
+\DoxyCodeLine{00021\ }
+\DoxyCodeLine{00022\ \textcolor{keyword}{class}\ \mbox{\hyperlink{classwitmotion_1_1witmotion__typed__bytecounts}{witmotion\_typed\_bytecounts}}}
+\DoxyCodeLine{00023\ \{}
+\DoxyCodeLine{00024\ \textcolor{keyword}{private}:}
+\DoxyCodeLine{00025\ \ \ \ \ size\_t\ array[32];}
+\DoxyCodeLine{00026\ \textcolor{keyword}{public}:}
+\DoxyCodeLine{00027\ \ \ \ \ witmotion\_typed\_bytecounts();}
+\DoxyCodeLine{00028\ \ \ \ \ size\_t\&\ operator[](\textcolor{keyword}{const}\ \mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3}{witmotion\_packet\_id}}\ id);}
+\DoxyCodeLine{00029\ \};}
+\DoxyCodeLine{00030\ }
+\DoxyCodeLine{00031\ \textcolor{comment}{/*!}}
+\DoxyCodeLine{00032\ \textcolor{comment}{\ \(\backslash\)brief\ Converts\ the\ frequency\ value\ in\ Hertz\ to\ subsequent\ Witmotion\ opcode.}}
+\DoxyCodeLine{00033\ \textcolor{comment}{}}
+\DoxyCodeLine{00034\ \textcolor{comment}{\ Special\ values\ for\ the\ \`{}hertz`\ argument\ are:}}
+\DoxyCodeLine{00035\ \textcolor{comment}{\ |Value|Description|}}
+\DoxyCodeLine{00036\ \textcolor{comment}{\ |-\/-\/-\/-\/-\/|-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/|}}
+\DoxyCodeLine{00037\ \textcolor{comment}{\ |`0`\ \ |\ Shuts\ down\ the\ measurements\ but\ does\ not\ turn\ the\ device\ into\ [dormant\ mode](\(\backslash\)ref\ ridStandbyMode)\ |}}
+\DoxyCodeLine{00038\ \textcolor{comment}{\ |`-\/1`\ |\ Orders\ the\ single-\/shot\ measurement,\ then\ shutdown\ |}}
+\DoxyCodeLine{00039\ \textcolor{comment}{\ |`-\/2`\ |\ 1\ measurement\ in\ 2\ seconds\ |}}
+\DoxyCodeLine{00040\ \textcolor{comment}{\ |`-\/10`|\ 1\ measurement\ in\ 10\ seconds\ |}}
+\DoxyCodeLine{00041\ \textcolor{comment}{\ \(\backslash\)param\ hertz\ -\/\ frequency\ in\ Hertz,\ or\ a\ special\ value\ as\ it\ is\ described\ above}}
+\DoxyCodeLine{00042\ \textcolor{comment}{\ \(\backslash\)return\ Witmotion\ opcode\ value\ as\ a\ byte,\ \`{}0x06`\ (10\ Hz)\ by\ default\ is\ the\ argument\ is\ inacceptable}}
+\DoxyCodeLine{00043\ \textcolor{comment}{\ */}}
+\DoxyCodeLine{00044\ uint8\_t\ \mbox{\hyperlink{namespacewitmotion_a90e09a9e4f3d24ab522bee3aa9bf9c78}{witmotion\_output\_frequency}}(\textcolor{keyword}{const}\ \textcolor{keywordtype}{int}\ hertz);}
+\DoxyCodeLine{00045\ }
+\DoxyCodeLine{00046\ uint8\_t\ witmotion\_baud\_rate(\textcolor{keyword}{const}\ QSerialPort::BaudRate\ rate);}
+\DoxyCodeLine{00047\ }
+\DoxyCodeLine{00048\ \textcolor{keywordtype}{bool}\ id\_registered(\textcolor{keyword}{const}\ size\_t\ id);}
+\DoxyCodeLine{00049\ }
+\DoxyCodeLine{00050\ \textcolor{comment}{/*\ COMPONENT\ DECODERS\ */}}
+\DoxyCodeLine{00051\ \textcolor{keywordtype}{float}\ decode\_acceleration(\textcolor{keyword}{const}\ int16\_t*\ value);}
+\DoxyCodeLine{00052\ \textcolor{keywordtype}{float}\ decode\_angular\_velocity(\textcolor{keyword}{const}\ int16\_t*\ value);}
+\DoxyCodeLine{00053\ \textcolor{keywordtype}{float}\ decode\_angle(\textcolor{keyword}{const}\ int16\_t*\ value);}
+\DoxyCodeLine{00054\ \textcolor{keywordtype}{float}\ decode\_temperature(\textcolor{keyword}{const}\ int16\_t*\ value);}
+\DoxyCodeLine{00055\ \textcolor{keywordtype}{float}\ decode\_orientation(\textcolor{keyword}{const}\ int16\_t*\ value);}
+\DoxyCodeLine{00056\ \textcolor{keywordtype}{void}\ decode\_gps\_coord(\textcolor{keyword}{const}\ int32\_t*\ value,}
+\DoxyCodeLine{00057\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{double}\&\ deg,}
+\DoxyCodeLine{00058\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{double}\&\ min);}
+\DoxyCodeLine{00059\ }
+\DoxyCodeLine{00060\ \textcolor{comment}{/*\ PACKET\ DECODERS\ */}}
+\DoxyCodeLine{00061\ \textcolor{keywordtype}{void}\ decode\_realtime\_clock(\textcolor{keyword}{const}\ \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\_datapacket}}\&\ packet,}
+\DoxyCodeLine{00062\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ uint8\_t\&\ year,}
+\DoxyCodeLine{00063\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ uint8\_t\&\ month,}
+\DoxyCodeLine{00064\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ uint8\_t\&\ day,}
+\DoxyCodeLine{00065\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ uint8\_t\&\ hour,}
+\DoxyCodeLine{00066\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ uint8\_t\&\ minute,}
+\DoxyCodeLine{00067\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ uint8\_t\&\ second,}
+\DoxyCodeLine{00068\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ uint16\_t\&\ millisecond);}
+\DoxyCodeLine{00069\ \textcolor{keywordtype}{void}\ decode\_accelerations(\textcolor{keyword}{const}\ \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\_datapacket}}\&\ packet,}
+\DoxyCodeLine{00070\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ x,}
+\DoxyCodeLine{00071\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ y,}
+\DoxyCodeLine{00072\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ z,}
+\DoxyCodeLine{00073\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ t);}
+\DoxyCodeLine{00074\ \textcolor{keywordtype}{void}\ decode\_angular\_velocities(\textcolor{keyword}{const}\ \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\_datapacket}}\&\ packet,}
+\DoxyCodeLine{00075\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ x,}
+\DoxyCodeLine{00076\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ y,}
+\DoxyCodeLine{00077\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ z,}
+\DoxyCodeLine{00078\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ t);}
+\DoxyCodeLine{00079\ \textcolor{keywordtype}{void}\ decode\_angles(\textcolor{keyword}{const}\ \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\_datapacket}}\&\ packet,}
+\DoxyCodeLine{00080\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ roll,}
+\DoxyCodeLine{00081\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ pitch,}
+\DoxyCodeLine{00082\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ yaw,}
+\DoxyCodeLine{00083\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ t);}
+\DoxyCodeLine{00084\ \textcolor{keywordtype}{void}\ decode\_magnetometer(\textcolor{keyword}{const}\ \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\_datapacket}}\&\ packet,}
+\DoxyCodeLine{00085\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ x,}
+\DoxyCodeLine{00086\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ y,}
+\DoxyCodeLine{00087\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ z,}
+\DoxyCodeLine{00088\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ t);}
+\DoxyCodeLine{00089\ \textcolor{keywordtype}{void}\ decode\_altimeter(\textcolor{keyword}{const}\ \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\_datapacket}}\&\ packet,}
+\DoxyCodeLine{00090\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{double}\&\ pressure,}
+\DoxyCodeLine{00091\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{double}\&\ height);}
+\DoxyCodeLine{00092\ \textcolor{keywordtype}{void}\ decode\_gps(\textcolor{keyword}{const}\ \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\_datapacket}}\&\ packet,}
+\DoxyCodeLine{00093\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{double}\&\ longitude\_deg,}
+\DoxyCodeLine{00094\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{double}\&\ longitude\_min,}
+\DoxyCodeLine{00095\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{double}\&\ latitude\_deg,}
+\DoxyCodeLine{00096\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{double}\&\ latitude\_min);}
+\DoxyCodeLine{00097\ \textcolor{keywordtype}{void}\ decode\_gps\_ground\_speed(\textcolor{keyword}{const}\ \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\_datapacket}}\&\ packet,}
+\DoxyCodeLine{00098\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ altitude,}
+\DoxyCodeLine{00099\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ angular\_velocity,}
+\DoxyCodeLine{00100\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{double}\&\ ground\_speed);}
+\DoxyCodeLine{00101\ \textcolor{keywordtype}{void}\ decode\_orientation(\textcolor{keyword}{const}\ \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\_datapacket}}\&\ packet,}
+\DoxyCodeLine{00102\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ x,}
+\DoxyCodeLine{00103\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ y,}
+\DoxyCodeLine{00104\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ z,}
+\DoxyCodeLine{00105\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ w);}
+\DoxyCodeLine{00106\ \textcolor{keywordtype}{void}\ decode\_gps\_accuracy(\textcolor{keyword}{const}\ \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\_datapacket}}\&\ packet,}
+\DoxyCodeLine{00107\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ size\_t\&\ satellites,}
+\DoxyCodeLine{00108\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ local\_accuracy,}
+\DoxyCodeLine{00109\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ horizontal\_accuracy,}
+\DoxyCodeLine{00110\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\&\ vertical\_accuracy);}
+\DoxyCodeLine{00111\ }
+\DoxyCodeLine{00112\ \textcolor{comment}{/*\ MISCELLANEOUS\ UTILITIES\ */}}
+\DoxyCodeLine{00113\ \textcolor{keyword}{template}<\textcolor{keyword}{typename}\ T>\ T\ variance(\textcolor{keyword}{const}\ std::vector<T>\&\ array)}
+\DoxyCodeLine{00114\ \{}
+\DoxyCodeLine{00115\ \ \ \ \ T\ sum\ =\ std::accumulate(array.begin(),\ array.end(),\ 0.f);}
+\DoxyCodeLine{00116\ \ \ \ \ T\ mean\ =\ sum\ /\ \textcolor{keyword}{static\_cast}<T>(array.size());}
+\DoxyCodeLine{00117\ \ \ \ \ T\ sq\_dif\ =\ 0.f;}
+\DoxyCodeLine{00118\ \ \ \ \ \textcolor{keywordflow}{for}(\textcolor{keyword}{auto}\ i\ =\ array.begin();\ i\ !=\ array.end();\ i++)}
+\DoxyCodeLine{00119\ \ \ \ \ \ \ \ \ sq\_dif\ +=\ std::pow((*i)\ -\/\ mean,\ 2);}
+\DoxyCodeLine{00120\ \ \ \ \ sq\_dif\ /=\ (array.size()\ >\ 1)\ ?\ \textcolor{keyword}{static\_cast}<T>(array.size()\ -\/\ 1)\ :\ 1.f;}
+\DoxyCodeLine{00121\ \ \ \ \ \textcolor{keywordflow}{return}\ std::sqrt(sq\_dif);}
+\DoxyCodeLine{00122\ \}}
+\DoxyCodeLine{00123\ }
+\DoxyCodeLine{00124\ \}}
+\DoxyCodeLine{00125\ \textcolor{preprocessor}{\#}\textcolor{preprocessor}{endif}}
+
+\end{DoxyCode}

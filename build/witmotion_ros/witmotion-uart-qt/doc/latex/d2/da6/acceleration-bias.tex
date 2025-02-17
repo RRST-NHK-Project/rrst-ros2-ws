@@ -1,0 +1,18 @@
+\chapter{Acceleration bias calculation}
+\hypertarget{acceleration-bias}{}\label{acceleration-bias}\index{Acceleration bias calculation@{Acceleration bias calculation}}
+\hypertarget{acceleration-bias_autotoc_md0}{}\doxysection{\texorpdfstring{Disclaimer}{Disclaimer}}\label{acceleration-bias_autotoc_md0}
+The algorithm explained here is determined during the tests. It can be different from the original undocumented algorithm used by Witmotion in their own sensor control tool.\hypertarget{acceleration-bias_autotoc_md1}{}\doxysection{\texorpdfstring{Data layout}{Data layout}}\label{acceleration-bias_autotoc_md1}
+In witmotion\+\_\+config\+\_\+packet the {\ttfamily setting} field uses inverse-\/byte data layout\+:
+\begin{DoxyItemize}
+\item {\ttfamily setting.\+raw\mbox{[}0\mbox{]}} is the {\bfseries{fine}} tuning part of bias from 0.\+0 to -\/0.\+25, divided into 256 grades, {\ttfamily uint8\+\_\+t}
+\item {\ttfamily setting.\+raw\mbox{[}1\mbox{]}} is the {\bfseries{rough}} tuning part of bias, imposed as signed integer, 127 bidirectional grades, {\ttfamily int8\+\_\+t}
+\end{DoxyItemize}\hypertarget{acceleration-bias_autotoc_md2}{}\doxysection{\texorpdfstring{Calculation}{Calculation}}\label{acceleration-bias_autotoc_md2}
+The sensor built-\/in calibration coefficient is 4, so the original formula looks as the following\+:  \begin{eqnarray*}
+    B &=& bias \\
+    B_a^{rough} &=& trunc(4 \cdot B) \; \mbox{if} \left| B \right| < 127 \\
+    \left| B_a^{rough} \right| &=& 127 \; \mbox{otherwise} \\
+    B_a^{fine} &=& \frac{255}{0.25} \left( 0.25 - \left| bias \bmod 0.25 \right| \right) \mbox{if}\; bias < 0 \\
+    &=& \frac{255}{0.25} \left| bias \bmod 0.25 \right| \; \mbox{otherwise}
+\end{eqnarray*}
+
+Then the fractional parts of $ B_a^{rough} $ and $  B_a^{fine} $ should be discarded and the values exposed as {\itshape signed} integers into {\ttfamily setting.\+raw} subfields. 

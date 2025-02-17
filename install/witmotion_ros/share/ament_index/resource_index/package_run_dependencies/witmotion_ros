@@ -1,0 +1,1 @@
+tf2_geometry_msgs;rclcpp;std_srvs;rcl_interfaces;rclcpp_lifecycle;lifecycle_msgs;qtbase5-dev;libqt5-serialport;boost;nav_msgs;std_msgs;tf2;ament_lint_auto;ament_lint_common

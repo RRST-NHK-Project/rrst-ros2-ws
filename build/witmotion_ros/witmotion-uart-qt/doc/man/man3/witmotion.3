@@ -1,0 +1,529 @@
+.TH "witmotion" 3 "Mon Feb 17 2025 17:07:52" "Version 1.2.28~dev_5c2e86d" "Witmotion IMU Library" \" -*- nroff -*-
+.ad l
+.nh
+.SH NAME
+witmotion \- Main namespace of Witmotion UART connection library\&.  
+
+.SH SYNOPSIS
+.br
+.PP
+.SS "Classes"
+
+.in +1c
+.ti -1c
+.RI "class \fBQAbstractWitmotionSensorController\fP"
+.br
+.ti -1c
+.RI "class \fBQAbstractWitmotionSensorReader\fP"
+.br
+.RI "Abstract base class to program convenience classes for the sensors\&. "
+.ti -1c
+.RI "class \fBQBaseSerialWitmotionSensorReader\fP"
+.br
+.ti -1c
+.RI "class \fBQGeneralSensorController\fP"
+.br
+.ti -1c
+.RI "struct \fBwitmotion_config_packet\fP"
+.br
+.RI "Generic structure respresenting the standard 5-byte configuration command defined in Witmotion protocol\&. "
+.ti -1c
+.RI "struct \fBwitmotion_datapacket\fP"
+.br
+.RI "Generic structure respresenting the standard 11-byte datapacket defined in Witmotion protocol\&. "
+.ti -1c
+.RI "class \fBwitmotion_typed_bytecounts\fP"
+.br
+.ti -1c
+.RI "class \fBwitmotion_typed_packets\fP"
+.br
+.in -1c
+.SS "Enumerations"
+
+.in +1c
+.ti -1c
+.RI "enum \fBwitmotion_packet_id\fP { \fBpidRTC\fP = 0x50, \fBpidAcceleration\fP = 0x51, \fBpidAngularVelocity\fP = 0x52, \fBpidAngles\fP = 0x53, \fBpidMagnetometer\fP = 0x54, \fBpidDataPortStatus\fP = 0x55, \fBpidAltimeter\fP = 0x56, \fBpidGPSCoordinates\fP = 0x57, \fBpidGPSGroundSpeed\fP = 0x58, \fBpidOrientation\fP = 0x59, \fBpidGPSAccuracy\fP = 0x5A }"
+.br
+.RI "Packet type IDs from the vendor-defined protocol\&. "
+.ti -1c
+.RI "enum \fBwitmotion_config_register_id\fP { \fBridSaveSettings\fP = 0x00, \fBridCalibrate\fP = 0x01, \fBridOutputValueSet\fP = 0x02, \fBridOutputFrequency\fP = 0x03, \fBridPortBaudRate\fP = 0x04, \fBridAccelerationBiasX\fP = 0x05, \fBridAccelerationBiasY\fP = 0x06, \fBridAccelerationBiasZ\fP = 0x07, \fBridAngularVelocityBiasX\fP = 0x08, \fBridAngularVelocityBiasY\fP = 0x09, \fBridAngularVelocityBiasZ\fP = 0x0A, \fBridMagnetometerBiasX\fP = 0x0B, \fBridMagnetometerBiasY\fP = 0x0C, \fBridMagnetometerBiasZ\fP = 0x0D, \fBridPortModeD0\fP = 0x0E, \fBridPortModeD1\fP = 0x0F, \fBridPortModeD2\fP = 0x10, \fBridPortModeD3\fP = 0x11, \fBridPortPWMLevelD0\fP = 0x12, \fBridPortPWMLevelD1\fP = 0x13, \fBridPortPWMLevelD2\fP = 0x14, \fBridPortPWMLevelD3\fP = 0x15, \fBridPortPWMPeriodD0\fP = 0x16, \fBridPortPWMPeriodD1\fP = 0x17, \fBridPortPWMPeriodD2\fP = 0x18, \fBridPortPWMPeriodD3\fP = 0x19, \fBridIICAddress\fP = 0x1A, \fBridLED\fP = 0x1B, \fBridGPSBaudRate\fP = 0x1C, \fBridFilterBandwidth\fP = 0x1F, \fBridGyroscopeRange\fP = 0x20, \fBridAccelerometerRange\fP = 0x21, \fBridStandbyMode\fP = 0x22, \fBridInstallationDirection\fP = 0x23, \fBridTransitionAlgorithm\fP = 0x24, \fBridInstructionStart\fP = 0x2D, \fBridTimeYearMonth\fP = 0x30, \fBridTimeDayHour\fP = 0x31, \fBridTimeMinuteSecond\fP = 0x32, \fBridTimeMilliseconds\fP = 0x33, \fBridSetAccelerationX\fP = 0x34, \fBridSetAccelerationY\fP = 0x35, \fBridSetAccelerationZ\fP = 0x36, \fBridSetAngularVelocityX\fP = 0x37, \fBridSetAngularVelocityY\fP = 0x38, \fBridSetAngularVelocityZ\fP = 0x39, \fBridSetMagnetometerX\fP = 0x3A, \fBridSetMagnetometerY\fP = 0x3B, \fBridSetMagnetometerZ\fP = 0x3C, \fBridSetAngleRoll\fP = 0x3D, \fBridSetAnglePitch\fP = 0x3E, \fBridSetAngleYaw\fP = 0x3F, \fBridSetTemperature\fP = 0x40, \fBridSetPortStatusD0\fP = 0x41, \fBridSetPortStatusD1\fP = 0x42, \fBridSetPortStatusD2\fP = 0x43, \fBridSetPortStatusD3\fP = 0x44, \fBridSetPressureLow\fP = 0x45, \fBridSetPressureHigh\fP = 0x46, \fBridSetAltitudeLow\fP = 0x47, \fBridSetAltitudeHigh\fP = 0x48, \fBridSetLongitudeLow\fP = 0x49, \fBridSetLongitudeHigh\fP = 0x4A, \fBridSetLatitudeLow\fP = 0x4B, \fBridSetLatitudeHigh\fP = 0x4C, \fBridSetGPSAltitude\fP = 0x4D, \fBridSetGPSYaw\fP = 0x4E, \fBridSetGPSGroundSpeedLow\fP = 0x4F, \fBridSetGPSGroundSpeedHigh\fP = 0x50, \fBridSetOrientationX\fP = 0x51, \fBridSetOrientationY\fP = 0x52, \fBridSetOrientationZ\fP = 0x53, \fBridSetOrientationW\fP = 0x54, \fBridGyroscopeAutoCalibrate\fP = 0x63, \fBridUnlockConfiguration\fP = 0x69 }"
+.br
+.RI "List of configuration slots (registers) available for the library\&. "
+.in -1c
+.SS "Functions"
+
+.in +1c
+.ti -1c
+.RI "uint8_t \fBwitmotion_output_frequency\fP (const int hertz)"
+.br
+.RI "Converts the frequency value in Hertz to subsequent Witmotion opcode\&. "
+.ti -1c
+.RI "uint8_t \fBwitmotion_baud_rate\fP (const QSerialPort::BaudRate rate)"
+.br
+.ti -1c
+.RI "bool \fBid_registered\fP (const size_t id)"
+.br
+.ti -1c
+.RI "float \fBdecode_acceleration\fP (const int16_t *value)"
+.br
+.ti -1c
+.RI "float \fBdecode_angular_velocity\fP (const int16_t *value)"
+.br
+.ti -1c
+.RI "float \fBdecode_angle\fP (const int16_t *value)"
+.br
+.ti -1c
+.RI "float \fBdecode_temperature\fP (const int16_t *value)"
+.br
+.ti -1c
+.RI "float \fBdecode_orientation\fP (const int16_t *value)"
+.br
+.ti -1c
+.RI "void \fBdecode_gps_coord\fP (const int32_t *value, double &deg, double &min)"
+.br
+.ti -1c
+.RI "void \fBdecode_realtime_clock\fP (const \fBwitmotion_datapacket\fP &packet, uint8_t &year, uint8_t &month, uint8_t &day, uint8_t &hour, uint8_t &minute, uint8_t &second, uint16_t &millisecond)"
+.br
+.ti -1c
+.RI "void \fBdecode_accelerations\fP (const \fBwitmotion_datapacket\fP &packet, float &x, float &y, float &z, float &t)"
+.br
+.ti -1c
+.RI "void \fBdecode_angular_velocities\fP (const \fBwitmotion_datapacket\fP &packet, float &x, float &y, float &z, float &t)"
+.br
+.ti -1c
+.RI "void \fBdecode_angles\fP (const \fBwitmotion_datapacket\fP &packet, float &roll, float &pitch, float &yaw, float &t)"
+.br
+.ti -1c
+.RI "void \fBdecode_magnetometer\fP (const \fBwitmotion_datapacket\fP &packet, float &x, float &y, float &z, float &t)"
+.br
+.ti -1c
+.RI "void \fBdecode_altimeter\fP (const \fBwitmotion_datapacket\fP &packet, double &pressure, double &height)"
+.br
+.ti -1c
+.RI "void \fBdecode_gps\fP (const \fBwitmotion_datapacket\fP &packet, double &longitude_deg, double &longitude_min, double &latitude_deg, double &latitude_min)"
+.br
+.ti -1c
+.RI "void \fBdecode_gps_ground_speed\fP (const \fBwitmotion_datapacket\fP &packet, float &altitude, float &angular_velocity, double &ground_speed)"
+.br
+.ti -1c
+.RI "void \fBdecode_orientation\fP (const \fBwitmotion_datapacket\fP &packet, float &x, float &y, float &z, float &w)"
+.br
+.ti -1c
+.RI "void \fBdecode_gps_accuracy\fP (const \fBwitmotion_datapacket\fP &packet, size_t &satellites, float &local_accuracy, float &horizontal_accuracy, float &vertical_accuracy)"
+.br
+.ti -1c
+.RI "template<typename T > T \fBvariance\fP (const std::vector< T > &array)"
+.br
+.ti -1c
+.RI "static const std::string \fBlibrary_version\fP ()"
+.br
+.in -1c
+.SS "Variables"
+
+.in +1c
+.ti -1c
+.RI "static const uint8_t \fBWITMOTION_HEADER_BYTE\fP = 0x55"
+.br
+.RI "Packet header byte value (vendor protocol-specific) "
+.ti -1c
+.RI "static const uint8_t \fBWITMOTION_CONFIG_HEADER\fP = 0xFF"
+.br
+.RI "Configuration header byte value (vendor protocol-specific) "
+.ti -1c
+.RI "static const uint8_t \fBWITMOTION_CONFIG_KEY\fP = 0xAA"
+.br
+.RI "Configuration marker key byte value (vendor protocol-specific) "
+.ti -1c
+.RI "static const std::set< size_t > \fBwitmotion_registered_ids\fP"
+.br
+.RI "Packet ID set to retrieve descriptions via \fBwitmotion_packet_descriptions\fP\&. "
+.ti -1c
+.RI "static const std::map< uint8_t, std::string > \fBwitmotion_packet_descriptions\fP"
+.br
+.RI "Packet ID string set to store built-in descriptions for \fBmessage-enumerator\fP\&. "
+.in -1c
+.SH "Detailed Description"
+.PP 
+Upper level namespace containing all the declared constants, parameters, classes, functions\&.
+.PP
+\fBNote\fP
+.RS 4
+It is strictly NOT RECOMMENDED to use this namespace implicitly through \fCusing namespace\fP directive\&. 
+.RE
+.PP
+
+.SH "Enumeration Type Documentation"
+.PP 
+.SS "enum \fBwitmotion::witmotion_config_register_id\fP"
+List of configuration slots (registers) available for the library\&. The actual availability depends from the actual sensor and installation circuit\&. Please refer to the official documentation for detailed explanation\&. 
+.PP
+\fBEnumerator\fP
+.in +1c
+.TP
+\fB\fIridSaveSettings \fP\fP
+Saves the settings uploaded in the current bringup session, or resets it to default (if supported)\&. To make factory reset of the sensor, set \fCraw[0] = 0x01\fP in \fBwitmotion_config_packet\fP instance used\&. 
+.TP
+\fB\fIridCalibrate \fP\fP
+Sets the sensor to calibration mode\&. The value stored in \fBwitmotion_config_packet::setting\fP\&.`raw[0]` determines device selection:
+.IP "\(bu" 2
+\fC0x00\fP - End calibration
+.IP "\(bu" 2
+\fC0x01\fP - Accelerometer calibration
+.IP "\(bu" 2
+\fC0x03\fP - Altitude reset (only for barometric altimeter)
+.IP "\(bu" 2
+\fC0x04\fP - Yaw [Z] Euler angle origin point reset
+.IP "\(bu" 2
+\fC0x07\fP - Magnetometer calibration
+.IP "\(bu" 2
+\fC0x08\fP - Angle reference reset 
+.PP
+
+.TP
+\fB\fIridOutputValueSet \fP\fP
+Regulates sensor output\&. The value stored in \fBwitmotion_config_packet::setting\fP\&.`raw` determines packet ID selection to output from low to high bits by offset\&. \fC0\fP means disabling of the selected data packet output\&.
+.PP
+\fCraw[0]\fP offset   Packet type   \fCraw[1]\fP offset   Packet type    0   \fBpidRTC\fP   0   \fBpidGPSGroundSpeed\fP    1   \fBpidAcceleration\fP   1   \fBpidOrientation\fP    2   \fBpidAngularVelocity\fP   2   \fBpidGPSAccuracy\fP    3   \fBpidAngles\fP   3   Reserved    4   \fBpidMagnetometer\fP   4   Reserved    5   \fBpidDataPortStatus\fP   5   Reserved    6   \fBpidAltimeter\fP   6   Reserved    7   \fBpidGPSCoordinates\fP   7   Reserved   
+.TP
+\fB\fIridOutputFrequency \fP\fP
+Regulates output frequency\&. \fBNOTE\fP: the maximum available frequency is determined internally by the available bandwidth obtained from \fBridPortBaudRate\fP\&. The actual value stored in \fBwitmotion_config_packet::setting\fP\&.`raw[0]` can be determined from the following table\&. \fBwitmotion_config_packet::setting\fP\&.`raw[1]` is set to \fC0x00\fP\&. Also the table contains argument value for \fBwitmotion_output_frequency\fP helper function which is used by the controller applications\&.
+.PP
+Frequency, Hz   Value   Argument    0 (shutdown)   \fC0x0D\fP   0    0 (single measurement)   \fC0x0C\fP   -1    0\&.1   \fC0x01\fP   -10    0\&.5   \fC0x02\fP   -2    1   \fC0x03\fP   1    2   \fC0x04\fP   2    5   \fC0x05\fP   5    10 (default)   \fC0x06\fP   10    20   \fC0x07\fP   20    50   \fC0x08\fP   50    100   \fC0x09\fP   100    125   \fC0x0A\fP   125    200   \fC0x0B\fP   200    Maximal available by hardware   \fC0x0C\fP   Not supported   
+.TP
+\fB\fIridPortBaudRate \fP\fP
+Regulates port baud rate\&. \fBNOTE\fP: the sensor has no possibility of hardware flow control and it cannot report to the system what baud rate should be explicitly used! The actual value stored in \fBwitmotion_config_packet::setting\fP\&.`raw[0]` can be determined from the following table\&. \fBwitmotion_config_packet::setting\fP\&.`raw[1]` is set to \fC0x00\fP\&. The \fBwitmotion_baud_rate\fP helper function argument is accepted as \fCQSerialPort::BaudRate\fP enumeration member, so only the speed inticated in that enumeration are explicitly supported\&. \fBRate, baud\fP   1200/1400   4800   9600   19200   38400   57600   115200    \fBValue\fP   \fC0x00\fP   \fC0x01\fP   \fC0x02\fP   \fC0x03\fP   \fC0x04\fP   \fC0x05\fP   \fC0x06\fP   
+.PP
+This parameter also implicitly sets \fBridOutputFrequency\fP to the maximal feasible value for the available bandwidth\&. 
+.TP
+\fB\fIridAccelerationBiasX \fP\fP
+Sets acceleration zero point bias for X axis, refer to \fBAcceleration bias calculation\fP page for explanation\&. 
+.TP
+\fB\fIridAccelerationBiasY \fP\fP
+Sets acceleration zero point bias for Y axis, refer to \fBAcceleration bias calculation\fP page for explanation\&. 
+.TP
+\fB\fIridAccelerationBiasZ \fP\fP
+Sets acceleration zero point bias for Z axis, refer to \fBAcceleration bias calculation\fP page for explanation\&. 
+.TP
+\fB\fIridAngularVelocityBiasX \fP\fP
+Sets angular velocity zero point bias for X axis\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridAngularVelocityBiasY \fP\fP
+Sets angular velocity zero point bias for Y axis\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridAngularVelocityBiasZ \fP\fP
+Sets angular velocity zero point bias for Z axis\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridMagnetometerBiasX \fP\fP
+Sets magnetometer zero point bias for X axis\&. \fBMAY BLOCK THE MEASUREMENTS\fP 
+.TP
+\fB\fIridMagnetometerBiasY \fP\fP
+Sets magnetometer zero point bias for Y axis\&. \fBMAY BLOCK THE MEASUREMENTS\fP 
+.TP
+\fB\fIridMagnetometerBiasZ \fP\fP
+Sets magnetometer zero point bias for Z axis\&. \fBMAY BLOCK THE MEASUREMENTS\fP 
+.TP
+\fB\fIridPortModeD0 \fP\fP
+Digital port D0 mode\&. The values are set only via \fBwitmotion_config_packet::setting\fP\&.`raw[0]` whilst \fBwitmotion_config_packet::setting\fP\&.`raw[1]` is set to 0\&. Please refer to the following table to determine the exact value needed\&.
+.PP
+\fBDescription\fP   Analog input (default)   Digital input   Digital output (high)   Digital output (low)   PWM output    \fBValue\fP   \fC0x00\fP   \fC0x01\fP   \fC0x02\fP   \fC0x03\fP   \fC0x04\fP   
+.TP
+\fB\fIridPortModeD1 \fP\fP
+Digital port D1 mode\&. The values are set only via \fBwitmotion_config_packet::setting\fP\&.`raw[0]` whilst \fBwitmotion_config_packet::setting\fP\&.`raw[1]` is set to 0\&. Please refer to the following table to determine the exact value needed\&.
+.PP
+\fBDescription\fP   Analog input (default)   Digital input   Digital output (high)   Digital output (low)   PWM output    \fBValue\fP   \fC0x00\fP   \fC0x01\fP   \fC0x02\fP   \fC0x03\fP   \fC0x04\fP   
+.PP
+\fBNote\fP
+.RS 4
+If the external GPS receiver is used to obtain world time, and it is compatible with Witmotion serial protocol, the port D1 should be connected to its \fBTX\fP pin and turned into GPS receiver port by the special value \fC0x05\fP set for this register\&. The baud rate on which GPS receiver communicates with the sensor, is set via \fBridGPSBaudRate\fP register\&. 
+.RE
+.PP
+
+.TP
+\fB\fIridPortModeD2 \fP\fP
+Digital port D2 mode\&. The values are set only via \fBwitmotion_config_packet::setting\fP\&.`raw[0]` whilst \fBwitmotion_config_packet::setting\fP\&.`raw[1]` is set to 0\&. Please refer to the following table to determine the exact value needed\&.
+.PP
+\fBDescription\fP   Analog input (default)   Digital input   Digital output (high)   Digital output (low)   PWM output    \fBValue\fP   \fC0x00\fP   \fC0x01\fP   \fC0x02\fP   \fC0x03\fP   \fC0x04\fP   
+.TP
+\fB\fIridPortModeD3 \fP\fP
+Digital port D3 mode\&. The values are set only via \fBwitmotion_config_packet::setting\fP\&.`raw[0]` whilst \fBwitmotion_config_packet::setting\fP\&.`raw[1]` is set to 0\&. Please refer to the following table to determine the exact value needed\&.
+.PP
+\fBDescription\fP   Analog input (default)   Digital input   Digital output (high)   Digital output (low)   PWM output    \fBValue\fP   \fC0x00\fP   \fC0x01\fP   \fC0x02\fP   \fC0x03\fP   \fC0x04\fP   
+.TP
+\fB\fIridPortPWMLevelD0 \fP\fP
+Digital port D0 PWM high level pulse width, microseconds, 16-bit unsigned integer\&. 
+.TP
+\fB\fIridPortPWMLevelD1 \fP\fP
+Digital port D1 PWM high level pulse width, microseconds, 16-bit unsigned integer\&. 
+.TP
+\fB\fIridPortPWMLevelD2 \fP\fP
+Digital port D2 PWM high level pulse width, microseconds, 16-bit unsigned integer\&. 
+.TP
+\fB\fIridPortPWMLevelD3 \fP\fP
+Digital port D3 PWM high level pulse width, microseconds, 16-bit unsigned integer\&. 
+.TP
+\fB\fIridPortPWMPeriodD0 \fP\fP
+Digital port D0 PWM period length, microseconds, 16-bit unsigned integer\&. 
+.TP
+\fB\fIridPortPWMPeriodD1 \fP\fP
+Digital port D1 PWM period length, microseconds, 16-bit unsigned integer\&. 
+.TP
+\fB\fIridPortPWMPeriodD2 \fP\fP
+Digital port D2 PWM period length, microseconds, 16-bit unsigned integer\&. 
+.TP
+\fB\fIridPortPWMPeriodD3 \fP\fP
+Digital port D3 PWM period length, microseconds, 16-bit unsigned integer\&. 
+.TP
+\fB\fIridIICAddress \fP\fP
+Sets up I2C address of the sensor\&. Default value is \fC0x50\fP, 7-bit unsigned integer in \fBwitmotion_config_packet::setting\fP\&.`raw[0]` whilst \fBwitmotion_config_packet::setting\fP\&.`raw[1]` is set to 0\&. 
+.TP
+\fB\fIridLED \fP\fP
+Toggles on/off LED indication (for enclosed sensors only)\&. 
+.TP
+\fB\fIridGPSBaudRate \fP\fP
+Regulates GPS receiver baud rate on port D1 (see \fBridPortModeD1\fP)\&. The following table contains value set for \fBwitmotion_config_packet::setting\fP\&.`raw[0]` representing the different baud rates\&. \fBwitmotion_config_packet::setting\fP\&.`raw[1]` should be set to 0\&. \fBRate, baud\fP   1200/1400   4800   9600   19200   38400   57600   115200   230400   460800   921600    \fBValue\fP   \fC0x00\fP   \fC0x01\fP   \fC0x02\fP   \fC0x03\fP   \fC0x04\fP   \fC0x05\fP   \fC0x06\fP   \fC0x07\fP   \fC0x08\fP   \fC0x09\fP   
+.PP
+\fBNote\fP
+.RS 4
+Baud rates over 256000 baud should not be considered standard\&. 
+.RE
+.PP
+
+.TP
+\fB\fIridFilterBandwidth \fP\fP
+Regulates internal filter bandwidth according to \fBwitmotion_config_packet::setting\fP\&. `raw[0]` value\&. Please refer to the following table for details\&. Value   Bandwidth, Hz    \fC0x00\fP   256    \fC0x01\fP   184    \fC0x02\fP   94    \fC0x03\fP   44    \fC0x04\fP   21    \fC0x05\fP   10    \fC0x06\fP   5   
+.PP
+\fBwitmotion_config_packet::setting\fP\&.`raw[1]` should be set to 0\&. NOT YET PROVEN AS WORKING 
+.TP
+\fB\fIridGyroscopeRange \fP\fP
+Regulates gyroscope value range according to \fBwitmotion_config_packet::setting\fP\&. `raw[0]` value\&. Please refer to the following table for details\&. Value   Range, $ deg/s $    \fC0x00\fP   250    \fC0x01\fP   500    \fC0x02\fP   1000    \fC0x03\fP   2000   
+.PP
+\fBwitmotion_config_packet::setting\fP\&.`raw[1]` should be set to 0\&. NOT YET PROVEN AS WORKING 
+.TP
+\fB\fIridAccelerometerRange \fP\fP
+Regulates accelerometer value range according to \fBwitmotion_config_packet::setting\fP\&. `raw[0]` value\&. Please refer to the following table for details\&. Value   Range, $ m/s^2 $    \fC0x00\fP   $ 2 \cdot g$    \fC0x01\fP   $ 4 \cdot g$    \fC0x02\fP   $ 8 \cdot g$    \fC0x03\fP   $ 16 \cdot g$   
+.PP
+Here $ g = 9.81 m/s^2 $\&. \fBwitmotion_config_packet::setting\fP\&.`raw[1]` should be set to 0\&. NOT YET PROVEN AS WORKING 
+.TP
+\fB\fIridStandbyMode \fP\fP
+Toggles dormant mode\&. \fBwitmotion_config_packet::setting\fP\&.`raw[0]` should be set to \fC0x01\fP, \fBwitmotion_config_packet::setting\fP\&.`raw[1]` to 0\&. 
+.TP
+\fB\fIridInstallationDirection \fP\fP
+Toggles on/off internal rotation transform for vertical installation\&. \fBwitmotion_config_packet::setting\fP\&.`raw[1]` should be set to 0, \fBwitmotion_config_packet::setting\fP\&.`raw[0]` being to \fC0x01\fP allows vertical installation, to \fC0x00\fP - horizontal installation\&. 
+.TP
+\fB\fIridTransitionAlgorithm \fP\fP
+Regulates whether 9-axis (\fC0x01\fP in \fBwitmotion_config_packet::setting\fP\&.`raw[0]`) or 6-axis (\fC0x00\fP) transition algorithm should be used\&. \fBwitmotion_config_packet::setting\fP\&.`raw[1]` should be set to 0\&. 
+.TP
+\fB\fIridInstructionStart \fP\fP
+Instruction mode\&. \fC0x00\fP in \fBwitmotion_config_packet::setting\fP\&.`raw[0]` means starting instruction mode, \fC0x01\fP toggles it off whilst \fBwitmotion_config_packet::setting\fP\&.`raw[1]` is set explicitly to 0\&. 
+.TP
+\fB\fIridTimeYearMonth \fP\fP
+Sets RTC to the given year (\fBwitmotion_config_packet::setting\fP\&.`raw[0]`) and month (\fBwitmotion_config_packet::setting\fP\&.`raw[1]`)\&. Year is a signed 8-bit integer with zero origin point set to 2000 year Gregorian calendar\&. Month is digitized to 1-12, unsigned 8-bit integer\&. 
+.TP
+\fB\fIridTimeDayHour \fP\fP
+Sets RTC to the given day of the month (\fBwitmotion_config_packet::setting\fP\&.`raw[0]`) and hour (\fBwitmotion_config_packet::setting\fP\&.`raw[1]`) in 24H system\&. 
+.TP
+\fB\fIridTimeMinuteSecond \fP\fP
+Sets RTC to the given minute (\fBwitmotion_config_packet::setting\fP\&.`raw[0]`) and second (\fBwitmotion_config_packet::setting\fP\&.`raw[1]`) in 24H system\&. 
+.TP
+\fB\fIridTimeMilliseconds \fP\fP
+Sets RTC to the given milliseconds exposed as 16-bit unsigned integer\&. 
+.TP
+\fB\fIridSetAccelerationX \fP\fP
+Sets up origin point or impostor value (needed when the measurement is forced for output by \fBridOutputValueSet\fP but not actually supported by the sensor) for acceleration on X axis\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetAccelerationY \fP\fP
+Sets up origin point or impostor value (needed when the measurement is forced for output by \fBridOutputValueSet\fP but not actually supported by the sensor) for acceleration on Y axis\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetAccelerationZ \fP\fP
+Sets up origin point or impostor value (needed when the measurement is forced for output by \fBridOutputValueSet\fP but not actually supported by the sensor) for acceleration on Z axis\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetAngularVelocityX \fP\fP
+Sets up origin point or impostor value (needed when the measurement is forced for output by \fBridOutputValueSet\fP but not actually supported by the sensor) for angular velocity on X axis\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetAngularVelocityY \fP\fP
+Sets up origin point or impostor value (needed when the measurement is forced for output by \fBridOutputValueSet\fP but not actually supported by the sensor) for angular velocity on Y axis\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetAngularVelocityZ \fP\fP
+Sets up origin point or impostor value (needed when the measurement is forced for output by \fBridOutputValueSet\fP but not actually supported by the sensor) for angular velocity on Z axis\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetMagnetometerX \fP\fP
+Sets up origin point or impostor value (needed when the measurement is forced for output by \fBridOutputValueSet\fP but not actually supported by the sensor) for magnetometer on X axis\&. \fBMAY BLOCK THE MEASUREMENTS\fP 
+.TP
+\fB\fIridSetMagnetometerY \fP\fP
+Sets up origin point or impostor value (needed when the measurement is forced for output by \fBridOutputValueSet\fP but not actually supported by the sensor) for magnetometer on Y axis\&. \fBMAY BLOCK THE MEASUREMENTS\fP 
+.TP
+\fB\fIridSetMagnetometerZ \fP\fP
+Sets up origin point or impostor value (needed when the measurement is forced for output by \fBridOutputValueSet\fP but not actually supported by the sensor) for magnetometer on Z axis\&. \fBMAY BLOCK THE MEASUREMENTS\fP 
+.TP
+\fB\fIridSetAngleRoll \fP\fP
+Sets up origin point or impostor value (needed when the measurement is forced for output by \fBridOutputValueSet\fP but not actually supported by the sensor) for Euler angle (roll) over X axis\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetAnglePitch \fP\fP
+Sets up origin point or impostor value (needed when the measurement is forced for output by \fBridOutputValueSet\fP but not actually supported by the sensor) for Euler angle (pitch) over Y axis\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetAngleYaw \fP\fP
+Sets up origin point or impostor value (needed when the measurement is forced for output by \fBridOutputValueSet\fP but not actually supported by the sensor) for Euler angle (yaw) over Z axis\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetTemperature \fP\fP
+Sets up origin point or impostor value (needed when the corresponding spatial measurement is forced for output by \fBridOutputValueSet\fP but not actually supported by the sensor) for temperature\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetPortStatusD0 \fP\fP
+Action unknown, not yet documented by Witmotion\&. 
+.TP
+\fB\fIridSetPortStatusD1 \fP\fP
+Action unknown, not yet documented by Witmotion\&. 
+.TP
+\fB\fIridSetPortStatusD2 \fP\fP
+Action unknown, not yet documented by Witmotion\&. 
+.TP
+\fB\fIridSetPortStatusD3 \fP\fP
+Action unknown, not yet documented by Witmotion\&. 
+.TP
+\fB\fIridSetPressureLow \fP\fP
+Sets up low part of initial value for 32-bit pressure measurement register\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetPressureHigh \fP\fP
+Sets up high part of initial value for 32-bit pressure measurement register\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetAltitudeLow \fP\fP
+Sets up low part of initial value for 32-bit altitude measurement register\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetAltitudeHigh \fP\fP
+Sets up high part of initial value for 32-bit altitude measurement register\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetLongitudeLow \fP\fP
+Sets up low part of initial value for 32-bit longitude measurement register\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetLongitudeHigh \fP\fP
+Sets up high part of initial value for 32-bit longitude measurement register\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetLatitudeLow \fP\fP
+Sets up low part of initial value for 32-bit latitude measurement register\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetLatitudeHigh \fP\fP
+Sets up high part of initial value for 32-bit latitude measurement register\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetGPSAltitude \fP\fP
+Sets up initial or impostor value (needed when the measurement is forced for output by \fBridOutputValueSet\fP but not actually supported by the sensor) for GPS altitude measurement\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetGPSYaw \fP\fP
+Sets up initial or impostor value (needed when the measurement is forced for output by \fBridOutputValueSet\fP but not actually supported by the sensor) for GPS orientation angle measurement\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetGPSGroundSpeedLow \fP\fP
+Sets up low part of initial value for 32-bit GPS ground speed measurement register\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetGPSGroundSpeedHigh \fP\fP
+Sets up high part of initial value for 32-bit GPS ground speed measurement register\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetOrientationX \fP\fP
+Sets up origin point or impostor value (needed when the measurement is forced for output by \fBridOutputValueSet\fP but not actually supported by the sensor) for orientation quaternion, X component\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetOrientationY \fP\fP
+Sets up origin point or impostor value (needed when the measurement is forced for output by \fBridOutputValueSet\fP but not actually supported by the sensor) for orientation quaternion, Y component\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetOrientationZ \fP\fP
+Sets up origin point or impostor value (needed when the measurement is forced for output by \fBridOutputValueSet\fP but not actually supported by the sensor) for orientation quaternion, Z component\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridSetOrientationW \fP\fP
+Sets up origin point or impostor value (needed when the measurement is forced for output by \fBridOutputValueSet\fP but not actually supported by the sensor) for orientation quaternion, W component\&. NOT YET PROVEN AS WORKING\&. 
+.TP
+\fB\fIridGyroscopeAutoCalibrate \fP\fP
+Toggles on/off automatic precalibration of the gyroscope\&. \fBwitmotion_config_packet::setting\fP\&.`raw[1]` should be set to 0\&. \fC0x01\fP in \fBwitmotion_config_packet::setting\fP\&.`raw[0]` turns gyroscope automatic precalibration \fBOFF\fP\&. To turn it \fBON\fP the value should be \fC0x00\fP\&. 
+.TP
+\fB\fIridUnlockConfiguration \fP\fP
+'Magic' vendor-defined value for configuration unlock packet \fC0xFF 0xAA 0x69 0x88 0xB5\fP\&. 
+.SS "enum \fBwitmotion::witmotion_packet_id\fP"
+If one of the packet type IDs defined here is registered after \fBWITMOTION_HEADER_BYTE\fP in the data flow received from the sensor, the packet header is considered found and the remaining bytes are considered as body of the packet\&. See \fButil\&.h\fP for decoder function reference\&. 
+.PP
+\fBEnumerator\fP
+.in +1c
+.TP
+\fB\fIpidRTC \fP\fP
+Real-Time-Clock: Year from 2000, Month, Day, Hour, Minute, Second (8-bit unsigned integers) + Millisecond (16-bit unsigned integer), representing time passed since last time set up in the \fBridTimeYearMonth\fP, \fBridTimeDayHour\fP, \fBridTimeMinuteSecond\fP and \fBridTimeMilliseconds\fP registers\&. 
+.TP
+\fB\fIpidAcceleration \fP\fP
+Linear accelerations + temperature/reserved field [X-Y-Z] (16-bit binary normalized quasi-floats) 
+.TP
+\fB\fIpidAngularVelocity \fP\fP
+Angular velocities + temperature/reserved field [Roll-Pitch-Yaw] (16-bit binary normalized quasi-floats) 
+.TP
+\fB\fIpidAngles \fP\fP
+Euler angles + temperature/reserved field [Roll-Pitch-Yaw] (16-bit binary normalized quasi-floats) 
+.TP
+\fB\fIpidMagnetometer \fP\fP
+Magnetic field tensity + temperature/reserved field [world X-Y-Z] (16-bit binary normalized quasi-floats) 
+.TP
+\fB\fIpidDataPortStatus \fP\fP
+Data port status packet, vendor-defined value\&. 
+.TP
+\fB\fIpidAltimeter \fP\fP
+Altimeter + Barometer output (32-bit binary normalized quasi-floats) 
+.TP
+\fB\fIpidGPSCoordinates \fP\fP
+GPS: longitude + latitude, if supported by hardware (32-bit binary normalized quasi-floats) 
+.TP
+\fB\fIpidGPSGroundSpeed \fP\fP
+GPS: ground speed (32-bit binary normalized quasi-float) + altitude + angular velocity around vertical axis (16-bit binary normalized quasi-floats), if supported by hardware\&. 
+.TP
+\fB\fIpidOrientation \fP\fP
+Orientation defined as quaternion [X-Y-Z-W], when available from the sensor firmware (16-bit binary normalized quasi-floats) 
+.TP
+\fB\fIpidGPSAccuracy \fP\fP
+GPS: visible satellites + variance vector [East-North-Up] (16-bit binary normalized quasi-floats) 
+.SH "Function Documentation"
+.PP 
+.SS "uint8_t witmotion::witmotion_output_frequency (const int hertz)"
+Special values for the \fChertz\fP argument are: Value   Description    \fC0\fP   Shuts down the measurements but does not turn the device into \fBdormant mode\fP    \fC-1\fP   Orders the single-shot measurement, then shutdown    \fC-2\fP   1 measurement in 2 seconds    \fC-10\fP   1 measurement in 10 seconds   
+.PP
+\fBParameters\fP
+.RS 4
+\fIhertz\fP - frequency in Hertz, or a special value as it is described above 
+.RE
+.PP
+\fBReturns\fP
+.RS 4
+Witmotion opcode value as a byte, \fC0x06\fP (10 Hz) by default is the argument is inacceptable 
+.RE
+.PP
+
+.SH "Variable Documentation"
+.PP 
+.SS "const std::map<uint8_t, std::string> witmotion::witmotion_packet_descriptions\fC [static]\fP"
+\fBInitial value:\fP.PP
+.nf
+= {
+    {0x50, "Real Time Clock"},
+    {0x51, "Accelerations"},
+    {0x52, "Angular velocities"},
+    {0x53, "Spatial orientation (Euler angles)"},
+    {0x54, "Magnetometer/Magnetic orientation"},
+    {0x55, "Data ports (D0\-D3) status"},
+    {0x56, "Barometry/Altimeter"},
+    {0x57, "GPS Coordinates"},
+    {0x58, "GPS Ground Speed"},
+    {0x59, "Spatial orientation (Quaternion)"},
+    {0x5A, "GPS accuracy estimation"}
+}
+.fi
+Contains values referenced in \fBwitmotion_packet_id\fP enumeration with corresponding description strings used by \fBmessage-enumerator\fP application\&. 
+.SS "const std::set<size_t> witmotion::witmotion_registered_ids\fC [static]\fP"
+\fBInitial value:\fP.PP
+.nf
+= {
+    0x50,
+    0x51,
+    0x52,
+    0x53,
+    0x54,
+    0x55,
+    0x56,
+    0x57,
+    0x58,
+    0x59,
+    0x5A
+}
+.fi
+Contains values referenced in \fBwitmotion_packet_id\fP enumeration to explicitly determine a set of currently supported packet IDs\&. The packet IDs not referenced here sould not be considered supported\&. 
+.SH "Author"
+.PP 
+Generated automatically by Doxygen for Witmotion IMU Library from the source code\&.

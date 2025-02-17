@@ -1,0 +1,4 @@
+source;share/witmotion_ros/local_setup.bash
+source;share/witmotion_ros/local_setup.dsv
+source;share/witmotion_ros/local_setup.sh
+source;share/witmotion_ros/local_setup.zsh

@@ -1,0 +1,149 @@
+.TH "witmotion::jy901::QWitmotionJY901Sensor" 3 "Mon Feb 17 2025 17:07:52" "Version 1.2.28~dev_5c2e86d" "Witmotion IMU Library" \" -*- nroff -*-
+.ad l
+.nh
+.SH NAME
+witmotion::jy901::QWitmotionJY901Sensor
+.SH SYNOPSIS
+.br
+.PP
+.PP
+Inherits \fBwitmotion::wt901::QWitmotionWT901Sensor\fP\&.
+.SS "Public Member Functions"
+
+.in +1c
+.ti -1c
+.RI "virtual const std::set< \fBwitmotion_packet_id\fP > * \fBRegisteredPacketTypes\fP ()"
+.br
+.ti -1c
+.RI "virtual void \fBSetMeasurements\fP (const bool realtime_clock=false, const bool acceleration=true, const bool angular_velocity=true, const bool euler_angles=true, const bool magnetometer=true, const bool orientation=false, const bool port_status=false, const bool altimeter=true)"
+.br
+.ti -1c
+.RI "\fBQWitmotionJY901Sensor\fP (const QString device, const QSerialPort::BaudRate rate, const uint32_t polling_period=50)"
+.br
+.in -1c
+
+Public Member Functions inherited from \fBwitmotion::wt901::QWitmotionWT901Sensor\fP
+.in +1c
+.ti -1c
+.RI "virtual void \fBStart\fP ()"
+.br
+.ti -1c
+.RI "virtual void \fBUnlockConfiguration\fP ()"
+.br
+.ti -1c
+.RI "virtual void \fBCalibrate\fP ()"
+.br
+.ti -1c
+.RI "virtual void \fBCalibrateMagnetometer\fP ()"
+.br
+.ti -1c
+.RI "virtual void \fBSetBaudRate\fP (const QSerialPort::BaudRate &rate)"
+.br
+.ti -1c
+.RI "virtual void \fBSetPollingRate\fP (const int32_t hz)"
+.br
+.ti -1c
+.RI "virtual void \fBSetOrientation\fP (const bool vertical=false)"
+.br
+.ti -1c
+.RI "virtual void \fBToggleDormant\fP ()"
+.br
+.ti -1c
+.RI "virtual void \fBSetGyroscopeAutoRecalibration\fP (const bool recalibrate=true)"
+.br
+.ti -1c
+.RI "virtual void \fBSetAxisTransition\fP (const bool axis9=true)"
+.br
+.ti -1c
+.RI "virtual void \fBSetLED\fP (const bool on=true)"
+.br
+.ti -1c
+.RI "virtual void \fBSetMeasurements\fP (const bool realtime_clock=false, const bool acceleration=true, const bool angular_velocity=true, const bool euler_angles=true, const bool magnetometer=true, const bool orientation=false, const bool port_status=false)"
+.br
+.ti -1c
+.RI "virtual void \fBSetAccelerationBias\fP (float x, float y, float z)"
+.br
+.ti -1c
+.RI "virtual void \fBSetI2CAddress\fP (const uint8_t address)"
+.br
+.ti -1c
+.RI "virtual void \fBSetRTC\fP (const QDateTime datetime)"
+.br
+.ti -1c
+.RI "virtual void \fBConfirmConfiguration\fP ()"
+.br
+.ti -1c
+.RI "\fBQWitmotionWT901Sensor\fP (const QString device, const QSerialPort::BaudRate rate, const uint32_t polling_period=50)"
+.br
+.in -1c
+
+Public Member Functions inherited from \fBwitmotion::QAbstractWitmotionSensorController\fP
+.in +1c
+.ti -1c
+.RI "\fBQAbstractWitmotionSensorController\fP (const QString tty_name, const QSerialPort::BaudRate rate)"
+.br
+.ti -1c
+.RI "void \fBSetValidation\fP (const bool validate)"
+.br
+.in -1c
+.SS "Additional Inherited Members"
+
+
+Public Slots inherited from \fBwitmotion::QAbstractWitmotionSensorController\fP
+.in +1c
+.ti -1c
+.RI "virtual void \fBPacket\fP (const \fBwitmotion_datapacket\fP &packet)"
+.br
+.ti -1c
+.RI "virtual void \fBError\fP (const QString &description)"
+.br
+.in -1c
+
+Signals inherited from \fBwitmotion::QAbstractWitmotionSensorController\fP
+.in +1c
+.ti -1c
+.RI "void \fBRunReader\fP ()"
+.br
+.ti -1c
+.RI "void \fBErrorOccurred\fP (const QString &description)"
+.br
+.ti -1c
+.RI "void \fBAcquired\fP (const \fBwitmotion_datapacket\fP &packet)"
+.br
+.ti -1c
+.RI "void \fBSendConfig\fP (const \fBwitmotion_config_packet\fP &packet)"
+.br
+.in -1c
+
+Protected Member Functions inherited from \fBwitmotion::wt901::QWitmotionWT901Sensor\fP
+.in +1c
+.ti -1c
+.RI "virtual void \fBCalculateAccelerationBias\fP (\fBwitmotion_config_packet\fP &packet, const float bias)"
+.br
+.in -1c
+
+Protected Attributes inherited from \fBwitmotion::QAbstractWitmotionSensorController\fP
+.in +1c
+.ti -1c
+.RI "QString \fBport_name\fP"
+.br
+.ti -1c
+.RI "QSerialPort::BaudRate \fBport_rate\fP"
+.br
+.ti -1c
+.RI "\fBQBaseSerialWitmotionSensorReader\fP * \fBreader\fP"
+.br
+.ti -1c
+.RI "QTextStream \fBttyout\fP"
+.br
+.in -1c
+.SH "Member Function Documentation"
+.PP 
+.SS "const std::set< \fBwitmotion_packet_id\fP > * witmotion::jy901::QWitmotionJY901Sensor::RegisteredPacketTypes ()\fC [virtual]\fP"
+
+.PP
+Reimplemented from \fBwitmotion::wt901::QWitmotionWT901Sensor\fP\&.
+
+.SH "Author"
+.PP 
+Generated automatically by Doxygen for Witmotion IMU Library from the source code\&.

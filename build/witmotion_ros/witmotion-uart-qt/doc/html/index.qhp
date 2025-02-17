@@ -1,0 +1,829 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<QtHelpProject version="1.0">
+<namespace>elettra.ict.witmotion</namespace>
+<virtualFolder>doc</virtualFolder>
+<filterSection>
+<filterAttribute>doxygen</filterAttribute>
+<toc>
+<section title="Witmotion IMU Library 1.2.28~dev_5c2e86d" ref="index.html">
+<section title="Witmotion Sensors UART Library" ref="index.html">
+<section title="Contents" ref="index.html#autotoc_md3"/>
+<section title="Device support policy" ref="index.html#support_policy">
+<section title="Supported devices" ref="index.html#devices"/>
+</section>
+<section title="Contribution" ref="index.html#contrib">
+<section title="List of incompleted development tasks" ref="index.html#autotoc_md4"/>
+</section>
+</section>
+<section title="Acceleration bias calculation" ref="d2/da6/acceleration-bias.html">
+<section title="Disclaimer" ref="d2/da6/acceleration-bias.html#autotoc_md0"/>
+<section title="Data layout" ref="d2/da6/acceleration-bias.html#autotoc_md1"/>
+<section title="Calculation" ref="d2/da6/acceleration-bias.html#autotoc_md2"/>
+</section>
+<section title="Installation" ref="d5/dfc/installation.html">
+<section title="Prerequisites" ref="d5/dfc/installation.html#autotoc_md5"/>
+<section title="Build" ref="d5/dfc/installation.html#autotoc_md6"/>
+<section title="Install" ref="d5/dfc/installation.html#autotoc_md7"/>
+</section>
+<section title="Datasheets and official documentation" ref="df/d09/witmotion_docs.html"/>
+<section title="Unified Witmotion communication protocol" ref="d6/de1/witmotion_protocol.html">
+<section title="Connection mode" ref="d6/de1/witmotion_protocol.html#autotoc_md8">
+<section title="Supported baud rates" ref="d6/de1/witmotion_protocol.html#autotoc_md9"/>
+</section>
+<section title="Packet structures" ref="d6/de1/witmotion_protocol.html#autotoc_md10">
+<section title="Output data packet" ref="d6/de1/witmotion_protocol.html#autotoc_md11"/>
+<section title="Configuration data packet" ref="d6/de1/witmotion_protocol.html#autotoc_md12"/>
+</section>
+<section title="Data decoding algorithms and decoder functions" ref="d6/de1/witmotion_protocol.html#autotoc_md13"/>
+</section>
+<section title="Unified controller applications" ref="da/dec/unified_applications.html">
+<section title="Message enumerator" ref="da/dec/unified_applications.html#message_enumerator">
+<section title="Usage" ref="da/dec/unified_applications.html#autotoc_md14">
+<section title="Options" ref="da/dec/unified_applications.html#autotoc_md15"/>
+<section title="Output" ref="da/dec/unified_applications.html#autotoc_md16"/>
+</section>
+</section>
+</section>
+<section title="Namespaces" ref="namespaces.html">
+<section title="Namespace List" ref="namespaces.html">
+<section title="witmotion" ref="dc/ddc/namespacewitmotion.html">
+<section title="QAbstractWitmotionSensorController" ref="d0/d9d/classwitmotion_1_1QAbstractWitmotionSensorController.html">
+</section>
+<section title="QAbstractWitmotionSensorReader" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html">
+<section title="Acquired" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html#af716461f427c9e7fa37b00a6089fd24e"/>
+<section title="Error" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html#ae1b6fa6897d0ae605904c5a79219dea5"/>
+<section title="ReadData" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html#a26dec3c2e06eb2953bbbc6fe9f826c65"/>
+<section title="RunPoll" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html#a01b7550252964d3e01cf3a5e4f6527c0"/>
+<section title="SendConfig" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html#afee4af791a65ff196f79b01977df3f98"/>
+</section>
+<section title="QBaseSerialWitmotionSensorReader" ref="da/d24/classwitmotion_1_1QBaseSerialWitmotionSensorReader.html">
+<section title="ReadData" ref="da/d24/classwitmotion_1_1QBaseSerialWitmotionSensorReader.html#a86aeebe95a926a29cbc9c6d6fb3fb9a2"/>
+<section title="RunPoll" ref="da/d24/classwitmotion_1_1QBaseSerialWitmotionSensorReader.html#a9af65f5936da60c51148e0668f89e5b7"/>
+<section title="SendConfig" ref="da/d24/classwitmotion_1_1QBaseSerialWitmotionSensorReader.html#adef9d17620ca9e47ee507f7eaa61b417"/>
+</section>
+<section title="QGeneralSensorController" ref="dd/db2/classwitmotion_1_1QGeneralSensorController.html">
+</section>
+<section title="witmotion_config_packet" ref="d1/d6d/structwitmotion_1_1witmotion__config__packet.html">
+<section title="address_byte" ref="d1/d6d/structwitmotion_1_1witmotion__config__packet.html#af94ab27fd4736d852779ff0d9da5d297"/>
+<section title="header_byte" ref="d1/d6d/structwitmotion_1_1witmotion__config__packet.html#ade9c4458ed89e04103db571fc549d216"/>
+<section title="key_byte" ref="d1/d6d/structwitmotion_1_1witmotion__config__packet.html#a797c369ba60e5ae2680522be695c4803"/>
+<section title="setting" ref="d1/d6d/structwitmotion_1_1witmotion__config__packet.html#a71914524d0042340923901e6788fd711"/>
+</section>
+<section title="witmotion_datapacket" ref="dc/d8d/structwitmotion_1_1witmotion__datapacket.html">
+<section title="crc" ref="dc/d8d/structwitmotion_1_1witmotion__datapacket.html#ab6cca4fa4201a4c4b5380b84e46dc47e"/>
+<section title="datastore" ref="dc/d8d/structwitmotion_1_1witmotion__datapacket.html#afe7c14394c5d2ed9328c6ed610f46191"/>
+<section title="header_byte" ref="dc/d8d/structwitmotion_1_1witmotion__datapacket.html#ae8bad5985e98addb6c113d0c73becbab"/>
+<section title="id_byte" ref="dc/d8d/structwitmotion_1_1witmotion__datapacket.html#a987f58271cf9d474aa989d2edc6c5802"/>
+</section>
+<section title="witmotion_typed_bytecounts" ref="d0/d33/classwitmotion_1_1witmotion__typed__bytecounts.html">
+</section>
+<section title="witmotion_typed_packets" ref="d3/dd3/classwitmotion_1_1witmotion__typed__packets.html">
+</section>
+<section title="witmotion_config_register_id" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3">
+<section title="ridSaveSettings" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a3215288a3e8615b0a2e7357497376599"/>
+<section title="ridCalibrate" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ab64e4385bdf96a2e49bcf1c173c73b77"/>
+<section title="ridOutputValueSet" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4"/>
+<section title="ridOutputFrequency" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a6b05a7147ce284d6ef2e1ea5fca0dc4b"/>
+<section title="ridPortBaudRate" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aafbc4c89aee2087c5861bfacfada9890"/>
+<section title="ridAccelerationBiasX" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aaeb88672e563afdddb49835ba4edfe77"/>
+<section title="ridAccelerationBiasY" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ab2756158adfc87940d20e88f893c76b2"/>
+<section title="ridAccelerationBiasZ" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aa0c369dc8c319ec347e455df3aa17841"/>
+<section title="ridAngularVelocityBiasX" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a9d6558877f66d098496618b351ff4bcd"/>
+<section title="ridAngularVelocityBiasY" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a03f8192885870ac4bd2b5f85974cdda9"/>
+<section title="ridAngularVelocityBiasZ" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3afee27b00865d07184c037f11bbef5c2c"/>
+<section title="ridMagnetometerBiasX" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a2eb9faa753c4adc79364c2a595e67c00"/>
+<section title="ridMagnetometerBiasY" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a5031a10e865baa17a8862672e8c331fc"/>
+<section title="ridMagnetometerBiasZ" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ac3ec01a7f731efde639b384694a31ae1"/>
+<section title="ridPortModeD0" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ad6b6872cc2b474d57b2198ec898bdf7e"/>
+<section title="ridPortModeD1" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a8df58e95b92f3957a5ae90f973db1e7a"/>
+<section title="ridPortModeD2" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a6e04a02620b6fedcb9bca62e6f24edad"/>
+<section title="ridPortModeD3" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a7c6e7a8e914dcf903d320ad9cd77a4b8"/>
+<section title="ridPortPWMLevelD0" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a20aaaca8b65cffe1b02ae5bf5d3f5651"/>
+<section title="ridPortPWMLevelD1" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a53111db6e031f93344a5db57932e1381"/>
+<section title="ridPortPWMLevelD2" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3adda87b6ba01b1562e80aa9a7eb6be6ff"/>
+<section title="ridPortPWMLevelD3" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a0182d7ce399242f31a6f07b08df3e679"/>
+<section title="ridPortPWMPeriodD0" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a84b92f91c231e44aeff92282dc2dabba"/>
+<section title="ridPortPWMPeriodD1" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a1be747000dc85b55ae66b160151a5350"/>
+<section title="ridPortPWMPeriodD2" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a73ec16b82c6b5e8b78c57e6c1e031a7a"/>
+<section title="ridPortPWMPeriodD3" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a298fdc22d7023239c80591435b6968a3"/>
+<section title="ridIICAddress" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a391ab4478ec408ab553bac43152e9a46"/>
+<section title="ridLED" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a2e3a09081461e24c7c065f9bd7e51810"/>
+<section title="ridGPSBaudRate" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a23e1f7b2e0d48ed03f0ce21d7ce8e85b"/>
+<section title="ridFilterBandwidth" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ac5b2c95e986d8cd87b47f8475c2e3d45"/>
+<section title="ridGyroscopeRange" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a0c94f5df4e6ba10377b5619238080ff1"/>
+<section title="ridAccelerometerRange" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a7a6ad3e464e638d7b8c700176a6198e1"/>
+<section title="ridStandbyMode" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aa0c382b1bbd92e110cf05656fca68846"/>
+<section title="ridInstallationDirection" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a9e91fab01aac11db869b2c3469197951"/>
+<section title="ridTransitionAlgorithm" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a6ed4aff9ef5db46614283f3137b7a33c"/>
+<section title="ridInstructionStart" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a3613237d9a04da1a69ab6233bdff6c87"/>
+<section title="ridTimeYearMonth" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a901d4a2268382df03b1842a23a03b4df"/>
+<section title="ridTimeDayHour" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a0ba92dbc353204d35aec965eae613c96"/>
+<section title="ridTimeMinuteSecond" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aac4180796c112f8a59c40acff749f705"/>
+<section title="ridTimeMilliseconds" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a98c1d3facc2a8a35a0e98af60665466f"/>
+<section title="ridSetAccelerationX" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a42a6e8a6f354bcd6b2b778c05d8e9f9f"/>
+<section title="ridSetAccelerationY" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3afbd52bd0fe49f0b4291552768d483423"/>
+<section title="ridSetAccelerationZ" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a7192ad42de7160e89f67385d2a952d29"/>
+<section title="ridSetAngularVelocityX" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a6509ae8041180b68bcd65a225416eb9e"/>
+<section title="ridSetAngularVelocityY" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a48508295f9f23d01dce584675ec6c9f0"/>
+<section title="ridSetAngularVelocityZ" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a7a1193aab35e38c7cb2d50b1b070c802"/>
+<section title="ridSetMagnetometerX" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a586b93305e288dce9d13924b4e2b7497"/>
+<section title="ridSetMagnetometerY" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a086061ec42a34429d4ecc87426bd16db"/>
+<section title="ridSetMagnetometerZ" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a3f7aacc3707d990356df81934205ce7d"/>
+<section title="ridSetAngleRoll" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a1e415569387a08b9bf79e77790470763"/>
+<section title="ridSetAnglePitch" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aba447e38147a544790c590f9f039eaf6"/>
+<section title="ridSetAngleYaw" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ad6cc9ede4fe5cc3b81076bd3e3ddbb0f"/>
+<section title="ridSetTemperature" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a2e2274acd5298a1422864030e2b320ba"/>
+<section title="ridSetPortStatusD0" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a4ebad711060439819f73aa07943481c7"/>
+<section title="ridSetPortStatusD1" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ab8368acbca776c26bf211a60fad166f0"/>
+<section title="ridSetPortStatusD2" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a24351f6f11569108042150dd3cd1d7c2"/>
+<section title="ridSetPortStatusD3" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aa336be9ed7dec9fdf579dae59838f2bb"/>
+<section title="ridSetPressureLow" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a5179834f2969bb85dbe566aca70e4f72"/>
+<section title="ridSetPressureHigh" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a4fa41cd61ddd08decf7e373786324fe4"/>
+<section title="ridSetAltitudeLow" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a2999f436df440eb4e4a16c04c93de615"/>
+<section title="ridSetAltitudeHigh" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a1a93aa388d3de727709b6d34452d0934"/>
+<section title="ridSetLongitudeLow" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ae19e9989db5b1b14bfae18fe5ace37fa"/>
+<section title="ridSetLongitudeHigh" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a69a1045e79d9ef5870f1f71747d10ae4"/>
+<section title="ridSetLatitudeLow" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aee7f477a2446d716bdca937fc4911959"/>
+<section title="ridSetLatitudeHigh" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a34515bb412a5bd623d77bdf020f9b5e9"/>
+<section title="ridSetGPSAltitude" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a84759181f9ff6bd2a318c9f8b1ed1f39"/>
+<section title="ridSetGPSYaw" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a549727f96698c8e2e7afbf20b4f286d0"/>
+<section title="ridSetGPSGroundSpeedLow" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aa8dc66482e5afdb4831e8602b2e89d58"/>
+<section title="ridSetGPSGroundSpeedHigh" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aa3bc5016e03de006cf633420ac34e25f"/>
+<section title="ridSetOrientationX" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a77da818475b1904a4e7ef051d14e063d"/>
+<section title="ridSetOrientationY" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a49c73008955b9fa89f9b4cba3dd37d9d"/>
+<section title="ridSetOrientationZ" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a3e1d48defa5dbaea479ee1498cf3db7a"/>
+<section title="ridSetOrientationW" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a6b12d4a88aa5b9477ad6acae3af6bb83"/>
+<section title="ridGyroscopeAutoCalibrate" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a83987c4864f06244dab4f5ef6f12af7f"/>
+<section title="ridUnlockConfiguration" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ae3b36162b2662cc9c637436bca5c8172"/>
+</section>
+<section title="witmotion_packet_id" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3">
+<section title="pidRTC" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a0eec2c5dacef2bfea50757ef63fd2735"/>
+<section title="pidAcceleration" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3aa55a0844425f2c57978b43ba96f9d14f"/>
+<section title="pidAngularVelocity" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3afb633ed3118253ba87c8560a203f4f44"/>
+<section title="pidAngles" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a2d5f569560d2a29fee1f179a4c46f143"/>
+<section title="pidMagnetometer" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3aa410e8a4ad06356282c0a7eaa0b7edb3"/>
+<section title="pidDataPortStatus" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a854420a4a97ec9a21e338aa236769f11"/>
+<section title="pidAltimeter" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a8ca47e826186715b57327ffbd91cada8"/>
+<section title="pidGPSCoordinates" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a7b05a239d11dcb700ddf67f6ea1b90b5"/>
+<section title="pidGPSGroundSpeed" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a7ecc187fe112b76a5135278dcd6b8bd5"/>
+<section title="pidOrientation" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a791db4f6c4cfa2ca9db09f6dac7c6011"/>
+<section title="pidGPSAccuracy" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a24c950fa7ba2faa32301bd4e72716487"/>
+</section>
+<section title="witmotion_output_frequency" ref="dc/ddc/namespacewitmotion.html#a90e09a9e4f3d24ab522bee3aa9bf9c78"/>
+<section title="WITMOTION_CONFIG_HEADER" ref="dc/ddc/namespacewitmotion.html#a856c58401c1ba5c7d8a9f58f31f2b83f"/>
+<section title="WITMOTION_CONFIG_KEY" ref="dc/ddc/namespacewitmotion.html#aac88381210eb4ab56eba64da7ae8c29c"/>
+<section title="WITMOTION_HEADER_BYTE" ref="dc/ddc/namespacewitmotion.html#a637c861a28f4015a1b57d8bd9ef08cbf"/>
+<section title="witmotion_packet_descriptions" ref="dc/ddc/namespacewitmotion.html#a4af000309f5694300ababe3086c486fc"/>
+<section title="witmotion_registered_ids" ref="dc/ddc/namespacewitmotion.html#a90712081209bb40591c1666a5a5362e5"/>
+</section>
+</section>
+<section title="Namespace Members" ref="namespacemembers.html">
+<section title="All" ref="namespacemembers.html"/>
+<section title="Functions" ref="namespacemembers_func.html"/>
+<section title="Variables" ref="namespacemembers_vars.html"/>
+<section title="Enumerations" ref="namespacemembers_enum.html"/>
+<section title="Enumerator" ref="namespacemembers_eval.html"/>
+</section>
+</section>
+<section title="Classes" ref="annotated.html">
+<section title="Class List" ref="annotated.html">
+<section title="witmotion" ref="dc/ddc/namespacewitmotion.html">
+<section title="jy901" ref="">
+<section title="QWitmotionJY901Sensor" ref="d9/d54/classwitmotion_1_1jy901_1_1QWitmotionJY901Sensor.html">
+</section>
+</section>
+<section title="wt31n" ref="">
+<section title="QWitmotionWT31NSensor" ref="dc/dfe/classwitmotion_1_1wt31n_1_1QWitmotionWT31NSensor.html">
+</section>
+</section>
+<section title="wt901" ref="">
+<section title="QWitmotionWT901Sensor" ref="da/dca/classwitmotion_1_1wt901_1_1QWitmotionWT901Sensor.html">
+</section>
+</section>
+<section title="QAbstractWitmotionSensorController" ref="d0/d9d/classwitmotion_1_1QAbstractWitmotionSensorController.html">
+</section>
+<section title="QAbstractWitmotionSensorReader" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html">
+<section title="Acquired" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html#af716461f427c9e7fa37b00a6089fd24e"/>
+<section title="Error" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html#ae1b6fa6897d0ae605904c5a79219dea5"/>
+<section title="ReadData" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html#a26dec3c2e06eb2953bbbc6fe9f826c65"/>
+<section title="RunPoll" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html#a01b7550252964d3e01cf3a5e4f6527c0"/>
+<section title="SendConfig" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html#afee4af791a65ff196f79b01977df3f98"/>
+</section>
+<section title="QBaseSerialWitmotionSensorReader" ref="da/d24/classwitmotion_1_1QBaseSerialWitmotionSensorReader.html">
+<section title="ReadData" ref="da/d24/classwitmotion_1_1QBaseSerialWitmotionSensorReader.html#a86aeebe95a926a29cbc9c6d6fb3fb9a2"/>
+<section title="RunPoll" ref="da/d24/classwitmotion_1_1QBaseSerialWitmotionSensorReader.html#a9af65f5936da60c51148e0668f89e5b7"/>
+<section title="SendConfig" ref="da/d24/classwitmotion_1_1QBaseSerialWitmotionSensorReader.html#adef9d17620ca9e47ee507f7eaa61b417"/>
+</section>
+<section title="QGeneralSensorController" ref="dd/db2/classwitmotion_1_1QGeneralSensorController.html">
+</section>
+<section title="witmotion_config_packet" ref="d1/d6d/structwitmotion_1_1witmotion__config__packet.html">
+<section title="address_byte" ref="d1/d6d/structwitmotion_1_1witmotion__config__packet.html#af94ab27fd4736d852779ff0d9da5d297"/>
+<section title="header_byte" ref="d1/d6d/structwitmotion_1_1witmotion__config__packet.html#ade9c4458ed89e04103db571fc549d216"/>
+<section title="key_byte" ref="d1/d6d/structwitmotion_1_1witmotion__config__packet.html#a797c369ba60e5ae2680522be695c4803"/>
+<section title="setting" ref="d1/d6d/structwitmotion_1_1witmotion__config__packet.html#a71914524d0042340923901e6788fd711"/>
+</section>
+<section title="witmotion_datapacket" ref="dc/d8d/structwitmotion_1_1witmotion__datapacket.html">
+<section title="crc" ref="dc/d8d/structwitmotion_1_1witmotion__datapacket.html#ab6cca4fa4201a4c4b5380b84e46dc47e"/>
+<section title="datastore" ref="dc/d8d/structwitmotion_1_1witmotion__datapacket.html#afe7c14394c5d2ed9328c6ed610f46191"/>
+<section title="header_byte" ref="dc/d8d/structwitmotion_1_1witmotion__datapacket.html#ae8bad5985e98addb6c113d0c73becbab"/>
+<section title="id_byte" ref="dc/d8d/structwitmotion_1_1witmotion__datapacket.html#a987f58271cf9d474aa989d2edc6c5802"/>
+</section>
+<section title="witmotion_typed_bytecounts" ref="d0/d33/classwitmotion_1_1witmotion__typed__bytecounts.html">
+</section>
+<section title="witmotion_typed_packets" ref="d3/dd3/classwitmotion_1_1witmotion__typed__packets.html">
+</section>
+</section>
+</section>
+<section title="Class Index" ref="classes.html"/>
+<section title="Class Hierarchy" ref="hierarchy.html">
+<section title="QObject" ref="">
+<section title="witmotion::QAbstractWitmotionSensorController" ref="d0/d9d/classwitmotion_1_1QAbstractWitmotionSensorController.html">
+<section title="witmotion::wt31n::QWitmotionWT31NSensor" ref="dc/dfe/classwitmotion_1_1wt31n_1_1QWitmotionWT31NSensor.html"/>
+<section title="witmotion::wt901::QWitmotionWT901Sensor" ref="da/dca/classwitmotion_1_1wt901_1_1QWitmotionWT901Sensor.html">
+<section title="witmotion::jy901::QWitmotionJY901Sensor" ref="d9/d54/classwitmotion_1_1jy901_1_1QWitmotionJY901Sensor.html"/>
+</section>
+</section>
+<section title="witmotion::QAbstractWitmotionSensorReader" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html">
+<section title="witmotion::QBaseSerialWitmotionSensorReader" ref="da/d24/classwitmotion_1_1QBaseSerialWitmotionSensorReader.html"/>
+</section>
+<section title="witmotion::QGeneralSensorController" ref="dd/db2/classwitmotion_1_1QGeneralSensorController.html"/>
+</section>
+<section title="witmotion::witmotion_config_packet" ref="d1/d6d/structwitmotion_1_1witmotion__config__packet.html"/>
+<section title="witmotion::witmotion_datapacket" ref="dc/d8d/structwitmotion_1_1witmotion__datapacket.html"/>
+<section title="witmotion::witmotion_typed_bytecounts" ref="d0/d33/classwitmotion_1_1witmotion__typed__bytecounts.html"/>
+<section title="witmotion::witmotion_typed_packets" ref="d3/dd3/classwitmotion_1_1witmotion__typed__packets.html"/>
+</section>
+<section title="Class Members" ref="functions.html">
+<section title="All" ref="functions.html"/>
+<section title="Functions" ref="functions_func.html"/>
+<section title="Variables" ref="functions_vars.html"/>
+</section>
+</section>
+<section title="Files" ref="files.html">
+<section title="File List" ref="files.html">
+<section title="witmotion_ros" ref="dir_1cf06fafba72c09c3e4f66ae55d7bd46.html">
+<section title="witmotion-uart-qt" ref="dir_8c93ff06af9fa60c7854733ac38ecee4.html">
+<section title="include" ref="dir_fe7fb09a82d668034dff92d13a7ed5e7.html">
+<section title="witmotion" ref="dir_0f59198f0feff1c13cdee29746395779.html">
+<section title="jy901-uart.h" ref="d1/daf/jy901-uart_8h_source.html"/>
+<section title="message-enumerator.h" ref="de/dc9/message-enumerator_8h_source.html"/>
+<section title="serial.h" ref="db/d11/serial_8h_source.html"/>
+<section title="types.h" ref="d9/d49/types_8h.html">
+<section title="witmotion::witmotion_datapacket" ref="dc/d8d/structwitmotion_1_1witmotion__datapacket.html">
+<section title="crc" ref="dc/d8d/structwitmotion_1_1witmotion__datapacket.html#ab6cca4fa4201a4c4b5380b84e46dc47e"/>
+<section title="datastore" ref="dc/d8d/structwitmotion_1_1witmotion__datapacket.html#afe7c14394c5d2ed9328c6ed610f46191"/>
+<section title="header_byte" ref="dc/d8d/structwitmotion_1_1witmotion__datapacket.html#ae8bad5985e98addb6c113d0c73becbab"/>
+<section title="id_byte" ref="dc/d8d/structwitmotion_1_1witmotion__datapacket.html#a987f58271cf9d474aa989d2edc6c5802"/>
+</section>
+<section title="witmotion::witmotion_config_packet" ref="d1/d6d/structwitmotion_1_1witmotion__config__packet.html">
+<section title="address_byte" ref="d1/d6d/structwitmotion_1_1witmotion__config__packet.html#af94ab27fd4736d852779ff0d9da5d297"/>
+<section title="header_byte" ref="d1/d6d/structwitmotion_1_1witmotion__config__packet.html#ade9c4458ed89e04103db571fc549d216"/>
+<section title="key_byte" ref="d1/d6d/structwitmotion_1_1witmotion__config__packet.html#a797c369ba60e5ae2680522be695c4803"/>
+<section title="setting" ref="d1/d6d/structwitmotion_1_1witmotion__config__packet.html#a71914524d0042340923901e6788fd711"/>
+</section>
+<section title="witmotion::QAbstractWitmotionSensorReader" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html">
+<section title="Acquired" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html#af716461f427c9e7fa37b00a6089fd24e"/>
+<section title="Error" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html#ae1b6fa6897d0ae605904c5a79219dea5"/>
+<section title="ReadData" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html#a26dec3c2e06eb2953bbbc6fe9f826c65"/>
+<section title="RunPoll" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html#a01b7550252964d3e01cf3a5e4f6527c0"/>
+<section title="SendConfig" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html#afee4af791a65ff196f79b01977df3f98"/>
+</section>
+<section title="witmotion_config_register_id" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3">
+<section title="ridSaveSettings" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a3215288a3e8615b0a2e7357497376599"/>
+<section title="ridCalibrate" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3ab64e4385bdf96a2e49bcf1c173c73b77"/>
+<section title="ridOutputValueSet" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4"/>
+<section title="ridOutputFrequency" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a6b05a7147ce284d6ef2e1ea5fca0dc4b"/>
+<section title="ridPortBaudRate" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3aafbc4c89aee2087c5861bfacfada9890"/>
+<section title="ridAccelerationBiasX" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3aaeb88672e563afdddb49835ba4edfe77"/>
+<section title="ridAccelerationBiasY" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3ab2756158adfc87940d20e88f893c76b2"/>
+<section title="ridAccelerationBiasZ" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3aa0c369dc8c319ec347e455df3aa17841"/>
+<section title="ridAngularVelocityBiasX" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a9d6558877f66d098496618b351ff4bcd"/>
+<section title="ridAngularVelocityBiasY" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a03f8192885870ac4bd2b5f85974cdda9"/>
+<section title="ridAngularVelocityBiasZ" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3afee27b00865d07184c037f11bbef5c2c"/>
+<section title="ridMagnetometerBiasX" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a2eb9faa753c4adc79364c2a595e67c00"/>
+<section title="ridMagnetometerBiasY" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a5031a10e865baa17a8862672e8c331fc"/>
+<section title="ridMagnetometerBiasZ" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3ac3ec01a7f731efde639b384694a31ae1"/>
+<section title="ridPortModeD0" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3ad6b6872cc2b474d57b2198ec898bdf7e"/>
+<section title="ridPortModeD1" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a8df58e95b92f3957a5ae90f973db1e7a"/>
+<section title="ridPortModeD2" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a6e04a02620b6fedcb9bca62e6f24edad"/>
+<section title="ridPortModeD3" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a7c6e7a8e914dcf903d320ad9cd77a4b8"/>
+<section title="ridPortPWMLevelD0" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a20aaaca8b65cffe1b02ae5bf5d3f5651"/>
+<section title="ridPortPWMLevelD1" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a53111db6e031f93344a5db57932e1381"/>
+<section title="ridPortPWMLevelD2" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3adda87b6ba01b1562e80aa9a7eb6be6ff"/>
+<section title="ridPortPWMLevelD3" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a0182d7ce399242f31a6f07b08df3e679"/>
+<section title="ridPortPWMPeriodD0" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a84b92f91c231e44aeff92282dc2dabba"/>
+<section title="ridPortPWMPeriodD1" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a1be747000dc85b55ae66b160151a5350"/>
+<section title="ridPortPWMPeriodD2" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a73ec16b82c6b5e8b78c57e6c1e031a7a"/>
+<section title="ridPortPWMPeriodD3" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a298fdc22d7023239c80591435b6968a3"/>
+<section title="ridIICAddress" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a391ab4478ec408ab553bac43152e9a46"/>
+<section title="ridLED" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a2e3a09081461e24c7c065f9bd7e51810"/>
+<section title="ridGPSBaudRate" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a23e1f7b2e0d48ed03f0ce21d7ce8e85b"/>
+<section title="ridFilterBandwidth" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3ac5b2c95e986d8cd87b47f8475c2e3d45"/>
+<section title="ridGyroscopeRange" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a0c94f5df4e6ba10377b5619238080ff1"/>
+<section title="ridAccelerometerRange" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a7a6ad3e464e638d7b8c700176a6198e1"/>
+<section title="ridStandbyMode" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3aa0c382b1bbd92e110cf05656fca68846"/>
+<section title="ridInstallationDirection" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a9e91fab01aac11db869b2c3469197951"/>
+<section title="ridTransitionAlgorithm" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a6ed4aff9ef5db46614283f3137b7a33c"/>
+<section title="ridInstructionStart" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a3613237d9a04da1a69ab6233bdff6c87"/>
+<section title="ridTimeYearMonth" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a901d4a2268382df03b1842a23a03b4df"/>
+<section title="ridTimeDayHour" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a0ba92dbc353204d35aec965eae613c96"/>
+<section title="ridTimeMinuteSecond" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3aac4180796c112f8a59c40acff749f705"/>
+<section title="ridTimeMilliseconds" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a98c1d3facc2a8a35a0e98af60665466f"/>
+<section title="ridSetAccelerationX" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a42a6e8a6f354bcd6b2b778c05d8e9f9f"/>
+<section title="ridSetAccelerationY" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3afbd52bd0fe49f0b4291552768d483423"/>
+<section title="ridSetAccelerationZ" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a7192ad42de7160e89f67385d2a952d29"/>
+<section title="ridSetAngularVelocityX" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a6509ae8041180b68bcd65a225416eb9e"/>
+<section title="ridSetAngularVelocityY" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a48508295f9f23d01dce584675ec6c9f0"/>
+<section title="ridSetAngularVelocityZ" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a7a1193aab35e38c7cb2d50b1b070c802"/>
+<section title="ridSetMagnetometerX" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a586b93305e288dce9d13924b4e2b7497"/>
+<section title="ridSetMagnetometerY" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a086061ec42a34429d4ecc87426bd16db"/>
+<section title="ridSetMagnetometerZ" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a3f7aacc3707d990356df81934205ce7d"/>
+<section title="ridSetAngleRoll" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a1e415569387a08b9bf79e77790470763"/>
+<section title="ridSetAnglePitch" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3aba447e38147a544790c590f9f039eaf6"/>
+<section title="ridSetAngleYaw" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3ad6cc9ede4fe5cc3b81076bd3e3ddbb0f"/>
+<section title="ridSetTemperature" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a2e2274acd5298a1422864030e2b320ba"/>
+<section title="ridSetPortStatusD0" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a4ebad711060439819f73aa07943481c7"/>
+<section title="ridSetPortStatusD1" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3ab8368acbca776c26bf211a60fad166f0"/>
+<section title="ridSetPortStatusD2" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a24351f6f11569108042150dd3cd1d7c2"/>
+<section title="ridSetPortStatusD3" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3aa336be9ed7dec9fdf579dae59838f2bb"/>
+<section title="ridSetPressureLow" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a5179834f2969bb85dbe566aca70e4f72"/>
+<section title="ridSetPressureHigh" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a4fa41cd61ddd08decf7e373786324fe4"/>
+<section title="ridSetAltitudeLow" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a2999f436df440eb4e4a16c04c93de615"/>
+<section title="ridSetAltitudeHigh" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a1a93aa388d3de727709b6d34452d0934"/>
+<section title="ridSetLongitudeLow" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3ae19e9989db5b1b14bfae18fe5ace37fa"/>
+<section title="ridSetLongitudeHigh" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a69a1045e79d9ef5870f1f71747d10ae4"/>
+<section title="ridSetLatitudeLow" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3aee7f477a2446d716bdca937fc4911959"/>
+<section title="ridSetLatitudeHigh" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a34515bb412a5bd623d77bdf020f9b5e9"/>
+<section title="ridSetGPSAltitude" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a84759181f9ff6bd2a318c9f8b1ed1f39"/>
+<section title="ridSetGPSYaw" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a549727f96698c8e2e7afbf20b4f286d0"/>
+<section title="ridSetGPSGroundSpeedLow" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3aa8dc66482e5afdb4831e8602b2e89d58"/>
+<section title="ridSetGPSGroundSpeedHigh" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3aa3bc5016e03de006cf633420ac34e25f"/>
+<section title="ridSetOrientationX" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a77da818475b1904a4e7ef051d14e063d"/>
+<section title="ridSetOrientationY" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a49c73008955b9fa89f9b4cba3dd37d9d"/>
+<section title="ridSetOrientationZ" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a3e1d48defa5dbaea479ee1498cf3db7a"/>
+<section title="ridSetOrientationW" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a6b12d4a88aa5b9477ad6acae3af6bb83"/>
+<section title="ridGyroscopeAutoCalibrate" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3a83987c4864f06244dab4f5ef6f12af7f"/>
+<section title="ridUnlockConfiguration" ref="d9/d49/types_8h.html#a2a0798fb689894f2b7f998303bd8a4b3ae3b36162b2662cc9c637436bca5c8172"/>
+</section>
+<section title="witmotion_packet_id" ref="d9/d49/types_8h.html#a5fdb17b12d46f0ec17e44a1dab9957d3">
+<section title="pidRTC" ref="d9/d49/types_8h.html#a5fdb17b12d46f0ec17e44a1dab9957d3a0eec2c5dacef2bfea50757ef63fd2735"/>
+<section title="pidAcceleration" ref="d9/d49/types_8h.html#a5fdb17b12d46f0ec17e44a1dab9957d3aa55a0844425f2c57978b43ba96f9d14f"/>
+<section title="pidAngularVelocity" ref="d9/d49/types_8h.html#a5fdb17b12d46f0ec17e44a1dab9957d3afb633ed3118253ba87c8560a203f4f44"/>
+<section title="pidAngles" ref="d9/d49/types_8h.html#a5fdb17b12d46f0ec17e44a1dab9957d3a2d5f569560d2a29fee1f179a4c46f143"/>
+<section title="pidMagnetometer" ref="d9/d49/types_8h.html#a5fdb17b12d46f0ec17e44a1dab9957d3aa410e8a4ad06356282c0a7eaa0b7edb3"/>
+<section title="pidDataPortStatus" ref="d9/d49/types_8h.html#a5fdb17b12d46f0ec17e44a1dab9957d3a854420a4a97ec9a21e338aa236769f11"/>
+<section title="pidAltimeter" ref="d9/d49/types_8h.html#a5fdb17b12d46f0ec17e44a1dab9957d3a8ca47e826186715b57327ffbd91cada8"/>
+<section title="pidGPSCoordinates" ref="d9/d49/types_8h.html#a5fdb17b12d46f0ec17e44a1dab9957d3a7b05a239d11dcb700ddf67f6ea1b90b5"/>
+<section title="pidGPSGroundSpeed" ref="d9/d49/types_8h.html#a5fdb17b12d46f0ec17e44a1dab9957d3a7ecc187fe112b76a5135278dcd6b8bd5"/>
+<section title="pidOrientation" ref="d9/d49/types_8h.html#a5fdb17b12d46f0ec17e44a1dab9957d3a791db4f6c4cfa2ca9db09f6dac7c6011"/>
+<section title="pidGPSAccuracy" ref="d9/d49/types_8h.html#a5fdb17b12d46f0ec17e44a1dab9957d3a24c950fa7ba2faa32301bd4e72716487"/>
+</section>
+<section title="WITMOTION_CONFIG_HEADER" ref="d9/d49/types_8h.html#a856c58401c1ba5c7d8a9f58f31f2b83f"/>
+<section title="WITMOTION_CONFIG_KEY" ref="d9/d49/types_8h.html#aac88381210eb4ab56eba64da7ae8c29c"/>
+<section title="WITMOTION_HEADER_BYTE" ref="d9/d49/types_8h.html#a637c861a28f4015a1b57d8bd9ef08cbf"/>
+<section title="witmotion_packet_descriptions" ref="d9/d49/types_8h.html#a4af000309f5694300ababe3086c486fc"/>
+<section title="witmotion_registered_ids" ref="d9/d49/types_8h.html#a90712081209bb40591c1666a5a5362e5"/>
+</section>
+<section title="util.h" ref="d8/d3c/util_8h.html">
+<section title="witmotion::witmotion_typed_packets" ref="d3/dd3/classwitmotion_1_1witmotion__typed__packets.html">
+</section>
+<section title="witmotion::witmotion_typed_bytecounts" ref="d0/d33/classwitmotion_1_1witmotion__typed__bytecounts.html">
+</section>
+<section title="witmotion_output_frequency" ref="d8/d3c/util_8h.html#a90e09a9e4f3d24ab522bee3aa9bf9c78"/>
+</section>
+<section title="version.h" ref="df/dfc/version_8h_source.html"/>
+<section title="wt31n-uart.h" ref="dc/d98/wt31n-uart_8h_source.html"/>
+<section title="wt901-uart.h" ref="df/d21/wt901-uart_8h_source.html"/>
+</section>
+</section>
+</section>
+</section>
+</section>
+</section>
+</section>
+</toc>
+<keywords>
+<keyword name="witmotion::QAbstractWitmotionSensorController" id="witmotion::QAbstractWitmotionSensorController_" ref="d0/d9d/classwitmotion_1_1QAbstractWitmotionSensorController.html"/>
+<keyword name="witmotion::QAbstractWitmotionSensorReader" id="witmotion::QAbstractWitmotionSensorReader_" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html"/>
+<keyword name="witmotion::QBaseSerialWitmotionSensorReader" id="witmotion::QBaseSerialWitmotionSensorReader_" ref="da/d24/classwitmotion_1_1QBaseSerialWitmotionSensorReader.html"/>
+<keyword name="witmotion::QGeneralSensorController" id="witmotion::QGeneralSensorController_" ref="dd/db2/classwitmotion_1_1QGeneralSensorController.html"/>
+<keyword name="witmotion::jy901::QWitmotionJY901Sensor" id="witmotion::jy901::QWitmotionJY901Sensor_" ref="d9/d54/classwitmotion_1_1jy901_1_1QWitmotionJY901Sensor.html"/>
+<keyword name="witmotion::wt31n::QWitmotionWT31NSensor" id="witmotion::wt31n::QWitmotionWT31NSensor_" ref="dc/dfe/classwitmotion_1_1wt31n_1_1QWitmotionWT31NSensor.html"/>
+<keyword name="witmotion::wt901::QWitmotionWT901Sensor" id="witmotion::wt901::QWitmotionWT901Sensor_" ref="da/dca/classwitmotion_1_1wt901_1_1QWitmotionWT901Sensor.html"/>
+<keyword name="witmotion::witmotion_config_packet" id="witmotion::witmotion_config_packet_" ref="d1/d6d/structwitmotion_1_1witmotion__config__packet.html"/>
+<keyword name="witmotion::witmotion_datapacket" id="witmotion::witmotion_datapacket_" ref="dc/d8d/structwitmotion_1_1witmotion__datapacket.html"/>
+<keyword name="witmotion::witmotion_typed_bytecounts" id="witmotion::witmotion_typed_bytecounts_" ref="d0/d33/classwitmotion_1_1witmotion__typed__bytecounts.html"/>
+<keyword name="witmotion::witmotion_typed_packets" id="witmotion::witmotion_typed_packets_" ref="d3/dd3/classwitmotion_1_1witmotion__typed__packets.html"/>
+<keyword name="witmotion" id="witmotion_" ref="dc/ddc/namespacewitmotion.html"/>
+<keyword name="Acceleration bias calculation" id="Acceleration bias calculation_" ref="d2/da6/acceleration-bias.html"/>
+<keyword name="Installation" id="Installation_" ref="d5/dfc/installation.html"/>
+<keyword name="Datasheets and official documentation" id="Datasheets and official documentation_" ref="df/d09/witmotion_docs.html"/>
+<keyword name="Unified Witmotion communication protocol" id="Unified Witmotion communication protocol_" ref="d6/de1/witmotion_protocol.html"/>
+<keyword name="Unified controller applications" id="Unified controller applications_" ref="da/dec/unified_applications.html"/>
+<keyword name="Acquired(const witmotion_datapacket &amp;packet)" id="witmotion::QAbstractWitmotionSensorReader::Acquired_af716461f427c9e7fa37b00a6089fd24e" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html#af716461f427c9e7fa37b00a6089fd24e"/>
+<keyword name="address_byte" id="witmotion::witmotion_config_packet::address_byte_af94ab27fd4736d852779ff0d9da5d297" ref="d1/d6d/structwitmotion_1_1witmotion__config__packet.html#af94ab27fd4736d852779ff0d9da5d297"/>
+<keyword name="crc" id="witmotion::witmotion_datapacket::crc_ab6cca4fa4201a4c4b5380b84e46dc47e" ref="dc/d8d/structwitmotion_1_1witmotion__datapacket.html#ab6cca4fa4201a4c4b5380b84e46dc47e"/>
+<keyword name="datastore" id="witmotion::witmotion_datapacket::datastore_afe7c14394c5d2ed9328c6ed610f46191" ref="dc/d8d/structwitmotion_1_1witmotion__datapacket.html#afe7c14394c5d2ed9328c6ed610f46191"/>
+<keyword name="Error(const QString &amp;description)" id="witmotion::QAbstractWitmotionSensorReader::Error_ae1b6fa6897d0ae605904c5a79219dea5" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html#ae1b6fa6897d0ae605904c5a79219dea5"/>
+<keyword name="header_byte" id="witmotion::witmotion_datapacket::header_byte_ae8bad5985e98addb6c113d0c73becbab" ref="dc/d8d/structwitmotion_1_1witmotion__datapacket.html#ae8bad5985e98addb6c113d0c73becbab"/>
+<keyword name="header_byte" id="witmotion::witmotion_config_packet::header_byte_ade9c4458ed89e04103db571fc549d216" ref="d1/d6d/structwitmotion_1_1witmotion__config__packet.html#ade9c4458ed89e04103db571fc549d216"/>
+<keyword name="id_byte" id="witmotion::witmotion_datapacket::id_byte_a987f58271cf9d474aa989d2edc6c5802" ref="dc/d8d/structwitmotion_1_1witmotion__datapacket.html#a987f58271cf9d474aa989d2edc6c5802"/>
+<keyword name="key_byte" id="witmotion::witmotion_config_packet::key_byte_a797c369ba60e5ae2680522be695c4803" ref="d1/d6d/structwitmotion_1_1witmotion__config__packet.html#a797c369ba60e5ae2680522be695c4803"/>
+<keyword name="ReadData()=0" id="witmotion::QAbstractWitmotionSensorReader::ReadData_a26dec3c2e06eb2953bbbc6fe9f826c65" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html#a26dec3c2e06eb2953bbbc6fe9f826c65"/>
+<keyword name="ReadData()" id="witmotion::QBaseSerialWitmotionSensorReader::ReadData_a86aeebe95a926a29cbc9c6d6fb3fb9a2" ref="da/d24/classwitmotion_1_1QBaseSerialWitmotionSensorReader.html#a86aeebe95a926a29cbc9c6d6fb3fb9a2"/>
+<keyword name="RunPoll()=0" id="witmotion::QAbstractWitmotionSensorReader::RunPoll_a01b7550252964d3e01cf3a5e4f6527c0" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html#a01b7550252964d3e01cf3a5e4f6527c0"/>
+<keyword name="RunPoll()" id="witmotion::QBaseSerialWitmotionSensorReader::RunPoll_a9af65f5936da60c51148e0668f89e5b7" ref="da/d24/classwitmotion_1_1QBaseSerialWitmotionSensorReader.html#a9af65f5936da60c51148e0668f89e5b7"/>
+<keyword name="SendConfig(const witmotion_config_packet &amp;packet)=0" id="witmotion::QAbstractWitmotionSensorReader::SendConfig_afee4af791a65ff196f79b01977df3f98" ref="d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html#afee4af791a65ff196f79b01977df3f98"/>
+<keyword name="SendConfig(const witmotion_config_packet &amp;packet)" id="witmotion::QBaseSerialWitmotionSensorReader::SendConfig_adef9d17620ca9e47ee507f7eaa61b417" ref="da/d24/classwitmotion_1_1QBaseSerialWitmotionSensorReader.html#adef9d17620ca9e47ee507f7eaa61b417"/>
+<keyword name="setting" id="witmotion::witmotion_config_packet::setting_a71914524d0042340923901e6788fd711" ref="d1/d6d/structwitmotion_1_1witmotion__config__packet.html#a71914524d0042340923901e6788fd711"/>
+<keyword name="pidAcceleration" id="witmotion::pidAcceleration_a5fdb17b12d46f0ec17e44a1dab9957d3aa55a0844425f2c57978b43ba96f9d14f" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3aa55a0844425f2c57978b43ba96f9d14f"/>
+<keyword name="pidAltimeter" id="witmotion::pidAltimeter_a5fdb17b12d46f0ec17e44a1dab9957d3a8ca47e826186715b57327ffbd91cada8" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a8ca47e826186715b57327ffbd91cada8"/>
+<keyword name="pidAngles" id="witmotion::pidAngles_a5fdb17b12d46f0ec17e44a1dab9957d3a2d5f569560d2a29fee1f179a4c46f143" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a2d5f569560d2a29fee1f179a4c46f143"/>
+<keyword name="pidAngularVelocity" id="witmotion::pidAngularVelocity_a5fdb17b12d46f0ec17e44a1dab9957d3afb633ed3118253ba87c8560a203f4f44" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3afb633ed3118253ba87c8560a203f4f44"/>
+<keyword name="pidDataPortStatus" id="witmotion::pidDataPortStatus_a5fdb17b12d46f0ec17e44a1dab9957d3a854420a4a97ec9a21e338aa236769f11" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a854420a4a97ec9a21e338aa236769f11"/>
+<keyword name="pidGPSAccuracy" id="witmotion::pidGPSAccuracy_a5fdb17b12d46f0ec17e44a1dab9957d3a24c950fa7ba2faa32301bd4e72716487" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a24c950fa7ba2faa32301bd4e72716487"/>
+<keyword name="pidGPSCoordinates" id="witmotion::pidGPSCoordinates_a5fdb17b12d46f0ec17e44a1dab9957d3a7b05a239d11dcb700ddf67f6ea1b90b5" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a7b05a239d11dcb700ddf67f6ea1b90b5"/>
+<keyword name="pidGPSGroundSpeed" id="witmotion::pidGPSGroundSpeed_a5fdb17b12d46f0ec17e44a1dab9957d3a7ecc187fe112b76a5135278dcd6b8bd5" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a7ecc187fe112b76a5135278dcd6b8bd5"/>
+<keyword name="pidMagnetometer" id="witmotion::pidMagnetometer_a5fdb17b12d46f0ec17e44a1dab9957d3aa410e8a4ad06356282c0a7eaa0b7edb3" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3aa410e8a4ad06356282c0a7eaa0b7edb3"/>
+<keyword name="pidOrientation" id="witmotion::pidOrientation_a5fdb17b12d46f0ec17e44a1dab9957d3a791db4f6c4cfa2ca9db09f6dac7c6011" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a791db4f6c4cfa2ca9db09f6dac7c6011"/>
+<keyword name="pidRTC" id="witmotion::pidRTC_a5fdb17b12d46f0ec17e44a1dab9957d3a0eec2c5dacef2bfea50757ef63fd2735" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a0eec2c5dacef2bfea50757ef63fd2735"/>
+<keyword name="ridAccelerationBiasX" id="witmotion::ridAccelerationBiasX_a2a0798fb689894f2b7f998303bd8a4b3aaeb88672e563afdddb49835ba4edfe77" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aaeb88672e563afdddb49835ba4edfe77"/>
+<keyword name="ridAccelerationBiasY" id="witmotion::ridAccelerationBiasY_a2a0798fb689894f2b7f998303bd8a4b3ab2756158adfc87940d20e88f893c76b2" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ab2756158adfc87940d20e88f893c76b2"/>
+<keyword name="ridAccelerationBiasZ" id="witmotion::ridAccelerationBiasZ_a2a0798fb689894f2b7f998303bd8a4b3aa0c369dc8c319ec347e455df3aa17841" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aa0c369dc8c319ec347e455df3aa17841"/>
+<keyword name="ridAccelerometerRange" id="witmotion::ridAccelerometerRange_a2a0798fb689894f2b7f998303bd8a4b3a7a6ad3e464e638d7b8c700176a6198e1" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a7a6ad3e464e638d7b8c700176a6198e1"/>
+<keyword name="ridAngularVelocityBiasX" id="witmotion::ridAngularVelocityBiasX_a2a0798fb689894f2b7f998303bd8a4b3a9d6558877f66d098496618b351ff4bcd" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a9d6558877f66d098496618b351ff4bcd"/>
+<keyword name="ridAngularVelocityBiasY" id="witmotion::ridAngularVelocityBiasY_a2a0798fb689894f2b7f998303bd8a4b3a03f8192885870ac4bd2b5f85974cdda9" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a03f8192885870ac4bd2b5f85974cdda9"/>
+<keyword name="ridAngularVelocityBiasZ" id="witmotion::ridAngularVelocityBiasZ_a2a0798fb689894f2b7f998303bd8a4b3afee27b00865d07184c037f11bbef5c2c" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3afee27b00865d07184c037f11bbef5c2c"/>
+<keyword name="ridCalibrate" id="witmotion::ridCalibrate_a2a0798fb689894f2b7f998303bd8a4b3ab64e4385bdf96a2e49bcf1c173c73b77" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ab64e4385bdf96a2e49bcf1c173c73b77"/>
+<keyword name="ridFilterBandwidth" id="witmotion::ridFilterBandwidth_a2a0798fb689894f2b7f998303bd8a4b3ac5b2c95e986d8cd87b47f8475c2e3d45" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ac5b2c95e986d8cd87b47f8475c2e3d45"/>
+<keyword name="ridGPSBaudRate" id="witmotion::ridGPSBaudRate_a2a0798fb689894f2b7f998303bd8a4b3a23e1f7b2e0d48ed03f0ce21d7ce8e85b" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a23e1f7b2e0d48ed03f0ce21d7ce8e85b"/>
+<keyword name="ridGyroscopeAutoCalibrate" id="witmotion::ridGyroscopeAutoCalibrate_a2a0798fb689894f2b7f998303bd8a4b3a83987c4864f06244dab4f5ef6f12af7f" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a83987c4864f06244dab4f5ef6f12af7f"/>
+<keyword name="ridGyroscopeRange" id="witmotion::ridGyroscopeRange_a2a0798fb689894f2b7f998303bd8a4b3a0c94f5df4e6ba10377b5619238080ff1" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a0c94f5df4e6ba10377b5619238080ff1"/>
+<keyword name="ridIICAddress" id="witmotion::ridIICAddress_a2a0798fb689894f2b7f998303bd8a4b3a391ab4478ec408ab553bac43152e9a46" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a391ab4478ec408ab553bac43152e9a46"/>
+<keyword name="ridInstallationDirection" id="witmotion::ridInstallationDirection_a2a0798fb689894f2b7f998303bd8a4b3a9e91fab01aac11db869b2c3469197951" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a9e91fab01aac11db869b2c3469197951"/>
+<keyword name="ridInstructionStart" id="witmotion::ridInstructionStart_a2a0798fb689894f2b7f998303bd8a4b3a3613237d9a04da1a69ab6233bdff6c87" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a3613237d9a04da1a69ab6233bdff6c87"/>
+<keyword name="ridLED" id="witmotion::ridLED_a2a0798fb689894f2b7f998303bd8a4b3a2e3a09081461e24c7c065f9bd7e51810" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a2e3a09081461e24c7c065f9bd7e51810"/>
+<keyword name="ridMagnetometerBiasX" id="witmotion::ridMagnetometerBiasX_a2a0798fb689894f2b7f998303bd8a4b3a2eb9faa753c4adc79364c2a595e67c00" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a2eb9faa753c4adc79364c2a595e67c00"/>
+<keyword name="ridMagnetometerBiasY" id="witmotion::ridMagnetometerBiasY_a2a0798fb689894f2b7f998303bd8a4b3a5031a10e865baa17a8862672e8c331fc" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a5031a10e865baa17a8862672e8c331fc"/>
+<keyword name="ridMagnetometerBiasZ" id="witmotion::ridMagnetometerBiasZ_a2a0798fb689894f2b7f998303bd8a4b3ac3ec01a7f731efde639b384694a31ae1" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ac3ec01a7f731efde639b384694a31ae1"/>
+<keyword name="ridOutputFrequency" id="witmotion::ridOutputFrequency_a2a0798fb689894f2b7f998303bd8a4b3a6b05a7147ce284d6ef2e1ea5fca0dc4b" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a6b05a7147ce284d6ef2e1ea5fca0dc4b"/>
+<keyword name="ridOutputValueSet" id="witmotion::ridOutputValueSet_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4"/>
+<keyword name="ridPortBaudRate" id="witmotion::ridPortBaudRate_a2a0798fb689894f2b7f998303bd8a4b3aafbc4c89aee2087c5861bfacfada9890" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aafbc4c89aee2087c5861bfacfada9890"/>
+<keyword name="ridPortModeD0" id="witmotion::ridPortModeD0_a2a0798fb689894f2b7f998303bd8a4b3ad6b6872cc2b474d57b2198ec898bdf7e" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ad6b6872cc2b474d57b2198ec898bdf7e"/>
+<keyword name="ridPortModeD1" id="witmotion::ridPortModeD1_a2a0798fb689894f2b7f998303bd8a4b3a8df58e95b92f3957a5ae90f973db1e7a" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a8df58e95b92f3957a5ae90f973db1e7a"/>
+<keyword name="ridPortModeD2" id="witmotion::ridPortModeD2_a2a0798fb689894f2b7f998303bd8a4b3a6e04a02620b6fedcb9bca62e6f24edad" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a6e04a02620b6fedcb9bca62e6f24edad"/>
+<keyword name="ridPortModeD3" id="witmotion::ridPortModeD3_a2a0798fb689894f2b7f998303bd8a4b3a7c6e7a8e914dcf903d320ad9cd77a4b8" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a7c6e7a8e914dcf903d320ad9cd77a4b8"/>
+<keyword name="ridPortPWMLevelD0" id="witmotion::ridPortPWMLevelD0_a2a0798fb689894f2b7f998303bd8a4b3a20aaaca8b65cffe1b02ae5bf5d3f5651" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a20aaaca8b65cffe1b02ae5bf5d3f5651"/>
+<keyword name="ridPortPWMLevelD1" id="witmotion::ridPortPWMLevelD1_a2a0798fb689894f2b7f998303bd8a4b3a53111db6e031f93344a5db57932e1381" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a53111db6e031f93344a5db57932e1381"/>
+<keyword name="ridPortPWMLevelD2" id="witmotion::ridPortPWMLevelD2_a2a0798fb689894f2b7f998303bd8a4b3adda87b6ba01b1562e80aa9a7eb6be6ff" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3adda87b6ba01b1562e80aa9a7eb6be6ff"/>
+<keyword name="ridPortPWMLevelD3" id="witmotion::ridPortPWMLevelD3_a2a0798fb689894f2b7f998303bd8a4b3a0182d7ce399242f31a6f07b08df3e679" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a0182d7ce399242f31a6f07b08df3e679"/>
+<keyword name="ridPortPWMPeriodD0" id="witmotion::ridPortPWMPeriodD0_a2a0798fb689894f2b7f998303bd8a4b3a84b92f91c231e44aeff92282dc2dabba" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a84b92f91c231e44aeff92282dc2dabba"/>
+<keyword name="ridPortPWMPeriodD1" id="witmotion::ridPortPWMPeriodD1_a2a0798fb689894f2b7f998303bd8a4b3a1be747000dc85b55ae66b160151a5350" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a1be747000dc85b55ae66b160151a5350"/>
+<keyword name="ridPortPWMPeriodD2" id="witmotion::ridPortPWMPeriodD2_a2a0798fb689894f2b7f998303bd8a4b3a73ec16b82c6b5e8b78c57e6c1e031a7a" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a73ec16b82c6b5e8b78c57e6c1e031a7a"/>
+<keyword name="ridPortPWMPeriodD3" id="witmotion::ridPortPWMPeriodD3_a2a0798fb689894f2b7f998303bd8a4b3a298fdc22d7023239c80591435b6968a3" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a298fdc22d7023239c80591435b6968a3"/>
+<keyword name="ridSaveSettings" id="witmotion::ridSaveSettings_a2a0798fb689894f2b7f998303bd8a4b3a3215288a3e8615b0a2e7357497376599" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a3215288a3e8615b0a2e7357497376599"/>
+<keyword name="ridSetAccelerationX" id="witmotion::ridSetAccelerationX_a2a0798fb689894f2b7f998303bd8a4b3a42a6e8a6f354bcd6b2b778c05d8e9f9f" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a42a6e8a6f354bcd6b2b778c05d8e9f9f"/>
+<keyword name="ridSetAccelerationY" id="witmotion::ridSetAccelerationY_a2a0798fb689894f2b7f998303bd8a4b3afbd52bd0fe49f0b4291552768d483423" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3afbd52bd0fe49f0b4291552768d483423"/>
+<keyword name="ridSetAccelerationZ" id="witmotion::ridSetAccelerationZ_a2a0798fb689894f2b7f998303bd8a4b3a7192ad42de7160e89f67385d2a952d29" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a7192ad42de7160e89f67385d2a952d29"/>
+<keyword name="ridSetAltitudeHigh" id="witmotion::ridSetAltitudeHigh_a2a0798fb689894f2b7f998303bd8a4b3a1a93aa388d3de727709b6d34452d0934" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a1a93aa388d3de727709b6d34452d0934"/>
+<keyword name="ridSetAltitudeLow" id="witmotion::ridSetAltitudeLow_a2a0798fb689894f2b7f998303bd8a4b3a2999f436df440eb4e4a16c04c93de615" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a2999f436df440eb4e4a16c04c93de615"/>
+<keyword name="ridSetAnglePitch" id="witmotion::ridSetAnglePitch_a2a0798fb689894f2b7f998303bd8a4b3aba447e38147a544790c590f9f039eaf6" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aba447e38147a544790c590f9f039eaf6"/>
+<keyword name="ridSetAngleRoll" id="witmotion::ridSetAngleRoll_a2a0798fb689894f2b7f998303bd8a4b3a1e415569387a08b9bf79e77790470763" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a1e415569387a08b9bf79e77790470763"/>
+<keyword name="ridSetAngleYaw" id="witmotion::ridSetAngleYaw_a2a0798fb689894f2b7f998303bd8a4b3ad6cc9ede4fe5cc3b81076bd3e3ddbb0f" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ad6cc9ede4fe5cc3b81076bd3e3ddbb0f"/>
+<keyword name="ridSetAngularVelocityX" id="witmotion::ridSetAngularVelocityX_a2a0798fb689894f2b7f998303bd8a4b3a6509ae8041180b68bcd65a225416eb9e" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a6509ae8041180b68bcd65a225416eb9e"/>
+<keyword name="ridSetAngularVelocityY" id="witmotion::ridSetAngularVelocityY_a2a0798fb689894f2b7f998303bd8a4b3a48508295f9f23d01dce584675ec6c9f0" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a48508295f9f23d01dce584675ec6c9f0"/>
+<keyword name="ridSetAngularVelocityZ" id="witmotion::ridSetAngularVelocityZ_a2a0798fb689894f2b7f998303bd8a4b3a7a1193aab35e38c7cb2d50b1b070c802" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a7a1193aab35e38c7cb2d50b1b070c802"/>
+<keyword name="ridSetGPSAltitude" id="witmotion::ridSetGPSAltitude_a2a0798fb689894f2b7f998303bd8a4b3a84759181f9ff6bd2a318c9f8b1ed1f39" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a84759181f9ff6bd2a318c9f8b1ed1f39"/>
+<keyword name="ridSetGPSGroundSpeedHigh" id="witmotion::ridSetGPSGroundSpeedHigh_a2a0798fb689894f2b7f998303bd8a4b3aa3bc5016e03de006cf633420ac34e25f" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aa3bc5016e03de006cf633420ac34e25f"/>
+<keyword name="ridSetGPSGroundSpeedLow" id="witmotion::ridSetGPSGroundSpeedLow_a2a0798fb689894f2b7f998303bd8a4b3aa8dc66482e5afdb4831e8602b2e89d58" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aa8dc66482e5afdb4831e8602b2e89d58"/>
+<keyword name="ridSetGPSYaw" id="witmotion::ridSetGPSYaw_a2a0798fb689894f2b7f998303bd8a4b3a549727f96698c8e2e7afbf20b4f286d0" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a549727f96698c8e2e7afbf20b4f286d0"/>
+<keyword name="ridSetLatitudeHigh" id="witmotion::ridSetLatitudeHigh_a2a0798fb689894f2b7f998303bd8a4b3a34515bb412a5bd623d77bdf020f9b5e9" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a34515bb412a5bd623d77bdf020f9b5e9"/>
+<keyword name="ridSetLatitudeLow" id="witmotion::ridSetLatitudeLow_a2a0798fb689894f2b7f998303bd8a4b3aee7f477a2446d716bdca937fc4911959" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aee7f477a2446d716bdca937fc4911959"/>
+<keyword name="ridSetLongitudeHigh" id="witmotion::ridSetLongitudeHigh_a2a0798fb689894f2b7f998303bd8a4b3a69a1045e79d9ef5870f1f71747d10ae4" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a69a1045e79d9ef5870f1f71747d10ae4"/>
+<keyword name="ridSetLongitudeLow" id="witmotion::ridSetLongitudeLow_a2a0798fb689894f2b7f998303bd8a4b3ae19e9989db5b1b14bfae18fe5ace37fa" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ae19e9989db5b1b14bfae18fe5ace37fa"/>
+<keyword name="ridSetMagnetometerX" id="witmotion::ridSetMagnetometerX_a2a0798fb689894f2b7f998303bd8a4b3a586b93305e288dce9d13924b4e2b7497" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a586b93305e288dce9d13924b4e2b7497"/>
+<keyword name="ridSetMagnetometerY" id="witmotion::ridSetMagnetometerY_a2a0798fb689894f2b7f998303bd8a4b3a086061ec42a34429d4ecc87426bd16db" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a086061ec42a34429d4ecc87426bd16db"/>
+<keyword name="ridSetMagnetometerZ" id="witmotion::ridSetMagnetometerZ_a2a0798fb689894f2b7f998303bd8a4b3a3f7aacc3707d990356df81934205ce7d" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a3f7aacc3707d990356df81934205ce7d"/>
+<keyword name="ridSetOrientationW" id="witmotion::ridSetOrientationW_a2a0798fb689894f2b7f998303bd8a4b3a6b12d4a88aa5b9477ad6acae3af6bb83" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a6b12d4a88aa5b9477ad6acae3af6bb83"/>
+<keyword name="ridSetOrientationX" id="witmotion::ridSetOrientationX_a2a0798fb689894f2b7f998303bd8a4b3a77da818475b1904a4e7ef051d14e063d" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a77da818475b1904a4e7ef051d14e063d"/>
+<keyword name="ridSetOrientationY" id="witmotion::ridSetOrientationY_a2a0798fb689894f2b7f998303bd8a4b3a49c73008955b9fa89f9b4cba3dd37d9d" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a49c73008955b9fa89f9b4cba3dd37d9d"/>
+<keyword name="ridSetOrientationZ" id="witmotion::ridSetOrientationZ_a2a0798fb689894f2b7f998303bd8a4b3a3e1d48defa5dbaea479ee1498cf3db7a" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a3e1d48defa5dbaea479ee1498cf3db7a"/>
+<keyword name="ridSetPortStatusD0" id="witmotion::ridSetPortStatusD0_a2a0798fb689894f2b7f998303bd8a4b3a4ebad711060439819f73aa07943481c7" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a4ebad711060439819f73aa07943481c7"/>
+<keyword name="ridSetPortStatusD1" id="witmotion::ridSetPortStatusD1_a2a0798fb689894f2b7f998303bd8a4b3ab8368acbca776c26bf211a60fad166f0" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ab8368acbca776c26bf211a60fad166f0"/>
+<keyword name="ridSetPortStatusD2" id="witmotion::ridSetPortStatusD2_a2a0798fb689894f2b7f998303bd8a4b3a24351f6f11569108042150dd3cd1d7c2" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a24351f6f11569108042150dd3cd1d7c2"/>
+<keyword name="ridSetPortStatusD3" id="witmotion::ridSetPortStatusD3_a2a0798fb689894f2b7f998303bd8a4b3aa336be9ed7dec9fdf579dae59838f2bb" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aa336be9ed7dec9fdf579dae59838f2bb"/>
+<keyword name="ridSetPressureHigh" id="witmotion::ridSetPressureHigh_a2a0798fb689894f2b7f998303bd8a4b3a4fa41cd61ddd08decf7e373786324fe4" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a4fa41cd61ddd08decf7e373786324fe4"/>
+<keyword name="ridSetPressureLow" id="witmotion::ridSetPressureLow_a2a0798fb689894f2b7f998303bd8a4b3a5179834f2969bb85dbe566aca70e4f72" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a5179834f2969bb85dbe566aca70e4f72"/>
+<keyword name="ridSetTemperature" id="witmotion::ridSetTemperature_a2a0798fb689894f2b7f998303bd8a4b3a2e2274acd5298a1422864030e2b320ba" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a2e2274acd5298a1422864030e2b320ba"/>
+<keyword name="ridStandbyMode" id="witmotion::ridStandbyMode_a2a0798fb689894f2b7f998303bd8a4b3aa0c382b1bbd92e110cf05656fca68846" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aa0c382b1bbd92e110cf05656fca68846"/>
+<keyword name="ridTimeDayHour" id="witmotion::ridTimeDayHour_a2a0798fb689894f2b7f998303bd8a4b3a0ba92dbc353204d35aec965eae613c96" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a0ba92dbc353204d35aec965eae613c96"/>
+<keyword name="ridTimeMilliseconds" id="witmotion::ridTimeMilliseconds_a2a0798fb689894f2b7f998303bd8a4b3a98c1d3facc2a8a35a0e98af60665466f" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a98c1d3facc2a8a35a0e98af60665466f"/>
+<keyword name="ridTimeMinuteSecond" id="witmotion::ridTimeMinuteSecond_a2a0798fb689894f2b7f998303bd8a4b3aac4180796c112f8a59c40acff749f705" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aac4180796c112f8a59c40acff749f705"/>
+<keyword name="ridTimeYearMonth" id="witmotion::ridTimeYearMonth_a2a0798fb689894f2b7f998303bd8a4b3a901d4a2268382df03b1842a23a03b4df" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a901d4a2268382df03b1842a23a03b4df"/>
+<keyword name="ridTransitionAlgorithm" id="witmotion::ridTransitionAlgorithm_a2a0798fb689894f2b7f998303bd8a4b3a6ed4aff9ef5db46614283f3137b7a33c" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a6ed4aff9ef5db46614283f3137b7a33c"/>
+<keyword name="ridUnlockConfiguration" id="witmotion::ridUnlockConfiguration_a2a0798fb689894f2b7f998303bd8a4b3ae3b36162b2662cc9c637436bca5c8172" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ae3b36162b2662cc9c637436bca5c8172"/>
+<keyword name="WITMOTION_CONFIG_HEADER" id="witmotion::WITMOTION_CONFIG_HEADER_a856c58401c1ba5c7d8a9f58f31f2b83f" ref="dc/ddc/namespacewitmotion.html#a856c58401c1ba5c7d8a9f58f31f2b83f"/>
+<keyword name="WITMOTION_CONFIG_KEY" id="witmotion::WITMOTION_CONFIG_KEY_aac88381210eb4ab56eba64da7ae8c29c" ref="dc/ddc/namespacewitmotion.html#aac88381210eb4ab56eba64da7ae8c29c"/>
+<keyword name="witmotion_config_register_id" id="witmotion::witmotion_config_register_id_a2a0798fb689894f2b7f998303bd8a4b3" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3"/>
+<keyword name="ridSaveSettings" id="witmotion::ridSaveSettings_a2a0798fb689894f2b7f998303bd8a4b3a3215288a3e8615b0a2e7357497376599" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a3215288a3e8615b0a2e7357497376599"/>
+<keyword name="ridCalibrate" id="witmotion::ridCalibrate_a2a0798fb689894f2b7f998303bd8a4b3ab64e4385bdf96a2e49bcf1c173c73b77" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ab64e4385bdf96a2e49bcf1c173c73b77"/>
+<keyword name="ridOutputValueSet" id="witmotion::ridOutputValueSet_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4"/>
+<keyword name="ridOutputFrequency" id="witmotion::ridOutputFrequency_a2a0798fb689894f2b7f998303bd8a4b3a6b05a7147ce284d6ef2e1ea5fca0dc4b" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a6b05a7147ce284d6ef2e1ea5fca0dc4b"/>
+<keyword name="ridPortBaudRate" id="witmotion::ridPortBaudRate_a2a0798fb689894f2b7f998303bd8a4b3aafbc4c89aee2087c5861bfacfada9890" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aafbc4c89aee2087c5861bfacfada9890"/>
+<keyword name="ridAccelerationBiasX" id="witmotion::ridAccelerationBiasX_a2a0798fb689894f2b7f998303bd8a4b3aaeb88672e563afdddb49835ba4edfe77" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aaeb88672e563afdddb49835ba4edfe77"/>
+<keyword name="ridAccelerationBiasY" id="witmotion::ridAccelerationBiasY_a2a0798fb689894f2b7f998303bd8a4b3ab2756158adfc87940d20e88f893c76b2" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ab2756158adfc87940d20e88f893c76b2"/>
+<keyword name="ridAccelerationBiasZ" id="witmotion::ridAccelerationBiasZ_a2a0798fb689894f2b7f998303bd8a4b3aa0c369dc8c319ec347e455df3aa17841" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aa0c369dc8c319ec347e455df3aa17841"/>
+<keyword name="ridAngularVelocityBiasX" id="witmotion::ridAngularVelocityBiasX_a2a0798fb689894f2b7f998303bd8a4b3a9d6558877f66d098496618b351ff4bcd" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a9d6558877f66d098496618b351ff4bcd"/>
+<keyword name="ridAngularVelocityBiasY" id="witmotion::ridAngularVelocityBiasY_a2a0798fb689894f2b7f998303bd8a4b3a03f8192885870ac4bd2b5f85974cdda9" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a03f8192885870ac4bd2b5f85974cdda9"/>
+<keyword name="ridAngularVelocityBiasZ" id="witmotion::ridAngularVelocityBiasZ_a2a0798fb689894f2b7f998303bd8a4b3afee27b00865d07184c037f11bbef5c2c" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3afee27b00865d07184c037f11bbef5c2c"/>
+<keyword name="ridMagnetometerBiasX" id="witmotion::ridMagnetometerBiasX_a2a0798fb689894f2b7f998303bd8a4b3a2eb9faa753c4adc79364c2a595e67c00" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a2eb9faa753c4adc79364c2a595e67c00"/>
+<keyword name="ridMagnetometerBiasY" id="witmotion::ridMagnetometerBiasY_a2a0798fb689894f2b7f998303bd8a4b3a5031a10e865baa17a8862672e8c331fc" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a5031a10e865baa17a8862672e8c331fc"/>
+<keyword name="ridMagnetometerBiasZ" id="witmotion::ridMagnetometerBiasZ_a2a0798fb689894f2b7f998303bd8a4b3ac3ec01a7f731efde639b384694a31ae1" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ac3ec01a7f731efde639b384694a31ae1"/>
+<keyword name="ridPortModeD0" id="witmotion::ridPortModeD0_a2a0798fb689894f2b7f998303bd8a4b3ad6b6872cc2b474d57b2198ec898bdf7e" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ad6b6872cc2b474d57b2198ec898bdf7e"/>
+<keyword name="ridPortModeD1" id="witmotion::ridPortModeD1_a2a0798fb689894f2b7f998303bd8a4b3a8df58e95b92f3957a5ae90f973db1e7a" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a8df58e95b92f3957a5ae90f973db1e7a"/>
+<keyword name="ridPortModeD2" id="witmotion::ridPortModeD2_a2a0798fb689894f2b7f998303bd8a4b3a6e04a02620b6fedcb9bca62e6f24edad" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a6e04a02620b6fedcb9bca62e6f24edad"/>
+<keyword name="ridPortModeD3" id="witmotion::ridPortModeD3_a2a0798fb689894f2b7f998303bd8a4b3a7c6e7a8e914dcf903d320ad9cd77a4b8" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a7c6e7a8e914dcf903d320ad9cd77a4b8"/>
+<keyword name="ridPortPWMLevelD0" id="witmotion::ridPortPWMLevelD0_a2a0798fb689894f2b7f998303bd8a4b3a20aaaca8b65cffe1b02ae5bf5d3f5651" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a20aaaca8b65cffe1b02ae5bf5d3f5651"/>
+<keyword name="ridPortPWMLevelD1" id="witmotion::ridPortPWMLevelD1_a2a0798fb689894f2b7f998303bd8a4b3a53111db6e031f93344a5db57932e1381" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a53111db6e031f93344a5db57932e1381"/>
+<keyword name="ridPortPWMLevelD2" id="witmotion::ridPortPWMLevelD2_a2a0798fb689894f2b7f998303bd8a4b3adda87b6ba01b1562e80aa9a7eb6be6ff" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3adda87b6ba01b1562e80aa9a7eb6be6ff"/>
+<keyword name="ridPortPWMLevelD3" id="witmotion::ridPortPWMLevelD3_a2a0798fb689894f2b7f998303bd8a4b3a0182d7ce399242f31a6f07b08df3e679" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a0182d7ce399242f31a6f07b08df3e679"/>
+<keyword name="ridPortPWMPeriodD0" id="witmotion::ridPortPWMPeriodD0_a2a0798fb689894f2b7f998303bd8a4b3a84b92f91c231e44aeff92282dc2dabba" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a84b92f91c231e44aeff92282dc2dabba"/>
+<keyword name="ridPortPWMPeriodD1" id="witmotion::ridPortPWMPeriodD1_a2a0798fb689894f2b7f998303bd8a4b3a1be747000dc85b55ae66b160151a5350" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a1be747000dc85b55ae66b160151a5350"/>
+<keyword name="ridPortPWMPeriodD2" id="witmotion::ridPortPWMPeriodD2_a2a0798fb689894f2b7f998303bd8a4b3a73ec16b82c6b5e8b78c57e6c1e031a7a" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a73ec16b82c6b5e8b78c57e6c1e031a7a"/>
+<keyword name="ridPortPWMPeriodD3" id="witmotion::ridPortPWMPeriodD3_a2a0798fb689894f2b7f998303bd8a4b3a298fdc22d7023239c80591435b6968a3" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a298fdc22d7023239c80591435b6968a3"/>
+<keyword name="ridIICAddress" id="witmotion::ridIICAddress_a2a0798fb689894f2b7f998303bd8a4b3a391ab4478ec408ab553bac43152e9a46" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a391ab4478ec408ab553bac43152e9a46"/>
+<keyword name="ridLED" id="witmotion::ridLED_a2a0798fb689894f2b7f998303bd8a4b3a2e3a09081461e24c7c065f9bd7e51810" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a2e3a09081461e24c7c065f9bd7e51810"/>
+<keyword name="ridGPSBaudRate" id="witmotion::ridGPSBaudRate_a2a0798fb689894f2b7f998303bd8a4b3a23e1f7b2e0d48ed03f0ce21d7ce8e85b" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a23e1f7b2e0d48ed03f0ce21d7ce8e85b"/>
+<keyword name="ridFilterBandwidth" id="witmotion::ridFilterBandwidth_a2a0798fb689894f2b7f998303bd8a4b3ac5b2c95e986d8cd87b47f8475c2e3d45" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ac5b2c95e986d8cd87b47f8475c2e3d45"/>
+<keyword name="ridGyroscopeRange" id="witmotion::ridGyroscopeRange_a2a0798fb689894f2b7f998303bd8a4b3a0c94f5df4e6ba10377b5619238080ff1" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a0c94f5df4e6ba10377b5619238080ff1"/>
+<keyword name="ridAccelerometerRange" id="witmotion::ridAccelerometerRange_a2a0798fb689894f2b7f998303bd8a4b3a7a6ad3e464e638d7b8c700176a6198e1" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a7a6ad3e464e638d7b8c700176a6198e1"/>
+<keyword name="ridStandbyMode" id="witmotion::ridStandbyMode_a2a0798fb689894f2b7f998303bd8a4b3aa0c382b1bbd92e110cf05656fca68846" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aa0c382b1bbd92e110cf05656fca68846"/>
+<keyword name="ridInstallationDirection" id="witmotion::ridInstallationDirection_a2a0798fb689894f2b7f998303bd8a4b3a9e91fab01aac11db869b2c3469197951" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a9e91fab01aac11db869b2c3469197951"/>
+<keyword name="ridTransitionAlgorithm" id="witmotion::ridTransitionAlgorithm_a2a0798fb689894f2b7f998303bd8a4b3a6ed4aff9ef5db46614283f3137b7a33c" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a6ed4aff9ef5db46614283f3137b7a33c"/>
+<keyword name="ridInstructionStart" id="witmotion::ridInstructionStart_a2a0798fb689894f2b7f998303bd8a4b3a3613237d9a04da1a69ab6233bdff6c87" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a3613237d9a04da1a69ab6233bdff6c87"/>
+<keyword name="ridTimeYearMonth" id="witmotion::ridTimeYearMonth_a2a0798fb689894f2b7f998303bd8a4b3a901d4a2268382df03b1842a23a03b4df" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a901d4a2268382df03b1842a23a03b4df"/>
+<keyword name="ridTimeDayHour" id="witmotion::ridTimeDayHour_a2a0798fb689894f2b7f998303bd8a4b3a0ba92dbc353204d35aec965eae613c96" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a0ba92dbc353204d35aec965eae613c96"/>
+<keyword name="ridTimeMinuteSecond" id="witmotion::ridTimeMinuteSecond_a2a0798fb689894f2b7f998303bd8a4b3aac4180796c112f8a59c40acff749f705" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aac4180796c112f8a59c40acff749f705"/>
+<keyword name="ridTimeMilliseconds" id="witmotion::ridTimeMilliseconds_a2a0798fb689894f2b7f998303bd8a4b3a98c1d3facc2a8a35a0e98af60665466f" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a98c1d3facc2a8a35a0e98af60665466f"/>
+<keyword name="ridSetAccelerationX" id="witmotion::ridSetAccelerationX_a2a0798fb689894f2b7f998303bd8a4b3a42a6e8a6f354bcd6b2b778c05d8e9f9f" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a42a6e8a6f354bcd6b2b778c05d8e9f9f"/>
+<keyword name="ridSetAccelerationY" id="witmotion::ridSetAccelerationY_a2a0798fb689894f2b7f998303bd8a4b3afbd52bd0fe49f0b4291552768d483423" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3afbd52bd0fe49f0b4291552768d483423"/>
+<keyword name="ridSetAccelerationZ" id="witmotion::ridSetAccelerationZ_a2a0798fb689894f2b7f998303bd8a4b3a7192ad42de7160e89f67385d2a952d29" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a7192ad42de7160e89f67385d2a952d29"/>
+<keyword name="ridSetAngularVelocityX" id="witmotion::ridSetAngularVelocityX_a2a0798fb689894f2b7f998303bd8a4b3a6509ae8041180b68bcd65a225416eb9e" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a6509ae8041180b68bcd65a225416eb9e"/>
+<keyword name="ridSetAngularVelocityY" id="witmotion::ridSetAngularVelocityY_a2a0798fb689894f2b7f998303bd8a4b3a48508295f9f23d01dce584675ec6c9f0" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a48508295f9f23d01dce584675ec6c9f0"/>
+<keyword name="ridSetAngularVelocityZ" id="witmotion::ridSetAngularVelocityZ_a2a0798fb689894f2b7f998303bd8a4b3a7a1193aab35e38c7cb2d50b1b070c802" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a7a1193aab35e38c7cb2d50b1b070c802"/>
+<keyword name="ridSetMagnetometerX" id="witmotion::ridSetMagnetometerX_a2a0798fb689894f2b7f998303bd8a4b3a586b93305e288dce9d13924b4e2b7497" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a586b93305e288dce9d13924b4e2b7497"/>
+<keyword name="ridSetMagnetometerY" id="witmotion::ridSetMagnetometerY_a2a0798fb689894f2b7f998303bd8a4b3a086061ec42a34429d4ecc87426bd16db" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a086061ec42a34429d4ecc87426bd16db"/>
+<keyword name="ridSetMagnetometerZ" id="witmotion::ridSetMagnetometerZ_a2a0798fb689894f2b7f998303bd8a4b3a3f7aacc3707d990356df81934205ce7d" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a3f7aacc3707d990356df81934205ce7d"/>
+<keyword name="ridSetAngleRoll" id="witmotion::ridSetAngleRoll_a2a0798fb689894f2b7f998303bd8a4b3a1e415569387a08b9bf79e77790470763" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a1e415569387a08b9bf79e77790470763"/>
+<keyword name="ridSetAnglePitch" id="witmotion::ridSetAnglePitch_a2a0798fb689894f2b7f998303bd8a4b3aba447e38147a544790c590f9f039eaf6" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aba447e38147a544790c590f9f039eaf6"/>
+<keyword name="ridSetAngleYaw" id="witmotion::ridSetAngleYaw_a2a0798fb689894f2b7f998303bd8a4b3ad6cc9ede4fe5cc3b81076bd3e3ddbb0f" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ad6cc9ede4fe5cc3b81076bd3e3ddbb0f"/>
+<keyword name="ridSetTemperature" id="witmotion::ridSetTemperature_a2a0798fb689894f2b7f998303bd8a4b3a2e2274acd5298a1422864030e2b320ba" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a2e2274acd5298a1422864030e2b320ba"/>
+<keyword name="ridSetPortStatusD0" id="witmotion::ridSetPortStatusD0_a2a0798fb689894f2b7f998303bd8a4b3a4ebad711060439819f73aa07943481c7" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a4ebad711060439819f73aa07943481c7"/>
+<keyword name="ridSetPortStatusD1" id="witmotion::ridSetPortStatusD1_a2a0798fb689894f2b7f998303bd8a4b3ab8368acbca776c26bf211a60fad166f0" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ab8368acbca776c26bf211a60fad166f0"/>
+<keyword name="ridSetPortStatusD2" id="witmotion::ridSetPortStatusD2_a2a0798fb689894f2b7f998303bd8a4b3a24351f6f11569108042150dd3cd1d7c2" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a24351f6f11569108042150dd3cd1d7c2"/>
+<keyword name="ridSetPortStatusD3" id="witmotion::ridSetPortStatusD3_a2a0798fb689894f2b7f998303bd8a4b3aa336be9ed7dec9fdf579dae59838f2bb" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aa336be9ed7dec9fdf579dae59838f2bb"/>
+<keyword name="ridSetPressureLow" id="witmotion::ridSetPressureLow_a2a0798fb689894f2b7f998303bd8a4b3a5179834f2969bb85dbe566aca70e4f72" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a5179834f2969bb85dbe566aca70e4f72"/>
+<keyword name="ridSetPressureHigh" id="witmotion::ridSetPressureHigh_a2a0798fb689894f2b7f998303bd8a4b3a4fa41cd61ddd08decf7e373786324fe4" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a4fa41cd61ddd08decf7e373786324fe4"/>
+<keyword name="ridSetAltitudeLow" id="witmotion::ridSetAltitudeLow_a2a0798fb689894f2b7f998303bd8a4b3a2999f436df440eb4e4a16c04c93de615" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a2999f436df440eb4e4a16c04c93de615"/>
+<keyword name="ridSetAltitudeHigh" id="witmotion::ridSetAltitudeHigh_a2a0798fb689894f2b7f998303bd8a4b3a1a93aa388d3de727709b6d34452d0934" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a1a93aa388d3de727709b6d34452d0934"/>
+<keyword name="ridSetLongitudeLow" id="witmotion::ridSetLongitudeLow_a2a0798fb689894f2b7f998303bd8a4b3ae19e9989db5b1b14bfae18fe5ace37fa" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ae19e9989db5b1b14bfae18fe5ace37fa"/>
+<keyword name="ridSetLongitudeHigh" id="witmotion::ridSetLongitudeHigh_a2a0798fb689894f2b7f998303bd8a4b3a69a1045e79d9ef5870f1f71747d10ae4" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a69a1045e79d9ef5870f1f71747d10ae4"/>
+<keyword name="ridSetLatitudeLow" id="witmotion::ridSetLatitudeLow_a2a0798fb689894f2b7f998303bd8a4b3aee7f477a2446d716bdca937fc4911959" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aee7f477a2446d716bdca937fc4911959"/>
+<keyword name="ridSetLatitudeHigh" id="witmotion::ridSetLatitudeHigh_a2a0798fb689894f2b7f998303bd8a4b3a34515bb412a5bd623d77bdf020f9b5e9" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a34515bb412a5bd623d77bdf020f9b5e9"/>
+<keyword name="ridSetGPSAltitude" id="witmotion::ridSetGPSAltitude_a2a0798fb689894f2b7f998303bd8a4b3a84759181f9ff6bd2a318c9f8b1ed1f39" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a84759181f9ff6bd2a318c9f8b1ed1f39"/>
+<keyword name="ridSetGPSYaw" id="witmotion::ridSetGPSYaw_a2a0798fb689894f2b7f998303bd8a4b3a549727f96698c8e2e7afbf20b4f286d0" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a549727f96698c8e2e7afbf20b4f286d0"/>
+<keyword name="ridSetGPSGroundSpeedLow" id="witmotion::ridSetGPSGroundSpeedLow_a2a0798fb689894f2b7f998303bd8a4b3aa8dc66482e5afdb4831e8602b2e89d58" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aa8dc66482e5afdb4831e8602b2e89d58"/>
+<keyword name="ridSetGPSGroundSpeedHigh" id="witmotion::ridSetGPSGroundSpeedHigh_a2a0798fb689894f2b7f998303bd8a4b3aa3bc5016e03de006cf633420ac34e25f" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3aa3bc5016e03de006cf633420ac34e25f"/>
+<keyword name="ridSetOrientationX" id="witmotion::ridSetOrientationX_a2a0798fb689894f2b7f998303bd8a4b3a77da818475b1904a4e7ef051d14e063d" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a77da818475b1904a4e7ef051d14e063d"/>
+<keyword name="ridSetOrientationY" id="witmotion::ridSetOrientationY_a2a0798fb689894f2b7f998303bd8a4b3a49c73008955b9fa89f9b4cba3dd37d9d" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a49c73008955b9fa89f9b4cba3dd37d9d"/>
+<keyword name="ridSetOrientationZ" id="witmotion::ridSetOrientationZ_a2a0798fb689894f2b7f998303bd8a4b3a3e1d48defa5dbaea479ee1498cf3db7a" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a3e1d48defa5dbaea479ee1498cf3db7a"/>
+<keyword name="ridSetOrientationW" id="witmotion::ridSetOrientationW_a2a0798fb689894f2b7f998303bd8a4b3a6b12d4a88aa5b9477ad6acae3af6bb83" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a6b12d4a88aa5b9477ad6acae3af6bb83"/>
+<keyword name="ridGyroscopeAutoCalibrate" id="witmotion::ridGyroscopeAutoCalibrate_a2a0798fb689894f2b7f998303bd8a4b3a83987c4864f06244dab4f5ef6f12af7f" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3a83987c4864f06244dab4f5ef6f12af7f"/>
+<keyword name="ridUnlockConfiguration" id="witmotion::ridUnlockConfiguration_a2a0798fb689894f2b7f998303bd8a4b3ae3b36162b2662cc9c637436bca5c8172" ref="dc/ddc/namespacewitmotion.html#a2a0798fb689894f2b7f998303bd8a4b3ae3b36162b2662cc9c637436bca5c8172"/>
+<keyword name="WITMOTION_HEADER_BYTE" id="witmotion::WITMOTION_HEADER_BYTE_a637c861a28f4015a1b57d8bd9ef08cbf" ref="dc/ddc/namespacewitmotion.html#a637c861a28f4015a1b57d8bd9ef08cbf"/>
+<keyword name="witmotion_output_frequency(const int hertz)" id="witmotion::witmotion_output_frequency_a90e09a9e4f3d24ab522bee3aa9bf9c78" ref="dc/ddc/namespacewitmotion.html#a90e09a9e4f3d24ab522bee3aa9bf9c78"/>
+<keyword name="witmotion_packet_descriptions" id="witmotion::witmotion_packet_descriptions_a4af000309f5694300ababe3086c486fc" ref="dc/ddc/namespacewitmotion.html#a4af000309f5694300ababe3086c486fc"/>
+<keyword name="witmotion_packet_id" id="witmotion::witmotion_packet_id_a5fdb17b12d46f0ec17e44a1dab9957d3" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3"/>
+<keyword name="pidRTC" id="witmotion::pidRTC_a5fdb17b12d46f0ec17e44a1dab9957d3a0eec2c5dacef2bfea50757ef63fd2735" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a0eec2c5dacef2bfea50757ef63fd2735"/>
+<keyword name="pidAcceleration" id="witmotion::pidAcceleration_a5fdb17b12d46f0ec17e44a1dab9957d3aa55a0844425f2c57978b43ba96f9d14f" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3aa55a0844425f2c57978b43ba96f9d14f"/>
+<keyword name="pidAngularVelocity" id="witmotion::pidAngularVelocity_a5fdb17b12d46f0ec17e44a1dab9957d3afb633ed3118253ba87c8560a203f4f44" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3afb633ed3118253ba87c8560a203f4f44"/>
+<keyword name="pidAngles" id="witmotion::pidAngles_a5fdb17b12d46f0ec17e44a1dab9957d3a2d5f569560d2a29fee1f179a4c46f143" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a2d5f569560d2a29fee1f179a4c46f143"/>
+<keyword name="pidMagnetometer" id="witmotion::pidMagnetometer_a5fdb17b12d46f0ec17e44a1dab9957d3aa410e8a4ad06356282c0a7eaa0b7edb3" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3aa410e8a4ad06356282c0a7eaa0b7edb3"/>
+<keyword name="pidDataPortStatus" id="witmotion::pidDataPortStatus_a5fdb17b12d46f0ec17e44a1dab9957d3a854420a4a97ec9a21e338aa236769f11" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a854420a4a97ec9a21e338aa236769f11"/>
+<keyword name="pidAltimeter" id="witmotion::pidAltimeter_a5fdb17b12d46f0ec17e44a1dab9957d3a8ca47e826186715b57327ffbd91cada8" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a8ca47e826186715b57327ffbd91cada8"/>
+<keyword name="pidGPSCoordinates" id="witmotion::pidGPSCoordinates_a5fdb17b12d46f0ec17e44a1dab9957d3a7b05a239d11dcb700ddf67f6ea1b90b5" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a7b05a239d11dcb700ddf67f6ea1b90b5"/>
+<keyword name="pidGPSGroundSpeed" id="witmotion::pidGPSGroundSpeed_a5fdb17b12d46f0ec17e44a1dab9957d3a7ecc187fe112b76a5135278dcd6b8bd5" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a7ecc187fe112b76a5135278dcd6b8bd5"/>
+<keyword name="pidOrientation" id="witmotion::pidOrientation_a5fdb17b12d46f0ec17e44a1dab9957d3a791db4f6c4cfa2ca9db09f6dac7c6011" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a791db4f6c4cfa2ca9db09f6dac7c6011"/>
+<keyword name="pidGPSAccuracy" id="witmotion::pidGPSAccuracy_a5fdb17b12d46f0ec17e44a1dab9957d3a24c950fa7ba2faa32301bd4e72716487" ref="dc/ddc/namespacewitmotion.html#a5fdb17b12d46f0ec17e44a1dab9957d3a24c950fa7ba2faa32301bd4e72716487"/>
+<keyword name="witmotion_registered_ids" id="witmotion::witmotion_registered_ids_a90712081209bb40591c1666a5a5362e5" ref="dc/ddc/namespacewitmotion.html#a90712081209bb40591c1666a5a5362e5"/>
+</keywords>
+<files>
+<file>annotated.html</file>
+<file>bc_s.png</file>
+<file>bc_sd.png</file>
+<file>classes.html</file>
+<file>closed.png</file>
+<file>d0/d07/classwitmotion_1_1wt31n_1_1QWitmotionWT31NSensor__coll__graph.pdf</file>
+<file>d0/d07/classwitmotion_1_1wt31n_1_1QWitmotionWT31NSensor__coll__graph.png</file>
+<file>d0/d33/classwitmotion_1_1witmotion__typed__bytecounts.html</file>
+<file>d0/d45/classwitmotion_1_1QAbstractWitmotionSensorReader.html</file>
+<file>d0/d87/classwitmotion_1_1QAbstractWitmotionSensorController__coll__graph.pdf</file>
+<file>d0/d87/classwitmotion_1_1QAbstractWitmotionSensorController__coll__graph.png</file>
+<file>d0/d9d/classwitmotion_1_1QAbstractWitmotionSensorController.html</file>
+<file>d1/d6d/structwitmotion_1_1witmotion__config__packet.html</file>
+<file>d1/daf/jy901-uart_8h_source.html</file>
+<file>d1/dc4/classwitmotion_1_1witmotion__typed__bytecounts__coll__graph.pdf</file>
+<file>d1/dc4/classwitmotion_1_1witmotion__typed__bytecounts__coll__graph.png</file>
+<file>d1/ddb/classwitmotion_1_1QAbstractWitmotionSensorReader__inherit__graph.pdf</file>
+<file>d1/ddb/classwitmotion_1_1QAbstractWitmotionSensorReader__inherit__graph.png</file>
+<file>d2/d07/classwitmotion_1_1witmotion__typed__packets__coll__graph.pdf</file>
+<file>d2/d07/classwitmotion_1_1witmotion__typed__packets__coll__graph.png</file>
+<file>d2/d1f/types_8h__incl.pdf</file>
+<file>d2/d1f/types_8h__incl.png</file>
+<file>d2/d57/classwitmotion_1_1QGeneralSensorController-members.html</file>
+<file>d2/da6/acceleration-bias.html</file>
+<file>d2/dbf/structwitmotion_1_1witmotion__datapacket-members.html</file>
+<file>d3/d08/classwitmotion_1_1QAbstractWitmotionSensorReader-members.html</file>
+<file>d3/dc9/classwitmotion_1_1QAbstractWitmotionSensorReader__coll__graph.pdf</file>
+<file>d3/dc9/classwitmotion_1_1QAbstractWitmotionSensorReader__coll__graph.png</file>
+<file>d3/dd3/classwitmotion_1_1witmotion__typed__packets.html</file>
+<file>d4/d16/classwitmotion_1_1QBaseSerialWitmotionSensorReader-members.html</file>
+<file>d4/d89/classwitmotion_1_1jy901_1_1QWitmotionJY901Sensor__coll__graph.pdf</file>
+<file>d4/d89/classwitmotion_1_1jy901_1_1QWitmotionJY901Sensor__coll__graph.png</file>
+<file>d4/dbc/structwitmotion_1_1witmotion__datapacket__coll__graph.pdf</file>
+<file>d4/dbc/structwitmotion_1_1witmotion__datapacket__coll__graph.png</file>
+<file>d4/dd8/classwitmotion_1_1wt901_1_1QWitmotionWT901Sensor-members.html</file>
+<file>d5/dfc/installation.html</file>
+<file>d5/dfe/classwitmotion_1_1wt901_1_1QWitmotionWT901Sensor__coll__graph.pdf</file>
+<file>d5/dfe/classwitmotion_1_1wt901_1_1QWitmotionWT901Sensor__coll__graph.png</file>
+<file>d6/dc5/structwitmotion_1_1witmotion__config__packet-members.html</file>
+<file>d6/de1/witmotion_protocol.html</file>
+<file>d6/de8/util_8h__dep__incl.pdf</file>
+<file>d6/de8/util_8h__dep__incl.png</file>
+<file>d7/d18/classwitmotion_1_1QAbstractWitmotionSensorController__inherit__graph.pdf</file>
+<file>d7/d18/classwitmotion_1_1QAbstractWitmotionSensorController__inherit__graph.png</file>
+<file>d7/d18/classwitmotion_1_1QBaseSerialWitmotionSensorReader__coll__graph.pdf</file>
+<file>d7/d18/classwitmotion_1_1QBaseSerialWitmotionSensorReader__coll__graph.png</file>
+<file>d8/d3c/util_8h.html</file>
+<file>d8/d3c/util_8h_source.html</file>
+<file>d8/d43/classwitmotion_1_1QGeneralSensorController__coll__graph.pdf</file>
+<file>d8/d43/classwitmotion_1_1QGeneralSensorController__coll__graph.png</file>
+<file>d9/d49/types_8h.html</file>
+<file>d9/d49/types_8h_source.html</file>
+<file>d9/d54/classwitmotion_1_1jy901_1_1QWitmotionJY901Sensor.html</file>
+<file>d9/d54/classwitmotion_1_1witmotion__typed__packets-members.html</file>
+<file>d9/dea/classwitmotion_1_1QAbstractWitmotionSensorController-members.html</file>
+<file>da/d24/classwitmotion_1_1QBaseSerialWitmotionSensorReader.html</file>
+<file>da/dba/classwitmotion_1_1wt901_1_1QWitmotionWT901Sensor__inherit__graph.pdf</file>
+<file>da/dba/classwitmotion_1_1wt901_1_1QWitmotionWT901Sensor__inherit__graph.png</file>
+<file>da/dca/classwitmotion_1_1wt901_1_1QWitmotionWT901Sensor.html</file>
+<file>da/dcc/classwitmotion_1_1QGeneralSensorController__inherit__graph.pdf</file>
+<file>da/dcc/classwitmotion_1_1QGeneralSensorController__inherit__graph.png</file>
+<file>da/dec/unified_applications.html</file>
+<file>da/dee/util_8h__incl.pdf</file>
+<file>da/dee/util_8h__incl.png</file>
+<file>db/d11/serial_8h_source.html</file>
+<file>db/d3d/classwitmotion_1_1jy901_1_1QWitmotionJY901Sensor__inherit__graph.pdf</file>
+<file>db/d3d/classwitmotion_1_1jy901_1_1QWitmotionJY901Sensor__inherit__graph.png</file>
+<file>db/d7b/classwitmotion_1_1wt31n_1_1QWitmotionWT31NSensor-members.html</file>
+<file>db/d91/classwitmotion_1_1jy901_1_1QWitmotionJY901Sensor-members.html</file>
+<file>dc/d56/types_8h__dep__incl.pdf</file>
+<file>dc/d56/types_8h__dep__incl.png</file>
+<file>dc/d8d/structwitmotion_1_1witmotion__datapacket.html</file>
+<file>dc/d98/wt31n-uart_8h_source.html</file>
+<file>dc/ddc/namespacewitmotion.html</file>
+<file>dc/dfe/classwitmotion_1_1wt31n_1_1QWitmotionWT31NSensor.html</file>
+<file>dd/d26/classwitmotion_1_1QBaseSerialWitmotionSensorReader__inherit__graph.pdf</file>
+<file>dd/d26/classwitmotion_1_1QBaseSerialWitmotionSensorReader__inherit__graph.png</file>
+<file>dd/d75/classwitmotion_1_1witmotion__typed__bytecounts-members.html</file>
+<file>dd/db2/classwitmotion_1_1QGeneralSensorController.html</file>
+<file>dd/dbb/structwitmotion_1_1witmotion__config__packet__coll__graph.pdf</file>
+<file>dd/dbb/structwitmotion_1_1witmotion__config__packet__coll__graph.png</file>
+<file>de/dc9/message-enumerator_8h_source.html</file>
+<file>de/df8/classwitmotion_1_1wt31n_1_1QWitmotionWT31NSensor__inherit__graph.pdf</file>
+<file>de/df8/classwitmotion_1_1wt31n_1_1QWitmotionWT31NSensor__inherit__graph.png</file>
+<file>df/d09/witmotion_docs.html</file>
+<file>df/d21/wt901-uart_8h_source.html</file>
+<file>df/dfc/version_8h_source.html</file>
+<file>dir_000002_000001.html</file>
+<file>dir_0f59198f0feff1c13cdee29746395779.html</file>
+<file>dir_0f59198f0feff1c13cdee29746395779_dep.png</file>
+<file>dir_1cf06fafba72c09c3e4f66ae55d7bd46.html</file>
+<file>dir_1cf06fafba72c09c3e4f66ae55d7bd46_dep.png</file>
+<file>dir_62093aeb58d9492bfe1141f664318db3.html</file>
+<file>dir_62093aeb58d9492bfe1141f664318db3_dep.png</file>
+<file>dir_8c93ff06af9fa60c7854733ac38ecee4.html</file>
+<file>dir_8c93ff06af9fa60c7854733ac38ecee4_dep.png</file>
+<file>dir_fa00dff4974947ac4d90aa7f08a43596.html</file>
+<file>dir_fa00dff4974947ac4d90aa7f08a43596_dep.png</file>
+<file>dir_fe7fb09a82d668034dff92d13a7ed5e7.html</file>
+<file>dir_fe7fb09a82d668034dff92d13a7ed5e7_dep.png</file>
+<file>doxygen-awesome.css</file>
+<file>doxygen.css</file>
+<file>doxygen.svg</file>
+<file>dynsections.js</file>
+<file>files.html</file>
+<file>functions.html</file>
+<file>functions_func.html</file>
+<file>functions_vars.html</file>
+<file>graph_legend.html</file>
+<file>graph_legend.png</file>
+<file>hierarchy.html</file>
+<file>index.html</file>
+<file>inherit_graph_0.png</file>
+<file>inherit_graph_1.png</file>
+<file>inherit_graph_2.png</file>
+<file>inherit_graph_3.png</file>
+<file>inherit_graph_4.png</file>
+<file>inherits.html</file>
+<file>jquery.js</file>
+<file>menu.js</file>
+<file>menudata.js</file>
+<file>namespacemembers.html</file>
+<file>namespacemembers_enum.html</file>
+<file>namespacemembers_eval.html</file>
+<file>namespacemembers_func.html</file>
+<file>namespacemembers_vars.html</file>
+<file>namespaces.html</file>
+<file>nav_f.png</file>
+<file>nav_fd.png</file>
+<file>nav_g.png</file>
+<file>nav_h.png</file>
+<file>nav_hd.png</file>
+<file>open.png</file>
+<file>pages.html</file>
+<file>search/all_0.js</file>
+<file>search/all_1.js</file>
+<file>search/all_10.js</file>
+<file>search/all_11.js</file>
+<file>search/all_12.js</file>
+<file>search/all_2.js</file>
+<file>search/all_3.js</file>
+<file>search/all_4.js</file>
+<file>search/all_5.js</file>
+<file>search/all_6.js</file>
+<file>search/all_7.js</file>
+<file>search/all_8.js</file>
+<file>search/all_9.js</file>
+<file>search/all_a.js</file>
+<file>search/all_b.js</file>
+<file>search/all_c.js</file>
+<file>search/all_d.js</file>
+<file>search/all_e.js</file>
+<file>search/all_f.js</file>
+<file>search/classes_0.js</file>
+<file>search/classes_1.js</file>
+<file>search/close.svg</file>
+<file>search/enums_0.js</file>
+<file>search/enumvalues_0.js</file>
+<file>search/enumvalues_1.js</file>
+<file>search/files_0.js</file>
+<file>search/files_1.js</file>
+<file>search/functions_0.js</file>
+<file>search/functions_1.js</file>
+<file>search/functions_2.js</file>
+<file>search/functions_3.js</file>
+<file>search/functions_4.js</file>
+<file>search/mag.svg</file>
+<file>search/mag_d.svg</file>
+<file>search/mag_sel.svg</file>
+<file>search/mag_seld.svg</file>
+<file>search/namespaces_0.js</file>
+<file>search/pages_0.js</file>
+<file>search/pages_1.js</file>
+<file>search/pages_2.js</file>
+<file>search/pages_3.js</file>
+<file>search/pages_4.js</file>
+<file>search/pages_5.js</file>
+<file>search/pages_6.js</file>
+<file>search/pages_7.js</file>
+<file>search/pages_8.js</file>
+<file>search/pages_9.js</file>
+<file>search/pages_a.js</file>
+<file>search/search.css</file>
+<file>search/search.js</file>
+<file>search/searchdata.js</file>
+<file>search/variables_0.js</file>
+<file>search/variables_1.js</file>
+<file>search/variables_2.js</file>
+<file>search/variables_3.js</file>
+<file>search/variables_4.js</file>
+<file>search/variables_5.js</file>
+<file>search/variables_6.js</file>
+<file>search/variables_7.js</file>
+<file>splitbar.png</file>
+<file>splitbard.png</file>
+<file>sync_off.png</file>
+<file>sync_on.png</file>
+<file>tab_a.png</file>
+<file>tab_ad.png</file>
+<file>tab_b.png</file>
+<file>tab_bd.png</file>
+<file>tab_h.png</file>
+<file>tab_hd.png</file>
+<file>tab_s.png</file>
+<file>tab_sd.png</file>
+<file>tabs.css</file>
+</files>
+</filterSection>
+</QtHelpProject>

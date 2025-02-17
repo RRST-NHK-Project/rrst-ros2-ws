@@ -1,0 +1,2 @@
+/usr/bin/ar qc libwitmotion_ros.a CMakeFiles/witmotion_ros.dir/witmotion_ros_autogen/mocs_compilation.cpp.o CMakeFiles/witmotion_ros.dir/include/moc_witmotion_ros.cpp.o CMakeFiles/witmotion_ros.dir/src/witmotion_ros.cpp.o
+/usr/bin/ranlib libwitmotion_ros.a

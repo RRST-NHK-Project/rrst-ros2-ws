@@ -1,0 +1,97 @@
+\doxysection{serial.\+h}
+\hypertarget{serial_8h_source}{}\label{serial_8h_source}\index{serial.h@{serial.h}}
+
+\begin{DoxyCode}{0}
+\DoxyCodeLine{00001\ \textcolor{preprocessor}{\#}\textcolor{preprocessor}{ifndef}\ \textcolor{preprocessor}{WITMOTION\_SERIAL\_H}}
+\DoxyCodeLine{00002\ \textcolor{preprocessor}{\#}\textcolor{preprocessor}{define}\ \textcolor{preprocessor}{WITMOTION\_SERIAL\_H}}
+\DoxyCodeLine{00003\ }
+\DoxyCodeLine{00004\ \textcolor{preprocessor}{\#}\textcolor{preprocessor}{include}\ \textcolor{preprocessor}{"{}witmotion/types.h"{}}}
+\DoxyCodeLine{00005\ \textcolor{preprocessor}{\#}\textcolor{preprocessor}{include}\ \textcolor{preprocessor}{"{}witmotion/util.h"{}}}
+\DoxyCodeLine{00006\ }
+\DoxyCodeLine{00007\ \textcolor{preprocessor}{\#}\textcolor{preprocessor}{include}\ \textcolor{preprocessor}{<}\textcolor{preprocessor}{QtCore}\textcolor{preprocessor}{>}}
+\DoxyCodeLine{00008\ \textcolor{preprocessor}{\#}\textcolor{preprocessor}{include}\ \textcolor{preprocessor}{<}\textcolor{preprocessor}{QSerialPort}\textcolor{preprocessor}{>}}
+\DoxyCodeLine{00009\ }
+\DoxyCodeLine{00010\ \textcolor{preprocessor}{\#}\textcolor{preprocessor}{include}\ \textcolor{preprocessor}{<}\textcolor{preprocessor}{list}\textcolor{preprocessor}{>}}
+\DoxyCodeLine{00011\ }
+\DoxyCodeLine{00012\ \textcolor{keyword}{namespace}\ \mbox{\hyperlink{namespacewitmotion}{witmotion}}}
+\DoxyCodeLine{00013\ \{}
+\DoxyCodeLine{00014\ }
+\DoxyCodeLine{00015\ \textcolor{keyword}{class}\ \mbox{\hyperlink{classwitmotion_1_1QBaseSerialWitmotionSensorReader}{QBaseSerialWitmotionSensorReader}}:\ \textcolor{keyword}{public}\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader}{QAbstractWitmotionSensorReader}}}
+\DoxyCodeLine{00016\ \{}
+\DoxyCodeLine{00017\ \ \ \ \ \mbox{\hyperlink{classwitmotion_1_1QBaseSerialWitmotionSensorReader}{Q\_OBJECT}}}
+\DoxyCodeLine{00018\ \textcolor{keyword}{private}:}
+\DoxyCodeLine{00019\ \ \ \ \ \mbox{\hyperlink{classwitmotion_1_1QBaseSerialWitmotionSensorReader}{QString}}\ \mbox{\hyperlink{classwitmotion_1_1QBaseSerialWitmotionSensorReader}{port\_name}};}
+\DoxyCodeLine{00020\ \ \ \ \ QSerialPort*\ witmotion\_port;}
+\DoxyCodeLine{00021\ \ \ \ \ QSerialPort::BaudRate\ port\_rate;}
+\DoxyCodeLine{00022\ \ \ \ \ qint64\ last\_avail;}
+\DoxyCodeLine{00023\ \ \ \ \ quint16\ avail\_rep\_count;}
+\DoxyCodeLine{00024\ \ \ \ \ uint8\_t\ raw\_data[128];}
+\DoxyCodeLine{00025\ \ \ \ \ \textcolor{keywordtype}{bool}\ validate;}
+\DoxyCodeLine{00026\ \ \ \ \ \textcolor{keywordtype}{bool}\ user\_defined\_return\_interval;}
+\DoxyCodeLine{00027\ \ \ \ \ uint32\_t\ return\_interval;}
+\DoxyCodeLine{00028\ \ \ \ \ \textcolor{keywordtype}{bool}\ user\_defined\_timeout;}
+\DoxyCodeLine{00029\ \ \ \ \ uint32\_t\ timeout\_ms;}
+\DoxyCodeLine{00030\ \ \ \ \ uint32\_t\ timeout\_counter;}
+\DoxyCodeLine{00031\ \textcolor{keyword}{protected}:}
+\DoxyCodeLine{00032\ \ \ \ \ QTextStream\ ttyout;}
+\DoxyCodeLine{00033\ \ \ \ \ QTimer*\ poll\_timer;}
+\DoxyCodeLine{00034\ \ \ \ \ QMetaObject::Connection\ timer\_connection;}
+\DoxyCodeLine{00035\ \ \ \ \ QMetaObject::Connection\ config\_connection;}
+\DoxyCodeLine{00036\ \ \ \ \ \textcolor{keyword}{enum}\ read\_state\_t}
+\DoxyCodeLine{00037\ \ \ \ \ \{}
+\DoxyCodeLine{00038\ \ \ \ \ \ \ \ \ rsUnknown,}
+\DoxyCodeLine{00039\ \ \ \ \ \ \ \ \ rsClear,}
+\DoxyCodeLine{00040\ \ \ \ \ \ \ \ \ rsRead}
+\DoxyCodeLine{00041\ \ \ \ \ \}read\_state;}
+\DoxyCodeLine{00042\ \ \ \ \ \mbox{\hyperlink{classwitmotion_1_1witmotion__typed__packets}{witmotion\_typed\_packets}}\ packets;}
+\DoxyCodeLine{00043\ \ \ \ \ \mbox{\hyperlink{classwitmotion_1_1witmotion__typed__bytecounts}{witmotion\_typed\_bytecounts}}\ counts;}
+\DoxyCodeLine{00044\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3}{witmotion\_packet\_id}}\ read\_cell;}
+\DoxyCodeLine{00045\ }
+\DoxyCodeLine{00046\ \ \ \ \ \textcolor{keyword}{volatile}\ \textcolor{keywordtype}{bool}\ configuring;}
+\DoxyCodeLine{00047\ \ \ \ \ std::list<witmotion\_config\_packet>\ configuration;}
+\DoxyCodeLine{00048\ \ \ \ \ \textcolor{keyword}{virtual}\ \textcolor{keywordtype}{void}\ \mbox{\hyperlink{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a86aeebe95a926a29cbc9c6d6fb3fb9a2}{ReadData}}();}
+\DoxyCodeLine{00049\ \ \ \ \ \textcolor{keyword}{virtual}\ \textcolor{keywordtype}{void}\ Configure();}
+\DoxyCodeLine{00050\ \ \ \ \ \textcolor{keyword}{virtual}\ \textcolor{keywordtype}{void}\ \mbox{\hyperlink{classwitmotion_1_1QBaseSerialWitmotionSensorReader_adef9d17620ca9e47ee507f7eaa61b417}{SendConfig}}(\textcolor{keyword}{const}\ \mbox{\hyperlink{structwitmotion_1_1witmotion__config__packet}{witmotion\_config\_packet}}\&\ packet);}
+\DoxyCodeLine{00051\ \textcolor{keyword}{public}:}
+\DoxyCodeLine{00052\ \ \ \ \ \textcolor{keywordtype}{void}\ SetBaudRate(\textcolor{keyword}{const}\ QSerialPort::BaudRate\&\ rate);}
+\DoxyCodeLine{00053\ \ \ \ \ QBaseSerialWitmotionSensorReader(\textcolor{keyword}{const}\ QString\ device,\ \textcolor{keyword}{const}\ QSerialPort::BaudRate\ rate);}
+\DoxyCodeLine{00054\ \ \ \ \ \textcolor{keyword}{virtual}\ \string~QBaseSerialWitmotionSensorReader();}
+\DoxyCodeLine{00055\ \ \ \ \ \textcolor{keyword}{virtual}\ \textcolor{keywordtype}{void}\ \mbox{\hyperlink{classwitmotion_1_1QBaseSerialWitmotionSensorReader_a9af65f5936da60c51148e0668f89e5b7}{RunPoll}}();}
+\DoxyCodeLine{00056\ \ \ \ \ \textcolor{keyword}{virtual}\ \textcolor{keywordtype}{void}\ Suspend();}
+\DoxyCodeLine{00057\ \ \ \ \ \textcolor{keywordtype}{void}\ ValidatePackets(\textcolor{keyword}{const}\ \textcolor{keywordtype}{bool}\ value);}
+\DoxyCodeLine{00058\ \ \ \ \ \textcolor{keywordtype}{void}\ SetSensorPollInterval(\textcolor{keyword}{const}\ uint32\_t\ ms);}
+\DoxyCodeLine{00059\ \ \ \ \ \textcolor{keywordtype}{void}\ SetSensorTimeout(\textcolor{keyword}{const}\ uint32\_t\ ms);}
+\DoxyCodeLine{00060\ \};}
+\DoxyCodeLine{00061\ }
+\DoxyCodeLine{00062\ \textcolor{keyword}{class}\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorController}{QAbstractWitmotionSensorController}}:\ \textcolor{keyword}{public}\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorController}{QObject}}}
+\DoxyCodeLine{00063\ \{}
+\DoxyCodeLine{00064\ \ \ \ \ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorController}{Q\_OBJECT}}}
+\DoxyCodeLine{00065\ \textcolor{keyword}{private}:}
+\DoxyCodeLine{00066\ \ \ \ \ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorController}{QThread}}\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorController}{reader\_thread}};}
+\DoxyCodeLine{00067\ \textcolor{keyword}{protected}:}
+\DoxyCodeLine{00068\ \ \ \ \ QString\ port\_name;}
+\DoxyCodeLine{00069\ \ \ \ \ QSerialPort::BaudRate\ port\_rate;}
+\DoxyCodeLine{00070\ \ \ \ \ \mbox{\hyperlink{classwitmotion_1_1QBaseSerialWitmotionSensorReader}{QBaseSerialWitmotionSensorReader}}*\ reader;}
+\DoxyCodeLine{00071\ \ \ \ \ QTextStream\ ttyout;}
+\DoxyCodeLine{00072\ \textcolor{keyword}{public}:}
+\DoxyCodeLine{00073\ \ \ \ \ \textcolor{keyword}{virtual}\ \textcolor{keyword}{const}\ std::set<witmotion\_packet\_id>*\ RegisteredPacketTypes()\ =\ 0;}
+\DoxyCodeLine{00074\ \ \ \ \ QAbstractWitmotionSensorController(\textcolor{keyword}{const}\ QString\ tty\_name,\ \textcolor{keyword}{const}\ QSerialPort::BaudRate\ rate);}
+\DoxyCodeLine{00075\ \ \ \ \ \textcolor{keyword}{virtual}\ \textcolor{keywordtype}{void}\ Start()\ =\ 0;}
+\DoxyCodeLine{00076\ \ \ \ \ \textcolor{keyword}{virtual}\ \string~QAbstractWitmotionSensorController();}
+\DoxyCodeLine{00077\ \ \ \ \ \textcolor{keyword}{virtual}\ \textcolor{keywordtype}{void}\ Calibrate()\ =\ 0;}
+\DoxyCodeLine{00078\ \ \ \ \ \textcolor{keyword}{virtual}\ \textcolor{keywordtype}{void}\ SetBaudRate(\textcolor{keyword}{const}\ QSerialPort::BaudRate\&\ rate)\ =\ 0;}
+\DoxyCodeLine{00079\ \ \ \ \ \textcolor{keywordtype}{void}\ SetValidation(\textcolor{keyword}{const}\ \textcolor{keywordtype}{bool}\ validate);}
+\DoxyCodeLine{00080\ \textcolor{keyword}{public}\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorController}{slots}}:}
+\DoxyCodeLine{00081\ \ \ \ \ \textcolor{keyword}{virtual}\ \textcolor{keywordtype}{void}\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorController}{Packet}}(\textcolor{keyword}{const}\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorController}{witmotion\_datapacket}}\&\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorController}{packet}});}
+\DoxyCodeLine{00082\ \ \ \ \ \textcolor{keyword}{virtual}\ \textcolor{keywordtype}{void}\ Error(\textcolor{keyword}{const}\ QString\&\ description);}
+\DoxyCodeLine{00083\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorController}{signals}}:}
+\DoxyCodeLine{00084\ \ \ \ \ \textcolor{keywordtype}{void}\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorController}{RunReader}}();}
+\DoxyCodeLine{00085\ \ \ \ \ \textcolor{keywordtype}{void}\ ErrorOccurred(\textcolor{keyword}{const}\ QString\&\ description);}
+\DoxyCodeLine{00086\ \ \ \ \ \textcolor{keywordtype}{void}\ Acquired(\textcolor{keyword}{const}\ \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\_datapacket}}\&\ packet);}
+\DoxyCodeLine{00087\ \ \ \ \ \textcolor{keywordtype}{void}\ SendConfig(\textcolor{keyword}{const}\ \mbox{\hyperlink{structwitmotion_1_1witmotion__config__packet}{witmotion\_config\_packet}}\&\ packet);}
+\DoxyCodeLine{00088\ \};}
+\DoxyCodeLine{00089\ }
+\DoxyCodeLine{00090\ \}}
+\DoxyCodeLine{00091\ \textcolor{preprocessor}{\#}\textcolor{preprocessor}{endif}}
+
+\end{DoxyCode}

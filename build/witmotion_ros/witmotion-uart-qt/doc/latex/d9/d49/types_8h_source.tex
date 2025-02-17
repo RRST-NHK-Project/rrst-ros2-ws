@@ -1,0 +1,372 @@
+\doxysection{types.\+h}
+\hypertarget{types_8h_source}{}\label{types_8h_source}\index{types.h@{types.h}}
+\mbox{\hyperlink{types_8h}{Go to the documentation of this file.}}
+\begin{DoxyCode}{0}
+\DoxyCodeLine{00001\ \textcolor{comment}{/*!}}
+\DoxyCodeLine{00002\ \textcolor{comment}{\ \ \ \ \(\backslash\)file\ types.h}}
+\DoxyCodeLine{00003\ \textcolor{comment}{\ \ \ \ \(\backslash\)brief\ Abstract\ types\ collection\ for\ Witmotion\ sensor\ library}}
+\DoxyCodeLine{00004\ \textcolor{comment}{\ \ \ \ \(\backslash\)author\ Andrey\ Vukolov\ andrey.vukolov@elettra.eu}}
+\DoxyCodeLine{00005\ \textcolor{comment}{}}
+\DoxyCodeLine{00006\ \textcolor{comment}{\ \ \ \ This\ header\ file\ contains\ all\ abstract\ types\ and\ hardware-\/defined\ constants\ to\ operate\ Witmotion\ sensor\ device.}}
+\DoxyCodeLine{00007\ \textcolor{comment}{*/}}
+\DoxyCodeLine{00008\ }
+\DoxyCodeLine{00009\ \textcolor{preprocessor}{\#}\textcolor{preprocessor}{ifndef}\ \textcolor{preprocessor}{WITMOTION}}
+\DoxyCodeLine{00010\ \textcolor{preprocessor}{\#}\textcolor{preprocessor}{define}\ \textcolor{preprocessor}{WITMOTION}}
+\DoxyCodeLine{00011\ \textcolor{preprocessor}{\#}\textcolor{preprocessor}{include}\ \textcolor{preprocessor}{<}\textcolor{preprocessor}{cmath}\textcolor{preprocessor}{>}}
+\DoxyCodeLine{00012\ \textcolor{preprocessor}{\#}\textcolor{preprocessor}{include}\ \textcolor{preprocessor}{<}\textcolor{preprocessor}{set}\textcolor{preprocessor}{>}}
+\DoxyCodeLine{00013\ \textcolor{preprocessor}{\#}\textcolor{preprocessor}{include}\ \textcolor{preprocessor}{<}\textcolor{preprocessor}{inttypes}\textcolor{preprocessor}{.}\textcolor{preprocessor}{h}\textcolor{preprocessor}{>}}
+\DoxyCodeLine{00014\ }
+\DoxyCodeLine{00015\ \textcolor{preprocessor}{\#}\textcolor{preprocessor}{include}\ \textcolor{preprocessor}{<}\textcolor{preprocessor}{QtCore}\textcolor{preprocessor}{>}}
+\DoxyCodeLine{00016\ \textcolor{preprocessor}{\#}\textcolor{preprocessor}{include}\ \textcolor{preprocessor}{<}\textcolor{preprocessor}{QSerialPort}\textcolor{preprocessor}{>}}
+\DoxyCodeLine{00017\ }
+\DoxyCodeLine{00018\ \textcolor{preprocessor}{\#}\textcolor{preprocessor}{include}\ \textcolor{preprocessor}{"{}witmotion/version.h"{}}}
+\DoxyCodeLine{00019\ }
+\DoxyCodeLine{00020\ }
+\DoxyCodeLine{00021\ \textcolor{comment}{/*!}}
+\DoxyCodeLine{00022\ \textcolor{comment}{\ \ \(\backslash\)brief\ Main\ namespace\ of\ Witmotion\ UART\ connection\ library}}
+\DoxyCodeLine{00023\ \textcolor{comment}{}}
+\DoxyCodeLine{00024\ \textcolor{comment}{Upper\ level\ namespace\ containing\ all\ the\ declared\ constants,\ parameters,\ classes,\ functions.}}
+\DoxyCodeLine{00025\ \textcolor{comment}{}}
+\DoxyCodeLine{00026\ \textcolor{comment}{\(\backslash\)note\ It\ is\ strictly\ NOT\ RECOMMENDED\ to\ use\ this\ namespace\ implicitly\ through\ \`{}using\ namespace`\ directive.}}
+\DoxyCodeLine{00027\ \textcolor{comment}{*/}}
+\DoxyCodeLine{00028\ \textcolor{keyword}{namespace}\ \mbox{\hyperlink{namespacewitmotion}{witmotion}}}
+\DoxyCodeLine{00029\ \{}
+\DoxyCodeLine{00030\ }
+\DoxyCodeLine{00031\ \textcolor{keyword}{static}\ \textcolor{keyword}{const}\ uint8\_t\ \mbox{\hyperlink{namespacewitmotion_a637c861a28f4015a1b57d8bd9ef08cbf}{WITMOTION\_HEADER\_BYTE}}\ =\ 0x55;\ \textcolor{comment}{///<\ Packet\ header\ byte\ value\ (vendor\ protocol-\/specific)}}
+\DoxyCodeLine{00032\ \textcolor{keyword}{static}\ \textcolor{keyword}{const}\ uint8\_t\ \mbox{\hyperlink{namespacewitmotion_a856c58401c1ba5c7d8a9f58f31f2b83f}{WITMOTION\_CONFIG\_HEADER}}\ =\ 0xFF;\ \textcolor{comment}{///<\ Configuration\ header\ byte\ value\ (vendor\ protocol-\/specific)}}
+\DoxyCodeLine{00033\ \textcolor{keyword}{static}\ \textcolor{keyword}{const}\ uint8\_t\ \mbox{\hyperlink{namespacewitmotion_aac88381210eb4ab56eba64da7ae8c29c}{WITMOTION\_CONFIG\_KEY}}\ =\ 0xAA;\ \textcolor{comment}{///<\ Configuration\ marker\ key\ byte\ value\ (vendor\ protocol-\/specific)}}
+\DoxyCodeLine{00034\ \textcolor{keyword}{static}\ \textcolor{keyword}{const}\ \textcolor{keywordtype}{float}\ DEG2RAD\ =\ M\_PI\ /\ 180.f;\ \textcolor{comment}{///<\ \(\backslash\)private}}
+\DoxyCodeLine{00035\ }
+\DoxyCodeLine{00036\ \textcolor{comment}{/*!}}
+\DoxyCodeLine{00037\ \textcolor{comment}{\ \ \(\backslash\)brief\ Packet\ type\ IDs\ from\ the\ vendor-\/defined\ protocol}}
+\DoxyCodeLine{00038\ \textcolor{comment}{}}
+\DoxyCodeLine{00039\ \textcolor{comment}{\ \ If\ one\ of\ the\ packet\ type\ IDs\ defined\ here\ is\ registered\ after\ \(\backslash\)ref\ WITMOTION\_HEADER\_BYTE\ in\ the\ data\ flow\ received\ from\ the\ sensor,\ the\ packet\ header\ is\ considered\ found\ and\ the\ remaining\ bytes\ are\ considered\ as\ body\ of\ the\ packet.\ See\ \(\backslash\)ref\ util.h\ for\ decoder\ function\ reference.}}
+\DoxyCodeLine{00040\ \textcolor{comment}{*/}}
+\DoxyCodeLine{00041\ \textcolor{keyword}{enum}\ \mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3}{witmotion\_packet\_id}}}
+\DoxyCodeLine{00042\ \{}
+\DoxyCodeLine{00043\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a0eec2c5dacef2bfea50757ef63fd2735}{pidRTC}}\ =\ 0x50,\ \textcolor{comment}{///<\ Real-\/Time-\/Clock:\ Year\ from\ 2000,\ Month,\ Day,\ Hour,\ Minute,\ Second\ (8-\/bit\ unsigned\ integers)\ +\ Millisecond\ (16-\/bit\ unsigned\ integer),\ representing\ time\ passed\ since\ last\ time\ set\ up\ in\ the\ \(\backslash\)ref\ ridTimeYearMonth,\ \(\backslash\)ref\ ridTimeDayHour,\ \(\backslash\)ref\ ridTimeMinuteSecond\ and\ \(\backslash\)ref\ ridTimeMilliseconds\ registers}}
+\DoxyCodeLine{00044\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3aa55a0844425f2c57978b43ba96f9d14f}{pidAcceleration}}\ =\ 0x51,\ \textcolor{comment}{///<\ Linear\ accelerations\ +\ temperature/reserved\ field\ [X-\/Y-\/Z]\ (16-\/bit\ binary\ normalized\ quasi-\/floats)}}
+\DoxyCodeLine{00045\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3afb633ed3118253ba87c8560a203f4f44}{pidAngularVelocity}}\ =\ 0x52,\ \textcolor{comment}{///<\ Angular\ velocities\ +\ temperature/reserved\ field\ [Roll-\/Pitch-\/Yaw]\ (16-\/bit\ binary\ normalized\ quasi-\/floats)}}
+\DoxyCodeLine{00046\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a2d5f569560d2a29fee1f179a4c46f143}{pidAngles}}\ =\ 0x53,\ \textcolor{comment}{///<\ Euler\ angles\ +\ temperature/reserved\ field\ [Roll-\/Pitch-\/Yaw]\ (16-\/bit\ binary\ normalized\ quasi-\/floats)}}
+\DoxyCodeLine{00047\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3aa410e8a4ad06356282c0a7eaa0b7edb3}{pidMagnetometer}}\ =\ 0x54,\ \textcolor{comment}{///<\ Magnetic\ field\ tensity\ +\ temperature/reserved\ field\ [world\ X-\/Y-\/Z]\ (16-\/bit\ binary\ normalized\ quasi-\/floats)}}
+\DoxyCodeLine{00048\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a854420a4a97ec9a21e338aa236769f11}{pidDataPortStatus}}\ =\ 0x55,\ \textcolor{comment}{///<\ Data\ port\ status\ packet,\ vendor-\/defined\ value}}
+\DoxyCodeLine{00049\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a8ca47e826186715b57327ffbd91cada8}{pidAltimeter}}\ =\ 0x56,\ \textcolor{comment}{///<\ Altimeter\ +\ Barometer\ output\ (32-\/bit\ binary\ normalized\ quasi-\/floats)}}
+\DoxyCodeLine{00050\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a7b05a239d11dcb700ddf67f6ea1b90b5}{pidGPSCoordinates}}\ =\ 0x57,\ \textcolor{comment}{///<\ GPS:\ longitude\ +\ latitude,\ if\ supported\ by\ hardware\ (32-\/bit\ binary\ normalized\ quasi-\/floats)}}
+\DoxyCodeLine{00051\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a7ecc187fe112b76a5135278dcd6b8bd5}{pidGPSGroundSpeed}}\ =\ 0x58,\ \textcolor{comment}{///<\ GPS:\ ground\ speed\ (32-\/bit\ binary\ normalized\ quasi-\/float)\ +\ altitude\ +\ angular\ velocity\ around\ vertical\ axis\ (16-\/bit\ binary\ normalized\ quasi-\/floats),\ if\ supported\ by\ hardware}}
+\DoxyCodeLine{00052\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a791db4f6c4cfa2ca9db09f6dac7c6011}{pidOrientation}}\ =\ 0x59,\ \textcolor{comment}{///<\ Orientation\ defined\ as\ quaternion\ [X-\/Y-\/Z-\/W],\ when\ available\ from\ the\ sensor\ firmware\ (16-\/bit\ binary\ normalized\ quasi-\/floats)}}
+\DoxyCodeLine{00053\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a5fdb17b12d46f0ec17e44a1dab9957d3a24c950fa7ba2faa32301bd4e72716487}{pidGPSAccuracy}}\ =\ 0x5A\ \textcolor{comment}{///<\ GPS:\ visible\ satellites\ +\ variance\ vector\ [East-\/North-\/Up]\ (16-\/bit\ binary\ normalized\ quasi-\/floats)}}
+\DoxyCodeLine{00054\ \};}
+\DoxyCodeLine{00055\ }
+\DoxyCodeLine{00056\ \textcolor{comment}{/*!}}
+\DoxyCodeLine{00057\ \textcolor{comment}{\ \ \(\backslash\)brief\ Packet\ ID\ set\ to\ retrieve\ descriptions\ via\ \(\backslash\)ref\ witmotion\_packet\_descriptions.}}
+\DoxyCodeLine{00058\ \textcolor{comment}{}}
+\DoxyCodeLine{00059\ \textcolor{comment}{\ \ Contains\ values\ referenced\ in\ \(\backslash\)ref\ witmotion\_packet\_id\ enumeration\ to\ explicitly\ determine\ a\ set\ of\ currently\ supported\ packet\ IDs.\ The\ packet\ IDs\ not\ referenced\ here\ sould\ not\ be\ considered\ supported.}}
+\DoxyCodeLine{00060\ \textcolor{comment}{*/}}
+\DoxyCodeLine{00061\ \textcolor{keyword}{static}\ \textcolor{keyword}{const}\ \mbox{\hyperlink{namespacewitmotion_a90712081209bb40591c1666a5a5362e5}{std}}::\mbox{\hyperlink{namespacewitmotion_a90712081209bb40591c1666a5a5362e5}{set}}<\mbox{\hyperlink{namespacewitmotion_a90712081209bb40591c1666a5a5362e5}{size\_t}}>\ \mbox{\hyperlink{namespacewitmotion_a90712081209bb40591c1666a5a5362e5}{witmotion\_registered\_ids}}\ =\ \{}
+\DoxyCodeLine{00062\ \ \ \ \ 0x50,}
+\DoxyCodeLine{00063\ \ \ \ \ 0x51,}
+\DoxyCodeLine{00064\ \ \ \ \ 0x52,}
+\DoxyCodeLine{00065\ \ \ \ \ 0x53,}
+\DoxyCodeLine{00066\ \ \ \ \ 0x54,}
+\DoxyCodeLine{00067\ \ \ \ \ 0x55,}
+\DoxyCodeLine{00068\ \ \ \ \ 0x56,}
+\DoxyCodeLine{00069\ \ \ \ \ 0x57,}
+\DoxyCodeLine{00070\ \ \ \ \ 0x58,}
+\DoxyCodeLine{00071\ \ \ \ \ 0x59,}
+\DoxyCodeLine{00072\ \ \ \ \ 0x5A}
+\DoxyCodeLine{00073\ \};}
+\DoxyCodeLine{00074\ }
+\DoxyCodeLine{00075\ \textcolor{comment}{/*!}}
+\DoxyCodeLine{00076\ \textcolor{comment}{\ \ \(\backslash\)brief\ Packet\ ID\ string\ set\ to\ store\ built-\/in\ descriptions\ for\ \(\backslash\)ref\ message-\/enumerator.}}
+\DoxyCodeLine{00077\ \textcolor{comment}{}}
+\DoxyCodeLine{00078\ \textcolor{comment}{\ \ Contains\ values\ referenced\ in\ \(\backslash\)ref\ witmotion\_packet\_id\ enumeration\ with\ corresponding\ description\ strings\ used\ by\ \(\backslash\)ref\ message-\/enumerator\ application.}}
+\DoxyCodeLine{00079\ \textcolor{comment}{*/}}
+\DoxyCodeLine{00080\ \textcolor{keyword}{static}\ \textcolor{keyword}{const}\ \mbox{\hyperlink{namespacewitmotion_a4af000309f5694300ababe3086c486fc}{std}}::\mbox{\hyperlink{namespacewitmotion_a4af000309f5694300ababe3086c486fc}{map}}<\mbox{\hyperlink{namespacewitmotion_a4af000309f5694300ababe3086c486fc}{uint8\_t}},\ \mbox{\hyperlink{namespacewitmotion_a4af000309f5694300ababe3086c486fc}{std}}::\mbox{\hyperlink{namespacewitmotion_a4af000309f5694300ababe3086c486fc}{string}}>\ \mbox{\hyperlink{namespacewitmotion_a4af000309f5694300ababe3086c486fc}{witmotion\_packet\_descriptions}}\ =\ \{}
+\DoxyCodeLine{00081\ \ \ \ \ \{0x50,\ \textcolor{stringliteral}{"{}Real\ Time\ Clock"{}}\},}
+\DoxyCodeLine{00082\ \ \ \ \ \{0x51,\ \textcolor{stringliteral}{"{}Accelerations"{}}\},}
+\DoxyCodeLine{00083\ \ \ \ \ \{0x52,\ \textcolor{stringliteral}{"{}Angular\ velocities"{}}\},}
+\DoxyCodeLine{00084\ \ \ \ \ \{0x53,\ \textcolor{stringliteral}{"{}Spatial\ orientation\ (Euler\ angles)"{}}\},}
+\DoxyCodeLine{00085\ \ \ \ \ \{0x54,\ \textcolor{stringliteral}{"{}Magnetometer/Magnetic\ orientation"{}}\},}
+\DoxyCodeLine{00086\ \ \ \ \ \{0x55,\ \textcolor{stringliteral}{"{}Data\ ports\ (D0-\/D3)\ status"{}}\},}
+\DoxyCodeLine{00087\ \ \ \ \ \{0x56,\ \textcolor{stringliteral}{"{}Barometry/Altimeter"{}}\},}
+\DoxyCodeLine{00088\ \ \ \ \ \{0x57,\ \textcolor{stringliteral}{"{}GPS\ Coordinates"{}}\},}
+\DoxyCodeLine{00089\ \ \ \ \ \{0x58,\ \textcolor{stringliteral}{"{}GPS\ Ground\ Speed"{}}\},}
+\DoxyCodeLine{00090\ \ \ \ \ \{0x59,\ \textcolor{stringliteral}{"{}Spatial\ orientation\ (Quaternion)"{}}\},}
+\DoxyCodeLine{00091\ \ \ \ \ \{0x5A,\ \textcolor{stringliteral}{"{}GPS\ accuracy\ estimation"{}}\}}
+\DoxyCodeLine{00092\ \};}
+\DoxyCodeLine{00093\ }
+\DoxyCodeLine{00094\ \textcolor{comment}{/*!}}
+\DoxyCodeLine{00095\ \textcolor{comment}{\ *\ \(\backslash\)brief\ Generic\ structure\ respresenting\ the\ standard\ 11-\/byte\ datapacket\ defined\ in\ Witmotion\ protocol.}}
+\DoxyCodeLine{00096\ \textcolor{comment}{*/}}
+\DoxyCodeLine{00097\ \textcolor{keyword}{struct}\ \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket}{witmotion\_datapacket}}}
+\DoxyCodeLine{00098\ \{}
+\DoxyCodeLine{00099\ \ \ \ \ uint8\_t\ \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket_ae8bad5985e98addb6c113d0c73becbab}{header\_byte}};\ \textcolor{comment}{///<\ Header\ byte,\ set\ constantly\ to\ \(\backslash\)ref\ WITMOTION\_HEADER\_BYTE}}
+\DoxyCodeLine{00100\ \ \ \ \ uint8\_t\ \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket_a987f58271cf9d474aa989d2edc6c5802}{id\_byte}};\ \textcolor{comment}{///<\ Packet\ type\ ID,\ referring\ to\ \(\backslash\)ref\ witmotion\_packet\_id,\ otherwise\ the\ packet\ is\ considered\ of\ unknown\ type.}}
+\DoxyCodeLine{00101\ \ \ \ \ \textcolor{keyword}{union}}
+\DoxyCodeLine{00102\ \ \ \ \ \{}
+\DoxyCodeLine{00103\ \ \ \ \ \ \ \ \ int8\_t\ raw\_signed[8];}
+\DoxyCodeLine{00104\ \ \ \ \ \ \ \ \ uint8\_t\ raw[8];}
+\DoxyCodeLine{00105\ \ \ \ \ \ \ \ \ int16\_t\ raw\_cells[4];}
+\DoxyCodeLine{00106\ \ \ \ \ \ \ \ \ int32\_t\ raw\_large[2];}
+\DoxyCodeLine{00107\ \ \ \ \ \}datastore;\ \textcolor{comment}{///<\ 8-\/byte\ internal\ data\ storage\ array\ represented\ as\ C-\/style\ memory\ union.\ The\ stored\ data\ represented\ as\ \`{}int8\_t*`,\ \`{}uint8\_t*`,\ \`{}int16\_t*`\ or\ \`{}int32\_t*`\ array\ head\ pointer.}}
+\DoxyCodeLine{00108\ \ \ \ \ uint8\_t\ \mbox{\hyperlink{structwitmotion_1_1witmotion__datapacket_ab6cca4fa4201a4c4b5380b84e46dc47e}{crc}};\ \textcolor{comment}{///<\ Validation\ CRC\ for\ the\ packet.\ Calculated\ as\ an\ equivalent\ to\ the\ following\ operation:\ \(\backslash\)f\$\ crc\ =\ \(\backslash\)sum\_\{i=0\}\string^\{i\ <\ 10\}\(\backslash\)times\(\backslash\)f\$`reinterpret\_cast<uint8\_t*>(this)\ +\ i`}}
+\DoxyCodeLine{00109\ \};}
+\DoxyCodeLine{00110\ }
+\DoxyCodeLine{00111\ \textcolor{comment}{/*!}}
+\DoxyCodeLine{00112\ \textcolor{comment}{\ *\ \(\backslash\)brief\ List\ of\ configuration\ slots\ (registers)\ available\ for\ the\ library.}}
+\DoxyCodeLine{00113\ \textcolor{comment}{\ *}}
+\DoxyCodeLine{00114\ \textcolor{comment}{\ *\ List\ of\ configuration\ slots\ (registers)\ available\ for\ the\ library.\ The\ actual\ availability\ depends\ from\ the\ actual\ sensor\ and\ installation\ circuit.}}
+\DoxyCodeLine{00115\ \textcolor{comment}{\ *\ Please\ refer\ to\ the\ official\ documentation\ for\ detailed\ explanation.}}
+\DoxyCodeLine{00116\ \textcolor{comment}{*/}}
+\DoxyCodeLine{00117\ \textcolor{keyword}{enum}\ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3}{witmotion\_config\_register\_id}}}
+\DoxyCodeLine{00118\ \{}
+\DoxyCodeLine{00119\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a3215288a3e8615b0a2e7357497376599}{ridSaveSettings}}\ =\ 0x00,\ \textcolor{comment}{///<\ Saves\ the\ settings\ uploaded\ in\ the\ current\ bringup\ session,\ or\ resets\ it\ to\ default\ (if\ supported).\ To\ make\ factory\ reset\ of\ the\ sensor,\ set\ \`{}raw[0]\ =\ 0x01`\ in\ \(\backslash\)ref\ witmotion\_config\_packet\ instance\ used.}}
+\DoxyCodeLine{00120\ \ \ \ \ \textcolor{comment}{/*!}}
+\DoxyCodeLine{00121\ \textcolor{comment}{\ \ \ \ \ \ Sets\ the\ sensor\ to\ calibration\ mode.\ The\ value\ stored\ in\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[0]`\ determines\ device\ selection:}}
+\DoxyCodeLine{00122\ \textcolor{comment}{\ \ \ \ \ \ -\/\ \`{}0x00`\ -\/\ End\ calibration}}
+\DoxyCodeLine{00123\ \textcolor{comment}{\ \ \ \ \ \ -\/\ \`{}0x01`\ -\/\ Accelerometer\ calibration}}
+\DoxyCodeLine{00124\ \textcolor{comment}{\ \ \ \ \ \ -\/\ \`{}0x03`\ -\/\ Altitude\ reset\ (only\ for\ barometric\ altimeter)}}
+\DoxyCodeLine{00125\ \textcolor{comment}{\ \ \ \ \ \ -\/\ \`{}0x04`\ -\/\ Yaw\ [Z]\ Euler\ angle\ origin\ point\ reset}}
+\DoxyCodeLine{00126\ \textcolor{comment}{\ \ \ \ \ \ -\/\ \`{}0x07`\ -\/\ Magnetometer\ calibration}}
+\DoxyCodeLine{00127\ \textcolor{comment}{\ \ \ \ \ \ -\/\ \`{}0x08`\ -\/\ Angle\ reference\ reset}}
+\DoxyCodeLine{00128\ \textcolor{comment}{\ \ \ \ */}}
+\DoxyCodeLine{00129\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab64e4385bdf96a2e49bcf1c173c73b77}{ridCalibrate}}\ =\ 0x01,}
+\DoxyCodeLine{00130\ \ \ \ \ \textcolor{comment}{/*!}}
+\DoxyCodeLine{00131\ \textcolor{comment}{\ \ \ \ \ \ Regulates\ sensor\ output.\ The\ value\ stored\ in\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw`\ determines\ packet\ ID\ selection\ to\ output\ from\ low\ to\ high\ bits\ by\ offset.\ \`{}0`\ means\ disabling\ of\ the\ selected\ data\ packet\ output.}}
+\DoxyCodeLine{00132\ \textcolor{comment}{}}
+\DoxyCodeLine{00133\ \textcolor{comment}{\ \ \ \ \ \ |`raw[0]`\ offset|Packet\ type|`raw[1]`\ offset|\ Packet\ type|}}
+\DoxyCodeLine{00134\ \textcolor{comment}{\ \ \ \ \ \ |:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|}}
+\DoxyCodeLine{00135\ \textcolor{comment}{\ \ \ \ \ \ |0|\(\backslash\)ref\ pidRTC|0|\(\backslash\)ref\ pidGPSGroundSpeed|}}
+\DoxyCodeLine{00136\ \textcolor{comment}{\ \ \ \ \ \ |1|\(\backslash\)ref\ pidAcceleration|1|\(\backslash\)ref\ pidOrientation|}}
+\DoxyCodeLine{00137\ \textcolor{comment}{\ \ \ \ \ \ |2|\(\backslash\)ref\ pidAngularVelocity|2|\(\backslash\)ref\ pidGPSAccuracy|}}
+\DoxyCodeLine{00138\ \textcolor{comment}{\ \ \ \ \ \ |3|\(\backslash\)ref\ pidAngles|3|Reserved|}}
+\DoxyCodeLine{00139\ \textcolor{comment}{\ \ \ \ \ \ |4|\(\backslash\)ref\ pidMagnetometer|4|Reserved|}}
+\DoxyCodeLine{00140\ \textcolor{comment}{\ \ \ \ \ \ |5|\(\backslash\)ref\ pidDataPortStatus|5|Reserved|}}
+\DoxyCodeLine{00141\ \textcolor{comment}{\ \ \ \ \ \ |6|\(\backslash\)ref\ pidAltimeter|6|Reserved|}}
+\DoxyCodeLine{00142\ \textcolor{comment}{\ \ \ \ \ \ |7|\(\backslash\)ref\ pidGPSCoordinates|7|Reserved|}}
+\DoxyCodeLine{00143\ \textcolor{comment}{\ \ \ \ */}}
+\DoxyCodeLine{00144\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab7e9282cb7434ad1ed65ab7c57b93cf4}{ridOutputValueSet}}\ =\ 0x02,}
+\DoxyCodeLine{00145\ \ \ \ \ \textcolor{comment}{/*!}}
+\DoxyCodeLine{00146\ \textcolor{comment}{\ \ \ \ \ \ Regulates\ output\ frequency.\ **NOTE**:\ the\ maximum\ available\ frequency\ is\ determined\ internally\ by\ the\ available\ bandwidth\ obtained\ from\ \(\backslash\)ref\ ridPortBaudRate.}}
+\DoxyCodeLine{00147\ \textcolor{comment}{\ \ \ \ \ \ The\ actual\ value\ stored\ in\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[0]`\ can\ be\ determined\ from\ the\ following\ table.\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[1]`\ is\ set\ to\ \`{}0x00`.\ Also\ the\ table\ contains\ argument\ value\ for\ \(\backslash\)ref\ witmotion\_output\_frequency\ helper\ function\ which\ is\ used\ by\ the\ controller\ applications.}}
+\DoxyCodeLine{00148\ \textcolor{comment}{}}
+\DoxyCodeLine{00149\ \textcolor{comment}{\ \ \ \ \ \ |Frequency,\ Hz|Value\ |Argument|}}
+\DoxyCodeLine{00150\ \textcolor{comment}{\ \ \ \ \ \ |:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/|:-\/-\/-\/-\/:|:-\/-\/-\/-\/-\/-\/:|}}
+\DoxyCodeLine{00151\ \textcolor{comment}{\ \ \ \ \ \ |0\ (shutdown)\ |`0x0D`|\ 0\ \ \ \ \ \ |}}
+\DoxyCodeLine{00152\ \textcolor{comment}{\ \ \ \ \ \ |0\ (single\ measurement)|`0x0C`|\ -\/1\ |}}
+\DoxyCodeLine{00153\ \textcolor{comment}{\ \ \ \ \ \ |0.1\ \ \ \ \ \ \ \ \ \ |`0x01`|\ -\/10\ \ \ \ |}}
+\DoxyCodeLine{00154\ \textcolor{comment}{\ \ \ \ \ \ |0.5\ \ \ \ \ \ \ \ \ \ |`0x02`|\ -\/2\ \ \ \ \ |}}
+\DoxyCodeLine{00155\ \textcolor{comment}{\ \ \ \ \ \ |\ 1\ \ \ \ \ \ \ \ \ \ \ |`0x03`|\ 1\ \ \ \ \ \ |}}
+\DoxyCodeLine{00156\ \textcolor{comment}{\ \ \ \ \ \ |\ 2\ \ \ \ \ \ \ \ \ \ \ |`0x04`|\ 2\ \ \ \ \ \ |}}
+\DoxyCodeLine{00157\ \textcolor{comment}{\ \ \ \ \ \ |\ 5\ \ \ \ \ \ \ \ \ \ \ |`0x05`|\ 5\ \ \ \ \ \ |}}
+\DoxyCodeLine{00158\ \textcolor{comment}{\ \ \ \ \ \ |10\ (default)\ |`0x06`|\ 10\ \ \ \ \ |}}
+\DoxyCodeLine{00159\ \textcolor{comment}{\ \ \ \ \ \ |20\ \ \ \ \ \ \ \ \ \ \ |`0x07`|\ 20\ \ \ \ \ |}}
+\DoxyCodeLine{00160\ \textcolor{comment}{\ \ \ \ \ \ |50\ \ \ \ \ \ \ \ \ \ \ |`0x08`|\ 50\ \ \ \ \ |}}
+\DoxyCodeLine{00161\ \textcolor{comment}{\ \ \ \ \ \ |100\ \ \ \ \ \ \ \ \ \ |`0x09`|\ 100\ \ \ \ |}}
+\DoxyCodeLine{00162\ \textcolor{comment}{\ \ \ \ \ \ |125\ \ \ \ \ \ \ \ \ \ |`0x0A`|\ 125\ \ \ \ |}}
+\DoxyCodeLine{00163\ \textcolor{comment}{\ \ \ \ \ \ |200\ \ \ \ \ \ \ \ \ \ |`0x0B`|\ 200\ \ \ \ |}}
+\DoxyCodeLine{00164\ \textcolor{comment}{\ \ \ \ \ \ |Maximal\ available\ by\ hardware|`0x0C`|Not\ supported|}}
+\DoxyCodeLine{00165\ \textcolor{comment}{\ \ \ \ */}}
+\DoxyCodeLine{00166\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6b05a7147ce284d6ef2e1ea5fca0dc4b}{ridOutputFrequency}}\ =\ 0x03,}
+\DoxyCodeLine{00167\ \ \ \ \ \textcolor{comment}{/*!}}
+\DoxyCodeLine{00168\ \textcolor{comment}{\ \ \ \ \ \ Regulates\ port\ baud\ rate.\ **NOTE**:\ the\ sensor\ has\ no\ possibility\ of\ hardware\ flow\ control\ and\ it\ cannot\ report\ to\ the\ system\ what\ baud\ rate\ should\ be\ explicitly\ used!}}
+\DoxyCodeLine{00169\ \textcolor{comment}{\ \ \ \ \ \ The\ actual\ value\ stored\ in\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[0]`\ can\ be\ determined\ from\ the\ following\ table.\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[1]`\ is\ set\ to\ \`{}0x00`.}}
+\DoxyCodeLine{00170\ \textcolor{comment}{\ \ \ \ \ \ The\ \(\backslash\)ref\ witmotion\_baud\_rate\ helper\ function\ argument\ is\ accepted\ as\ \`{}QSerialPort::BaudRate`\ enumeration\ member,\ so\ only\ the\ speed\ inticated\ in\ that\ enumeration\ are\ explicitly\ supported.}}
+\DoxyCodeLine{00171\ \textcolor{comment}{\ \ \ \ \ \ |**Rate,\ baud**|1200/1400|4800\ \ |9600\ \ |19200\ |38400\ |57600\ |115200|}}
+\DoxyCodeLine{00172\ \textcolor{comment}{\ \ \ \ \ \ |:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/|:-\/-\/-\/-\/-\/-\/-\/:|:-\/-\/-\/-\/:|:-\/-\/-\/-\/:|:-\/-\/-\/-\/:|:-\/-\/-\/-\/:|:-\/-\/-\/-\/:|:-\/-\/-\/-\/:|}}
+\DoxyCodeLine{00173\ \textcolor{comment}{\ \ \ \ \ \ |**Value**\ \ \ \ \ |`0x00`\ \ \ |`0x01`|`0x02`|`0x03`|`0x04`|`0x05`|`0x06`|}}
+\DoxyCodeLine{00174\ \textcolor{comment}{}}
+\DoxyCodeLine{00175\ \textcolor{comment}{\ \ \ \ \ \ This\ parameter\ also\ implicitly\ sets\ \(\backslash\)ref\ ridOutputFrequency\ to\ the\ maximal\ feasible\ value\ for\ the\ available\ bandwidth.}}
+\DoxyCodeLine{00176\ \textcolor{comment}{\ \ \ \ */}}
+\DoxyCodeLine{00177\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aafbc4c89aee2087c5861bfacfada9890}{ridPortBaudRate}}\ =\ 0x04,}
+\DoxyCodeLine{00178\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aaeb88672e563afdddb49835ba4edfe77}{ridAccelerationBiasX}}\ =\ 0x05,\ \textcolor{comment}{///<\ Sets\ acceleration\ zero\ point\ bias\ for\ X\ axis,\ refer\ to\ \(\backslash\)ref\ acceleration-\/bias\ page\ for\ explanation.}}
+\DoxyCodeLine{00179\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab2756158adfc87940d20e88f893c76b2}{ridAccelerationBiasY}}\ =\ 0x06,\ \textcolor{comment}{///<\ Sets\ acceleration\ zero\ point\ bias\ for\ Y\ axis,\ refer\ to\ \(\backslash\)ref\ acceleration-\/bias\ page\ for\ explanation.}}
+\DoxyCodeLine{00180\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa0c369dc8c319ec347e455df3aa17841}{ridAccelerationBiasZ}}\ =\ 0x07,\ \textcolor{comment}{///<\ Sets\ acceleration\ zero\ point\ bias\ for\ Z\ axis,\ refer\ to\ \(\backslash\)ref\ acceleration-\/bias\ page\ for\ explanation.}}
+\DoxyCodeLine{00181\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a9d6558877f66d098496618b351ff4bcd}{ridAngularVelocityBiasX}}\ =\ 0x08,\ \textcolor{comment}{///<\ Sets\ angular\ velocity\ zero\ point\ bias\ for\ X\ axis.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00182\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a03f8192885870ac4bd2b5f85974cdda9}{ridAngularVelocityBiasY}}\ =\ 0x09,\ \textcolor{comment}{///<\ Sets\ angular\ velocity\ zero\ point\ bias\ for\ Y\ axis.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00183\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3afee27b00865d07184c037f11bbef5c2c}{ridAngularVelocityBiasZ}}\ =\ 0x0A,\ \textcolor{comment}{///<\ Sets\ angular\ velocity\ zero\ point\ bias\ for\ Z\ axis.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00184\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a2eb9faa753c4adc79364c2a595e67c00}{ridMagnetometerBiasX}}\ =\ 0x0B,\ \textcolor{comment}{///<\ Sets\ magnetometer\ zero\ point\ bias\ for\ X\ axis.\ **MAY\ BLOCK\ THE\ MEASUREMENTS**}}
+\DoxyCodeLine{00185\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a5031a10e865baa17a8862672e8c331fc}{ridMagnetometerBiasY}}\ =\ 0x0C,\ \textcolor{comment}{///<\ Sets\ magnetometer\ zero\ point\ bias\ for\ Y\ axis.\ **MAY\ BLOCK\ THE\ MEASUREMENTS**}}
+\DoxyCodeLine{00186\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ac3ec01a7f731efde639b384694a31ae1}{ridMagnetometerBiasZ}}\ =\ 0x0D,\ \textcolor{comment}{///<\ Sets\ magnetometer\ zero\ point\ bias\ for\ Z\ axis.\ **MAY\ BLOCK\ THE\ MEASUREMENTS**}}
+\DoxyCodeLine{00187\ \ \ \ \ \textcolor{comment}{/*!}}
+\DoxyCodeLine{00188\ \textcolor{comment}{\ \ \ \ \ \ Digital\ port\ D0\ mode.\ The\ values\ are\ set\ only\ via\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[0]`\ whilst\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[1]`\ is\ set\ to\ 0.\ Please\ refer\ to\ the\ following\ table\ to\ determine\ the\ exact\ value\ needed.}}
+\DoxyCodeLine{00189\ \textcolor{comment}{}}
+\DoxyCodeLine{00190\ \textcolor{comment}{\ \ \ \ \ \ |**Description**|Analog\ input\ (default)|Digital\ input|Digital\ output\ (high)|Digital\ output\ (low)|PWM\ output|}}
+\DoxyCodeLine{00191\ \textcolor{comment}{\ \ \ \ \ \ |:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/|:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|:-\/-\/-\/-\/-\/-\/-\/-\/:|}}
+\DoxyCodeLine{00192\ \textcolor{comment}{\ \ \ \ \ \ |**Value**\ \ \ \ \ \ |`0x00`\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ |`0x01`\ \ \ \ \ \ \ |`0x02`\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ |`0x03`\ \ \ \ \ \ \ \ \ \ \ \ \ \ |`0x04`\ \ \ \ |}}
+\DoxyCodeLine{00193\ \textcolor{comment}{\ \ \ \ */}}
+\DoxyCodeLine{00194\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ad6b6872cc2b474d57b2198ec898bdf7e}{ridPortModeD0}}\ =\ 0x0E,}
+\DoxyCodeLine{00195\ \ \ \ \ \textcolor{comment}{/*!}}
+\DoxyCodeLine{00196\ \textcolor{comment}{\ \ \ \ \ \ Digital\ port\ D1\ mode.\ The\ values\ are\ set\ only\ via\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[0]`\ whilst\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[1]`\ is\ set\ to\ 0.\ Please\ refer\ to\ the\ following\ table\ to\ determine\ the\ exact\ value\ needed.}}
+\DoxyCodeLine{00197\ \textcolor{comment}{}}
+\DoxyCodeLine{00198\ \textcolor{comment}{\ \ \ \ \ \ |**Description**|Analog\ input\ (default)|Digital\ input|Digital\ output\ (high)|Digital\ output\ (low)|PWM\ output|}}
+\DoxyCodeLine{00199\ \textcolor{comment}{\ \ \ \ \ \ |:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/|:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|:-\/-\/-\/-\/-\/-\/-\/-\/:|}}
+\DoxyCodeLine{00200\ \textcolor{comment}{\ \ \ \ \ \ |**Value**\ \ \ \ \ \ |`0x00`\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ |`0x01`\ \ \ \ \ \ \ |`0x02`\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ |`0x03`\ \ \ \ \ \ \ \ \ \ \ \ \ \ |`0x04`\ \ \ \ |}}
+\DoxyCodeLine{00201\ \textcolor{comment}{}}
+\DoxyCodeLine{00202\ \textcolor{comment}{\ \ \ \ \ \ \(\backslash\)note\ If\ the\ external\ GPS\ receiver\ is\ used\ to\ obtain\ world\ time,\ and\ it\ is\ compatible\ with\ Witmotion\ serial\ protocol,\ the\ port\ D1\ should\ be\ connected\ to\ its\ **TX**\ pin\ and\ turned\ into\ GPS\ receiver\ port\ by\ the\ special\ value\ \`{}0x05`\ set\ for\ this\ register.\ The\ baud\ rate\ on\ which\ GPS\ receiver\ communicates\ with\ the\ sensor,\ is\ set\ via\ \(\backslash\)ref\ ridGPSBaudRate\ register.}}
+\DoxyCodeLine{00203\ \textcolor{comment}{\ \ \ \ */}}
+\DoxyCodeLine{00204\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a8df58e95b92f3957a5ae90f973db1e7a}{ridPortModeD1}}\ =\ 0x0F,}
+\DoxyCodeLine{00205\ \ \ \ \ \textcolor{comment}{/*!}}
+\DoxyCodeLine{00206\ \textcolor{comment}{\ \ \ \ \ \ Digital\ port\ D2\ mode.\ The\ values\ are\ set\ only\ via\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[0]`\ whilst\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[1]`\ is\ set\ to\ 0.\ Please\ refer\ to\ the\ following\ table\ to\ determine\ the\ exact\ value\ needed.}}
+\DoxyCodeLine{00207\ \textcolor{comment}{}}
+\DoxyCodeLine{00208\ \textcolor{comment}{\ \ \ \ \ \ |**Description**|Analog\ input\ (default)|Digital\ input|Digital\ output\ (high)|Digital\ output\ (low)|PWM\ output|}}
+\DoxyCodeLine{00209\ \textcolor{comment}{\ \ \ \ \ \ |:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/|:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|:-\/-\/-\/-\/-\/-\/-\/-\/:|}}
+\DoxyCodeLine{00210\ \textcolor{comment}{\ \ \ \ \ \ |**Value**\ \ \ \ \ \ |`0x00`\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ |`0x01`\ \ \ \ \ \ \ |`0x02`\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ |`0x03`\ \ \ \ \ \ \ \ \ \ \ \ \ \ |`0x04`\ \ \ \ |}}
+\DoxyCodeLine{00211\ \textcolor{comment}{\ \ \ \ */}}
+\DoxyCodeLine{00212\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6e04a02620b6fedcb9bca62e6f24edad}{ridPortModeD2}}\ =\ 0x10,}
+\DoxyCodeLine{00213\ \ \ \ \ \textcolor{comment}{/*!}}
+\DoxyCodeLine{00214\ \textcolor{comment}{\ \ \ \ \ \ Digital\ port\ D3\ mode.\ The\ values\ are\ set\ only\ via\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[0]`\ whilst\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[1]`\ is\ set\ to\ 0.\ Please\ refer\ to\ the\ following\ table\ to\ determine\ the\ exact\ value\ needed.}}
+\DoxyCodeLine{00215\ \textcolor{comment}{}}
+\DoxyCodeLine{00216\ \textcolor{comment}{\ \ \ \ \ \ |**Description**|Analog\ input\ (default)|Digital\ input|Digital\ output\ (high)|Digital\ output\ (low)|PWM\ output|}}
+\DoxyCodeLine{00217\ \textcolor{comment}{\ \ \ \ \ \ |:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/|:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|:-\/-\/-\/-\/-\/-\/-\/-\/:|}}
+\DoxyCodeLine{00218\ \textcolor{comment}{\ \ \ \ \ \ |**Value**\ \ \ \ \ \ |`0x00`\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ |`0x01`\ \ \ \ \ \ \ |`0x02`\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ |`0x03`\ \ \ \ \ \ \ \ \ \ \ \ \ \ |`0x04`\ \ \ \ |}}
+\DoxyCodeLine{00219\ \textcolor{comment}{\ \ \ \ */}}
+\DoxyCodeLine{00220\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a7c6e7a8e914dcf903d320ad9cd77a4b8}{ridPortModeD3}}\ =\ 0x11,}
+\DoxyCodeLine{00221\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a20aaaca8b65cffe1b02ae5bf5d3f5651}{ridPortPWMLevelD0}}\ =\ 0x12,\ \textcolor{comment}{///<\ Digital\ port\ D0\ PWM\ high\ level\ pulse\ width,\ microseconds,\ 16-\/bit\ unsigned\ integer.}}
+\DoxyCodeLine{00222\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a53111db6e031f93344a5db57932e1381}{ridPortPWMLevelD1}}\ =\ 0x13,\ \textcolor{comment}{///<\ Digital\ port\ D1\ PWM\ high\ level\ pulse\ width,\ microseconds,\ 16-\/bit\ unsigned\ integer.}}
+\DoxyCodeLine{00223\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3adda87b6ba01b1562e80aa9a7eb6be6ff}{ridPortPWMLevelD2}}\ =\ 0x14,\ \textcolor{comment}{///<\ Digital\ port\ D2\ PWM\ high\ level\ pulse\ width,\ microseconds,\ 16-\/bit\ unsigned\ integer.}}
+\DoxyCodeLine{00224\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a0182d7ce399242f31a6f07b08df3e679}{ridPortPWMLevelD3}}\ =\ 0x15,\ \textcolor{comment}{///<\ Digital\ port\ D3\ PWM\ high\ level\ pulse\ width,\ microseconds,\ 16-\/bit\ unsigned\ integer.}}
+\DoxyCodeLine{00225\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a84b92f91c231e44aeff92282dc2dabba}{ridPortPWMPeriodD0}}\ =\ 0x16,\ \textcolor{comment}{///<\ Digital\ port\ D0\ PWM\ period\ length,\ microseconds,\ 16-\/bit\ unsigned\ integer.}}
+\DoxyCodeLine{00226\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a1be747000dc85b55ae66b160151a5350}{ridPortPWMPeriodD1}}\ =\ 0x17,\ \textcolor{comment}{///<\ Digital\ port\ D1\ PWM\ period\ length,\ microseconds,\ 16-\/bit\ unsigned\ integer.}}
+\DoxyCodeLine{00227\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a73ec16b82c6b5e8b78c57e6c1e031a7a}{ridPortPWMPeriodD2}}\ =\ 0x18,\ \textcolor{comment}{///<\ Digital\ port\ D2\ PWM\ period\ length,\ microseconds,\ 16-\/bit\ unsigned\ integer.}}
+\DoxyCodeLine{00228\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a298fdc22d7023239c80591435b6968a3}{ridPortPWMPeriodD3}}\ =\ 0x19,\ \textcolor{comment}{///<\ Digital\ port\ D3\ PWM\ period\ length,\ microseconds,\ 16-\/bit\ unsigned\ integer.}}
+\DoxyCodeLine{00229\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a391ab4478ec408ab553bac43152e9a46}{ridIICAddress}}\ =\ 0x1A,\ \textcolor{comment}{///<\ Sets\ up\ I2C\ address\ of\ the\ sensor.\ Default\ value\ is\ \`{}0x50`,\ 7-\/bit\ unsigned\ integer\ in\ \ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[0]`\ whilst\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[1]`\ is\ set\ to\ 0.}}
+\DoxyCodeLine{00230\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a2e3a09081461e24c7c065f9bd7e51810}{ridLED}}\ =\ 0x1B,\ \textcolor{comment}{///<\ Toggles\ on/off\ LED\ indication\ (for\ enclosed\ sensors\ only).}}
+\DoxyCodeLine{00231\ \ \ \ \ \textcolor{comment}{/*!}}
+\DoxyCodeLine{00232\ \textcolor{comment}{\ \ \ \ \ \ Regulates\ GPS\ receiver\ baud\ rate\ on\ port\ D1\ (see\ \(\backslash\)ref\ ridPortModeD1).\ The\ following\ table\ contains\ value\ set\ for\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[0]`\ representing\ the\ different\ baud\ rates.\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[1]`\ should\ be\ set\ to\ 0.}}
+\DoxyCodeLine{00233\ \textcolor{comment}{\ \ \ \ \ \ |**Rate,\ baud**|1200/1400|4800\ \ |9600\ \ |19200\ |38400\ |57600\ |115200|230400|460800|921600|}}
+\DoxyCodeLine{00234\ \textcolor{comment}{\ \ \ \ \ \ |:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/|:-\/-\/-\/-\/-\/-\/-\/:|:-\/-\/-\/-\/:|:-\/-\/-\/-\/:|:-\/-\/-\/-\/:|:-\/-\/-\/-\/:|:-\/-\/-\/-\/:|:-\/-\/-\/-\/:|:-\/-\/-\/-\/:|:-\/-\/-\/-\/:|:-\/-\/-\/-\/:|}}
+\DoxyCodeLine{00235\ \textcolor{comment}{\ \ \ \ \ \ |**Value**\ \ \ \ \ |`0x00`\ \ \ |`0x01`|`0x02`|`0x03`|`0x04`|`0x05`|`0x06`|`0x07`|`0x08`|`0x09`|}}
+\DoxyCodeLine{00236\ \textcolor{comment}{\ \ \ \ \ \ \(\backslash\)note\ Baud\ rates\ over\ 256000\ baud\ should\ not\ be\ considered\ standard.}}
+\DoxyCodeLine{00237\ \textcolor{comment}{\ \ \ \ */}}
+\DoxyCodeLine{00238\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a23e1f7b2e0d48ed03f0ce21d7ce8e85b}{ridGPSBaudRate}}\ =\ 0x1C,}
+\DoxyCodeLine{00239\ \ \ \ \ \textcolor{comment}{/*!}}
+\DoxyCodeLine{00240\ \textcolor{comment}{\ \ \ \ \ \ \ Regulates\ internal\ filter\ bandwidth\ according\ to\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[0]`\ value.\ Please\ refer\ to\ the\ following\ table\ for\ details.}}
+\DoxyCodeLine{00241\ \textcolor{comment}{\ \ \ \ \ \ \ |\ \ Value\ \ \ \ \ \ \ \ \ |Bandwidth,\ Hz|}}
+\DoxyCodeLine{00242\ \textcolor{comment}{\ \ \ \ \ \ \ |:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|}}
+\DoxyCodeLine{00243\ \textcolor{comment}{\ \ \ \ \ \ \ |`0x00`\ \ \ \ \ \ \ \ \ \ |\ 256\ |}}
+\DoxyCodeLine{00244\ \textcolor{comment}{\ \ \ \ \ \ \ |`0x01`\ \ \ \ \ \ \ \ \ \ |\ 184\ |}}
+\DoxyCodeLine{00245\ \textcolor{comment}{\ \ \ \ \ \ \ |`0x02`\ \ \ \ \ \ \ \ \ \ |\ 94\ |}}
+\DoxyCodeLine{00246\ \textcolor{comment}{\ \ \ \ \ \ \ |`0x03`\ \ \ \ \ \ \ \ \ \ |\ 44\ |}}
+\DoxyCodeLine{00247\ \textcolor{comment}{\ \ \ \ \ \ \ |`0x04`\ \ \ \ \ \ \ \ \ \ |\ 21\ |}}
+\DoxyCodeLine{00248\ \textcolor{comment}{\ \ \ \ \ \ \ |`0x05`\ \ \ \ \ \ \ \ \ \ |\ 10\ |}}
+\DoxyCodeLine{00249\ \textcolor{comment}{\ \ \ \ \ \ \ |`0x06`\ \ \ \ \ \ \ \ \ \ |\ 5\ \ |}}
+\DoxyCodeLine{00250\ \textcolor{comment}{}}
+\DoxyCodeLine{00251\ \textcolor{comment}{\ \ \ \ \ \ \ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[1]`\ should\ be\ set\ to\ 0.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00252\ \textcolor{comment}{\ \ \ \ */}}
+\DoxyCodeLine{00253\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ac5b2c95e986d8cd87b47f8475c2e3d45}{ridFilterBandwidth}}\ =\ 0x1F,}
+\DoxyCodeLine{00254\ }
+\DoxyCodeLine{00255\ \ \ \ \ \textcolor{comment}{/*!}}
+\DoxyCodeLine{00256\ \textcolor{comment}{\ \ \ \ \ \ \ Regulates\ gyroscope\ value\ range\ according\ to\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[0]`\ value.\ Please\ refer\ to\ the\ following\ table\ for\ details.}}
+\DoxyCodeLine{00257\ \textcolor{comment}{\ \ \ \ \ \ \ |\ \ Value\ \ \ \ \ \ \ \ \ |Range,\ \(\backslash\)f\$\ deg/s\ \(\backslash\)f\$|}}
+\DoxyCodeLine{00258\ \textcolor{comment}{\ \ \ \ \ \ \ |:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|-\/-\/-\/-\/-\/-\/-\/-\/:|}}
+\DoxyCodeLine{00259\ \textcolor{comment}{\ \ \ \ \ \ \ |`0x00`\ \ \ \ \ \ \ \ \ \ |250\ \ \ \ \ \ |}}
+\DoxyCodeLine{00260\ \textcolor{comment}{\ \ \ \ \ \ \ |`0x01`\ \ \ \ \ \ \ \ \ \ |500\ \ \ \ \ \ |}}
+\DoxyCodeLine{00261\ \textcolor{comment}{\ \ \ \ \ \ \ |`0x02`\ \ \ \ \ \ \ \ \ \ |1000\ \ \ \ \ |}}
+\DoxyCodeLine{00262\ \textcolor{comment}{\ \ \ \ \ \ \ |`0x03`\ \ \ \ \ \ \ \ \ \ |2000\ \ \ \ \ |}}
+\DoxyCodeLine{00263\ \textcolor{comment}{}}
+\DoxyCodeLine{00264\ \textcolor{comment}{\ \ \ \ \ \ \ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[1]`\ should\ be\ set\ to\ 0.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00265\ \textcolor{comment}{\ \ \ \ */}}
+\DoxyCodeLine{00266\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a0c94f5df4e6ba10377b5619238080ff1}{ridGyroscopeRange}}\ =\ 0x20,}
+\DoxyCodeLine{00267\ \ \ \ \ \textcolor{comment}{/*!}}
+\DoxyCodeLine{00268\ \textcolor{comment}{\ \ \ \ \ \ \ Regulates\ accelerometer\ value\ range\ according\ to\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[0]`\ value.\ Please\ refer\ to\ the\ following\ table\ for\ details.}}
+\DoxyCodeLine{00269\ \textcolor{comment}{\ \ \ \ \ \ \ |\ \ Value\ \ \ \ \ \ \ \ \ |Range,\ \(\backslash\)f\$\ m/s\string^2\ \(\backslash\)f\$|}}
+\DoxyCodeLine{00270\ \textcolor{comment}{\ \ \ \ \ \ \ |:-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/:|-\/-\/-\/-\/-\/-\/-\/-\/:|}}
+\DoxyCodeLine{00271\ \textcolor{comment}{\ \ \ \ \ \ \ |`0x00`\ \ \ \ \ \ \ \ \ \ |\(\backslash\)f\$\ 2\ \(\backslash\)cdot\ g\(\backslash\)f\$|}}
+\DoxyCodeLine{00272\ \textcolor{comment}{\ \ \ \ \ \ \ |`0x01`\ \ \ \ \ \ \ \ \ \ |\(\backslash\)f\$\ 4\ \(\backslash\)cdot\ g\(\backslash\)f\$|}}
+\DoxyCodeLine{00273\ \textcolor{comment}{\ \ \ \ \ \ \ |`0x02`\ \ \ \ \ \ \ \ \ \ |\(\backslash\)f\$\ 8\ \(\backslash\)cdot\ g\(\backslash\)f\$|}}
+\DoxyCodeLine{00274\ \textcolor{comment}{\ \ \ \ \ \ \ |`0x03`\ \ \ \ \ \ \ \ \ \ |\(\backslash\)f\$\ 16\ \(\backslash\)cdot\ g\(\backslash\)f\$|}}
+\DoxyCodeLine{00275\ \textcolor{comment}{}}
+\DoxyCodeLine{00276\ \textcolor{comment}{\ \ \ \ \ \ \ Here\ \(\backslash\)f\$\ g\ =\ 9.81\ m/s\string^2\ \(\backslash\)f\$.\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[1]`\ should\ be\ set\ to\ 0.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00277\ \textcolor{comment}{\ \ \ \ */}}
+\DoxyCodeLine{00278\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a7a6ad3e464e638d7b8c700176a6198e1}{ridAccelerometerRange}}\ =\ 0x21,}
+\DoxyCodeLine{00279\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa0c382b1bbd92e110cf05656fca68846}{ridStandbyMode}}\ =\ 0x22,\ \textcolor{comment}{///<\ Toggles\ dormant\ mode.\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[0]`\ should\ be\ set\ to\ \`{}0x01`,\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[1]`\ to\ 0.}}
+\DoxyCodeLine{00280\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a9e91fab01aac11db869b2c3469197951}{ridInstallationDirection}}\ =\ 0x23,\ \textcolor{comment}{///<\ Toggles\ on/off\ internal\ rotation\ transform\ for\ vertical\ installation.\ \ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[1]`\ should\ be\ set\ to\ 0,\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[0]`\ being\ to\ \`{}0x01`\ allows\ vertical\ installation,\ to\ \`{}0x00`\ -\/\ horizontal\ installation.}}
+\DoxyCodeLine{00281\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6ed4aff9ef5db46614283f3137b7a33c}{ridTransitionAlgorithm}}\ =\ 0x24,\ \textcolor{comment}{///<\ Regulates\ whether\ 9-\/axis\ (`0x01`\ in\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[0]`)\ or\ 6-\/axis\ (`0x00`)\ transition\ algorithm\ should\ be\ used.\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[1]`\ should\ be\ set\ to\ 0.}}
+\DoxyCodeLine{00282\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a3613237d9a04da1a69ab6233bdff6c87}{ridInstructionStart}}\ =\ 0x2D,\ \textcolor{comment}{///<\ Instruction\ mode.\ \`{}0x00`\ in\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[0]`\ means\ starting\ instruction\ mode,\ \`{}0x01`\ toggles\ it\ off\ whilst\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[1]`\ is\ set\ explicitly\ to\ 0.}}
+\DoxyCodeLine{00283\ }
+\DoxyCodeLine{00284\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a901d4a2268382df03b1842a23a03b4df}{ridTimeYearMonth}}\ =\ 0x30,\ \textcolor{comment}{///<\ Sets\ RTC\ to\ the\ given\ year\ (\(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[0]`)\ and\ month\ (\(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[1]`).\ Year\ is\ a\ signed\ 8-\/bit\ integer\ with\ zero\ origin\ point\ set\ to\ 2000\ year\ Gregorian\ calendar.\ Month\ is\ digitized\ to\ 1-\/12,\ unsigned\ 8-\/bit\ integer.}}
+\DoxyCodeLine{00285\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a0ba92dbc353204d35aec965eae613c96}{ridTimeDayHour}}\ =\ 0x31,\ \textcolor{comment}{///<\ Sets\ RTC\ to\ the\ given\ day\ of\ the\ month\ (\(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[0]`)\ and\ hour\ (\(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[1]`)\ in\ 24H\ system.}}
+\DoxyCodeLine{00286\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aac4180796c112f8a59c40acff749f705}{ridTimeMinuteSecond}}\ =\ 0x32,\ \textcolor{comment}{///<\ Sets\ RTC\ to\ the\ given\ minute\ (\(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[0]`)\ and\ second\ (\(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[1]`)\ in\ 24H\ system.}}
+\DoxyCodeLine{00287\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a98c1d3facc2a8a35a0e98af60665466f}{ridTimeMilliseconds}}\ =\ 0x33,\ \textcolor{comment}{///<\ Sets\ RTC\ to\ the\ given\ milliseconds\ exposed\ as\ 16-\/bit\ unsigned\ integer.}}
+\DoxyCodeLine{00288\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a42a6e8a6f354bcd6b2b778c05d8e9f9f}{ridSetAccelerationX}}\ =\ 0x34,\ \textcolor{comment}{///<\ Sets\ up\ origin\ point\ or\ impostor\ value\ (needed\ when\ the\ measurement\ is\ forced\ for\ output\ by\ \(\backslash\)ref\ ridOutputValueSet\ but\ not\ actually\ supported\ by\ the\ sensor)\ for\ acceleration\ on\ X\ axis.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00289\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3afbd52bd0fe49f0b4291552768d483423}{ridSetAccelerationY}}\ =\ 0x35,\ \textcolor{comment}{///<\ Sets\ up\ origin\ point\ or\ impostor\ value\ (needed\ when\ the\ measurement\ is\ forced\ for\ output\ by\ \(\backslash\)ref\ ridOutputValueSet\ but\ not\ actually\ supported\ by\ the\ sensor)\ for\ acceleration\ on\ Y\ axis.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00290\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a7192ad42de7160e89f67385d2a952d29}{ridSetAccelerationZ}}\ =\ 0x36,\ \textcolor{comment}{///<\ Sets\ up\ origin\ point\ or\ impostor\ value\ (needed\ when\ the\ measurement\ is\ forced\ for\ output\ by\ \(\backslash\)ref\ ridOutputValueSet\ but\ not\ actually\ supported\ by\ the\ sensor)\ for\ acceleration\ on\ Z\ axis.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00291\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6509ae8041180b68bcd65a225416eb9e}{ridSetAngularVelocityX}}\ =\ 0x37,\ \textcolor{comment}{///<\ Sets\ up\ origin\ point\ or\ impostor\ value\ (needed\ when\ the\ measurement\ is\ forced\ for\ output\ by\ \(\backslash\)ref\ ridOutputValueSet\ but\ not\ actually\ supported\ by\ the\ sensor)\ for\ angular\ velocity\ on\ X\ axis.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00292\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a48508295f9f23d01dce584675ec6c9f0}{ridSetAngularVelocityY}}\ =\ 0x38,\ \textcolor{comment}{///<\ Sets\ up\ origin\ point\ or\ impostor\ value\ (needed\ when\ the\ measurement\ is\ forced\ for\ output\ by\ \(\backslash\)ref\ ridOutputValueSet\ but\ not\ actually\ supported\ by\ the\ sensor)\ for\ angular\ velocity\ on\ Y\ axis.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00293\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a7a1193aab35e38c7cb2d50b1b070c802}{ridSetAngularVelocityZ}}\ =\ 0x39,\ \textcolor{comment}{///<\ Sets\ up\ origin\ point\ or\ impostor\ value\ (needed\ when\ the\ measurement\ is\ forced\ for\ output\ by\ \(\backslash\)ref\ ridOutputValueSet\ but\ not\ actually\ supported\ by\ the\ sensor)\ for\ angular\ velocity\ on\ Z\ axis.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00294\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a586b93305e288dce9d13924b4e2b7497}{ridSetMagnetometerX}}\ =\ 0x3A,\ \textcolor{comment}{///<\ Sets\ up\ origin\ point\ or\ impostor\ value\ (needed\ when\ the\ measurement\ is\ forced\ for\ output\ by\ \(\backslash\)ref\ ridOutputValueSet\ but\ not\ actually\ supported\ by\ the\ sensor)\ for\ magnetometer\ on\ X\ axis.\ **MAY\ BLOCK\ THE\ MEASUREMENTS**}}
+\DoxyCodeLine{00295\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a086061ec42a34429d4ecc87426bd16db}{ridSetMagnetometerY}}\ =\ 0x3B,\ \textcolor{comment}{///<\ Sets\ up\ origin\ point\ or\ impostor\ value\ (needed\ when\ the\ measurement\ is\ forced\ for\ output\ by\ \(\backslash\)ref\ ridOutputValueSet\ but\ not\ actually\ supported\ by\ the\ sensor)\ for\ magnetometer\ on\ Y\ axis.\ **MAY\ BLOCK\ THE\ MEASUREMENTS**}}
+\DoxyCodeLine{00296\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a3f7aacc3707d990356df81934205ce7d}{ridSetMagnetometerZ}}\ =\ 0x3C,\ \textcolor{comment}{///<\ Sets\ up\ origin\ point\ or\ impostor\ value\ (needed\ when\ the\ measurement\ is\ forced\ for\ output\ by\ \(\backslash\)ref\ ridOutputValueSet\ but\ not\ actually\ supported\ by\ the\ sensor)\ for\ magnetometer\ on\ Z\ axis.\ **MAY\ BLOCK\ THE\ MEASUREMENTS**}}
+\DoxyCodeLine{00297\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a1e415569387a08b9bf79e77790470763}{ridSetAngleRoll}}\ =\ 0x3D,\ \textcolor{comment}{///<\ Sets\ up\ origin\ point\ or\ impostor\ value\ (needed\ when\ the\ measurement\ is\ forced\ for\ output\ by\ \(\backslash\)ref\ ridOutputValueSet\ but\ not\ actually\ supported\ by\ the\ sensor)\ for\ Euler\ angle\ (roll)\ over\ X\ axis.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00298\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aba447e38147a544790c590f9f039eaf6}{ridSetAnglePitch}}\ =\ 0x3E,\ \textcolor{comment}{///<\ Sets\ up\ origin\ point\ or\ impostor\ value\ (needed\ when\ the\ measurement\ is\ forced\ for\ output\ by\ \(\backslash\)ref\ ridOutputValueSet\ but\ not\ actually\ supported\ by\ the\ sensor)\ for\ Euler\ angle\ (pitch)\ over\ Y\ axis.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00299\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ad6cc9ede4fe5cc3b81076bd3e3ddbb0f}{ridSetAngleYaw}}\ =\ 0x3F,\ \textcolor{comment}{///<\ Sets\ up\ origin\ point\ or\ impostor\ value\ (needed\ when\ the\ measurement\ is\ forced\ for\ output\ by\ \(\backslash\)ref\ ridOutputValueSet\ but\ not\ actually\ supported\ by\ the\ sensor)\ for\ Euler\ angle\ (yaw)\ over\ Z\ axis.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00300\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a2e2274acd5298a1422864030e2b320ba}{ridSetTemperature}}\ =\ 0x40,\ \textcolor{comment}{///<\ Sets\ up\ origin\ point\ or\ impostor\ value\ (needed\ when\ the\ corresponding\ spatial\ measurement\ is\ forced\ for\ output\ by\ \(\backslash\)ref\ ridOutputValueSet\ but\ not\ actually\ supported\ by\ the\ sensor)\ for\ temperature.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00301\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a4ebad711060439819f73aa07943481c7}{ridSetPortStatusD0}}\ =\ 0x41,\ \textcolor{comment}{///<\ Action\ unknown,\ not\ yet\ documented\ by\ Witmotion}}
+\DoxyCodeLine{00302\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ab8368acbca776c26bf211a60fad166f0}{ridSetPortStatusD1}}\ =\ 0x42,\ \textcolor{comment}{///<\ Action\ unknown,\ not\ yet\ documented\ by\ Witmotion}}
+\DoxyCodeLine{00303\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a24351f6f11569108042150dd3cd1d7c2}{ridSetPortStatusD2}}\ =\ 0x43,\ \textcolor{comment}{///<\ Action\ unknown,\ not\ yet\ documented\ by\ Witmotion}}
+\DoxyCodeLine{00304\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa336be9ed7dec9fdf579dae59838f2bb}{ridSetPortStatusD3}}\ =\ 0x44,\ \textcolor{comment}{///<\ Action\ unknown,\ not\ yet\ documented\ by\ Witmotion}}
+\DoxyCodeLine{00305\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a5179834f2969bb85dbe566aca70e4f72}{ridSetPressureLow}}\ =\ 0x45,\ \textcolor{comment}{///<\ Sets\ up\ low\ part\ of\ initial\ value\ for\ 32-\/bit\ pressure\ measurement\ register.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00306\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a4fa41cd61ddd08decf7e373786324fe4}{ridSetPressureHigh}}\ =\ 0x46,\ \textcolor{comment}{///<\ Sets\ up\ high\ part\ of\ initial\ value\ for\ 32-\/bit\ pressure\ measurement\ register.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00307\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a2999f436df440eb4e4a16c04c93de615}{ridSetAltitudeLow}}\ =\ 0x47,\ \textcolor{comment}{///<\ Sets\ up\ low\ part\ of\ initial\ value\ for\ 32-\/bit\ altitude\ measurement\ register.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00308\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a1a93aa388d3de727709b6d34452d0934}{ridSetAltitudeHigh}}\ =\ 0x48,\ \textcolor{comment}{///<\ Sets\ up\ high\ part\ of\ initial\ value\ for\ 32-\/bit\ altitude\ measurement\ register.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00309\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ae19e9989db5b1b14bfae18fe5ace37fa}{ridSetLongitudeLow}}\ =\ 0x49,\ \textcolor{comment}{///<\ Sets\ up\ low\ part\ of\ initial\ value\ for\ 32-\/bit\ longitude\ measurement\ register.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00310\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a69a1045e79d9ef5870f1f71747d10ae4}{ridSetLongitudeHigh}}\ =\ 0x4A,\ \textcolor{comment}{///<\ Sets\ up\ high\ part\ of\ initial\ value\ for\ 32-\/bit\ longitude\ measurement\ register.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00311\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aee7f477a2446d716bdca937fc4911959}{ridSetLatitudeLow}}\ =\ 0x4B,\ \textcolor{comment}{///<\ Sets\ up\ low\ part\ of\ initial\ value\ for\ 32-\/bit\ latitude\ measurement\ register.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00312\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a34515bb412a5bd623d77bdf020f9b5e9}{ridSetLatitudeHigh}}\ =\ 0x4C,\ \textcolor{comment}{///<\ Sets\ up\ high\ part\ of\ initial\ value\ for\ 32-\/bit\ latitude\ measurement\ register.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00313\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a84759181f9ff6bd2a318c9f8b1ed1f39}{ridSetGPSAltitude}}\ =\ 0x4D,\ \textcolor{comment}{///<\ Sets\ up\ initial\ or\ impostor\ value\ (needed\ when\ the\ measurement\ is\ forced\ for\ output\ by\ \(\backslash\)ref\ ridOutputValueSet\ but\ not\ actually\ supported\ by\ the\ sensor)\ for\ GPS\ altitude\ measurement.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00314\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a549727f96698c8e2e7afbf20b4f286d0}{ridSetGPSYaw}}\ =\ 0x4E,\ \textcolor{comment}{///<\ Sets\ up\ initial\ or\ impostor\ value\ (needed\ when\ the\ measurement\ is\ forced\ for\ output\ by\ \(\backslash\)ref\ ridOutputValueSet\ but\ not\ actually\ supported\ by\ the\ sensor)\ for\ GPS\ orientation\ angle\ measurement.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00315\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa8dc66482e5afdb4831e8602b2e89d58}{ridSetGPSGroundSpeedLow}}\ =\ 0x4F,\ \textcolor{comment}{///<\ Sets\ up\ low\ part\ of\ initial\ value\ for\ 32-\/bit\ GPS\ ground\ speed\ measurement\ register.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00316\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3aa3bc5016e03de006cf633420ac34e25f}{ridSetGPSGroundSpeedHigh}}\ =\ 0x50,\ \textcolor{comment}{///<\ Sets\ up\ high\ part\ of\ initial\ value\ for\ 32-\/bit\ GPS\ ground\ speed\ measurement\ register.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00317\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a77da818475b1904a4e7ef051d14e063d}{ridSetOrientationX}}\ =\ 0x51,\ \textcolor{comment}{///<\ Sets\ up\ origin\ point\ or\ impostor\ value\ (needed\ when\ the\ measurement\ is\ forced\ for\ output\ by\ \(\backslash\)ref\ ridOutputValueSet\ but\ not\ actually\ supported\ by\ the\ sensor)\ for\ orientation\ quaternion,\ X\ component.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00318\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a49c73008955b9fa89f9b4cba3dd37d9d}{ridSetOrientationY}}\ =\ 0x52,\ \textcolor{comment}{///<\ Sets\ up\ origin\ point\ or\ impostor\ value\ (needed\ when\ the\ measurement\ is\ forced\ for\ output\ by\ \(\backslash\)ref\ ridOutputValueSet\ but\ not\ actually\ supported\ by\ the\ sensor)\ for\ orientation\ quaternion,\ Y\ component.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00319\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a3e1d48defa5dbaea479ee1498cf3db7a}{ridSetOrientationZ}}\ =\ 0x53,\ \textcolor{comment}{///<\ Sets\ up\ origin\ point\ or\ impostor\ value\ (needed\ when\ the\ measurement\ is\ forced\ for\ output\ by\ \(\backslash\)ref\ ridOutputValueSet\ but\ not\ actually\ supported\ by\ the\ sensor)\ for\ orientation\ quaternion,\ Z\ component.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00320\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a6b12d4a88aa5b9477ad6acae3af6bb83}{ridSetOrientationW}}\ =\ 0x54,\ \textcolor{comment}{///<\ Sets\ up\ origin\ point\ or\ impostor\ value\ (needed\ when\ the\ measurement\ is\ forced\ for\ output\ by\ \(\backslash\)ref\ ridOutputValueSet\ but\ not\ actually\ supported\ by\ the\ sensor)\ for\ orientation\ quaternion,\ W\ component.\ NOT\ YET\ PROVEN\ AS\ WORKING}}
+\DoxyCodeLine{00321\ }
+\DoxyCodeLine{00322\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3a83987c4864f06244dab4f5ef6f12af7f}{ridGyroscopeAutoCalibrate}}\ =\ 0x63,\ \textcolor{comment}{///<\ Toggles\ on/off\ automatic\ precalibration\ of\ the\ gyroscope.\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[1]`\ should\ be\ set\ to\ 0.\ \`{}0x01`\ in\ \(\backslash\)ref\ witmotion\_config\_packet.setting.`raw[0]`\ turns\ gyroscope\ automatic\ precalibration\ **OFF**.\ To\ turn\ it\ **ON**\ the\ value\ should\ be\ \`{}0x00`.}}
+\DoxyCodeLine{00323\ }
+\DoxyCodeLine{00324\ \ \ \ \ \mbox{\hyperlink{namespacewitmotion_a2a0798fb689894f2b7f998303bd8a4b3ae3b36162b2662cc9c637436bca5c8172}{ridUnlockConfiguration}}\ =\ 0x69\ \textcolor{comment}{///<\ "{}Magic"{}\ vendor-\/defined\ value\ for\ configuration\ unlock\ packet\ \`{}0xFF\ 0xAA\ 0x69\ 0x88\ 0xB5`.}}
+\DoxyCodeLine{00325\ \};}
+\DoxyCodeLine{00326\ }
+\DoxyCodeLine{00327\ \textcolor{comment}{/*!}}
+\DoxyCodeLine{00328\ \textcolor{comment}{\ *\ \(\backslash\)brief\ Generic\ structure\ respresenting\ the\ standard\ 5-\/byte\ configuration\ command\ defined\ in\ Witmotion\ protocol.}}
+\DoxyCodeLine{00329\ \textcolor{comment}{*/}}
+\DoxyCodeLine{00330\ \textcolor{keyword}{struct}\ \mbox{\hyperlink{structwitmotion_1_1witmotion__config__packet}{witmotion\_config\_packet}}}
+\DoxyCodeLine{00331\ \{}
+\DoxyCodeLine{00332\ \ \ \ \ uint8\_t\ \mbox{\hyperlink{structwitmotion_1_1witmotion__config__packet_ade9c4458ed89e04103db571fc549d216}{header\_byte}};\ \textcolor{comment}{///<\ Header\ byte,\ set\ constantly\ to\ \(\backslash\)ref\ WITMOTION\_CONFIG\_HEADER}}
+\DoxyCodeLine{00333\ \ \ \ \ uint8\_t\ \mbox{\hyperlink{structwitmotion_1_1witmotion__config__packet_a797c369ba60e5ae2680522be695c4803}{key\_byte}};\ \textcolor{comment}{///<\ Packet\ type,\ constantly\ set\ to\ \(\backslash\)ref\ WITMOTION\_CONFIG\_KEY}}
+\DoxyCodeLine{00334\ \ \ \ \ uint8\_t\ \mbox{\hyperlink{structwitmotion_1_1witmotion__config__packet_af94ab27fd4736d852779ff0d9da5d297}{address\_byte}};\ \textcolor{comment}{///<\ Configuration\ slot\ address,\ refers\ to\ the\ registered\ values\ in\ \(\backslash\)ref\ witmotion\_config\_register\_id}}
+\DoxyCodeLine{00335\ \ \ \ \ \textcolor{keyword}{union}}
+\DoxyCodeLine{00336\ \ \ \ \ \{}
+\DoxyCodeLine{00337\ \ \ \ \ \ \ \ \ uint8\_t\ raw[2];}
+\DoxyCodeLine{00338\ \ \ \ \ \ \ \ \ uint16\_t\ bin;}
+\DoxyCodeLine{00339\ \ \ \ \ \}setting;\ \textcolor{comment}{///<\ 2-\/byte\ internal\ data\ storage\ array\ represented\ as\ C-\/style\ memory\ union.\ The\ values\ should\ be\ formulated\ byte-\/by-\/byte\ referring\ to\ the\ actual\ sensor's\ documentation.}}
+\DoxyCodeLine{00340\ \};}
+\DoxyCodeLine{00341\ }
+\DoxyCodeLine{00342\ \textcolor{comment}{/*!}}
+\DoxyCodeLine{00343\ \textcolor{comment}{\ \ \(\backslash\)brief\ Abstract\ base\ class\ to\ program\ convenience\ classes\ for\ the\ sensors.}}
+\DoxyCodeLine{00344\ \textcolor{comment}{}}
+\DoxyCodeLine{00345\ \textcolor{comment}{\ \ This\ class\ allows\ the\ developer\ to\ write\ handler\ functions\ for\ multithreaded\ polling\ timer\ control,\ sensor\ configuration\ request\ and\ data\ decoding\ event.}}
+\DoxyCodeLine{00346\ \textcolor{comment}{\ \ It\ also\ provides\ predefined\ signals\ to\ allow\ the\ end\ user\ to\ react\ on\ actual\ data\ acquisition\ and\ error\ occurence\ events.}}
+\DoxyCodeLine{00347\ \textcolor{comment}{\ \ The\ common\ use\ case\ for\ this\ class\ is\ to\ provide\ a\ base\ interface\ for\ the\ family\ of\ sensors\ supporting\ the\ same\ protocol.\ Please\ refer\ to\ \(\backslash\)ref\ QBaseSerialWitmotionSensorReader\ class\ for\ actual\ implementation\ of\ the\ currently\ supported\ UART-\/based\ protocol.}}
+\DoxyCodeLine{00348\ \textcolor{comment}{*/}}
+\DoxyCodeLine{00349\ \textcolor{keyword}{class}\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader}{QAbstractWitmotionSensorReader}}:\ \textcolor{keyword}{public}\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader}{QObject}}}
+\DoxyCodeLine{00350\ \{\ \ \ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader}{Q\_OBJECT}}}
+\DoxyCodeLine{00351\ \textcolor{keyword}{protected}\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader}{slots}}:}
+\DoxyCodeLine{00352\ \ \ \ \ \textcolor{keyword}{virtual}\ \textcolor{keywordtype}{void}\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader}{ReadData}}()\ =\ 0;\ \textcolor{comment}{///<\ Protected\ abstract\ slot\ to\ be\ implemented\ in\ the\ derived\ class.\ The\ common\ usage\ is\ as\ a\ callback\ for\ the\ polling\ timer\ thread.}}
+\DoxyCodeLine{00353\ \textcolor{keyword}{public}\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader}{slots}}:}
+\DoxyCodeLine{00354\ \ \ \ \ \textcolor{keyword}{virtual}\ \textcolor{keywordtype}{void}\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader}{SendConfig}}(\textcolor{keyword}{const}\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader}{witmotion\_config\_packet}}\&\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader}{packet}})\ =\ 0;\ \textcolor{comment}{///<\ Public\ abstract\ slot\ to\ be\ implemented\ in\ the\ derived\ class.\ \(\backslash\)param\ packet\ accepts\ the\ \(\backslash\)ref\ witmotion\_config\_packet\ object\ for\ being\ sent\ to\ the\ sensor\ configuration\ registers.}}
+\DoxyCodeLine{00355\ \ \ \ \ \textcolor{keyword}{virtual}\ \textcolor{keywordtype}{void}\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader_a01b7550252964d3e01cf3a5e4f6527c0}{RunPoll}}()\ =\ 0;\ \textcolor{comment}{///<\ Public\ abstract\ slot\ to\ be\ implemented\ in\ the\ derived\ class.\ The\ common\ use\ is\ to\ start\ the\ polling\ timer\ thread\ for\ the\ sensors\ after\ Qt\ event\ loop\ is\ started.}}
+\DoxyCodeLine{00356\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader}{signals}}:}
+\DoxyCodeLine{00357\ \ \ \ \ \textcolor{keywordtype}{void}\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader}{Acquired}}(\textcolor{keyword}{const}\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader}{witmotion\_datapacket}}\&\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader}{packet}});\ \textcolor{comment}{///<\ Signal\ function\ to\ be\ emitted\ when\ the\ data\ packet\ is\ acquired\ by\ the\ polling\ thread\ or\ process.\ Can\ only\ be\ redefined,\ not\ overridden\ in\ the\ class\ hierarchy.}}
+\DoxyCodeLine{00358\ \ \ \ \ \textcolor{keywordtype}{void}\ \mbox{\hyperlink{classwitmotion_1_1QAbstractWitmotionSensorReader_ae1b6fa6897d0ae605904c5a79219dea5}{Error}}(\textcolor{keyword}{const}\ QString\&\ description);\ \textcolor{comment}{///<\ Signal\ function\ to\ be\ emitted\ when\ the\ internal\ error\ reported\ in\ the\ polling\ thread\ or\ process.\ Can\ only\ be\ redefined,\ not\ overridden\ in\ the\ class\ hierarchy.}}
+\DoxyCodeLine{00359\ \};}
+\DoxyCodeLine{00360\ }
+\DoxyCodeLine{00361\ \}}
+\DoxyCodeLine{00362\ }
+\DoxyCodeLine{00363\ Q\_DECLARE\_METATYPE(\mbox{\hyperlink{namespacewitmotion}{witmotion}}::witmotion\_datapacket);\ \textcolor{comment}{///<\ \(\backslash\)private}}
+\DoxyCodeLine{00364\ Q\_DECLARE\_METATYPE(\mbox{\hyperlink{namespacewitmotion}{witmotion}}::witmotion\_config\_packet);\ \textcolor{comment}{///<\ \(\backslash\)private}}
+\DoxyCodeLine{00365\ }
+\DoxyCodeLine{00366\ \textcolor{preprocessor}{\#}\textcolor{preprocessor}{endif}}
+
+\end{DoxyCode}

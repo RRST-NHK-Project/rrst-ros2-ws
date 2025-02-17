@@ -1,0 +1,106 @@
+{
+	"BUILD_DIR" : "/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/witmotion-jy901_autogen",
+	"CMAKE_BINARY_DIR" : "/home/dev/ros2_ws/src/build/witmotion_ros",
+	"CMAKE_CURRENT_BINARY_DIR" : "/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt",
+	"CMAKE_CURRENT_SOURCE_DIR" : "/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt",
+	"CMAKE_EXECUTABLE" : "/usr/bin/cmake",
+	"CMAKE_LIST_FILES" : 
+	[
+		"/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/CMakeLists.txt",
+		"/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/config/version.h.in",
+		"/usr/share/cmake-3.28/Modules/CheckIncludeFile.cmake",
+		"/usr/lib/x86_64-linux-gnu/cmake/Qt5/Qt5ConfigVersion.cmake",
+		"/usr/lib/x86_64-linux-gnu/cmake/Qt5/Qt5Config.cmake",
+		"/usr/lib/x86_64-linux-gnu/cmake/Qt5/Qt5ModuleLocation.cmake",
+		"/usr/lib/x86_64-linux-gnu/cmake/Qt5Core/Qt5CoreConfigVersion.cmake",
+		"/usr/lib/x86_64-linux-gnu/cmake/Qt5Core/Qt5CoreConfig.cmake",
+		"/usr/lib/x86_64-linux-gnu/cmake/Qt5Core/Qt5CoreConfigExtras.cmake",
+		"/usr/lib/x86_64-linux-gnu/cmake/Qt5Core/Qt5CoreConfigExtrasMkspecDir.cmake",
+		"/usr/lib/x86_64-linux-gnu/cmake/Qt5Core/Qt5CoreMacros.cmake",
+		"/usr/share/cmake-3.28/Modules/CMakeParseArguments.cmake",
+		"/usr/lib/x86_64-linux-gnu/cmake/Qt5SerialPort/Qt5SerialPortConfigVersion.cmake",
+		"/usr/lib/x86_64-linux-gnu/cmake/Qt5SerialPort/Qt5SerialPortConfig.cmake",
+		"/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/cmake/doxygen-generator.cmake",
+		"/usr/share/cmake-3.28/Modules/FindDoxygen.cmake",
+		"/usr/share/cmake-3.28/Modules/FindPackageHandleStandardArgs.cmake",
+		"/usr/share/cmake-3.28/Modules/FindPackageMessage.cmake",
+		"/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/config/Doxyfile.in"
+	],
+	"CMAKE_SOURCE_DIR" : "/home/dev/ros2_ws/src/witmotion_ros",
+	"DEP_FILE" : "/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/witmotion-jy901_autogen/deps",
+	"DEP_FILE_RULE_NAME" : "witmotion-jy901_autogen/timestamp",
+	"HEADERS" : [],
+	"HEADER_EXTENSIONS" : [ "h", "hh", "h++", "hm", "hpp", "hxx", "in", "txx" ],
+	"INCLUDE_DIR" : "/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/witmotion-jy901_autogen/include",
+	"MOC_COMPILATION_FILE" : "/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/witmotion-jy901_autogen/mocs_compilation.cpp",
+	"MOC_DEFINITIONS" : 
+	[
+		"QT_CORE_LIB",
+		"QT_NO_DEBUG",
+		"QT_SERIALPORT_LIB",
+		"witmotion_jy901_EXPORTS"
+	],
+	"MOC_DEPEND_FILTERS" : 
+	[
+		[
+			"Q_PLUGIN_METADATA",
+			"[\n][ \t]*Q_PLUGIN_METADATA[ \t]*\\([^\\)]*FILE[ \t]*\"([^\"]+)\""
+		]
+	],
+	"MOC_INCLUDES" : 
+	[
+		"/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include",
+		"/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt",
+		"/usr/include/x86_64-linux-gnu/qt5",
+		"/usr/include/x86_64-linux-gnu/qt5/QtCore",
+		"/usr/lib/x86_64-linux-gnu/qt5/mkspecs/linux-g++",
+		"/usr/include/x86_64-linux-gnu/qt5/QtSerialPort",
+		"/usr/include/c++/13",
+		"/usr/include/x86_64-linux-gnu/c++/13",
+		"/usr/include/c++/13/backward",
+		"/usr/lib/gcc/x86_64-linux-gnu/13/include",
+		"/usr/local/include",
+		"/usr/include/x86_64-linux-gnu",
+		"/usr/include"
+	],
+	"MOC_MACRO_NAMES" : [ "Q_OBJECT", "Q_GADGET", "Q_NAMESPACE", "Q_NAMESPACE_EXPORT" ],
+	"MOC_OPTIONS" : [],
+	"MOC_PATH_PREFIX" : false,
+	"MOC_PREDEFS_CMD" : 
+	[
+		"/usr/bin/c++",
+		"-std=gnu++14",
+		"-dM",
+		"-E",
+		"-c",
+		"/usr/share/cmake-3.28/Modules/CMakeCXXCompilerABI.cpp"
+	],
+	"MOC_PREDEFS_FILE" : "/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/witmotion-jy901_autogen/moc_predefs.h",
+	"MOC_RELAXED_MODE" : false,
+	"MOC_SKIP" : 
+	[
+		"/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/jy901-uart.h",
+		"/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/message-enumerator.h",
+		"/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/serial.h",
+		"/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/types.h",
+		"/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt31n-uart.h",
+		"/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/wt901-uart.h"
+	],
+	"MULTI_CONFIG" : false,
+	"PARALLEL" : 10,
+	"PARSE_CACHE_FILE" : "/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/CMakeFiles/witmotion-jy901_autogen.dir/ParseCache.txt",
+	"QT_MOC_EXECUTABLE" : "/usr/lib/qt5/bin/moc",
+	"QT_UIC_EXECUTABLE" : "",
+	"QT_VERSION_MAJOR" : 5,
+	"QT_VERSION_MINOR" : 15,
+	"SETTINGS_FILE" : "/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/CMakeFiles/witmotion-jy901_autogen.dir/AutogenUsed.txt",
+	"SOURCES" : 
+	[
+		[
+			"/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/src/jy901-uart.cpp",
+			"Mu",
+			null
+		]
+	],
+	"VERBOSITY" : 0
+}
