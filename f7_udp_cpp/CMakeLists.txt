@@ -68,6 +68,10 @@ ament_target_dependencies(nr25_pid rclcpp std_msgs sensor_msgs geometry_msgs)
 add_executable(nr25_dr_c610 src/NR25_DR_C610.cpp src/include/UDP.cpp)
 ament_target_dependencies(nr25_dr_c610 rclcpp std_msgs sensor_msgs geometry_msgs)
 
+add_executable(nr25_mr_servo_cal src/NR25_MR_Servo_Calibrator.cpp)
+ament_target_dependencies(nr25_mr_servo_cal rclcpp std_msgs sensor_msgs geometry_msgs)
+target_include_directories(nr25_mr_servo_cal PRIVATE ${nlohmann_json_SOURCE_DIR}/single_include)
+
 # インストール設定
 install(TARGETS
   nr25_mr
@@ -82,6 +86,7 @@ install(TARGETS
   nr25_enc_pid
   nr25_pid
   nr25_dr_c610
+  nr25_mr_servo_cal
   DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY launch/
