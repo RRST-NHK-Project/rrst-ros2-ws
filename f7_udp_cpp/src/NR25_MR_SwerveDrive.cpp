@@ -17,18 +17,18 @@ RRST NHK2025
 // 自作クラス
 #include "include/UDP.hpp"
 
-// サーボの組み付け時のズレを補正（度数法）
-#define SERVO1_CAL -7 
-#define SERVO2_CAL 2
-#define SERVO3_CAL -7
-#define SERVO4_CAL -16
-
 // スティックのデッドゾーン
 #define DEADZONE_L 0.7
 #define DEADZONE_R 0.3
 
 int deg;
 int truedeg;
+
+// サーボの組み付け時のズレを補正（度数法）
+int SERVO1_CAL = -7;
+int SERVO2_CAL = 2;
+int SERVO3_CAL = -7;
+int SERVO4_CAL = -16;
 
 // IPアドレスとポートの指定
 std::string udp_ip = "192.168.8.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
@@ -47,6 +47,9 @@ public:
             "joy0", 10,
             std::bind(&PS4_Listener::ps4_listener_callback, this,
                       std::placeholders::_1));
+        // figletでノード名を表示
+        std::string figletout = "figlet MR SwerveDrive";
+        std::system(figletout.c_str());
         RCLCPP_INFO(this->get_logger(),
                     "NHK2025 MR SD initialized with IP: %s, Port: %d", ip.c_str(),
                     port);
@@ -204,8 +207,8 @@ private:
         }
 
         // デバッグ用
-        // std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4] << ", ";
-        // std::cout << data[5] << ", " << data[6] << ", " << data[7] << ", " << data[8] << ", " << std::endl;
+        std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4] << ", ";
+        std::cout << data[5] << ", " << data[6] << ", " << data[7] << ", " << data[8] << ", " << std::endl;
 
         // std::cout << data << std::endl;
         udp_.send(data);
@@ -241,14 +244,39 @@ private:
     rclcpp::TimerBase::SharedPtr timer_;
 };
 
+class Params_Listener : public rclcpp::Node {
+public:
+    Params_Listener()
+        : Node("nr25_servo_cal_listener") {
+        subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
+            "mr_servo_cal", 10,
+            std::bind(&Params_Listener::params_listener_callback, this,
+                      std::placeholders::_1));
+        RCLCPP_INFO(this->get_logger(),
+                    "MR Servo Calibrator Listener");
+    }
+
+private:
+    void params_listener_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        SERVO1_CAL = msg->data[0];
+        SERVO2_CAL = msg->data[1];
+        SERVO3_CAL = msg->data[2];
+        SERVO4_CAL = msg->data[3];
+    }
+
+    rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
+};
+
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
     rclcpp::executors::SingleThreadedExecutor exec;
     auto ps4_listener = std::make_shared<PS4_Listener>(udp_ip, udp_port);
     auto servo_deg_publisher = std::make_shared<Servo_Deg_Publisher>();
+    auto params_listener = std::make_shared<Params_Listener>();
     exec.add_node(ps4_listener);
     exec.add_node(servo_deg_publisher);
+    exec.add_node(params_listener);
 
     exec.spin();
 

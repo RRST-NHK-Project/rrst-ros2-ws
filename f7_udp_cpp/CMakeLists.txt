@@ -17,6 +17,11 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/nlohmann/json.git
   GIT_TAG v3.11.3
 )
+FetchContent_Declare(
+  figlet
+  GIT_REPOSITORY https://github.com/cmatsuoka/figlet.git
+  GIT_TAG 2.2.5
+)
 FetchContent_MakeAvailable(nlohmann_json)
 
 find_package(ament_cmake REQUIRED)
@@ -67,12 +72,16 @@ ament_target_dependencies(nr25_pid rclcpp std_msgs sensor_msgs geometry_msgs)
 add_executable(nr25_dr_c610 src/NR25_DR_C610.cpp src/include/UDP.cpp)
 ament_target_dependencies(nr25_dr_c610 rclcpp std_msgs sensor_msgs geometry_msgs)
 
+
 add_executable(nr25_imu2yaw src/NR25_Iimu_to_yaw.cpp)
 ament_target_dependencies(nr25_imu2yaw rclcpp std_msgs sensor_msgs geometry_msgs tf2 tf2_ros visualization_msgs)
 
 add_executable(nr25_mr_sd_imu src/NR25_MR_SwerveDrive_imu.cpp src/include/UDP.cpp)
 ament_target_dependencies(nr25_mr_sd_imu rclcpp std_msgs sensor_msgs geometry_msgs tf2 tf2_ros visualization_msgs tf2_geometry_msgs)
 
+add_executable(nr25_mr_servo_cal src/NR25_MR_Servo_Calibrator.cpp)
+ament_target_dependencies(nr25_mr_servo_cal rclcpp std_msgs sensor_msgs geometry_msgs)
+target_include_directories(nr25_mr_servo_cal PRIVATE ${nlohmann_json_SOURCE_DIR}/single_include)
 
 # インストール設定
 install(TARGETS
@@ -90,6 +99,7 @@ install(TARGETS
   nr25_dr_c610
   nr25_imu2yaw
   nr25_mr_sd_imu
+  nr25_mr_servo_cal
   DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY launch/

@@ -14,6 +14,8 @@ Dribble State: 0
 
 // 標準
 #include <chrono>
+#include <cstdlib>
+#include <iostream>
 #include <thread>
 
 // ROS
@@ -127,6 +129,9 @@ public:
             "joy0", 10,
             std::bind(&PS4_Listener::ps4_listener_callback, this,
                       std::placeholders::_1));
+        // figletでノード名を表示
+        std::string figletout = "figlet MR";
+        std::system(figletout.c_str());
         RCLCPP_INFO(this->get_logger(),
                     "NHK2025 MR initialized with IP: %s, Port: %d", ip.c_str(),
                     port);
@@ -208,13 +213,14 @@ private:
 class Params_Listener : public rclcpp::Node {
 public:
     Params_Listener()
-        : Node("nhk25_pr_listener") {
+        : Node("mr_pr_listener") {
         subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
             "parameter_array", 10,
             std::bind(&Params_Listener::params_listener_callback, this,
                       std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(),
-                    "NHK2025 Parameter Listener");
+
+                    "NHK2025 Parameter Listener initialized");
     }
 
 private:
