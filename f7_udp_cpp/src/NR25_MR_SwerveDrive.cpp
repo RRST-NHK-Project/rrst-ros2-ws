@@ -27,17 +27,17 @@ RRST NHK2025
 #define deg_Kp 0.01      // 角度Pゲイン
 #define deg_Ki 0.5        //角度Iゲイン
 #define  deg_Kd 0   // 角度Dゲイン
-#define  speed_Kp 0      // 速度Pゲイン
-#define  speed_Ki 0.2      // 速度Iゲイン
+#define  speed_Kp 0.3      // 速度Pゲイン
+#define  speed_Ki 0.3      // 速度Iゲイン
 #define  speed_Kd 0        // 速度Dゲイン
-#define speed_limit 15
+#define speed_limit 35
 #define deg_limit 360
 #define DPAD_SPEED 30  // 方向パッド入力時の目標速度
 //角度一覧
-int deg;
+int deg = 0;
 int previous_deg =135;
-int truedeg;
-int desired_deg;
+int truedeg = 0;
+int desired_deg = 0;
 int measured_deg = 0;
 
 
@@ -55,18 +55,18 @@ double speed_Differential = 0.0;
 double speed_Output = 0.0;
 
 // 制御周期 [秒]
-const double dt = 0.01;  // 10ms
+const double dt = 0.005;  // 5ms
 
 //速度
 int wheelspeed = 30;
 int yawspeed = 10;
 int previous_speed = 0;
-int desired_speed;
+int desired_speed =30;
 int measured_speed = 0;
-//static double current_motor_command = 0.0;
+static double current_motor_command = 0.0;
 int deadzone_speed = 0;
 //角度の変位
-int displacement;
+int displacement = 0;
 
 // IPアドレスとポートの指定
 std::string udp_ip = "192.168.8.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
@@ -90,6 +90,17 @@ public:
 
 private:
     // コントローラーの入力を取得、使わない入力はコメントアウト推奨
+    double PID(int measured_speed){
+        // PID計算（台形則による積分計算をそのまま使用）
+        speed_Error = desired_speed - measured_speed;
+        
+        speed_Integral += (speed_Error + speed_last_Error) * dt/ 2.0;
+        speed_Differential = (speed_Error - speed_last_Error) / dt;
+        // 各サンプリングごとにPID出力を再計算
+        speed_Output = (speed_Kp * speed_Error) + (speed_Ki * speed_Integral) + (speed_Kd * speed_Differential);
+        speed_last_Error = speed_Error;
+        return speed_Output;
+    }
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
         float LS_X = -1 * msg->axes[0];
         float LS_Y = msg->axes[1];
@@ -135,30 +146,33 @@ private:
         deg = rad * 180 / M_PI;
 
         // PID計算（台形則による積分計算をそのまま使用）
-        speed_Error = desired_speed - measured_speed;
+        // speed_Error = desired_speed - measured_speed;
         
-        speed_Integral += (speed_Error + speed_last_Error) * dt/ 2.0;
-        speed_Differential = (speed_Error - speed_last_Error) / dt;
-        // 各サンプリングごとにPID出力を再計算
-        speed_Output = (speed_Kp * speed_Error) + (speed_Ki * speed_Integral) + (speed_Kd * speed_Differential);
-        speed_last_Error = speed_Error;
+        // speed_Integral += (speed_Error + speed_last_Error) * dt/ 2.0;
+        // speed_Differential = (speed_Error - speed_last_Error) / dt;
+        // // 各サンプリングごとにPID出力を再計算
+        // speed_Output = (speed_Kp * speed_Error) + (speed_Ki * speed_Integral) + (speed_Kd * speed_Differential);
+        // speed_last_Error = speed_Error;
 
-        // PID計算（台形則による積分計算をそのまま使用）
-        deg_Error = deg - previous_speed;
+        // // PID計算（台形則による積分計算をそのまま使用）
+        // deg_Error = deg - previous_speed;
         
-        deg_Integral += (deg_Error + deg_last_Error) * dt/ 2.0;
-        deg_Differential = (deg_Error - deg_last_Error) / dt;
-        // 各サンプリングごとにPID出力を再計算
-        deg_Output = (deg_Kp * deg_Error) + (deg_Ki * deg_Integral) + (deg_Kd * deg_Differential);
-        deg_last_Error = deg_Error;
+        // deg_Integral += (deg_Error + deg_last_Error) * dt/ 2.0;
+        // deg_Differential = (deg_Error - deg_last_Error) / dt;
+        // // 各サンプリングごとにPID出力を再計算
+        // deg_Output = (deg_Kp * deg_Error) + (deg_Ki * deg_Integral) + (deg_Kd * deg_Differential);
+        // deg_last_Error = deg_Error;
         
-        // // deadzone追加
+        speed_Output = PID(measured_speed);
+        // deadzone追加
         // if ((fabs(LS_X) <= DEADZONE_R) && (fabs(LS_Y) <= DEADZONE_R) && (fabs(RS_X) <= DEADZONE_L)&&(!LEFT && !RIGHT && !UP && !DOWN)) {
         //     deg = 135;
-        //     // desired_speed = 0;
-        //     // measured_speed = 0;
+        //     desired_speed = 0;
+        //     measured_speed = 0;
             
         //     speed_Integral = 0;
+        //     speed_Differential =0;
+        //     speed_Output = PID(measured_speed);
         //     //speed_last_Error = 0;
         //     // for (int i = speed_Output;i>=0;i=i-0.25){
         //     //     data[1] = i;
@@ -167,9 +181,17 @@ private:
         //     //     data[4] = i;
         //     // }
         //     // deadzone状態なら、現状の指令値から0に向かって徐々に減衰させる
-        //     double decay_rate = 0.1; // 0～1の値。大きいほど速く0に近づく
-        //     current_motor_command += (0 - current_motor_command) * decay_rate;
-        //     speed_Output = current_motor_command;
+        //     double decay_rate = 0.05; // 0～1の値。大きいほど速く0に近づく
+            
+        //     if (current_motor_command > 0){
+        //         current_motor_command += (0-current_motor_command) * decay_rate;
+        //         speed_Output = current_motor_command;
+        //     }else if(current_motor_command < 0){
+        //         current_motor_command += ( 0-current_motor_command) * decay_rate;
+        //         speed_Output = current_motor_command;
+                
+        //     }
+            
         //     data[1] = speed_Output;
         //     data[2] = speed_Output;
         //     data[3] = speed_Output;
@@ -180,7 +202,7 @@ private:
         //     data[8] = deg + SERVO4_CAL;
         // }else{
         //     desired_speed = 30;
-        //     current_motor_command = -speed_Output;
+        //     current_motor_command = speed_Output;
         // }
 
         // 135度を90度とみなしたときのズレの角度
@@ -217,15 +239,16 @@ private:
         // data[4] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
 
         // 安全のため、出力値に対して上限を設ける
-        if (speed_Output >= speed_limit) {
+        if (speed_Output > speed_limit) {
             speed_Output = speed_limit;
         } else if (speed_Output < -speed_limit) {
             speed_Output = -speed_limit;
         }
-        data[1] = -speed_Output;
-        data[2] = -speed_Output;
-        data[3] = -speed_Output;
-        data[4] = -speed_Output;
+        speed_Output = -speed_Output;
+        data[1] = speed_Output;
+        data[2] = speed_Output;
+        data[3] = speed_Output;
+        data[4] = speed_Output;
         
     //     // 方向パッド入力による加速処理
     //     if (LEFT) {
@@ -260,74 +283,74 @@ private:
     //         deg = 135;
     //     }
 
-        if (LEFT) {
-            deg = 45;
-            //displacement = deg -previous_deg;
-            // data[1] = -wheelspeed/(1 + k*displacement) * R2;
-            // data[2] = -wheelspeed/(1 + k*displacement) * R2;
-            // data[3] = -wheelspeed/(1 + k*displacement) * R2;
-            // data[4] = -wheelspeed/(1 + k*displacement) * R2;
-            // data[1] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
-            // data[2] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
-            // data[3] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
-            // data[4] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+        // if (LEFT) {
+        //     deg = 45;
+        //     //displacement = deg -previous_deg;
+        //     // data[1] = -wheelspeed/(1 + k*displacement) * R2;
+        //     // data[2] = -wheelspeed/(1 + k*displacement) * R2;
+        //     // data[3] = -wheelspeed/(1 + k*displacement) * R2;
+        //     // data[4] = -wheelspeed/(1 + k*displacement) * R2;
+        //     // data[1] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+        //     // data[2] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+        //     // data[3] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+        //     // data[4] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
             
-            data[1] = -speed_Output;
-            data[2] = -speed_Output;
-            data[3] = -speed_Output;
-            data[4] = -speed_Output;
-        }
-        if (RIGHT) {
-            deg = 45;
-            //displacement = deg -previous_deg;
-            // data[1] = wheelspeed/(1 + k*displacement) * R2;
-            // data[2] = wheelspeed/(1 + k*displacement) * R2;
-            // data[3] = wheelspeed/(1 + k*displacement) * R2;
-            // data[4] = wheelspeed/(1 + k*displacement) * R2;
-            // data[1] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
-            // data[2] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
-            // data[3] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
-            // data[4] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+        //     data[1] = -speed_Output;
+        //     data[2] = -speed_Output;
+        //     data[3] = -speed_Output;
+        //     data[4] = -speed_Output;
+        // }
+        // if (RIGHT) {
+        //     deg = 45;
+        //     //displacement = deg -previous_deg;
+        //     // data[1] = wheelspeed/(1 + k*displacement) * R2;
+        //     // data[2] = wheelspeed/(1 + k*displacement) * R2;
+        //     // data[3] = wheelspeed/(1 + k*displacement) * R2;
+        //     // data[4] = wheelspeed/(1 + k*displacement) * R2;
+        //     // data[1] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+        //     // data[2] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+        //     // data[3] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+        //     // data[4] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
             
-            data[1] = speed_Output;
-            data[2] = speed_Output;
-            data[3] = speed_Output;
-            data[4] = speed_Output;
-        }
-        if (UP) {
-            deg = 135;
-            //displacement = deg -previous_deg;
-            // data[1] = -wheelspeed/(1 + k*displacement) * R2;
-            // data[2] = -wheelspeed/(1 + k*displacement) * R2;
-            // data[3] = -wheelspeed/(1 + k*displacement) * R2;
-            // data[4] = -wheelspeed/(1 + k*displacement) * R2;
-            // data[1] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
-            // data[2] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
-            // data[3] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
-            // data[4] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+        //     data[1] = speed_Output;
+        //     data[2] = speed_Output;
+        //     data[3] = speed_Output;
+        //     data[4] = speed_Output;
+        // }
+        // if (UP) {
+        //     deg = 135;
+        //     //displacement = deg -previous_deg;
+        //     // data[1] = -wheelspeed/(1 + k*displacement) * R2;
+        //     // data[2] = -wheelspeed/(1 + k*displacement) * R2;
+        //     // data[3] = -wheelspeed/(1 + k*displacement) * R2;
+        //     // data[4] = -wheelspeed/(1 + k*displacement) * R2;
+        //     // data[1] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+        //     // data[2] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+        //     // data[3] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+        //     // data[4] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
             
-            data[1] = -speed_Output;
-            data[2] = -speed_Output;
-            data[3] = -speed_Output;
-            data[4] = -speed_Output;
-        }
-        if (DOWN) {
-            deg = 135;
-            //displacement = deg -previous_deg;
-            // data[1] = wheelspeed/(1 + k*displacement) * R2;
-            // data[2] = wheelspeed/(1 + k*displacement) * R2;
-            // data[3] = wheelspeed/(1 + k*displacement) * R2;
-            // data[4] = wheelspeed/(1 + k*displacement) * R2;
-            // data[1] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
-            // data[2] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
-            // data[3] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
-            // data[4] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+        //     data[1] = -speed_Output;
+        //     data[2] = -speed_Output;
+        //     data[3] = -speed_Output;
+        //     data[4] = -speed_Output;
+        // }
+        // if (DOWN) {
+        //     deg = 135;
+        //     //displacement = deg -previous_deg;
+        //     // data[1] = wheelspeed/(1 + k*displacement) * R2;
+        //     // data[2] = wheelspeed/(1 + k*displacement) * R2;
+        //     // data[3] = wheelspeed/(1 + k*displacement) * R2;
+        //     // data[4] = wheelspeed/(1 + k*displacement) * R2;
+        //     // data[1] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+        //     // data[2] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+        //     // data[3] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+        //     // data[4] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
             
-            data[1] = speed_Output;
-            data[2] = speed_Output;
-            data[3] = speed_Output;
-            data[4] = speed_Output;
-        }
+        //     data[1] = speed_Output;
+        //     data[2] = speed_Output;
+        //     data[3] = speed_Output;
+        //     data[4] = speed_Output;
+        // }
 
         //独ステが扱えない範囲の変換
         // if ((345 < deg) && (deg < 360)) {
@@ -381,6 +404,7 @@ private:
             // data[2] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
             // data[3] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
             // data[4] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+            speed_Output = -speed_Output;
             data[1] = speed_Output;
             data[2] = speed_Output;
             data[3] = speed_Output;
@@ -427,82 +451,126 @@ private:
             data[3] = yawspeed;
             data[4] = -yawspeed;
         }
-        int i;
-        //deadzone追加
-        if ((fabs(LS_X) <= DEADZONE_R) && (fabs(LS_Y) <= DEADZONE_R) && (fabs(RS_X) <= DEADZONE_L)) {
+        // deadzone追加
+        if ((fabs(LS_X) <= DEADZONE_R) && (fabs(LS_Y) <= DEADZONE_R) && (fabs(RS_X) <= DEADZONE_L)&&(!LEFT && !RIGHT && !UP && !DOWN)) {
             deg = 135;
-            // desired_speed = 0;
-            // measured_speed = 0;
-
-            //speed_Integral = 0;
+            desired_speed = 0;
+            measured_speed = 0;
+            
+            speed_Integral = 0;
+            speed_Differential =0;
+            speed_Output = PID(measured_speed);
             //speed_last_Error = 0;
-            deadzone_speed = speed_Output;
-            if(deadzone_speed>0){
-                for(i=deadzone_speed;i>=0;i=i-1){
-                    speed_Output = i;
-                    data[1] = speed_Output;
-                    data[2] = speed_Output;
-                    data[3] = speed_Output;
-                    data[4] = speed_Output;
-                    data[5] = deg + SERVO1_CAL;
-                    data[6] = deg + SERVO2_CAL;
-                    data[7] = deg + SERVO3_CAL;
-                    data[8] = deg + SERVO4_CAL;
-                    udp_.send(data);
-                    if(deadzone_speed==0){
-                        speed_Integral=0;
+            // for (int i = speed_Output;i>=0;i=i-0.25){
+            //     data[1] = i;
+            //     data[2] = i;
+            //     data[3] = i;
+            //     data[4] = i;
+            // }
+            // deadzone状態なら、現状の指令値から0に向かって徐々に減衰させる
+            double decay_rate = 0.05; // 0～1の値。大きいほど速く0に近づく
+            
+            if (current_motor_command > 0){
+                current_motor_command += (0-current_motor_command) * decay_rate;
+                speed_Output = current_motor_command;
+            }else if(current_motor_command < 0){
+                current_motor_command += ( 0-current_motor_command) * decay_rate;
+                speed_Output = current_motor_command;
                 
-                        data[1] = speed_Output;
-                        data[2] = speed_Output;
-                        data[3] = speed_Output;
-                        data[4] = speed_Output;
-                        data[5] = deg + SERVO1_CAL;
-                        data[6] = deg + SERVO2_CAL;
-                        data[7] = deg + SERVO3_CAL;
-                        data[8] = deg + SERVO4_CAL;
-                        udp_.send(data);
-                    }
-                }
-            }
-            if(deadzone_speed<0){
-                for(i=deadzone_speed;i<=0;i=i+1){
-                    speed_Output = i;
-                    data[1] = speed_Output;
-                    data[2] = speed_Output;
-                    data[3] = speed_Output;
-                    data[4] = speed_Output;
-                    data[5] = deg + SERVO1_CAL;
-                    data[6] = deg + SERVO2_CAL;
-                    data[7] = deg + SERVO3_CAL;
-                    data[8] = deg + SERVO4_CAL;
-                    udp_.send(data);
-                    if(deadzone_speed==0){
-                        speed_Integral=0;
-                
-                        data[1] = speed_Output;
-                        data[2] = speed_Output;
-                        data[3] = speed_Output;
-                        data[4] = speed_Output;
-                        data[5] = deg + SERVO1_CAL;
-                        data[6] = deg + SERVO2_CAL;
-                        data[7] = deg + SERVO3_CAL;
-                        data[8] = deg + SERVO4_CAL;
-                        udp_.send(data);
-                    }
-                }
             }
             
-            //speed_Integral = 0;
+            data[1] = speed_Output;
+            data[2] = speed_Output;
+            data[3] = speed_Output;
+            data[4] = speed_Output;
+            data[5] = deg + SERVO1_CAL;
+            data[6] = deg + SERVO2_CAL;
+            data[7] = deg + SERVO3_CAL;
+            data[8] = deg + SERVO4_CAL;
         }else{
             desired_speed = 30;
-            udp_.send(data);
+            current_motor_command = speed_Output;
         }
+        // int i;
+        // //deadzone追加
+        // if ((fabs(LS_X) <= DEADZONE_R) && (fabs(LS_Y) <= DEADZONE_R) && (fabs(RS_X) <= DEADZONE_L)) {
+        //     deg = 135;
+        //     // desired_speed = 0;
+        //     // measured_speed = 0;
+
+        //     //speed_Integral = 0;
+        //     //speed_last_Error = 0;
+        //     deadzone_speed = speed_Output;
+        //     if(deadzone_speed>=0){
+        //         for(i=deadzone_speed;i>=0;i=i-1){
+        //             speed_Output = i;
+        //             data[1] = speed_Output;
+        //             data[2] = speed_Output;
+        //             data[3] = speed_Output;
+        //             data[4] = speed_Output;
+        //             data[5] = deg + SERVO1_CAL;
+        //             data[6] = deg + SERVO2_CAL;
+        //             data[7] = deg + SERVO3_CAL;
+        //             data[8] = deg + SERVO4_CAL;
+        //             //std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        //             udp_.send(data);
+        //             if(deadzone_speed==0){
+        //                 speed_Integral=0;
+                
+        //                 data[1] = speed_Output;
+        //                 data[2] = speed_Output;
+        //                 data[3] = speed_Output;
+        //                 data[4] = speed_Output;
+        //                 data[5] = deg + SERVO1_CAL;
+        //                 data[6] = deg + SERVO2_CAL;
+        //                 data[7] = deg + SERVO3_CAL;
+        //                 data[8] = deg + SERVO4_CAL;
+        //                 udp_.send(data);
+        //             }
+        //         }
+        //     }
+        //     if(deadzone_speed<=0){
+        //         for(i=deadzone_speed;i<=0;i=i+1){
+        //             speed_Output = i;
+        //             data[1] = speed_Output;
+        //             data[2] = speed_Output;
+        //             data[3] = speed_Output;
+        //             data[4] = speed_Output;
+        //             data[5] = deg + SERVO1_CAL;
+        //             data[6] = deg + SERVO2_CAL;
+        //             data[7] = deg + SERVO3_CAL;
+        //             data[8] = deg + SERVO4_CAL;
+        //             //std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        //             udp_.send(data);
+        //             if(deadzone_speed==0){
+        //                 speed_Integral=0;
+                
+        //                 data[1] = speed_Output;
+        //                 data[2] = speed_Output;
+        //                 data[3] = speed_Output;
+        //                 data[4] = speed_Output;
+        //                 data[5] = deg + SERVO1_CAL;
+        //                 data[6] = deg + SERVO2_CAL;
+        //                 data[7] = deg + SERVO3_CAL;
+        //                 data[8] = deg + SERVO4_CAL;
+        //                 udp_.send(data);
+        //             }
+        //         }
+        //     }
+            
+            //speed_Integral = 0;
+        // }else{
+        //     desired_speed = 30;
+        //     udp_.send(data);
+        // }
         // デバッグ用
         // std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4] << ", ";
         // std::cout << data[5] << ", " << data[6] << ", " << data[7] << ", " << data[8] << ", " << std::endl;
 
 
         std::cout << data[1] << std::endl;
+        //std::cout << data[1] << ", " << speed_Output << ", " << speed_Integral << ", " << std::endl;
+        udp_.send(data);
         
     }
 
