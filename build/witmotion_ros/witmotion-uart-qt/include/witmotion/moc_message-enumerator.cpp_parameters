@@ -1,5 +1,0 @@
--I/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include
--I/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt
--o
-/home/dev/ros2_ws/src/build/witmotion_ros/witmotion-uart-qt/include/witmotion/moc_message-enumerator.cpp
-/home/dev/ros2_ws/src/witmotion_ros/witmotion-uart-qt/include/witmotion/message-enumerator.h

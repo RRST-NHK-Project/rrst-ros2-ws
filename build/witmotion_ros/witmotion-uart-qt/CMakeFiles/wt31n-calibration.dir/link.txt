@@ -1,1 +1,0 @@
-/usr/bin/c++ -rdynamic "CMakeFiles/wt31n-calibration.dir/wt31n-calibration_autogen/mocs_compilation.cpp.o" "CMakeFiles/wt31n-calibration.dir/examples/wt31n/calibration-standalone.cpp.o" -o wt31n-calibration  /usr/lib/x86_64-linux-gnu/libQt5SerialPort.so.5.15.13 /usr/lib/x86_64-linux-gnu/libQt5Core.so.5.15.13 
