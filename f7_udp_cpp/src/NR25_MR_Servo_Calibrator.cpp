@@ -1,16 +1,8 @@
 /*
 RRST NHK2025
-CUIパラメーター調整ノード
+サーボのキャリブレーション用
 使い方
-showで現在設定しているパラメーターが見れます
-例えばノード実行中のターミナルで,
-0 20
-と入力すると0番を20に設定できます
-シュートとドリブルもコマンドを設定してますがうまく動きません
-
-2025/2/14 Updated
-JSONファイルに最後のパラメータを保存・次回起動時に読み込みできるようにしました
-CSVファイルにノード切った際のパラメータを現在時刻付きでログ保存できるようにしました
+NR25_Parameter_Tuner.cppを参照
 */
 
 #include <atomic>
@@ -28,19 +20,19 @@ CSVファイルにノード切った際のパラメータを現在時刻付き�
 
 using json = nlohmann::json;
 // 保存用のファイル
-const std::string PARAM_FILE = "mr_parameter.json";
+const std::string PARAM_FILE = "mr_servo_cal.json";
 
-const std::string CSV_FILE = "mr_parameter.csv";
+const std::string CSV_FILE = "mr_servo_cal.csv";
 
 class ParameterNode : public rclcpp::Node {
 public:
-    ParameterNode() : Node("nhk2025 parameter_node"), shoot_state(0), dribble_state(0) {
+    ParameterNode() : Node("mr_servo_cal"), shoot_state(0), dribble_state(0) {
         show_usage(); // 起動時に使い方を表示
 
         // パラメータファイル読み込み
         load_parameters();
         publisher = this->create_publisher<std_msgs::msg::Int32MultiArray>(
-            "parameter_array", 10);
+            "mr_servo_cal", 10);
 
         running = true;
         publish_thread = std::thread(&ParameterNode::publish_parameters, this);
@@ -70,10 +62,10 @@ private:
 
     // 使い方を表示する関数
     void show_usage() {
-        std::cout << "\n=== MR Parameter Tuner ===\n";
-        std::cout << "MR  機構系のパラメーター調整\n";
+        std::cout << "\n=== MR Servo Calibrator ===\n";
+        std::cout << "サーボ独ステのキャリブレーション\n";
         std::cout << "使用方法:\n";
-        std::cout << "  - <index> <value>: 指定したインデックスのパラメーターを変更 (0-3, 0-100)\n";
+        std::cout << "  - <index> <value>: 指定したインデックスのキャリブレーション値を変更 (0-3, -135-135)\n";
         std::cout << "  - show: 現在のパラメータを表示\n";
         std::cout << "=====================================\n";
     }
@@ -110,10 +102,10 @@ private:
         if (file.is_open()) {
             json json;
             file >> json;
-            params = json.value("params", std::vector<int>{50, 50, 50, 50});
+            params = json.value("params", std::vector<int>{0, 0, 0, 0});
             std::cout << "パラメータファイルのロードに成功。\n";
         } else {
-            params = {50, 50, 50, 50};
+            params = {0, 0, 0, 0};
             std::cout
                 << "パラメータファイルのロードに失敗。デフォルト値を適用します。\n";
         }
@@ -161,7 +153,7 @@ private:
             } else {
                 int idx, value;
                 if (sscanf(input.c_str(), "%d %d", &idx, &value) == 2 && idx >= 0 &&
-                    idx < 4 && value >= 0 && value <= 100) {
+                    idx < 4 && value >= -135 && value <= 135) {
                     params[idx] = value;
                     show_parameters();
                 } else {
@@ -174,12 +166,10 @@ private:
 
     void show_parameters() {
         std::cout << "\n=== Current Parameters ===\n";
-        std::cout << "0: roller_speed_dribble_ab = " << params[0] << "\n";
-        std::cout << "1: roller_speed_dribble_cd = " << params[1] << "\n";
-        std::cout << "2: roller_speed_shoot_ab   = " << params[2] << "\n";
-        std::cout << "3: roller_speed_shoot_cd   = " << params[3] << "\n";
-        std::cout << "Shoot State: " << shoot_state.load() << "\n";
-        std::cout << "Dribble State: " << dribble_state.load() << "\n";
+        std::cout << "0: SERVO1_CAL = " << params[0] << "\n";
+        std::cout << "1: SERVO2_CAL = " << params[1] << "\n";
+        std::cout << "2: SERVO3_CAL = " << params[2] << "\n";
+        std::cout << "3: SERVO4_CAL = " << params[3] << "\n";
         std::cout << "==========================\n";
     }
 };

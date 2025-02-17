@@ -208,13 +208,13 @@ private:
 class Params_Listener : public rclcpp::Node {
 public:
     Params_Listener()
-        : Node("nhk25_pr_listener") {
+        : Node("mr_pr_listener") {
         subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
             "parameter_array", 10,
             std::bind(&Params_Listener::params_listener_callback, this,
                       std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(),
-                    "NHK2025 Parameter Listener");
+                    "MR Parameter Listener");
     }
 
 private:
