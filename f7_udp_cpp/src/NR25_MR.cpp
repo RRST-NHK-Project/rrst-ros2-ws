@@ -1,7 +1,8 @@
 /*
 RRST NHK2025
 汎用機の機構制御
-クリコア　
+
+クリコア　(ロンリウム)
 === Current Parameters ===
 0: roller_speed_dribble_ab = 15
 1: roller_speed_dribble_cd = 75
