@@ -17,14 +17,7 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/nlohmann/json.git
   GIT_TAG v3.11.3
 )
-FetchContent_Declare(
-  figlet
-  GIT_REPOSITORY https://github.com/cmatsuoka/figlet.git
-  GIT_TAG 2.2.5
-)
-
 FetchContent_MakeAvailable(nlohmann_json)
-FetchContent_MakeAvailable(figlet)
 
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -94,6 +87,18 @@ install(TARGETS
   nr25_dr_c610
   nr25_mr_servo_cal
   DESTINATION lib/${PROJECT_NAME})
+
+# figletがインストールされていない場合、警告を表示
+execute_process(
+  COMMAND dpkg -s figlet
+  RESULT_VARIABLE figlet_installed
+  OUTPUT_QUIET
+  ERROR_QUIET
+)
+
+if(NOT figlet_installed EQUAL 0)
+  message(WARNING "Please install 'figlet' with the following command. \nsudo apt install figlet")
+endif()
 
 install(DIRECTORY launch/
   DESTINATION share/${PROJECT_NAME}/launch)
