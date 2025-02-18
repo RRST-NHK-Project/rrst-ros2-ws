@@ -49,7 +49,13 @@ public:
                       std::placeholders::_1));
         // figletでノード名を表示
         std::string figletout = "figlet MR SwerveDrive";
-        std::system(figletout.c_str());
+        int result = std::system(figletout.c_str());
+        if (result != 0) {
+            std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+            std::cerr << "Please install 'figlet' with the following command:" << std::endl;
+            std::cerr << "sudo apt install figlet" << std::endl;
+            std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+        }
         RCLCPP_INFO(this->get_logger(),
                     "NHK2025 MR SD initialized with IP: %s, Port: %d", ip.c_str(),
                     port);
@@ -57,7 +63,8 @@ public:
 
 private:
     // コントローラーの入力を取得、使わない入力はコメントアウト推奨
-    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
+    void
+    ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
         float LS_X = -1 * msg->axes[0];
         float LS_Y = msg->axes[1];
         float RS_X = -1 * msg->axes[3];

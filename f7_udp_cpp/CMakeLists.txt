@@ -10,6 +10,18 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# figletがインストールされていない場合、警告を表示
+if(NOT DEFINED ENV{FIGLET_CHECKED})
+  execute_process(
+    COMMAND which figlet
+    RESULT_VARIABLE figlet_installed
+  )
+  if(NOT figlet_installed EQUAL 0)
+    message(WARNING "Please install 'figlet' with the following command. \nsudo apt install figlet")
+  endif()
+  set(ENV{FIGLET_CHECKED} 1)
+endif()
+
 # 自動でインストール
 include(FetchContent)
 FetchContent_Declare(
