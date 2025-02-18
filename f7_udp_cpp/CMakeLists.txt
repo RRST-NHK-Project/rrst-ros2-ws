@@ -22,7 +22,9 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/cmatsuoka/figlet.git
   GIT_TAG 2.2.5
 )
+
 FetchContent_MakeAvailable(nlohmann_json)
+FetchContent_MakeAvailable(figlet)
 
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
