@@ -34,7 +34,7 @@ const std::string CSV_FILE = "mr_parameter.csv";
 
 class ParameterNode : public rclcpp::Node {
 public:
-    ParameterNode() : Node("nhk2025 parameter_node"), shoot_state(0), dribble_state(0) {
+    ParameterNode() : Node("nhk2025_parameter_node"), shoot_state(0), dribble_state(0) {
         show_usage(); // 起動時に使い方を表示
 
         // パラメータファイル読み込み
