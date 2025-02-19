@@ -11,6 +11,8 @@ RRST NHK2025
 #include <cmath>
 #include <std_msgs/msg/int32_multi_array.hpp>
 #include <thread>
+#include <vector>
+#include <iostream>
 
 // サーボの組み付け時のズレを補正（度数法）
 #define SERVO1_CAL 0 // 7
@@ -19,10 +21,12 @@ RRST NHK2025
 #define SERVO4_CAL 0 //-5
 
 // スティックのデッドゾーン
-#define DEADZONE_L 0.7
-#define DEADZONE_R 0.2
+#define DEADZONE_L 0.3
+#define DEADZONE_R 0.3
+
 //定数k
 #define k 0.05
+
 //PIDパラメータ（チューニングが必要）
 #define deg_Kp 0.01      // 角度Pゲイン
 #define deg_Ki 0.5        //角度Iゲイン
@@ -30,10 +34,12 @@ RRST NHK2025
 #define  speed_Kp 0.3      // 速度Pゲイン
 #define  speed_Ki 0.3      // 速度Iゲイン
 #define  speed_Kd 0        // 速度Dゲイン
+
 #define speed_limit 35
 #define deg_limit 360
 #define DPAD_SPEED 30  // 方向パッド入力時の目標速度
-//角度一覧
+
+//グローバル変数（角度一覧）
 int deg = 0;
 int previous_deg =135;
 int truedeg = 0;
@@ -61,10 +67,12 @@ const double dt = 0.005;  // 5ms
 int wheelspeed = 30;
 int yawspeed = 10;
 int previous_speed = 0;
-int desired_speed =30;
+int desired_speed = 30;
 int measured_speed = 0;
 static double current_motor_command = 0.0;
 int deadzone_speed = 0;
+
+
 //角度の変位
 int displacement = 0;
 
@@ -89,18 +97,41 @@ public:
     }
 
 private:
+    
     // コントローラーの入力を取得、使わない入力はコメントアウト推奨
     double PID(int measured_speed){
-        // PID計算（台形則による積分計算をそのまま使用）
-        speed_Error = desired_speed - measured_speed;
+        double error = desired_speed - measured_speed;
+        double derivative = (error - speed_last_Error) / dt;
+        // 積分項の一時更新
+        double tentative_integral = speed_Integral + (error + speed_last_Error) * dt / 2.0;
+        double output = speed_Kp * error + speed_Ki * tentative_integral + speed_Kd * derivative;
         
-        speed_Integral += (speed_Error + speed_last_Error) * dt/ 2.0;
-        speed_Differential = (speed_Error - speed_last_Error) / dt;
-        // 各サンプリングごとにPID出力を再計算
-        speed_Output = (speed_Kp * speed_Error) + (speed_Ki * speed_Integral) + (speed_Kd * speed_Differential);
-        speed_last_Error = speed_Error;
-        return speed_Output;
+        // 変更点：出力が上限・下限を超えた場合、積分更新を抑制（アンチウィンドアップ処理）
+        if (output > speed_limit) {
+            output = speed_limit;
+            if (error > 0) { // 正のエラーの場合、積分更新しない
+                tentative_integral = speed_Integral;
+            }
+        } else if (output < -speed_limit) {
+            output = -speed_limit;
+            if (error < 0) {
+                tentative_integral = speed_Integral;
+            }
+        }
+        speed_Integral = tentative_integral;
+        speed_last_Error = error;
+        return output;
+        // PID計算（台形則による積分計算をそのまま使用）
+        // speed_Error = desired_speed - measured_speed;
+        
+        // speed_Integral += (speed_Error + speed_last_Error) * dt/ 2.0;
+        // speed_Differential = (speed_Error - speed_last_Error) / dt;
+        // // 各サンプリングごとにPID出力を再計算
+        // speed_Output = (speed_Kp * speed_Error) + (speed_Ki * speed_Integral) + (speed_Kd * speed_Differential);
+        // speed_last_Error = speed_Error;
+        // return speed_Output;
     }
+
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
         float LS_X = -1 * msg->axes[0];
         float LS_Y = msg->axes[1];
@@ -239,11 +270,11 @@ private:
         // data[4] = -wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
 
         // 安全のため、出力値に対して上限を設ける
-        if (speed_Output > speed_limit) {
-            speed_Output = speed_limit;
-        } else if (speed_Output < -speed_limit) {
-            speed_Output = -speed_limit;
-        }
+        // if (speed_Output > speed_limit) {
+        //     speed_Output = speed_limit;
+        // } else if (speed_Output < -speed_limit) {
+        //     speed_Output = -speed_limit;
+        // }
         speed_Output = -speed_Output;
         data[1] = speed_Output;
         data[2] = speed_Output;
@@ -419,37 +450,39 @@ private:
         data[7] = deg + SERVO3_CAL;
         data[8] = deg + SERVO4_CAL;
 
-        previous_deg = desired_deg;
+        // previous_deg = desired_deg;
 
         // 安全のため、出力値に対して上限を設ける
-        if (deg_Output > deg_limit) {
-            deg_Output = deg_limit;
-        } else if (deg_Output < -deg_limit) {
-            deg_Output = -deg_limit;
-        }
+        // if (deg_Output > deg_limit) {
+        //     deg_Output = deg_limit;
+        // } else if (deg_Output < -deg_limit) {
+        //     deg_Output = -deg_limit;
+        // }
         
 
         // 時計回りYAW回転
         if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R) {
+            speed_Output = -yawspeed;
             data[5] = 180 + SERVO1_CAL;
             data[6] = 90 + SERVO2_CAL;
             data[7] = 90 + SERVO3_CAL;
             data[8] = 180 + SERVO4_CAL;
-            data[1] = -yawspeed;
-            data[2] = yawspeed;
-            data[3] = -yawspeed;
-            data[4] = yawspeed;
+            data[1] = speed_Output;
+            data[2] = -speed_Output;
+            data[3] = speed_Output;
+            data[4] = -speed_Output;
         }
         // 半時計回りYAW回転
         if (0 < RS_X && fabs(RS_X) >= DEADZONE_R) {
+            speed_Output = yawspeed;
             data[5] = 180 + SERVO1_CAL;
             data[6] = 90 + SERVO2_CAL;
             data[7] = 90 + SERVO3_CAL;
             data[8] = 180 + SERVO4_CAL;
-            data[1] = yawspeed;
-            data[2] = -yawspeed;
-            data[3] = yawspeed;
-            data[4] = -yawspeed;
+            data[1] = speed_Output;
+            data[2] = -speed_Output;
+            data[3] = speed_Output;
+            data[4] = -speed_Output;
         }
         // deadzone追加
         if ((fabs(LS_X) <= DEADZONE_R) && (fabs(LS_Y) <= DEADZONE_R) && (fabs(RS_X) <= DEADZONE_L)&&(!LEFT && !RIGHT && !UP && !DOWN)) {
@@ -459,7 +492,7 @@ private:
             
             speed_Integral = 0;
             speed_Differential =0;
-            speed_Output = PID(measured_speed);
+            
             //speed_last_Error = 0;
             // for (int i = speed_Output;i>=0;i=i-0.25){
             //     data[1] = i;
@@ -470,10 +503,10 @@ private:
             // deadzone状態なら、現状の指令値から0に向かって徐々に減衰させる
             double decay_rate = 0.05; // 0～1の値。大きいほど速く0に近づく
             
-            if (current_motor_command > 0){
+            if (previous_speed > 0){
                 current_motor_command += (0-current_motor_command) * decay_rate;
                 speed_Output = current_motor_command;
-            }else if(current_motor_command < 0){
+            }else if(previous_speed < 0){
                 current_motor_command += ( 0-current_motor_command) * decay_rate;
                 speed_Output = current_motor_command;
                 
@@ -490,6 +523,13 @@ private:
         }else{
             desired_speed = 30;
             current_motor_command = speed_Output;
+        }
+
+        // 安全のため、出力値に対して上限を設ける
+        if (speed_Output > speed_limit) {
+            speed_Output = speed_limit;
+        } else if (speed_Output < -speed_limit) {
+            speed_Output = -speed_limit;
         }
         // int i;
         // //deadzone追加
@@ -566,7 +606,7 @@ private:
         // デバッグ用
         // std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4] << ", ";
         // std::cout << data[5] << ", " << data[6] << ", " << data[7] << ", " << data[8] << ", " << std::endl;
-
+        previous_speed = speed_Output;
 
         std::cout << data[1] << std::endl;
         //std::cout << data[1] << ", " << speed_Output << ", " << speed_Integral << ", " << std::endl;
