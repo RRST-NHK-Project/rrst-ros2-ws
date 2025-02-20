@@ -38,6 +38,7 @@ RRST NHK2025
 #define speed_limit 30
 #define deg_limit 360
 #define DPAD_SPEED 30  // 方向パッド入力時の目標速度
+bool CHANGEMODE = false;
 
 //グローバル変数（角度一覧）
 int deg = 0;
@@ -152,15 +153,18 @@ private:
         bool R1 = msg->buttons[5];
 
         // float L2 = (-1 * msg->axes[2] + 1) / 2;
-        //float R2 = (-1 * msg->axes[5] + 1) / 2;
+        float R2 = (-1 * msg->axes[5] + 1) / 2;
 
         // bool SHARE = msg->buttons[8];
         bool OPTION = msg->buttons[9];
         bool PS = msg->buttons[10];
+        static bool last_option = false;       // 前回の状態を保持する static 変数
+        // OPTION のラッチ状態を保持する static 変数（初期状態は OFF とする）
+        static bool option_latch = false;
 
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
-
+        //bool CHANGEMODE = 0;
         if (PS) {
             std::fill(data.begin(), data.end(), 0);                          // 配列をゼロで埋める
             for (int attempt = 0; attempt < 10; attempt++) {                 // 10回試行
@@ -171,10 +175,10 @@ private:
             rclcpp::shutdown();
         }
 
-        if (OPTION){
-        OPTION = !OPTION;
-        std::this_thread::sleep_for(std::chrono::milliseconds(500)); // 500msの遅延
-        } 
+        // if (OPTION){
+        // CHANGEMODE = !(CHANGEMODE);
+        // //std::this_thread::sleep_for(std::chrono::milliseconds(500)); // 500msの遅延
+        // } 
         float rad = atan2(LS_Y, LS_X);
         //  float s = sin(rad);
         //  float c = cos(rad);
@@ -182,7 +186,8 @@ private:
         //！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         //もとの移動方法！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         //！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
-        if(OPTION == 0){
+        if(OPTION && !last_option){
+            option_latch = !option_latch;
             // XY座標での正しい角度truedeg
         truedeg = deg;
         if ((0 <= truedeg) && (truedeg <= 180)) {
@@ -288,12 +293,12 @@ private:
             data[3] = yawspeed;
             data[4] = -yawspeed;
         }
-
+        //std::cout << data[1] << std::endl;
         }
         //！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         //加速する移動方法！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         //！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
-        if(OPTION == 1){
+        else{
         speed_Output = -PID(measured_speed);
         // 以下、目標速度へのランプアップ制御を行う
         // deadzone外の場合は wheelspeed (30) を目標速度とする
@@ -828,7 +833,12 @@ private:
         // std::cout << data[5] << ", " << data[6] << ", " << data[7] << ", " << data[8] << ", " << std::endl;
         previous_speed = speed_Output;
         previous_deg = deg;
+        //std::cout << data[1] << std::endl;
         }
+
+        // 現在の状態を次回のために保存
+        last_option = OPTION;
+        CHANGEMODE = option_latch;
         std::cout << data[1] << std::endl;
         //std::cout << data[1] << ", " << speed_Output << ", " << speed_Integral << ", " << std::endl;
         udp_.send(data);
