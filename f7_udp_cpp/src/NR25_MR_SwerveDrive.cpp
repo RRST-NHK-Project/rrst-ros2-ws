@@ -57,10 +57,10 @@ int measured_speed = 0;
 static double current_motor_command = 0.0;
 
 // サーボの組み付け時のズレを補正（度数法）
-int SERVO1_CAL = 0; // 7
+int SERVO1_CAL = 0;
 int SERVO2_CAL = 0;
-int SERVO3_CAL = 0; // 0
-int SERVO4_CAL = 0; //-5
+int SERVO3_CAL = 0;
+int SERVO4_CAL = 0;
 
 // IPアドレスとポートの指定
 std::string udp_ip = "192.168.8.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
@@ -363,7 +363,6 @@ private:
             data[6] = deg + SERVO2_CAL;
             data[7] = deg + SERVO3_CAL;
             data[8] = deg + SERVO4_CAL;
-            // // }
 
             previous_deg = desired_deg;
 
@@ -435,8 +434,8 @@ private:
         // 現在の状態を次回のために保存
         last_option = OPTION;
         CHANGEMODE = option_latch;
-        //std::cout << data[1] << std::endl;
-        // std::cout << data[1] << ", " << speed_Output << ", " << speed_Integral << ", " << std::endl;
+        // std::cout << data[1] << std::endl;
+        //  std::cout << data[1] << ", " << speed_Output << ", " << speed_Integral << ", " << std::endl;
         udp_.send(data);
     }
 
@@ -470,14 +469,39 @@ private:
     rclcpp::TimerBase::SharedPtr timer_;
 };
 
+class Params_Listener : public rclcpp::Node {
+public:
+    Params_Listener()
+        : Node("nr25_servo_cal_listener") {
+        subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
+            "mr_servo_cal", 10,
+            std::bind(&Params_Listener::params_listener_callback, this,
+                      std::placeholders::_1));
+        RCLCPP_INFO(this->get_logger(),
+                    "MR Servo Calibrator Listener");
+    }
+
+private:
+    void params_listener_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        SERVO1_CAL = msg->data[0];
+        SERVO2_CAL = msg->data[1];
+        SERVO3_CAL = msg->data[2];
+        SERVO4_CAL = msg->data[3];
+    }
+
+    rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
+};
+
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
     rclcpp::executors::SingleThreadedExecutor exec;
     auto ps4_listener = std::make_shared<PS4_Listener>(udp_ip, udp_port);
     auto servo_deg_publisher = std::make_shared<Servo_Deg_Publisher>();
+    auto params_listener = std::make_shared<Params_Listener>();
     exec.add_node(ps4_listener);
     exec.add_node(servo_deg_publisher);
+    exec.add_node(params_listener);
 
     exec.spin();
 
