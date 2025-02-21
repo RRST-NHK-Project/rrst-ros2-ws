@@ -435,7 +435,7 @@ private:
         // 現在の状態を次回のために保存
         last_option = OPTION;
         CHANGEMODE = option_latch;
-        std::cout << data[1] << std::endl;
+        //std::cout << data[1] << std::endl;
         // std::cout << data[1] << ", " << speed_Output << ", " << speed_Integral << ", " << std::endl;
         udp_.send(data);
     }
