@@ -81,6 +81,9 @@ ament_target_dependencies(nr25_dr_c610 rclcpp std_msgs sensor_msgs geometry_msgs
 
 add_executable(nr25_mr_servo_cal src/NR25_MR_Servo_Calibrator.cpp)
 ament_target_dependencies(nr25_mr_servo_cal rclcpp std_msgs sensor_msgs geometry_msgs)
+
+add_executable(nr25_dr_led src/NR25_DR_LED.cpp src/include/UDP.cpp)
+ament_target_dependencies(nr25_dr_led rclcpp std_msgs sensor_msgs geometry_msgs)
 target_include_directories(nr25_mr_servo_cal PRIVATE ${nlohmann_json_SOURCE_DIR}/single_include)
 
 # インストール設定
@@ -98,6 +101,7 @@ install(TARGETS
   nr25_pid
   nr25_dr_c610
   nr25_mr_servo_cal
+  nr25_dr_led
   DESTINATION lib/${PROJECT_NAME})
 
 # figletがインストールされていない場合、警告を表示
