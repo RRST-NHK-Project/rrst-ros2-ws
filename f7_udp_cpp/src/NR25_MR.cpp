@@ -131,7 +131,7 @@ public:
             std::bind(&PS4_Listener::ps4_listener_callback, this,
                       std::placeholders::_1));
         // figletでノード名を表示
-        std::string figletout = "figlet MR";
+        std::string figletout = "figlet RRST MR";
         int result = std::system(figletout.c_str());
         if (result != 0) {
             std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;

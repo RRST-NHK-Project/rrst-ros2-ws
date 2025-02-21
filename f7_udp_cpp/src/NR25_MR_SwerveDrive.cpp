@@ -25,10 +25,10 @@ int deg;
 int truedeg;
 
 // サーボの組み付け時のズレを補正（度数法）
-int SERVO1_CAL = -7;
-int SERVO2_CAL = 2;
-int SERVO3_CAL = -7;
-int SERVO4_CAL = -16;
+int SERVO1_CAL = -8;
+int SERVO2_CAL = 0;
+int SERVO3_CAL = -5;
+int SERVO4_CAL = 7;
 
 // IPアドレスとポートの指定
 std::string udp_ip = "192.168.8.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
