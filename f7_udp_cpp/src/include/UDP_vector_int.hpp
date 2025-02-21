@@ -1,5 +1,5 @@
-#ifndef UDP_HPP
-#define UDP_HPP
+#ifndef UDP_vector_int_HPP
+#define UDP_vector_int_HPP
 
 #include <arpa/inet.h>
 #include <cstring>
@@ -9,9 +9,9 @@
 #include <sys/socket.h>
 #include <vector>
 
-class UDP {
+class UDP_vector_int {
 public:
-    UDP(const std::string &ip_address, int port);
+    UDP_vector_int(const std::string &ip_address, int port);
     void send(std::vector<int> &data);
 
 private:
@@ -19,4 +19,4 @@ private:
     struct sockaddr_in src_addr, dst_addr;
 };
 
-#endif // UDP_HPP
+#endif // UDP_vector_intHPP
