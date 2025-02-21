@@ -34,8 +34,9 @@ RRST NHK2025
 
 #define speed_limit 30
 #define deg_limit 360
-#define DPAD_SPEED 30 // 方向パッド入力時の目標速度
-bool CHANGEMODE = false;
+
+#define DPAD_SPEED 30  // 方向パッド入力時の目標速度
+bool CHANGEMODE = 0;
 
 // グローバル変数（角度一覧）
 int deg = 0;
@@ -179,6 +180,8 @@ private:
         // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         if (OPTION && !last_option) {
             option_latch = !option_latch;
+        }
+        if(CHANGEMODE == 1){
             // XY座標での正しい角度truedeg
             truedeg = deg;
             if ((0 <= truedeg) && (truedeg <= 180)) {
@@ -220,34 +223,127 @@ private:
             data[7] = deg + SERVO3_CAL;
             data[8] = deg + SERVO4_CAL;
 
-            if (LEFT) {
-                deg = 45;
-                data[1] = -wheelspeed * R2;
-                data[2] = -wheelspeed * R2;
-                data[3] = -wheelspeed * R2;
-                data[4] = -wheelspeed * R2;
-            }
-            if (RIGHT) {
-                deg = 45;
-                data[1] = wheelspeed * R2;
-                data[2] = wheelspeed * R2;
-                data[3] = wheelspeed * R2;
-                data[4] = wheelspeed * R2;
-            }
-            if (UP) {
-                deg = 135;
-                data[1] = -wheelspeed * R2;
-                data[2] = -wheelspeed * R2;
-                data[3] = -wheelspeed * R2;
-                data[4] = -wheelspeed * R2;
-            }
-            if (DOWN) {
-                deg = 135;
-                data[1] = wheelspeed * R2;
-                data[2] = wheelspeed * R2;
-                data[3] = wheelspeed * R2;
-                data[4] = wheelspeed * R2;
-            }
+        // 時計回りYAW回転
+        if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R) {
+            data[5] = 180 + SERVO1_CAL;
+            data[6] = 90 + SERVO2_CAL;
+            data[7] = 90 + SERVO3_CAL;
+            data[8] = 180 + SERVO4_CAL;
+            data[1] = -yawspeed;
+            data[2] = yawspeed;
+            data[3] = -yawspeed;
+            data[4] = yawspeed;
+        }
+        // 半時計回りYAW回転
+        if (0 < RS_X && fabs(RS_X) >= DEADZONE_R) {
+            data[5] = 180 + SERVO1_CAL;
+            data[6] = 90 + SERVO2_CAL;
+            data[7] = 90 + SERVO3_CAL;
+            data[8] = 180 + SERVO4_CAL;
+            data[1] = yawspeed;
+            data[2] = -yawspeed;
+            data[3] = yawspeed;
+            data[4] = -yawspeed;
+        }
+        //std::cout << data[1] << std::endl;
+        }
+        //！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
+        //加速する移動方法！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
+        //！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
+        if (CHANGEMODE == 0){
+        speed_Output = -PID(measured_speed);
+        // 以下、目標速度へのランプアップ制御を行う
+        // deadzone外の場合は wheelspeed (30) を目標速度とする
+        // if (!((fabs(LS_X) <= DEADZONE_R) && (fabs(LS_Y) <= DEADZONE_R) && (fabs(RS_X) <= DEADZONE_L)
+        //       && (!LEFT && !RIGHT && !UP && !DOWN))) {
+        //     desired_speed = wheelspeed; // 正常時の目標速度
+        //     double ramp_rate = 0.01;  // ランプアップの割合（0～1、値が大きいほど速く追従）
+        //     current_motor_command += (desired_speed - current_motor_command) * ramp_rate;
+        //     speed_Output = current_motor_command;
+        // }
+        // // deadzone内の場合は徐々に0に戻す
+        // else {
+        //     deg = 135;
+        //     desired_speed = 0;
+        //     measured_speed = 0;
+        //     double decay_rate = 0.03; // 0～1の値。大きいほど速く0に近づく
+        //     current_motor_command += (0 - current_motor_command) * decay_rate;
+        //     speed_Output = current_motor_command;
+        // }
+
+
+        // PID計算（台形則による積分計算をそのまま使用）
+        // speed_Error = desired_speed - measured_speed;
+        
+        // speed_Integral += (speed_Error + speed_last_Error) * dt/ 2.0;
+        // speed_Differential = (speed_Error - speed_last_Error) / dt;
+        // // 各サンプリングごとにPID出力を再計算
+        // speed_Output = (speed_Kp * speed_Error) + (speed_Ki * speed_Integral) + (speed_Kd * speed_Differential);
+        // speed_last_Error = speed_Error;
+
+        // // PID計算（台形則による積分計算をそのまま使用）
+        // deg_Error = deg - previous_speed;
+        
+        // deg_Integral += (deg_Error + deg_last_Error) * dt/ 2.0;
+        // deg_Differential = (deg_Error - deg_last_Error) / dt;
+        // // 各サンプリングごとにPID出力を再計算
+        // deg_Output = (deg_Kp * deg_Error) + (deg_Ki * deg_Integral) + (deg_Kd * deg_Differential);
+        // deg_last_Error = deg_Error;
+        
+        
+        // deadzone追加
+        // if ((fabs(LS_X) <= DEADZONE_R) && (fabs(LS_Y) <= DEADZONE_R) && (fabs(RS_X) <= DEADZONE_L)&&(!LEFT && !RIGHT && !UP && !DOWN)) {
+        //     deg = 135;
+        //     desired_speed = 0;
+        //     measured_speed = 0;
+            
+        //     speed_Integral = 0;
+        //     speed_Differential =0;
+        //     speed_Output = PID(measured_speed);
+        //     //speed_last_Error = 0;
+        //     // for (int i = speed_Output;i>=0;i=i-0.25){
+        //     //     data[1] = i;
+        //     //     data[2] = i;
+        //     //     data[3] = i;
+        //     //     data[4] = i;
+        //     // }
+        //     // deadzone状態なら、現状の指令値から0に向かって徐々に減衰させる
+        //     double decay_rate = 0.05; // 0～1の値。大きいほど速く0に近づく
+            
+        //     if (current_motor_command > 0){
+        //         current_motor_command += (0-current_motor_command) * decay_rate;
+        //         speed_Output = current_motor_command;
+        //     }else if(current_motor_command < 0){
+        //         current_motor_command += ( 0-current_motor_command) * decay_rate;
+        //         speed_Output = current_motor_command;
+                
+        //     }
+            
+        //     data[1] = speed_Output;
+        //     data[2] = speed_Output;
+        //     data[3] = speed_Output;
+        //     data[4] = speed_Output;
+        //     data[5] = deg + SERVO1_CAL;
+        //     data[6] = deg + SERVO2_CAL;
+        //     data[7] = deg + SERVO3_CAL;
+        //     data[8] = deg + SERVO4_CAL;
+        // }else{
+        //     desired_speed = 30;
+        //     current_motor_command = speed_Output;
+        // }
+
+
+        // 135度を90度とみなしたときのズレの角度
+
+        // XY座標での正しい角度truedeg
+        truedeg = deg;
+        if ((0 <= truedeg) && (truedeg <= 180)) {
+            truedeg = truedeg;
+        }
+        if ((-180 <= truedeg) && (truedeg <= 0)) {
+            truedeg = -truedeg + 360;
+        }
+
 
             // 独ステが扱えない範囲の変換
             if ((270 < deg) && (deg < 360)) {
