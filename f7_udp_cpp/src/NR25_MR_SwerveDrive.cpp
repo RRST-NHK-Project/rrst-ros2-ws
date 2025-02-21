@@ -3,25 +3,22 @@ RRST NHK2025
 汎用機独ステ
 */
 
-#include "include/UDP.hpp"
+// 標準
+#include <chrono>
+#include <cmath>
+#include <thread>
+
+// ROS
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/int32.hpp"
-#include <chrono>
-#include <cmath>
 #include <std_msgs/msg/int32_multi_array.hpp>
-#include <thread>
-#include <vector>
-#include <iostream>
 
-// サーボの組み付け時のズレを補正（度数法）
-#define SERVO1_CAL 0 // 7
-#define SERVO2_CAL 0
-#define SERVO3_CAL 0 // 0
-#define SERVO4_CAL 0 //-5
+// 自作クラス
+#include "include/UDP.hpp"
 
 // スティックのデッドゾーン
-#define DEADZONE_L 0.3
+#define DEADZONE_L 0.7
 #define DEADZONE_R 0.3
 
 //定数k
@@ -74,8 +71,12 @@ static double current_motor_command = 0.0;
 int deadzone_speed = 0;
 
 
-//角度の変位
-int displacement = 0;
+
+// サーボの組み付け時のズレを補正（度数法）
+int SERVO1_CAL = -8;
+int SERVO2_CAL = 0;
+int SERVO3_CAL = -5;
+int SERVO4_CAL = 7;
 
 // IPアドレスとポートの指定
 std::string udp_ip = "192.168.8.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
@@ -83,6 +84,8 @@ int udp_port = 5000;                  // 送信元ポート番号、宛先マイ
 
 std::vector<int> data = {0, 0, 0, 0, 0, 0, 0, 0, 0};
 
+int wheelspeed = 30;
+int yawspeed = 10;
 
 class PS4_Listener : public rclcpp::Node {
 public:
@@ -92,14 +95,22 @@ public:
             "joy0", 10,
             std::bind(&PS4_Listener::ps4_listener_callback, this,
                       std::placeholders::_1));
+        // figletでノード名を表示
+        std::string figletout = "figlet MR SwerveDrive";
+        int result = std::system(figletout.c_str());
+        if (result != 0) {
+            std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+            std::cerr << "Please install 'figlet' with the following command:" << std::endl;
+            std::cerr << "sudo apt install figlet" << std::endl;
+            std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+        }
         RCLCPP_INFO(this->get_logger(),
                     "NHK2025 MR SD initialized with IP: %s, Port: %d", ip.c_str(),
                     port);
     }
 
 private:
-    
-    // コントローラーの入力を取得、使わない入力はコメントアウト推奨
+
     double PID(int measured_speed){
         double error = desired_speed - measured_speed;
         double derivative = (error - speed_last_Error) / dt;
@@ -133,6 +144,7 @@ private:
         // return speed_Output;
     }
 
+      // コントローラーの入力を取得、使わない入力はコメントアウト推奨
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
         float LS_X = -1 * msg->axes[0];
         float LS_Y = msg->axes[1];
@@ -180,6 +192,7 @@ private:
         // //std::this_thread::sleep_for(std::chrono::milliseconds(500)); // 500msの遅延
         // } 
         float rad = atan2(LS_Y, LS_X);
+
         //  float s = sin(rad);
         //  float c = cos(rad);
         deg = rad * 180 / M_PI;
@@ -380,8 +393,9 @@ private:
         //     current_motor_command = speed_Output;
         // }
 
+
         // 135度を90度とみなしたときのズレの角度
-            
+
         // XY座標での正しい角度truedeg
         truedeg = deg;
         if ((0 <= truedeg) && (truedeg <= 180)) {
@@ -398,7 +412,6 @@ private:
         } else {
             deg = 225 - deg;
         }
-
         //displacement = fabs(deg -previous_deg);
 
 
@@ -606,6 +619,7 @@ private:
             // data[2] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
             // data[3] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
             // data[4] = wheelspeed/(1 + k*displacement) * (pow(s,2) + pow(c,2));
+
             data[5] = deg + SERVO1_CAL;
             data[6] = deg + SERVO2_CAL;
             data[7] = deg + SERVO3_CAL;
@@ -666,87 +680,50 @@ private:
         // //     data[2] = speed_Output;
         // //     data[3] = speed_Output;
         // //     data[4] = speed_Output;
+
         data[5] = deg + SERVO1_CAL;
         data[6] = deg + SERVO2_CAL;
         data[7] = deg + SERVO3_CAL;
         data[8] = deg + SERVO4_CAL;
         // // }
-
         
-
         previous_deg = desired_deg;
 
-        // 安全のため、出力値に対して上限を設ける
-        // if (deg_Output > deg_limit) {
-        //     deg_Output = deg_limit;
-        // } else if (deg_Output < -deg_limit) {
-        //     deg_Output = -deg_limit;
-        // }
-        
 
-        // 時計回りYAW回転
-        if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R) {
-            speed_Output = -yawspeed;
-            data[5] = 180 + SERVO1_CAL;
-            data[6] = 90 + SERVO2_CAL;
-            data[7] = 90 + SERVO3_CAL;
-            data[8] = 180 + SERVO4_CAL;
-            data[1] = speed_Output;
-            data[2] = -speed_Output;
-            data[3] = speed_Output;
-            data[4] = -speed_Output;
-        }
-        // 半時計回りYAW回転
-        if (0 < RS_X && fabs(RS_X) >= DEADZONE_R) {
-            speed_Output = yawspeed;
-            data[5] = 180 + SERVO1_CAL;
-            data[6] = 90 + SERVO2_CAL;
-            data[7] = 90 + SERVO3_CAL;
-            data[8] = 180 + SERVO4_CAL;
-            data[1] = speed_Output;
-            data[2] = -speed_Output;
-            data[3] = speed_Output;
-            data[4] = -speed_Output;
-        }
-        // deadzone追加
-        if ((fabs(LS_X) <= DEADZONE_R) && (fabs(LS_Y) <= DEADZONE_R) && (fabs(RS_X) <= DEADZONE_L)&&(!LEFT && !RIGHT && !UP && !DOWN)) {
-            deg = 135;
-            desired_speed = 0;
-            measured_speed = 0;
-            
-            speed_Integral = 0;
-            speed_Differential =0;
-            
-            //speed_last_Error = 0;
-            // for (int i = speed_Output;i>=0;i=i-0.25){
-            //     data[1] = i;
-            //     data[2] = i;
-            //     data[3] = i;
-            //     data[4] = i;
-            // }
-            // deadzone状態なら、現状の指令値から0に向かって徐々に減衰させる
-            double decay_rate = 0.05; // 0～1の値。大きいほど速く0に近づく
-            
-            if (previous_speed > 0){
-                current_motor_command += (0-current_motor_command) * decay_rate;
-                speed_Output = current_motor_command;
-            }else if(previous_speed < 0){
-                current_motor_command += ( 0-current_motor_command) * decay_rate;
-                speed_Output = current_motor_command;
-                
-            }
-            
-            data[1] = speed_Output;
-            data[2] = speed_Output;
-            data[3] = speed_Output;
-            data[4] = speed_Output;
+        // 独ステが扱えない範囲の変換
+        if ((270 < deg) && (deg < 360)) {
+            deg = deg - 180;
+            data[1] = wheelspeed * R2;
+            data[2] = wheelspeed * R2;
+            data[3] = wheelspeed * R2;
+            data[4] = wheelspeed * R2;
             data[5] = deg + SERVO1_CAL;
             data[6] = deg + SERVO2_CAL;
             data[7] = deg + SERVO3_CAL;
             data[8] = deg + SERVO4_CAL;
-        }else{
-            desired_speed = 30;
-            current_motor_command = speed_Output;
+        }
+
+        // 時計回りYAW回転
+        if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R) {
+            data[5] = 180 + SERVO1_CAL;
+            data[6] = 90 + SERVO2_CAL;
+            data[7] = 90 + SERVO3_CAL;
+            data[8] = 180 + SERVO4_CAL;
+            data[1] = -yawspeed;
+            data[2] = yawspeed;
+            data[3] = -yawspeed;
+            data[4] = yawspeed;
+        }
+        // 半時計回りYAW回転
+        if (0 < RS_X && fabs(RS_X) >= DEADZONE_R) {
+            data[5] = 180 + SERVO1_CAL;
+            data[6] = 90 + SERVO2_CAL;
+            data[7] = 90 + SERVO3_CAL;
+            data[8] = 180 + SERVO4_CAL;
+            data[1] = yawspeed;
+            data[2] = -yawspeed;
+            data[3] = yawspeed;
+            data[4] = -yawspeed;
         }
 
         // 安全のため、出力値に対して上限を設ける
@@ -841,8 +818,8 @@ private:
         CHANGEMODE = option_latch;
         std::cout << data[1] << std::endl;
         //std::cout << data[1] << ", " << speed_Output << ", " << speed_Integral << ", " << std::endl;
+
         udp_.send(data);
-        
     }
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
@@ -875,14 +852,39 @@ private:
     rclcpp::TimerBase::SharedPtr timer_;
 };
 
+class Params_Listener : public rclcpp::Node {
+public:
+    Params_Listener()
+        : Node("nr25_servo_cal_listener") {
+        subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
+            "mr_servo_cal", 10,
+            std::bind(&Params_Listener::params_listener_callback, this,
+                      std::placeholders::_1));
+        RCLCPP_INFO(this->get_logger(),
+                    "MR Servo Calibrator Listener");
+    }
+
+private:
+    void params_listener_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        SERVO1_CAL = msg->data[0];
+        SERVO2_CAL = msg->data[1];
+        SERVO3_CAL = msg->data[2];
+        SERVO4_CAL = msg->data[3];
+    }
+
+    rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
+};
+
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
     rclcpp::executors::SingleThreadedExecutor exec;
     auto ps4_listener = std::make_shared<PS4_Listener>(udp_ip, udp_port);
     auto servo_deg_publisher = std::make_shared<Servo_Deg_Publisher>();
+    auto params_listener = std::make_shared<Params_Listener>();
     exec.add_node(ps4_listener);
     exec.add_node(servo_deg_publisher);
+    exec.add_node(params_listener);
 
     exec.spin();
 

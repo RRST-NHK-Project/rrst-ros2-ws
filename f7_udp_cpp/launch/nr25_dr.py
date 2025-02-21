@@ -7,7 +7,7 @@ def generate_launch_description():
             package='joy',
             executable='joy_node',
             output='screen',
-            parameters=[{"device_id": 1}],  # ここで device_id を指定
+            parameters=[{"device_id": 0}],  # ここで device_id を指定
             remappings=[("/joy", "/joy1")]
         ),
         Node(
