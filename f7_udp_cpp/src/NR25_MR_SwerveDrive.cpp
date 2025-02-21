@@ -35,7 +35,7 @@ RRST NHK2025
 #define speed_limit 30
 #define deg_limit 360
 #define DPAD_SPEED 30  // 方向パッド入力時の目標速度
-bool CHANGEMODE = false;
+bool CHANGEMODE = 0;
 
 //グローバル変数（角度一覧）
 int deg = 0;
@@ -201,6 +201,8 @@ private:
         //！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         if(OPTION && !last_option){
             option_latch = !option_latch;
+        }
+        if(CHANGEMODE == 1){
             // XY座標での正しい角度truedeg
         truedeg = deg;
         if ((0 <= truedeg) && (truedeg <= 180)) {
@@ -311,7 +313,7 @@ private:
         //！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         //加速する移動方法！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         //！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
-        else{
+        if (CHANGEMODE == 0){
         speed_Output = -PID(measured_speed);
         // 以下、目標速度へのランプアップ制御を行う
         // deadzone外の場合は wheelspeed (30) を目標速度とする
