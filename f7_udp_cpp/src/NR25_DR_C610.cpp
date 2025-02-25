@@ -70,11 +70,15 @@ public:
     static void dribble_action(UDP &udp) {
         std::cout << "<ロボマス回転>" << std::endl;
         data[6] = 50;
+        data[7] = 50;
+        data[8] = 50;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
 
         std::cout << "<回転終了>" << std::endl;
          data[6]= 0;
+         data[7] = 0;
+         data[8] = 0;
         udp.send(data);
     }    
 };
