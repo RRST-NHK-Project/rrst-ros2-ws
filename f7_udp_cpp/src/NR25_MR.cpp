@@ -130,15 +130,6 @@ public:
             "joy0", 10,
             std::bind(&PS4_Listener::ps4_listener_callback, this,
                       std::placeholders::_1));
-        // figletでノード名を表示
-        std::string figletout = "figlet RRST MR";
-        int result = std::system(figletout.c_str());
-        if (result != 0) {
-            std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
-            std::cerr << "Please install 'figlet' with the following command:" << std::endl;
-            std::cerr << "sudo apt install figlet" << std::endl;
-            std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
-        }
         RCLCPP_INFO(this->get_logger(),
                     "NHK2025 MR initialized with IP: %s, Port: %d", ip.c_str(),
                     port);
@@ -247,6 +238,16 @@ private:
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
+
+    // figletでノード名を表示
+    std::string figletout = "figlet RRST MR";
+    int result = std::system(figletout.c_str());
+    if (result != 0) {
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+        std::cerr << "Please install 'figlet' with the following command:" << std::endl;
+        std::cerr << "sudo apt install figlet" << std::endl;
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+    }
 
     rclcpp::executors::SingleThreadedExecutor exec;
     auto ps4_listener = std::make_shared<PS4_Listener>(udp_ip, udp_port);

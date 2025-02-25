@@ -495,6 +495,16 @@ private:
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
+        // figletでノード名を表示
+    std::string figletout = "figlet MR SwerveDrive";
+    int result = std::system(figletout.c_str());
+    if (result != 0) {
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+        std::cerr << "Please install 'figlet' with the following command:" << std::endl;
+        std::cerr << "sudo apt install figlet" << std::endl;
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+    }
+
     rclcpp::executors::SingleThreadedExecutor exec;
     auto ps4_listener = std::make_shared<PS4_Listener>(udp_ip, udp_port);
     auto servo_deg_publisher = std::make_shared<Servo_Deg_Publisher>();
