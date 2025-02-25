@@ -34,7 +34,7 @@ void UDP::send(std::vector<int> &data) {
         if (value > max) {
             value = max;
         } else if (value < -max) {
-            value = -max;std::cout << "<ダンクシーケンス終了>" << std::endl;
+            value = -max;
         }
     }
 
