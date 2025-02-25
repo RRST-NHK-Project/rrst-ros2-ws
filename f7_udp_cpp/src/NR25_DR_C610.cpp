@@ -17,6 +17,10 @@ RRST NHK2025
 // 自作クラス
 #include "include/UDP.hpp"
 
+int motor1 = 50;
+int motor2 = 50;
+int motor3 = 50;
+int motor4 = 50;
 // IPアドレスとポートの指定
 std::string udp_ip = "192.168.0.218"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
@@ -69,9 +73,9 @@ public:
 
     static void dribble_action(UDP &udp) {
         std::cout << "<ロボマス回転>" << std::endl;
-        data[6] = 50;
-        data[7] = 50;
-        data[8] = 50;
+        data[6] = motor1;
+        data[7] = motor2;
+        data[8] = motor3;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
 
@@ -173,41 +177,41 @@ private:
     UDP udp_;
 };
 
-// class Params_Listener : public rclcpp::Node {
-// public:
-//     Params_Listener()
-//         : Node("nhk25_pr_listener") {
-//         subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
-//             "parameter_array", 10,
-//             std::bind(&Params_Listener::params_listener_callback, this,
-//                       std::placeholders::_1));
-//         RCLCPP_INFO(this->get_logger(),
-//                     "NHK2025 Parameter Listener");
-//     }
+class Params_Listener : public rclcpp::Node {
+public:
+    Params_Listener()
+        : Node("nhk25_pr_listener") {
+        subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
+            "dr_parameter_array", 10,
+            std::bind(&Params_Listener::params_listener_callback, this,
+                      std::placeholders::_1));
+        RCLCPP_INFO(this->get_logger(),
+                    "NHK2025 Parameter Listener");
+    }
 
-// private:
-//     void params_listener_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
-//         roller_speed_dribble_ab = msg->data[0];
-//         roller_speed_dribble_cd = msg->data[1];
-//         roller_speed_shoot_ab = msg->data[2];
-//         roller_speed_shoot_cd = msg->data[3];
-//         std::cout << roller_speed_dribble_ab;
-//         std::cout << roller_speed_dribble_cd;
-//         std::cout << roller_speed_shoot_ab;
-//         std::cout << roller_speed_shoot_cd << std::endl;
-//     }
+private:
+    void params_listener_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        motor1 = msg->data[0];
+         motor2 = msg->data[1];
+         motor3 = msg->data[2];
+         motor4 = msg->data[3];
+        std::cout <<  motor1;
+        std::cout <<  motor2;
+        std::cout <<  motor3;
+        std::cout <<  motor4 << std::endl;
+    }
 
-//     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
-// };
+    rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
+};
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
     rclcpp::executors::SingleThreadedExecutor exec;
     auto ps4_listener = std::make_shared<PS4_Listener>(udp_ip, udp_port);
-    // auto params_listener = std::make_shared<Params_Listener>();
+    auto params_listener = std::make_shared<Params_Listener>();
     exec.add_node(ps4_listener);
-    // exec.add_node(params_listener);
+    exec.add_node(params_listener);
 
     exec.spin();
 
