@@ -27,10 +27,16 @@ CSVファイルにノード切った際のパラメータを現在時刻付き�
 #include <vector>
 
 using json = nlohmann::json;
-// 保存用のファイル
-const std::string PARAM_FILE = "mr_parameter.json";
 
-const std::string CSV_FILE = "mr_parameter.csv";
+// ソースコードのあるディレクトリを取得
+const std::string SOURCE_DIR = std::filesystem::path(__FILE__).parent_path().string();
+
+// 保存先ディレクトリ
+const std::string BASE_DIR = SOURCE_DIR + "/config";
+
+// ファイルのフルパス
+const std::string PARAM_FILE = BASE_DIR + "/mr_parameter.json";
+const std::string CSV_FILE = BASE_DIR + "/mr_parameter.csv";
 
 class ParameterNode : public rclcpp::Node {
 public:
