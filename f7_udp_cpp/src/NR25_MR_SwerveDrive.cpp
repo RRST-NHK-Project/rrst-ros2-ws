@@ -3,16 +3,21 @@ RRST NHK2025
 汎用機独ステ
 */
 
-#include "include/UDP.hpp"
-#include "rclcpp/rclcpp.hpp"
-#include "sensor_msgs/msg/joy.hpp"
-#include "std_msgs/msg/int32.hpp"
+// 標準
 #include <chrono>
 #include <cmath>
 #include <iostream>
-#include <std_msgs/msg/int32_multi_array.hpp>
 #include <thread>
 #include <vector>
+
+// ROS
+#include "rclcpp/rclcpp.hpp"
+#include "sensor_msgs/msg/joy.hpp"
+#include "std_msgs/msg/int32.hpp"
+#include <std_msgs/msg/int32_multi_array.hpp>
+
+// 自作クラス
+#include "include/UDP.hpp"
 
 // スティックのデッドゾーン
 #define DEADZONE_L 0.3
@@ -446,7 +451,7 @@ private:
 class Servo_Deg_Publisher : public rclcpp::Node {
 public:
     Servo_Deg_Publisher()
-        : Node("servo_deg_publisher") {
+        : Node("mr_servo_deg_publisher") {
         // Publisherの作成
         publisher_ = this->create_publisher<std_msgs::msg::Int32MultiArray>("mr_servo_deg", 10);
 
@@ -472,7 +477,7 @@ private:
 class Params_Listener : public rclcpp::Node {
 public:
     Params_Listener()
-        : Node("nr25_servo_cal_listener") {
+        : Node("nr25_mr_servo_cal_listener") {
         subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
             "mr_servo_cal", 10,
             std::bind(&Params_Listener::params_listener_callback, this,
@@ -495,7 +500,7 @@ private:
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
-        // figletでノード名を表示
+    // figletでノード名を表示
     std::string figletout = "figlet MR SwerveDrive";
     int result = std::system(figletout.c_str());
     if (result != 0) {

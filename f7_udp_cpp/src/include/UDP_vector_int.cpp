@@ -1,11 +1,7 @@
-/*
-RRST NHK2025
-UDPで送信するクラス
-*/
-
 #include "UDP_vector_int.hpp"
 
-int max = 9999; // 最大値を4桁に制限
+#include <stdexcept>
+#include <unistd.h> 
 
 UDP_vector_int::UDP_vector_int(const std::string &ip_address, int port) {
     try {
@@ -20,17 +16,18 @@ UDP_vector_int::UDP_vector_int(const std::string &ip_address, int port) {
         if (inet_pton(AF_INET, ip_address.c_str(), &dst_addr.sin_addr) <= 0) {
             throw std::runtime_error("Invalid IP address: " + ip_address);
         }
-
-        memset(&src_addr, 0, sizeof(src_addr));
-        src_addr.sin_family = AF_INET;
-        src_addr.sin_port = 0;
     } catch (const std::exception &e) {
         std::cerr << "UDP initialization error: " << e.what() << std::endl;
     }
 }
 
-void UDP_vector_int::send(std::vector<int> &data) {
-    for (auto &value : data) {
+UDP_vector_int::~UDP_vector_int() {
+    close(udp_socket);
+}
+
+void UDP_vector_int::send(const std::vector<int16_t> &data) {
+    std::vector<int16_t> limited_data = data;
+    for (auto &value : limited_data) {
         if (value > max) {
             value = max;
         } else if (value < -max) {
@@ -38,16 +35,15 @@ void UDP_vector_int::send(std::vector<int> &data) {
         }
     }
 
-    // int配列をそのまま送信
     ssize_t sent_bytes = sendto(
         udp_socket,
-        data.data(),               // 送信データのポインタ
-        data.size() * sizeof(int), // バイトサイズ
+        limited_data.data(),
+        limited_data.size() * sizeof(int16_t), // サイズも変更
         0,
         (struct sockaddr *)&dst_addr,
         sizeof(dst_addr));
 
     if (sent_bytes < 0) {
-        std::cerr << "Failed to send data." << std::endl;
+        std::cerr << "Failed to send data: " << strerror(errno) << std::endl;
     }
 }
