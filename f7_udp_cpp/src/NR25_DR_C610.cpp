@@ -25,7 +25,7 @@ int motor4 = 50;
 std::string udp_ip = "192.168.0.218"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
 
-std::vector<int16_t> data(17, 0); // 1~5番を電磁弁制御に転用中（-1 or 1）
+std::vector<int16_t> data(19, 0); // 1~5番を電磁弁制御に転用中（-1 or 1）
 
 // 各機構のシーケンスを格納するクラス
 class Action {

@@ -1,6 +1,6 @@
 /*
 RRST NHK2025
-ダンク機独ステ（パケットサイズの削減実験中）
+ダンク機独ステ
 */
 
 // 標準
@@ -18,6 +18,8 @@ RRST NHK2025
 
 // 自作クラス
 #include "include/UDP.hpp"
+
+#define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 // スティックのデッドゾーン
 #define DEADZONE_L 0.3
@@ -71,7 +73,7 @@ int SERVO4_CAL = 0;
 std::string udp_ip = "192.168.128.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                    // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
 
-std::vector<int16_t> data(17, 0);
+std::vector<int16_t> data(19, 0);
 
 class PS4_Listener : public rclcpp::Node {
 public:
@@ -152,6 +154,8 @@ private:
 
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
+
+        data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
         if (PS) {
             std::fill(data.begin(), data.end(), 0);                          // 配列をゼロで埋める
@@ -433,10 +437,11 @@ private:
         }
 
         // デバッグ用（for文でcoutするとカクつく）
-        std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4] << ", ";
-        std::cout << data[5] << ", " << data[6] << ", " << data[7] << ", " << data[8] << ", ";
-        std::cout << data[9] << ", " << data[10] << ", " << data[11] << ", " << data[12] << ", ";
-        std::cout << data[13] << ", " << data[14] << ", " << data[15] << ", " << data[16] << std::endl;
+        std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", ";
+        std::cout << data[4] << ", " << data[5] << ", " << data[6] << ", " << data[7] << ", ";
+        std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
+        std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
+        std::cout << data[16] << ", " << data[17] << ", " << data[18] << std::endl;
 
         // 現在の状態を次回のために保存
         last_option = OPTION;

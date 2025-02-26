@@ -20,7 +20,7 @@ float deadzone = 0.3; // adjust DS4 deadzone
 std::string udp_ip = "192.168.8.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
 
-std::vector<int16_t> data(17, 0); // 各モーターの出力（0% ~ 100%）
+std::vector<int16_t> data(19, 0); // 各モーターの出力（0% ~ 100%）
 float v1, v2, v3, v4;
 
 class PS4_Listener : public rclcpp::Node {
