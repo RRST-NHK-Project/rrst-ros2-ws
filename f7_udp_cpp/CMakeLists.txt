@@ -57,7 +57,7 @@ ament_target_dependencies(nr25_dr rclcpp std_msgs sensor_msgs geometry_msgs)
 add_executable(nr25_dr_omni src/NR25_DR_Omni.cpp src/include/UDP.cpp)
 ament_target_dependencies(nr25_dr_omni rclcpp std_msgs sensor_msgs geometry_msgs)
 
-add_executable(nr25_dr_sd src/NR25_DR_SwerveDrive.cpp src/include/UDP_vector_int.cpp)
+add_executable(nr25_dr_sd src/NR25_DR_SwerveDrive.cpp src/include/UDP.cpp)
 ament_target_dependencies(nr25_dr_sd rclcpp std_msgs sensor_msgs geometry_msgs)
 
 add_executable(nr25_enc src/NR25_ENC.cpp)

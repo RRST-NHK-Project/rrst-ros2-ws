@@ -17,7 +17,7 @@ RRST NHK2025
 #include <std_msgs/msg/int32_multi_array.hpp>
 
 // 自作クラス
-#include "include/UDP_vector_int.hpp"
+#include "include/UDP.hpp"
 
 // スティックのデッドゾーン
 #define DEADZONE_L 0.3
@@ -445,7 +445,7 @@ private:
     }
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
-    UDP_vector_int udp_;
+    UDP udp_;
 };
 
 class Servo_Deg_Publisher : public rclcpp::Node {
