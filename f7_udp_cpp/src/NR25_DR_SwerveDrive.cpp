@@ -69,9 +69,9 @@ int SERVO4_CAL = 0;
 
 // IPアドレスとポートの指定
 std::string udp_ip = "192.168.128.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
-int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
+int udp_port = 5000;                    // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
 
-std::vector<int16_t> data = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+std::vector<int16_t> data(17, 0);
 
 class PS4_Listener : public rclcpp::Node {
 public:
@@ -432,15 +432,16 @@ private:
             // std::cout << data[1] << std::endl;
         }
 
-        // デバッグ用
+        // デバッグ用（for文でcoutするとカクつく）
         std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4] << ", ";
-        std::cout << data[5] << ", " << data[6] << ", " << data[7] << ", " << data[8] << std::endl;
+        std::cout << data[5] << ", " << data[6] << ", " << data[7] << ", " << data[8] << ", ";
+        std::cout << data[9] << ", " << data[10] << ", " << data[11] << ", " << data[12] << ", ";
+        std::cout << data[13] << ", " << data[14] << ", " << data[15] << ", " << data[16] << std::endl;
 
         // 現在の状態を次回のために保存
         last_option = OPTION;
         CHANGEMODE = option_latch;
-        // std::cout << data[1] << std::endl;
-        //  std::cout << data[1] << ", " << speed_Output << ", " << speed_Integral << ", " << std::endl;
+
         udp_.send(data);
     }
 
