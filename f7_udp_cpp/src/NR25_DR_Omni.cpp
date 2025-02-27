@@ -19,7 +19,7 @@ int roller_speed_reload = 10;
 std::string udp_ip = "192.168.128.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                    // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
 
-std::vector<int> data = {0, 0, 0, 0, 0, 0, -1, -1, -1}; // グローバル変数
+std::vector<int16_t> data(19, 0); // グローバル変数
 
 // 各機構のシーケンスを格納するクラス
 class Action {

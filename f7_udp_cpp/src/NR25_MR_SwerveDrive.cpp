@@ -3,16 +3,21 @@ RRST NHK2025
 汎用機独ステ
 */
 
-#include "include/UDP.hpp"
-#include "rclcpp/rclcpp.hpp"
-#include "sensor_msgs/msg/joy.hpp"
-#include "std_msgs/msg/int32.hpp"
+// 標準
 #include <chrono>
 #include <cmath>
 #include <iostream>
-#include <std_msgs/msg/int32_multi_array.hpp>
 #include <thread>
 #include <vector>
+
+// ROS
+#include "rclcpp/rclcpp.hpp"
+#include "sensor_msgs/msg/joy.hpp"
+#include "std_msgs/msg/int32.hpp"
+#include <std_msgs/msg/int32_multi_array.hpp>
+
+// 自作クラス
+#include "include/UDP.hpp"
 
 // スティックのデッドゾーン
 #define DEADZONE_L 0.3
@@ -29,6 +34,9 @@ RRST NHK2025
 #define speed_limit 30
 #define deg_limit 360
 #define DPAD_SPEED 30 // 方向パッド入力時の目標速度
+
+#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
+
 bool CHANGEMODE = false;
 
 // グローバル変数（角度一覧）
@@ -66,7 +74,7 @@ int SERVO4_CAL = 0;
 std::string udp_ip = "192.168.8.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
 
-std::vector<int> data = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+std::vector<int16_t> data(19, 0);
 
 class PS4_Listener : public rclcpp::Node {
 public:
@@ -148,6 +156,8 @@ private:
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
 
+        data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
+
         if (PS) {
             std::fill(data.begin(), data.end(), 0);                          // 配列をゼロで埋める
             for (int attempt = 0; attempt < 10; attempt++) {                 // 10回試行
@@ -191,20 +201,20 @@ private:
                 data[2] = 0;
                 data[3] = 0;
                 data[4] = 0;
-                data[5] = deg + SERVO1_CAL;
-                data[6] = deg + SERVO2_CAL;
-                data[7] = deg + SERVO3_CAL;
-                data[8] = deg + SERVO4_CAL;
+                data[7] = deg + SERVO1_CAL;
+                data[8] = deg + SERVO2_CAL;
+                data[9] = deg + SERVO3_CAL;
+                data[10] = deg + SERVO4_CAL;
             }
 
             data[1] = -wheelspeed * R2;
             data[2] = -wheelspeed * R2;
             data[3] = -wheelspeed * R2;
             data[4] = -wheelspeed * R2;
-            data[5] = deg + SERVO1_CAL;
-            data[6] = deg + SERVO2_CAL;
-            data[7] = deg + SERVO3_CAL;
-            data[8] = deg + SERVO4_CAL;
+            data[7] = deg + SERVO1_CAL;
+            data[8] = deg + SERVO2_CAL;
+            data[9] = deg + SERVO3_CAL;
+            data[10] = deg + SERVO4_CAL;
 
             if (LEFT) {
                 deg = 45;
@@ -242,18 +252,18 @@ private:
                 data[2] = wheelspeed * R2;
                 data[3] = wheelspeed * R2;
                 data[4] = wheelspeed * R2;
-                data[5] = deg + SERVO1_CAL;
-                data[6] = deg + SERVO2_CAL;
-                data[7] = deg + SERVO3_CAL;
-                data[8] = deg + SERVO4_CAL;
+                data[7] = deg + SERVO1_CAL;
+                data[8] = deg + SERVO2_CAL;
+                data[9] = deg + SERVO3_CAL;
+                data[10] = deg + SERVO4_CAL;
             }
 
             // 時計回りYAW回転
             if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R) {
-                data[5] = 180 + SERVO1_CAL;
-                data[6] = 90 + SERVO2_CAL;
-                data[7] = 90 + SERVO3_CAL;
-                data[8] = 180 + SERVO4_CAL;
+                data[7] = 180 + SERVO1_CAL;
+                data[8] = 90 + SERVO2_CAL;
+                data[9] = 90 + SERVO3_CAL;
+                data[10] = 180 + SERVO4_CAL;
                 data[1] = -yawspeed;
                 data[2] = yawspeed;
                 data[3] = -yawspeed;
@@ -261,10 +271,10 @@ private:
             }
             // 半時計回りYAW回転
             if (0 < RS_X && fabs(RS_X) >= DEADZONE_R) {
-                data[5] = 180 + SERVO1_CAL;
-                data[6] = 90 + SERVO2_CAL;
-                data[7] = 90 + SERVO3_CAL;
-                data[8] = 180 + SERVO4_CAL;
+                data[7] = 180 + SERVO1_CAL;
+                data[8] = 90 + SERVO2_CAL;
+                data[9] = 90 + SERVO3_CAL;
+                data[10] = 180 + SERVO4_CAL;
                 data[1] = yawspeed;
                 data[2] = -yawspeed;
                 data[3] = yawspeed;
@@ -336,10 +346,10 @@ private:
             if ((225 < deg) && (deg <= 360) && (R1)) {
                 deg = deg - 180;
 
-                data[5] = deg + SERVO1_CAL;
-                data[6] = deg + SERVO2_CAL;
-                data[7] = deg + SERVO3_CAL;
-                data[8] = deg + SERVO4_CAL;
+                data[7] = deg + SERVO1_CAL;
+                data[8] = deg + SERVO2_CAL;
+                data[9] = deg + SERVO3_CAL;
+                data[10] = deg + SERVO4_CAL;
                 speed_Output = -speed_Output;
                 data[1] = speed_Output;
                 data[2] = speed_Output;
@@ -348,10 +358,10 @@ private:
             }
             if ((0 <= deg) && (deg < 45) && (R1)) {
                 deg = deg + 180;
-                data[5] = deg + SERVO1_CAL;
-                data[6] = deg + SERVO2_CAL;
-                data[7] = deg + SERVO3_CAL;
-                data[8] = deg + SERVO4_CAL;
+                data[7] = deg + SERVO1_CAL;
+                data[8] = deg + SERVO2_CAL;
+                data[9] = deg + SERVO3_CAL;
+                data[10] = deg + SERVO4_CAL;
                 speed_Output = -speed_Output;
                 data[1] = speed_Output;
                 data[2] = speed_Output;
@@ -359,20 +369,20 @@ private:
                 data[4] = speed_Output;
             }
 
-            data[5] = deg + SERVO1_CAL;
-            data[6] = deg + SERVO2_CAL;
-            data[7] = deg + SERVO3_CAL;
-            data[8] = deg + SERVO4_CAL;
+            data[7] = deg + SERVO1_CAL;
+            data[8] = deg + SERVO2_CAL;
+            data[9] = deg + SERVO3_CAL;
+            data[10] = deg + SERVO4_CAL;
 
             previous_deg = desired_deg;
 
             // 時計回りYAW回転
             if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R) {
                 speed_Output = -yawspeed;
-                data[5] = 180 + SERVO1_CAL;
-                data[6] = 90 + SERVO2_CAL;
-                data[7] = 90 + SERVO3_CAL;
-                data[8] = 180 + SERVO4_CAL;
+                data[7] = 180 + SERVO1_CAL;
+                data[8] = 90 + SERVO2_CAL;
+                data[9] = 90 + SERVO3_CAL;
+                data[10] = 180 + SERVO4_CAL;
                 data[1] = speed_Output;
                 data[2] = -speed_Output;
                 data[3] = speed_Output;
@@ -381,10 +391,10 @@ private:
             // 半時計回りYAW回転
             if (0 < RS_X && fabs(RS_X) >= DEADZONE_R) {
                 speed_Output = yawspeed;
-                data[5] = 180 + SERVO1_CAL;
-                data[6] = 90 + SERVO2_CAL;
-                data[7] = 90 + SERVO3_CAL;
-                data[8] = 180 + SERVO4_CAL;
+                data[7] = 180 + SERVO1_CAL;
+                data[8] = 90 + SERVO2_CAL;
+                data[9] = 90 + SERVO3_CAL;
+                data[10] = 180 + SERVO4_CAL;
                 data[1] = speed_Output;
                 data[2] = -speed_Output;
                 data[3] = speed_Output;
@@ -413,10 +423,10 @@ private:
                 data[2] = speed_Output;
                 data[3] = speed_Output;
                 data[4] = speed_Output;
-                data[5] = deg + SERVO1_CAL;
-                data[6] = deg + SERVO2_CAL;
-                data[7] = deg + SERVO3_CAL;
-                data[8] = deg + SERVO4_CAL;
+                data[7] = deg + SERVO1_CAL;
+                data[8] = deg + SERVO2_CAL;
+                data[9] = deg + SERVO3_CAL;
+                data[10] = deg + SERVO4_CAL;
             } else {
                 desired_speed = 30;
                 current_motor_command = speed_Output;
@@ -427,9 +437,12 @@ private:
             // std::cout << data[1] << std::endl;
         }
 
-        // デバッグ用
-        std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4] << ", ";
-        std::cout << data[5] << ", " << data[6] << ", " << data[7] << ", " << data[8] << ", " << std::endl;
+        // デバッグ用（for文でcoutするとカクつく）
+        // std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", ";
+        // std::cout << data[4] << ", " << data[5] << ", " << data[6] << ", " << data[7] << ", ";
+        // std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
+        // std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
+        // std::cout << data[16] << ", " << data[17] << ", " << data[18] << std::endl;
 
         // 現在の状態を次回のために保存
         last_option = OPTION;
@@ -446,7 +459,7 @@ private:
 class Servo_Deg_Publisher : public rclcpp::Node {
 public:
     Servo_Deg_Publisher()
-        : Node("servo_deg_publisher") {
+        : Node("mr_servo_deg_publisher") {
         // Publisherの作成
         publisher_ = this->create_publisher<std_msgs::msg::Int32MultiArray>("mr_servo_deg", 10);
 
@@ -472,7 +485,7 @@ private:
 class Params_Listener : public rclcpp::Node {
 public:
     Params_Listener()
-        : Node("nr25_servo_cal_listener") {
+        : Node("nr25_mr_servo_cal_listener") {
         subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
             "mr_servo_cal", 10,
             std::bind(&Params_Listener::params_listener_callback, this,
@@ -495,7 +508,7 @@ private:
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
-        // figletでノード名を表示
+    // figletでノード名を表示
     std::string figletout = "figlet MR SwerveDrive";
     int result = std::system(figletout.c_str());
     if (result != 0) {

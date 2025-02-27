@@ -25,7 +25,7 @@ int motor4 = 50;
 std::string udp_ip = "192.168.0.218"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
 
-std::vector<int> data = {0, -1, -1, -1, -1, -1, 0, 0, 0}; // 1~5番を電磁弁制御に転用中（-1 or 1）
+std::vector<int16_t> data(19, 0); // 1~5番を電磁弁制御に転用中（-1 or 1）
 
 // 各機構のシーケンスを格納するクラス
 class Action {
@@ -80,11 +80,11 @@ public:
         std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
 
         std::cout << "<回転終了>" << std::endl;
-         data[6]= 0;
-         data[7] = 0;
-         data[8] = 0;
+        data[6] = 0;
+        data[7] = 0;
+        data[8] = 0;
         udp.send(data);
-    }    
+    }
 };
 bool Action::ready_for_dunk = false;
 
@@ -161,11 +161,10 @@ private:
         if (CIRCLE && Action::ready_for_dunk) {
             Action::dunk_shoot_action(udp_);
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            
         }
 
         if (CROSS) {
-          // std::cout << "<ロボマス回転>" << std::endl;
+            // std::cout << "<ロボマス回転>" << std::endl;
             Action::dribble_action(udp_);
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
@@ -192,13 +191,13 @@ public:
 private:
     void params_listener_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
         motor1 = msg->data[0];
-         motor2 = msg->data[1];
-         motor3 = msg->data[2];
-         motor4 = msg->data[3];
-        std::cout <<  motor1;
-        std::cout <<  motor2;
-        std::cout <<  motor3;
-        std::cout <<  motor4 << std::endl;
+        motor2 = msg->data[1];
+        motor3 = msg->data[2];
+        motor4 = msg->data[3];
+        std::cout << motor1;
+        std::cout << motor2;
+        std::cout << motor3;
+        std::cout << motor4 << std::endl;
     }
 
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
