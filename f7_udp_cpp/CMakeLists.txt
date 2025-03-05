@@ -42,22 +42,22 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 
 # ターゲットの定義と依存関係の追加
-add_executable(nr25_mr src/NR25_MR.cpp src/include/UDP.cpp)
+add_executable(nr25_mr src/NR25_MR.cpp src/include/UDP.cpp src/include/IP.cpp)
 ament_target_dependencies(nr25_mr rclcpp std_msgs sensor_msgs geometry_msgs)
 
 add_executable(nr25_mr_omni src/NR25_MR_Omni.cpp src/include/UDP.cpp)
 ament_target_dependencies(nr25_mr_omni rclcpp std_msgs sensor_msgs geometry_msgs)
 
-add_executable(nr25_mr_sd src/NR25_MR_SwerveDrive.cpp src/include/UDP.cpp)
+add_executable(nr25_mr_sd src/NR25_MR_SwerveDrive.cpp src/include/UDP.cpp src/include/IP.cpp)
 ament_target_dependencies(nr25_mr_sd rclcpp std_msgs sensor_msgs geometry_msgs)
 
-add_executable(nr25_dr src/NR25_DR.cpp src/include/UDP.cpp)
+add_executable(nr25_dr src/NR25_DR.cpp src/include/UDP.cpp src/include/IP.cpp)
 ament_target_dependencies(nr25_dr rclcpp std_msgs sensor_msgs geometry_msgs)
 
 add_executable(nr25_dr_omni src/NR25_DR_Omni.cpp src/include/UDP.cpp)
 ament_target_dependencies(nr25_dr_omni rclcpp std_msgs sensor_msgs geometry_msgs)
 
-add_executable(nr25_dr_sd src/NR25_DR_SwerveDrive.cpp src/include/UDP.cpp)
+add_executable(nr25_dr_sd src/NR25_DR_SwerveDrive.cpp src/include/UDP.cpp src/include/IP.cpp)
 ament_target_dependencies(nr25_dr_sd rclcpp std_msgs sensor_msgs geometry_msgs)
 
 add_executable(nr25_enc src/NR25_ENC.cpp)

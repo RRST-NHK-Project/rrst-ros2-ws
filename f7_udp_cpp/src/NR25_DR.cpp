@@ -14,13 +14,10 @@ RRST NHK2025
 #include <std_msgs/msg/int32_multi_array.hpp>
 
 // 自作クラス
+#include "include/IP.hpp"
 #include "include/UDP.hpp"
 
 #define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
-
-// IPアドレスとポートの指定
-std::string udp_ip = "192.168.0.218"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
-int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
 
 std::vector<int16_t> data(19, 0); // 1~5番を電磁弁制御に転用中（-1 or 1）
 
@@ -164,7 +161,7 @@ int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
     rclcpp::executors::SingleThreadedExecutor exec;
-    auto ps4_listener = std::make_shared<PS4_Listener>(udp_ip, udp_port);
+    auto ps4_listener = std::make_shared<PS4_Listener>(IP_DR, PORT_DR);
     // auto params_listener = std::make_shared<Params_Listener>();
     exec.add_node(ps4_listener);
     // exec.add_node(params_listener);

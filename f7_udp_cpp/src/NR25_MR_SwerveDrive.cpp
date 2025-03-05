@@ -17,6 +17,7 @@ RRST NHK2025
 #include <std_msgs/msg/int32_multi_array.hpp>
 
 // 自作クラス
+#include "include/IP.hpp"
 #include "include/UDP.hpp"
 
 // スティックのデッドゾーン
@@ -69,10 +70,6 @@ int SERVO1_CAL = 0;
 int SERVO2_CAL = 0;
 int SERVO3_CAL = 0;
 int SERVO4_CAL = 0;
-
-// IPアドレスとポートの指定
-std::string udp_ip = "192.168.8.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
-int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
 
 std::vector<int16_t> data(19, 0);
 
@@ -519,7 +516,7 @@ int main(int argc, char *argv[]) {
     }
 
     rclcpp::executors::SingleThreadedExecutor exec;
-    auto ps4_listener = std::make_shared<PS4_Listener>(udp_ip, udp_port);
+    auto ps4_listener = std::make_shared<PS4_Listener>(IP_MR_SD, PORT_MR_SD);
     auto servo_deg_publisher = std::make_shared<Servo_Deg_Publisher>();
     auto params_listener = std::make_shared<Params_Listener>();
     exec.add_node(ps4_listener);
