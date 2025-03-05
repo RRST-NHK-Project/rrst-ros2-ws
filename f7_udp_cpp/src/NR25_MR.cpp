@@ -37,7 +37,32 @@ int roller_speed_shoot_ab = 50;
 int roller_speed_shoot_cd = 50;
 int roller_speed_reload = 15;
 
-std::vector<int16_t> data(17, 0); // 7~9番を電磁弁制御に転用中（-1 or 1）
+std::vector<int16_t> data(19, 0); // 7~9番を電磁弁制御に転用中（-1 or 1）
+/*
+マイコンに送信される配列"data"
+debug: マイコンのprintfを有効化, MD: モータードライバー, TR: トランジスタ
+| data[n] | 詳細 | 範囲 |
+| ---- | ---- | ---- |
+| data[0] | debug | 0 or 1 |
+| data[1] | MD1 | -100 ~ 100 |
+| data[2] | MD2 | -100 ~ 100 |
+| data[3] | MD3 | -100 ~ 100 |
+| data[4] | MD4 | -100 ~ 100 |
+| data[5] | MD5 | -100 ~ 100 |
+| data[6] | MD6 | -100 ~ 100 |
+| data[7] | Servo1 | 0 ~ 270 |
+| data[8] | Servo2 | 0 ~ 270 |
+| data[9] | Servo3 | 0 ~ 270 |
+| data[10] | Servo4 | 0 ~ 270 |
+| data[11] | TR1 | 0 or 1|
+| data[12] | TR2 | 0 or 1|
+| data[13] | TR3 | 0 or 1|
+| data[14] | TR4 | 0 or 1|
+| data[15] | TR5 | 0 or 1|
+| data[16] | TR6 | 0 or 1|
+| data[17] | TR7 | 0 or 1|
+| data[18] | TR8 | 0 or 1|
+*/
 
 // 各機構のシーケンスを格納するクラス
 class Action {
