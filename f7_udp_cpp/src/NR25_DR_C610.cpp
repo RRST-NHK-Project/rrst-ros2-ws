@@ -88,6 +88,13 @@ public:
         data[15] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
+        
+        std::cout << "初期状態" << std::endl;
+        data[15] = 0;
+        data[14] = 0;
+        data[13] = 0;
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
 
         ready_for_dunk = false;
         std::cout << "完了." << std::endl;
