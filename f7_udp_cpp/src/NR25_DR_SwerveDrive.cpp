@@ -507,7 +507,7 @@ public:
     Params_Listener()
         : Node("nr25_dr_servo_cal_listener") {
         subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
-            "dr_servo_cal", 10,
+            "mr_servo_cal", 10,
             std::bind(&Params_Listener::params_listener_callback, this,
                       std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(),

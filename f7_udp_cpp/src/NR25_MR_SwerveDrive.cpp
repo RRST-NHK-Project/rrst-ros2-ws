@@ -20,6 +20,8 @@ RRST NHK2025
 #include "include/IP.hpp"
 #include "include/UDP.hpp"
 
+#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
+
 // スティックのデッドゾーン
 #define DEADZONE_L 0.3
 #define DEADZONE_R 0.3
@@ -35,8 +37,6 @@ RRST NHK2025
 #define speed_limit 30
 #define deg_limit 360
 #define DPAD_SPEED 30 // 方向パッド入力時の目標速度
-
-#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 bool CHANGEMODE = false;
 
@@ -66,10 +66,10 @@ int measured_speed = 0;
 static double current_motor_command = 0.0;
 
 // サーボの組み付け時のズレを補正（度数法）
-int SERVO1_CAL = 0;
-int SERVO2_CAL = 0;
-int SERVO3_CAL = 0;
-int SERVO4_CAL = 0;
+int SERVO1_CAL = 7;
+int SERVO2_CAL = -2;
+int SERVO3_CAL = 14;
+int SERVO4_CAL = 10;
 
 std::vector<int16_t> data(19, 0);
 /*

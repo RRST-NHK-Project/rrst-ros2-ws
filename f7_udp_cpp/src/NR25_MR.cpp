@@ -28,14 +28,14 @@ Dribble State: 0
 #include "include/IP.hpp"
 #include "include/UDP.hpp"
 
-#define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
+#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 // 各ローラーの速度を指定(%)
 int roller_speed_dribble_ab = 30;
 int roller_speed_dribble_cd = 30;
 int roller_speed_shoot_ab = 50;
 int roller_speed_shoot_cd = 50;
-int roller_speed_reload = 15;
+int roller_speed_reload = 25;
 
 std::vector<int16_t> data(19, 0); // 7~9番を電磁弁制御に転用中（-1 or 1）
 /*
