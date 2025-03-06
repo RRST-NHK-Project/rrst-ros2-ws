@@ -197,7 +197,7 @@ private:
         // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         // もとの移動方法！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
-        if (CHANGEMODE == 1) {
+        if (CHANGEMODE == 0) {
             // XY座標での正しい角度truedeg
             truedeg = deg;
             if ((0 <= truedeg) && (truedeg <= 180)) {
@@ -305,7 +305,7 @@ private:
         // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         // 加速する移動方法！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
-        if (CHANGEMODE == 0) {
+        if (CHANGEMODE == 1) {
             speed_Output = -PID(measured_speed);
 
             // XY座標での正しい角度truedeg
@@ -507,7 +507,7 @@ public:
     Params_Listener()
         : Node("nr25_dr_servo_cal_listener") {
         subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
-            "mr_servo_cal", 10,
+            "dr_servo_cal", 10,
             std::bind(&Params_Listener::params_listener_callback, this,
                       std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(),
