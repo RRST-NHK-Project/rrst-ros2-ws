@@ -23,6 +23,7 @@ int motor1 = 50;
 int motor2 = 50;
 int motor3 = 50;
 int motor4 = 50;
+int hcsr04 = 0;
 // IPアドレスとポートの指定
 std::string udp_ip = "192.168.0.218"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
@@ -36,6 +37,7 @@ public:
     static bool ready_for_dunk;
 
     static void ready_for_dunk_action(UDP &udp) {
+        std::cout << "ダンク待機開始" << std::endl;
         std::cout << "１段階展開[1]" << std::endl;
         data[11] = 1;
         udp.send(data);
@@ -57,36 +59,117 @@ public:
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-        std::cout << "格納[15]" << std::endl;
+        std::cout << "格納[15]+チルト展開[16]" << std::endl;
         data[15] = 1;
-        std::cout << "サーボ[7]" << std::endl;
-        data[7] = 0;
+        data[16] = 1;
+        udp.send(data);
+        std::cout << "モーター1[1]+モーター2[2]" << std::endl;//ダンクシュート
+        data[1] = -motor1;
+        data[2] = motor2;
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
+        data[1] = 0;
+        data[2] = 0;
+        udp.send(data);// モーター止める
+
+        std::cout << "１段階格納[11]＋２段階格納[12]＋チルト格納[16]" << std::endl;
+        data[11] = 0;
+        data[12] = 0;
+        data[16] = 0;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
 
-        std::cout << "１段階格納[11]＋２段階格納[12]" << std::endl;
-        data[11] = 0;
-        data[12] = 0;
+        std::cout << "格納off[15]" << std::endl;
+        data[15] = 0;
         udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
+
+        std::cout << "格納on[15]" << std::endl;
+        data[15] = 1;
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
+
         ready_for_dunk = false;
         std::cout << "完了." << std::endl;
         std::cout << "<ダンクシーケンス終了>" << std::endl;
     }
+    
+    static void pass_shoot_action(UDP &udp){//パス、シュート
+     std::cout << "パス、シュート開始" << std::endl;    
+     std::cout << "１段階展開[11]＋２段階展開[12]" << std::endl;
+        data[11] = 1;
+        data[12] = 1;
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
+        std::cout << "モーター回転" << std::endl;
+        data[1] = motor1;
+        data[2] = -motor2;
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
+        std::cout << "モーター停止" << std::endl;
+        data[1] = 0;
+        data[2] = 0;
+        udp.send(data);
+        std::cout << "１段階格納[11]＋２段階格納[12]" << std::endl;
+        data[11] = 0;
+        data[12] = 0;
+        udp.send(data);
+        std::cout << "パス、シュート完了" << std::endl;
+    }
+
+    static void ball_load_action(UDP &udp){//ボール保持
+         std::cout << "ボール保持開始" << std::endl;
+        std::cout << "１段階展開[1]" << std::endl;
+        data[11] = 1;
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+        data[1] = motor1;
+        data[2] = -motor2;
+        udp.send(data);
+        std::cout << "１段階格納[11]" << std::endl;
+        data[11] = 0;
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+        //センサーが反応したら
+        if(hcsr04){
+             std::cout << "ボール保持" << std::endl;
+             data[1] = 0;
+             data[2] = 0;
+             udp.send(data);
+             std::cout << "ボール保持完了" << std::endl;
+        }else{//保持できてなかったらもう一回やる
+        std::cout << "ボール保持失敗" << std::endl;
+        data[1] = 0;
+        data[2] = 0;
+        udp.send(data);
+        }
+
+    }
 
     static void dribble_action(UDP &udp) {
-        std::cout << "<ロボマス回転>" << std::endl;
-        data[1] = motor1;
+        std::cout << "ドリブル開始" << std::endl;
+        std::cout << "１段階展開[11]＋２段階展開[12]" << std::endl;
+        data[11] = 1;
+        data[12] = 1;
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
+        std::cout << "<ドリブル[2],[3]>" << std::endl;
+       // data[1] = motor1;
         data[2] = motor2;
         data[3] = motor3;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
-
         std::cout << "<回転終了>" << std::endl;
-         data[1]= 0;
+         //data[1]= 0;
          data[2] = 0;
          data[3] = 0;
-
+         udp.send(data);
+         std::cout << "１段階格納[11]＋２段階格納[12]" << std::endl;
+        data[11] = 0;
+        data[12] = 0;
         udp.send(data);
+        std::cout << "ドリブル完了" << std::endl;
+        
     }
 };
 bool Action::ready_for_dunk = false;
@@ -115,11 +198,11 @@ private:
         bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
         bool TRIANGLE = msg->buttons[2];
-        // bool SQUARE = msg->buttons[3];
+        bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
         // bool RIGHT = msg->axes[6] == -1.0;
-        // bool UP = msg->axes[7] == 1.0;
+        bool UP = msg->axes[7] == 1.0;
         // bool DOWN = msg->axes[7] == -1.0;
 
         // bool L1 = msg->buttons[4];
@@ -157,7 +240,7 @@ private:
         //     rclcpp::shutdown();
         // }
 
-        if (TRIANGLE) {
+        if (SQUARE) {
             Action::ready_for_dunk_action(udp_);
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
@@ -167,10 +250,18 @@ private:
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
 
-        if (CROSS) {
+        if (TRIANGLE) {
             // std::cout << "<ロボマス回転>" << std::endl;
             Action::dribble_action(udp_);
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+        if (CROSS) {
+            Action::pass_shoot_action(udp_);
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+        if (UP){
+            Action::ball_load_action(udp_);
+            std::this_thread::sleep_for(std::chrono::milliseconds(500)); 
         }
 
         udp_.send(data);
@@ -206,6 +297,28 @@ private:
 
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
 };
+
+class hcsr04_Listener : public rclcpp::Node {
+public:
+    hcsr04_Listener()
+        : Node("nhk25_dr_hcsr04") {
+        subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
+            "hcsr04", 10,
+            std::bind(&hcsr04_Listener::hcsr04_listener_callback, this,
+                      std::placeholders::_1));
+        RCLCPP_INFO(this->get_logger(),
+                    "NHK2025 HCSR04 Listener");
+    }
+
+private:
+    void hcsr04_listener_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        hcsr04 = msg->data[4]; 
+        std::cout << hcsr04<< std::endl;
+    }
+
+    rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
+};
+
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
