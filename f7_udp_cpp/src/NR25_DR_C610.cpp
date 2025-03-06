@@ -17,6 +17,8 @@ RRST NHK2025
 // 自作クラス
 #include "include/UDP.hpp"
 
+#define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
+
 int motor1 = 50;
 int motor2 = 50;
 int motor3 = 50;
@@ -132,6 +134,8 @@ private:
 
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
+
+ data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
         if (PS) {
             std::fill(data.begin(), data.end(), 0);                          // 配列をゼロで埋める                                      // 最後の3つを-1に
