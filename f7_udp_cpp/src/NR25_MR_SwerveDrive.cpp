@@ -17,7 +17,10 @@ RRST NHK2025
 #include <std_msgs/msg/int32_multi_array.hpp>
 
 // 自作クラス
+#include "include/IP.hpp"
 #include "include/UDP.hpp"
+
+#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 // スティックのデッドゾーン
 #define DEADZONE_L 0.3
@@ -34,8 +37,6 @@ RRST NHK2025
 #define speed_limit 30
 #define deg_limit 360
 #define DPAD_SPEED 30 // 方向パッド入力時の目標速度
-
-#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 bool CHANGEMODE = false;
 
@@ -65,16 +66,37 @@ int measured_speed = 0;
 static double current_motor_command = 0.0;
 
 // サーボの組み付け時のズレを補正（度数法）
-int SERVO1_CAL = 0;
-int SERVO2_CAL = 0;
-int SERVO3_CAL = 0;
-int SERVO4_CAL = 0;
-
-// IPアドレスとポートの指定
-std::string udp_ip = "192.168.8.215"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
-int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
+int SERVO1_CAL = 7;
+int SERVO2_CAL = -2;
+int SERVO3_CAL = 14;
+int SERVO4_CAL = 10;
 
 std::vector<int16_t> data(19, 0);
+/*
+マイコンに送信される配列"data"
+debug: マイコンのprintfを有効化, MD: モータードライバー, TR: トランジスタ
+| data[n] | 詳細 | 範囲 |
+| ---- | ---- | ---- |
+| data[0] | debug | 0 or 1 |
+| data[1] | MD1 | -100 ~ 100 |
+| data[2] | MD2 | -100 ~ 100 |
+| data[3] | MD3 | -100 ~ 100 |
+| data[4] | MD4 | -100 ~ 100 |
+| data[5] | MD5 | -100 ~ 100 |
+| data[6] | MD6 | -100 ~ 100 |
+| data[7] | Servo1 | 0 ~ 270 |
+| data[8] | Servo2 | 0 ~ 270 |
+| data[9] | Servo3 | 0 ~ 270 |
+| data[10] | Servo4 | 0 ~ 270 |
+| data[11] | TR1 | 0 or 1|
+| data[12] | TR2 | 0 or 1|
+| data[13] | TR3 | 0 or 1|
+| data[14] | TR4 | 0 or 1|
+| data[15] | TR5 | 0 or 1|
+| data[16] | TR6 | 0 or 1|
+| data[17] | TR7 | 0 or 1|
+| data[18] | TR8 | 0 or 1|
+*/
 
 class PS4_Listener : public rclcpp::Node {
 public:
@@ -176,7 +198,7 @@ private:
         // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         // もとの移動方法！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
-        if (CHANGEMODE == 1) {
+        if (CHANGEMODE == 0) {
             // XY座標での正しい角度truedeg
             truedeg = deg;
             if ((0 <= truedeg) && (truedeg <= 180)) {
@@ -284,7 +306,7 @@ private:
         // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         // 加速する移動方法！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
-        if (CHANGEMODE == 0) {
+        if (CHANGEMODE == 1) {
             speed_Output = -PID(measured_speed);
 
             // XY座標での正しい角度truedeg
@@ -519,7 +541,7 @@ int main(int argc, char *argv[]) {
     }
 
     rclcpp::executors::SingleThreadedExecutor exec;
-    auto ps4_listener = std::make_shared<PS4_Listener>(udp_ip, udp_port);
+    auto ps4_listener = std::make_shared<PS4_Listener>(IP_MR_SD, PORT_MR_SD);
     auto servo_deg_publisher = std::make_shared<Servo_Deg_Publisher>();
     auto params_listener = std::make_shared<Params_Listener>();
     exec.add_node(ps4_listener);

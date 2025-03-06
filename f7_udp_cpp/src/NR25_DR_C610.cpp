@@ -17,6 +17,8 @@ RRST NHK2025
 // 自作クラス
 #include "include/UDP.hpp"
 
+#define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
+
 int motor1 = 50;
 int motor2 = 50;
 int motor3 = 50;
@@ -35,7 +37,7 @@ public:
 
     static void ready_for_dunk_action(UDP &udp) {
         std::cout << "１段階展開[1]" << std::endl;
-        data[1] = 1;
+        data[11] = 1;
         udp.send(data);
         ready_for_dunk = true;
         std::cout << "完了." << std::endl;
@@ -44,27 +46,27 @@ public:
     static void dunk_shoot_action(UDP &udp) {
         std::cout << "<ダンクシーケンス開始>" << std::endl;
 
-        std::cout << "２段階展開[2]＋トリガー[3]" << std::endl;
-        data[2] = 1;
-        data[3] = 1;
+        std::cout << "２段階展開[12]＋トリガー[13]" << std::endl;
+        data[12] = 1;
+        data[13] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
-        std::cout << "ストッパ[4]" << std::endl;
-        data[4] = 1;
+        std::cout << "ストッパ[14]" << std::endl;
+        data[14] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-        std::cout << "格納[5]" << std::endl;
-        data[5] = 1;
-        std::cout << "サーボ[8]" << std::endl;
-        data[8] = 0;
+        std::cout << "格納[15]" << std::endl;
+        data[15] = 1;
+        std::cout << "サーボ[7]" << std::endl;
+        data[7] = 0;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
 
-        std::cout << "１段階格納[1]＋２段階格納[2]" << std::endl;
-        data[1] = -1;
-        data[2] = -1;
+        std::cout << "１段階格納[11]＋２段階格納[12]" << std::endl;
+        data[11] = 0;
+        data[12] = 0;
         udp.send(data);
         ready_for_dunk = false;
         std::cout << "完了." << std::endl;
@@ -73,16 +75,17 @@ public:
 
     static void dribble_action(UDP &udp) {
         std::cout << "<ロボマス回転>" << std::endl;
-        data[6] = motor1;
-        data[7] = motor2;
-        data[8] = motor3;
+        data[1] = motor1;
+        data[2] = motor2;
+        data[3] = motor3;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
 
         std::cout << "<回転終了>" << std::endl;
-        data[6] = 0;
-        data[7] = 0;
-        data[8] = 0;
+         data[1]= 0;
+         data[2] = 0;
+         data[3] = 0;
+
         udp.send(data);
     }
 };
@@ -132,9 +135,10 @@ private:
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
 
+ data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
+
         if (PS) {
-            std::fill(data.begin(), data.end(), 0);                          // 配列をゼロで埋める
-            data[6] = data[7] = data[8] = -1;                                // 最後の3つを-1に
+            std::fill(data.begin(), data.end(), 0);                          // 配列をゼロで埋める                                      // 最後の3つを-1に
             for (int attempt = 0; attempt < 10; attempt++) {                 // 10回試行
                 udp_.send(data);                                             // データ送信
                 std::cout << "緊急停止！ 試行" << attempt + 1 << std::endl;  // 試行回数を表示
