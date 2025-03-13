@@ -41,6 +41,7 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 
+
 # ターゲットの定義と依存関係の追加
 add_executable(nr25_mr src/NR25_MR.cpp src/include/UDP.cpp src/include/IP.cpp)
 ament_target_dependencies(nr25_mr rclcpp std_msgs sensor_msgs geometry_msgs)
@@ -91,8 +92,12 @@ add_executable(nr25_dr_pr src/NR25_DR_Parameter_Tuner.cpp)
 ament_target_dependencies(nr25_dr_pr rclcpp std_msgs sensor_msgs geometry_msgs)
 target_include_directories(nr25_dr_pr PRIVATE ${nlohmann_json_SOURCE_DIR}/single_include)
 
+add_executable(nr25_dr_hcsr04 src/NR25_DR_HCSR04.cpp)
+ament_target_dependencies(nr25_dr_hcsr04 rclcpp std_msgs sensor_msgs geometry_msgs)
+
 add_executable(mb_tester src/MB_TESTER.cpp src/include/UDP.cpp)
 ament_target_dependencies(mb_tester rclcpp std_msgs sensor_msgs geometry_msgs)
+
 
 # インストール設定
 install(TARGETS
@@ -111,6 +116,7 @@ install(TARGETS
   nr25_mr_servo_cal
   nr25_dr_servo_cal
   nr25_dr_pr
+  nr25_dr_hcsr04
   mb_tester
   DESTINATION lib/${PROJECT_NAME})
 
