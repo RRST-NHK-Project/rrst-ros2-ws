@@ -28,7 +28,32 @@ int hcsr04 = 0;
 std::string udp_ip = "192.168.0.218"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
 
-std::vector<int16_t> data(19, 0); // 1~5番を電磁弁制御に転用中（-1 or 1）
+std::vector<int16_t> data(19, 0);
+/*
+マイコンに送信される配列"data"
+debug: マイコンのprintfを有効化, MD: モータードライバー, TR: トランジスタ
+| data[n] | 詳細 | 範囲 |
+| ---- | ---- | ---- |
+| data[0] | debug | 0 or 1 |
+| data[1] | MD1 | -100 ~ 100 |
+| data[2] | MD2 | -100 ~ 100 |
+| data[3] | MD3 | -100 ~ 100 |
+| data[4] | MD4 | -100 ~ 100 |
+| data[5] | MD5 | -100 ~ 100 |
+| data[6] | MD6 | -100 ~ 100 |
+| data[7] | Servo1 | 0 ~ 270 |
+| data[8] | Servo2 | 0 ~ 270 |
+| data[9] | Servo3 | 0 ~ 270 |
+| data[10] | Servo4 | 0 ~ 270 |
+| data[11] | TR1 | 0 or 1|
+| data[12] | TR2 | 0 or 1|
+| data[13] | TR3 | 0 or 1|
+| data[14] | TR4 | 0 or 1|
+| data[15] | TR5 | 0 or 1|
+| data[16] | TR6 | 0 or 1|
+| data[17] | TR7 | 0 or 1|
+| data[18] | TR8 | 0 or 1|
+*/
 
 // 各機構のシーケンスを格納するクラス
 class Action {
@@ -63,14 +88,14 @@ public:
         data[15] = 1;
         data[16] = 1;
         udp.send(data);
-        std::cout << "モーター1[1]+モーター2[2]" << std::endl;//ダンクシュート
+        std::cout << "モーター1[1]+モーター2[2]" << std::endl; // ダンクシュート
         data[1] = -motor1;
         data[2] = motor2;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
         data[1] = 0;
         data[2] = 0;
-        udp.send(data);// モーター止める
+        udp.send(data); // モーター止める
 
         std::cout << "１段階格納[11]＋２段階格納[12]＋チルト格納[16]" << std::endl;
         data[11] = 0;
@@ -88,7 +113,7 @@ public:
         data[15] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
-        
+
         std::cout << "初期状態" << std::endl;
         data[15] = 0;
         data[14] = 0;
@@ -100,10 +125,10 @@ public:
         std::cout << "完了." << std::endl;
         std::cout << "<ダンクシーケンス終了>" << std::endl;
     }
-    
-    static void pass_shoot_action(UDP &udp){//パス、シュート
-     std::cout << "パス、シュート開始" << std::endl;    
-     std::cout << "１段階展開[11]＋２段階展開[12]" << std::endl;
+
+    static void pass_shoot_action(UDP &udp) { // パス、シュート
+        std::cout << "パス、シュート開始" << std::endl;
+        std::cout << "１段階展開[11]＋２段階展開[12]" << std::endl;
         data[11] = 1;
         data[12] = 1;
         udp.send(data);
@@ -124,8 +149,8 @@ public:
         std::cout << "パス、シュート完了" << std::endl;
     }
 
-    static void ball_load_action(UDP &udp){//ボール保持
-         std::cout << "ボール保持開始" << std::endl;
+    static void ball_load_action(UDP &udp) { // ボール保持
+        std::cout << "ボール保持開始" << std::endl;
         std::cout << "１段階展開[1]" << std::endl;
         data[11] = 1;
         udp.send(data);
@@ -137,20 +162,19 @@ public:
         data[11] = 0;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-        //センサーが反応したら
-        if(hcsr04){
-             std::cout << "ボール保持" << std::endl;
-             data[1] = 0;
-             data[2] = 0;
-             udp.send(data);
-             std::cout << "ボール保持完了" << std::endl;
-        }else{//保持できてなかったらもう一回やる
-        std::cout << "ボール保持失敗" << std::endl;
-        data[1] = 0;
-        data[2] = 0;
-        udp.send(data);
+        // センサーが反応したら
+        if (hcsr04) {
+            std::cout << "ボール保持" << std::endl;
+            data[1] = 0;
+            data[2] = 0;
+            udp.send(data);
+            std::cout << "ボール保持完了" << std::endl;
+        } else { // 保持できてなかったらもう一回やる
+            std::cout << "ボール保持失敗" << std::endl;
+            data[1] = 0;
+            data[2] = 0;
+            udp.send(data);
         }
-
     }
 
     static void dribble_action(UDP &udp) {
@@ -161,22 +185,21 @@ public:
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
         std::cout << "<ドリブル[2],[3]>" << std::endl;
-       // data[1] = motor1;
+        // data[1] = motor1;
         data[2] = motor2;
         data[3] = motor3;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
         std::cout << "<回転終了>" << std::endl;
-         //data[1]= 0;
-         data[2] = 0;
-         data[3] = 0;
-         udp.send(data);
-         std::cout << "１段階格納[11]＋２段階格納[12]" << std::endl;
+        // data[1]= 0;
+        data[2] = 0;
+        data[3] = 0;
+        udp.send(data);
+        std::cout << "１段階格納[11]＋２段階格納[12]" << std::endl;
         data[11] = 0;
         data[12] = 0;
         udp.send(data);
         std::cout << "ドリブル完了" << std::endl;
-        
     }
 };
 bool Action::ready_for_dunk = false;
@@ -225,7 +248,7 @@ private:
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
 
- data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
+        data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
         if (PS) {
             std::fill(data.begin(), data.end(), 0);                          // 配列をゼロで埋める                                      // 最後の3つを-1に
@@ -266,9 +289,9 @@ private:
             Action::pass_shoot_action(udp_);
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
-        if (UP){
+        if (UP) {
             Action::ball_load_action(udp_);
-            std::this_thread::sleep_for(std::chrono::milliseconds(500)); 
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
 
         udp_.send(data);
@@ -319,13 +342,12 @@ public:
 
 private:
     void hcsr04_listener_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
-        hcsr04 = msg->data[4]; 
-        std::cout << hcsr04<< std::endl;
+        hcsr04 = msg->data[4]; // FIXME: 適切なインデックスに変更
+        std::cout << hcsr04 << std::endl;
     }
 
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
 };
-
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);

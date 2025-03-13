@@ -37,7 +37,7 @@ int roller_speed_shoot_ab = 50;
 int roller_speed_shoot_cd = 50;
 int roller_speed_reload = 25;
 
-std::vector<int16_t> data(19, 0); // 7~9番を電磁弁制御に転用中（-1 or 1）
+std::vector<int16_t> data(19, 0);
 /*
 マイコンに送信される配列"data"
 debug: マイコンのprintfを有効化, MD: モータードライバー, TR: トランジスタ
