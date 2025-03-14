@@ -7,7 +7,8 @@ ROS 2-マイコン間の通信をUDPで行うパッケージです。マイコ�
 | Ubuntu 24.04 LTS | Jazzy | 
 
 ## マイコン側のプログラム 
-ros2_udp_pioリポジトリがマイコン側のプログラム群です。
+[ros2udp_pio](https://github.com/RRST-NHK-Project/ros2udp_pio.git)
+リポジトリがマイコン側のプログラム群です。
 
 ## 使い方
 ### １，マイコン側プログラムの書き込み
