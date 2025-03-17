@@ -28,7 +28,7 @@ Dribble State: 0
 #include "include/IP.hpp"
 #include "include/UDP.hpp"
 
-#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
+#define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 // 各ローラーの速度を指定(%)
 int roller_speed_dribble_ab = 30;
@@ -142,6 +142,62 @@ public:
         std::cout << "完了." << std::endl;
         std::cout << "<ドリブルシーケンス終了>" << std::endl;
     }
+
+    // テスト用！！実機で実行するな！！！！
+    static void tester(UDP &udp) {
+        int tester_time = 150;
+        while (1) {
+            data[11] = 1;
+            udp.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
+            data[12] = 1;
+            udp.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
+            data[13] = 1;
+            udp.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
+            data[14] = 1;
+            udp.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
+            data[15] = 1;
+            udp.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
+            data[16] = 1;
+            udp.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
+            data[17] = 1;
+            udp.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
+            data[18] = 1;
+            udp.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
+
+            data[11] = 0;
+            udp.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
+            data[12] = 0;
+            udp.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
+            data[13] = 0;
+            udp.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
+            data[14] = 0;
+            udp.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
+            data[15] = 0;
+            udp.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
+            data[16] = 0;
+            udp.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
+            data[17] = 0;
+            udp.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
+            data[18] = 0;
+            udp.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
+        }
+    }
 };
 
 bool Action::ready_for_shoot = false;
@@ -215,6 +271,10 @@ private:
         if (TRIANGLE && !Action::ready_for_shoot) {
             Action::dribble_action(udp_);
         }
+
+        // if (OPTION) {
+        //     Action::tester(udp_);
+        // }
 
         udp_.send(data);
     }

@@ -10,7 +10,7 @@ RRST NHK2025
 
 // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 const std::string IP_MR_SD = "192.168.8.215";
-const std::string IP_MR = "192.168.8.216";
+const std::string IP_MR = "192.168.0.216";
 const std::string IP_DR_SD = "192.168.0.217";
 const std::string IP_DR = "192.168.0.218";
 
