@@ -147,57 +147,19 @@ public:
     static void tester(UDP &udp) {
         int tester_time = 150;
         while (1) {
-            data[11] = 1;
-            udp.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
-            data[12] = 1;
-            udp.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
-            data[13] = 1;
-            udp.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
-            data[14] = 1;
-            udp.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
-            data[15] = 1;
-            udp.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
-            data[16] = 1;
-            udp.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
-            data[17] = 1;
-            udp.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
-            data[18] = 1;
-            udp.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
-
-            data[11] = 0;
-            udp.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
-            data[12] = 0;
-            udp.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
-            data[13] = 0;
-            udp.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
-            data[14] = 0;
-            udp.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
-            data[15] = 0;
-            udp.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
-            data[16] = 0;
-            udp.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
-            data[17] = 0;
-            udp.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
-            data[18] = 0;
-            udp.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
+            for (int i = 11; i <= 18; ++i) {
+                data[i] = 1;
+                udp.send(data);
+                std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
+            }
+            for (int i = 11; i <= 18; ++i) {
+                data[i] = 0;
+                udp.send(data);
+                std::this_thread::sleep_for(std::chrono::milliseconds(tester_time));
+            }
         }
     }
+    
 };
 
 bool Action::ready_for_shoot = false;
