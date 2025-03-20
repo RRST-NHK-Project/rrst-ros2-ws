@@ -89,12 +89,14 @@ public:
         data[16] = 1;
         udp.send(data);
         std::cout << "モーター1[1]+モーター2[2]" << std::endl; // ダンクシュート
-        data[1] = -motor1;
-        data[2] = motor2;
+        data[1] = -30;
+        data[2] = 50;
+        data[3] = 100;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
         data[1] = 0;
         data[2] = 0;
+        data[3] = 0;
         udp.send(data); // モーター止める
 
         std::cout << "１段階格納[11]＋２段階格納[12]＋チルト格納[16]" << std::endl;
@@ -134,8 +136,8 @@ public:
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
         std::cout << "モーター回転" << std::endl;
-        data[1] = motor1;
-        data[2] = -motor2;
+        data[1] = 80;
+        data[2] = -80;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
         std::cout << "モーター停止" << std::endl;
@@ -156,23 +158,30 @@ public:
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000));
         data[1] = motor1;
-        data[2] = -motor2;
+        data[3] = -motor2;
+        data[2] = motor2;
         udp.send(data);
         std::cout << "１段階格納[11]" << std::endl;
         data[11] = 0;
         udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         // センサーが反応したら
         if (hcsr04) {
             std::cout << "ボール保持" << std::endl;
-            data[1] = 0;
             data[2] = 0;
+            udp.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            data[1] = 0;
+            data[3] = 0;
             udp.send(data);
             std::cout << "ボール保持完了" << std::endl;
         } else { // 保持できてなかったらもう一回やる
             std::cout << "ボール保持失敗" << std::endl;
-            data[1] = 0;
             data[2] = 0;
+            udp.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            data[1] = 0;
+            data[3] = 0;
             udp.send(data);
         }
     }
@@ -186,13 +195,13 @@ public:
         std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
         std::cout << "<ドリブル[2],[3]>" << std::endl;
         // data[1] = motor1;
-        data[2] = motor2;
-        data[3] = motor3;
+        data[1] = -10;
+        data[3] = 80;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
         std::cout << "<回転終了>" << std::endl;
         // data[1]= 0;
-        data[2] = 0;
+        data[1] = 0;
         data[3] = 0;
         udp.send(data);
         std::cout << "１段階格納[11]＋２段階格納[12]" << std::endl;
