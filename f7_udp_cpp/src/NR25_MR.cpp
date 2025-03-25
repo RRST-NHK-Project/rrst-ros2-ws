@@ -32,10 +32,10 @@ Dribble State: 0
 
 // 各ローラーの速度を指定(%)
 int roller_speed_dribble_ab = 30;
-int roller_speed_dribble_cd = 30;
-int roller_speed_shoot_ab = 50;
-int roller_speed_shoot_cd = 50;
-int roller_speed_reload = 25;
+int roller_speed_dribble_cd = 70;
+int roller_speed_shoot_ab = 90;
+int roller_speed_shoot_cd = 90;
+int roller_speed_reload = 35;
 
 std::vector<int16_t> data(19, 0);
 /*
@@ -159,7 +159,6 @@ public:
             }
         }
     }
-    
 };
 
 bool Action::ready_for_shoot = false;
