@@ -280,7 +280,7 @@ private:
             }
 
             // 時計回りYAW回転
-            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R) {
+            if (RS_X > 0 && fabs(RS_X) >= DEADZONE_R) {
                 data[7] = 180 + SERVO1_CAL;
                 data[8] = 90 + SERVO2_CAL;
                 data[9] = 90 + SERVO3_CAL;
@@ -291,7 +291,7 @@ private:
                 data[4] = yawspeed;
             }
             // 半時計回りYAW回転
-            if (0 < RS_X && fabs(RS_X) >= DEADZONE_R) {
+            if (0 > RS_X && fabs(RS_X) >= DEADZONE_R) {
                 data[7] = 180 + SERVO1_CAL;
                 data[8] = 90 + SERVO2_CAL;
                 data[9] = 90 + SERVO3_CAL;
