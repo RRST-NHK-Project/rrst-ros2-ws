@@ -39,6 +39,7 @@ RRST NHK2025
 #define DPAD_SPEED 30 // 方向パッド入力時の目標速度
 
 bool CHANGEMODE = false;
+bool REVERSEMODE = false;
 
 // グローバル変数（角度一覧）
 int deg = 0;
@@ -168,12 +169,14 @@ private:
         // float L2 = (-1 * msg->axes[2] + 1) / 2;
         float R2 = (-1 * msg->axes[5] + 1) / 2;
 
-        // bool SHARE = msg->buttons[8];
+        bool SHARE = msg->buttons[8];
         bool OPTION = msg->buttons[9];
         bool PS = msg->buttons[10];
         static bool last_option = false; // 前回の状態を保持する static 変数
+        static bool last_share = false;
         // OPTION のラッチ状態を保持する static 変数（初期状態は OFF とする）
         static bool option_latch = false;
+        static bool share_latch = false;
 
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
@@ -195,81 +198,150 @@ private:
         if (OPTION && !last_option) {
             option_latch = !option_latch;
         }
+        if (SHARE && !last_share){
+            share_latch = !share_latch;
+        }
         // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         // もとの移動方法！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         if (CHANGEMODE == 0) {
             // XY座標での正しい角度truedeg
-            truedeg = deg;
-            if ((0 <= truedeg) && (truedeg <= 180)) {
-                truedeg = truedeg;
-            }
-            if ((-180 <= truedeg) && (truedeg <= 0)) {
-                truedeg = -truedeg + 360;
-            }
+            if (REVERSEMODE == 0) {
+                truedeg = deg;
+                if ((0 <= truedeg) && (truedeg <= 180)) {
+                    truedeg = truedeg;
+                }
+                if ((-180 <= truedeg) && (truedeg <= 0)) {
+                    truedeg = -truedeg + 360;
+                }
 
-            // ！！！！！最重要！！！！！
-            //  XY座標での９０度の位置に１３５度を変換して計算
-            if ((-180 <= deg) && (deg <= -135)) {
-                deg = -deg - 135;
-            } else {
-                deg = 225 - deg;
-            }
+                // ！！！！！最重要！！！！！
+                //  XY座標での９０度の位置に１３５度を変換して計算
+                if ((-180 <= deg) && (deg <= -135)) {
+                    deg = -deg - 135;
+                } else {
+                    deg = 225 - deg;
+                }
 
-            // deadzone追加
-            if ((fabs(LS_X) <= DEADZONE_R) && (fabs(LS_Y) <= DEADZONE_R) && (fabs(RS_X) <= DEADZONE_L)) {
-                deg = 135;
-                data[1] = 0;
-                data[2] = 0;
-                data[3] = 0;
-                data[4] = 0;
-                data[7] = deg + SERVO1_CAL;
-                data[8] = deg + SERVO2_CAL;
-                data[9] = deg + SERVO3_CAL;
-                data[10] = deg + SERVO4_CAL;
-            }
+                // deadzone追加
+                if ((fabs(LS_X) <= DEADZONE_R) && (fabs(LS_Y) <= DEADZONE_R) && (fabs(RS_X) <= DEADZONE_L)) {
+                    deg = 135;
+                    data[1] = 0;
+                    data[2] = 0;
+                    data[3] = 0;
+                    data[4] = 0;
+                    data[7] = deg + SERVO1_CAL;
+                    data[8] = deg + SERVO2_CAL;
+                    data[9] = deg + SERVO3_CAL;
+                    data[10] = deg + SERVO4_CAL;
+                }
 
-            data[1] = -wheelspeed * R2;
-            data[2] = -wheelspeed * R2;
-            data[3] = -wheelspeed * R2;
-            data[4] = -wheelspeed * R2;
-            data[7] = deg + SERVO1_CAL;
-            data[8] = deg + SERVO2_CAL;
-            data[9] = deg + SERVO3_CAL;
-            data[10] = deg + SERVO4_CAL;
-
-            if (LEFT) {
-                deg = 45;
                 data[1] = -wheelspeed * R2;
                 data[2] = -wheelspeed * R2;
                 data[3] = -wheelspeed * R2;
                 data[4] = -wheelspeed * R2;
-            }
-            if (RIGHT) {
-                deg = 45;
-                data[1] = wheelspeed * R2;
-                data[2] = wheelspeed * R2;
-                data[3] = wheelspeed * R2;
-                data[4] = wheelspeed * R2;
-            }
-            if (UP) {
-                deg = 135;
-                data[1] = -wheelspeed * R2;
-                data[2] = -wheelspeed * R2;
-                data[3] = -wheelspeed * R2;
-                data[4] = -wheelspeed * R2;
-            }
-            if (DOWN) {
-                deg = 135;
-                data[1] = wheelspeed * R2;
-                data[2] = wheelspeed * R2;
-                data[3] = wheelspeed * R2;
-                data[4] = wheelspeed * R2;
-            }
+                data[7] = deg + SERVO1_CAL;
+                data[8] = deg + SERVO2_CAL;
+                data[9] = deg + SERVO3_CAL;
+                data[10] = deg + SERVO4_CAL;
 
-            // 独ステが扱えない範囲の変換
-            if ((270 < deg) && (deg < 360)) {
-                deg = deg - 180;
+                if (LEFT) {
+                    deg = 45;
+                    data[1] = -wheelspeed * R2;
+                    data[2] = -wheelspeed * R2;
+                    data[3] = -wheelspeed * R2;
+                    data[4] = -wheelspeed * R2;
+                }
+                if (RIGHT) {
+                    deg = 45;
+                    data[1] = wheelspeed * R2;
+                    data[2] = wheelspeed * R2;
+                    data[3] = wheelspeed * R2;
+                    data[4] = wheelspeed * R2;
+                }
+                if (UP) {
+                    deg = 135;
+                    data[1] = -wheelspeed * R2;
+                    data[2] = -wheelspeed * R2;
+                    data[3] = -wheelspeed * R2;
+                    data[4] = -wheelspeed * R2;
+                }
+                if (DOWN) {
+                    deg = 135;
+                    data[1] = wheelspeed * R2;
+                    data[2] = wheelspeed * R2;
+                    data[3] = wheelspeed * R2;
+                    data[4] = wheelspeed * R2;
+                }
+
+                // 独ステが扱えない範囲の変換
+                if ((270 < deg) && (deg < 360)) {
+                    deg = deg - 180;
+                    data[1] = wheelspeed * R2;
+                    data[2] = wheelspeed * R2;
+                    data[3] = wheelspeed * R2;
+                    data[4] = wheelspeed * R2;
+                    data[7] = deg + SERVO1_CAL;
+                    data[8] = deg + SERVO2_CAL;
+                    data[9] = deg + SERVO3_CAL;
+                    data[10] = deg + SERVO4_CAL;
+                }
+
+                // 時計回りYAW回転
+                if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R) {
+                    data[7] = 180 + SERVO1_CAL;
+                    data[8] = 90 + SERVO2_CAL;
+                    data[9] = 90 + SERVO3_CAL;
+                    data[10] = 180 + SERVO4_CAL;
+                    data[1] = -yawspeed;
+                    data[2] = yawspeed;
+                    data[3] = -yawspeed;
+                    data[4] = yawspeed;
+                }
+                // 半時計回りYAW回転
+                if (0 < RS_X && fabs(RS_X) >= DEADZONE_R) {
+                    data[7] = 180 + SERVO1_CAL;
+                    data[8] = 90 + SERVO2_CAL;
+                    data[9] = 90 + SERVO3_CAL;
+                    data[10] = 180 + SERVO4_CAL;
+                    data[1] = yawspeed;
+                    data[2] = -yawspeed;
+                    data[3] = yawspeed;
+                    data[4] = -yawspeed;
+                }
+            }
+            //反転モード
+            //
+            if (REVERSEMODE ==1){
+                truedeg = deg;
+                if ((0 <= truedeg) && (truedeg <= 180)) {
+                    truedeg = truedeg;
+                }
+                if ((-180 <= truedeg) && (truedeg <= 0)) {
+                    truedeg = -truedeg + 360;
+                }
+
+                // ！！！！！最重要！！！！！
+                //  XY座標での９０度の位置に１３５度を変換して計算
+                if ((-180 <= deg) && (deg <= -135)) {
+                    deg = -deg - 135;
+                } else {
+                    deg = 225 - deg;
+                }
+
+                // deadzone追加
+                if ((fabs(LS_X) <= DEADZONE_R) && (fabs(LS_Y) <= DEADZONE_R) && (fabs(RS_X) <= DEADZONE_L)) {
+                    deg = 135;
+                    data[1] = 0;
+                    data[2] = 0;
+                    data[3] = 0;
+                    data[4] = 0;
+                    data[7] = deg + SERVO1_CAL;
+                    data[8] = deg + SERVO2_CAL;
+                    data[9] = deg + SERVO3_CAL;
+                    data[10] = deg + SERVO4_CAL;
+                }
+
                 data[1] = wheelspeed * R2;
                 data[2] = wheelspeed * R2;
                 data[3] = wheelspeed * R2;
@@ -278,30 +350,75 @@ private:
                 data[8] = deg + SERVO2_CAL;
                 data[9] = deg + SERVO3_CAL;
                 data[10] = deg + SERVO4_CAL;
-            }
 
-            // 時計回りYAW回転
-            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R) {
-                data[7] = 180 + SERVO1_CAL;
-                data[8] = 90 + SERVO2_CAL;
-                data[9] = 90 + SERVO3_CAL;
-                data[10] = 180 + SERVO4_CAL;
-                data[1] = -yawspeed;
-                data[2] = yawspeed;
-                data[3] = -yawspeed;
-                data[4] = yawspeed;
+                if (LEFT) {
+                    deg = 45;
+                    data[1] = wheelspeed * R2;
+                    data[2] = wheelspeed * R2;
+                    data[3] = wheelspeed * R2;
+                    data[4] = wheelspeed * R2;
+                }
+                if (RIGHT) {
+                    deg = 45;
+                    data[1] = -wheelspeed * R2;
+                    data[2] = -wheelspeed * R2;
+                    data[3] = -wheelspeed * R2;
+                    data[4] = -wheelspeed * R2;
+                }
+                if (UP) {
+                    deg = 135;
+                    data[1] = wheelspeed * R2;
+                    data[2] = wheelspeed * R2;
+                    data[3] = wheelspeed * R2;
+                    data[4] = wheelspeed * R2;
+                }
+                if (DOWN) {
+                    deg = 135;
+                    data[1] = -wheelspeed * R2;
+                    data[2] = -wheelspeed * R2;
+                    data[3] = -wheelspeed * R2;
+                    data[4] = -wheelspeed * R2;
+                }
+
+                // 独ステが扱えない範囲の変換
+                if ((270 < deg) && (deg < 360)) {
+                    deg = deg - 180;
+                    data[1] = -wheelspeed * R2;
+                    data[2] = -wheelspeed * R2;
+                    data[3] = -wheelspeed * R2;
+                    data[4] = -wheelspeed * R2;
+                    data[7] = deg + SERVO1_CAL;
+                    data[8] = deg + SERVO2_CAL;
+                    data[9] = deg + SERVO3_CAL;
+                    data[10] = deg + SERVO4_CAL;
+                }
+
+                // 時計回りYAW回転
+                if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R) {
+                    data[7] = 180 + SERVO1_CAL;
+                    data[8] = 90 + SERVO2_CAL;
+                    data[9] = 90 + SERVO3_CAL;
+                    data[10] = 180 + SERVO4_CAL;
+                    data[1] = -yawspeed;
+                    data[2] = yawspeed;
+                    data[3] = -yawspeed;
+                    data[4] = yawspeed;
+                }
+                // 半時計回りYAW回転
+                if (0 < RS_X && fabs(RS_X) >= DEADZONE_R) {
+                    data[7] = 180 + SERVO1_CAL;
+                    data[8] = 90 + SERVO2_CAL;
+                    data[9] = 90 + SERVO3_CAL;
+                    data[10] = 180 + SERVO4_CAL;
+                    data[1] = yawspeed;
+                    data[2] = -yawspeed;
+                    data[3] = yawspeed;
+                    data[4] = -yawspeed;
+                }
             }
-            // 半時計回りYAW回転
-            if (0 < RS_X && fabs(RS_X) >= DEADZONE_R) {
-                data[7] = 180 + SERVO1_CAL;
-                data[8] = 90 + SERVO2_CAL;
-                data[9] = 90 + SERVO3_CAL;
-                data[10] = 180 + SERVO4_CAL;
-                data[1] = yawspeed;
-                data[2] = -yawspeed;
-                data[3] = yawspeed;
-                data[4] = -yawspeed;
-            }
+            last_share = SHARE;
+            REVERSEMODE = share_latch;
+            //std::cout << REVERSEMODE << std::endl;
         }
         // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         // 加速する移動方法！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
@@ -468,8 +585,10 @@ private:
 
         // 現在の状態を次回のために保存
         last_option = OPTION;
+        //last_share = SHARE;
         CHANGEMODE = option_latch;
-        // std::cout << data[1] << std::endl;
+        //REVERSEMODE = share_latch;
+        std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4]<< std::endl;
         //  std::cout << data[1] << ", " << speed_Output << ", " << speed_Integral << ", " << std::endl;
         udp_.send(data);
     }
