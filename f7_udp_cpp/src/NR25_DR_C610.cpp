@@ -74,7 +74,7 @@ public:
     static void dunk_shoot_action(UDP &udp) {
         std::cout << "<ダンクシーケンス開始>" << std::endl;
 
-        std::cout << "２段階展開[12]＋トリガー[13]" << std::endl;
+        std::cout << "２段階展開[15]＋トリガー[13]" << std::endl;
         data[15] = 1;
         data[13] = 1;
         udp.send(data);
@@ -85,14 +85,14 @@ public:
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-        std::cout << "格納[15]+チルト展開[16]" << std::endl;
+        std::cout << "格納[18]+チルト展開[16]" << std::endl;
         data[18] = 1;
         data[16] = 1;
         udp.send(data);
         std::cout << "モーター1[1]+モーター2[2]" << std::endl; // ダンクシュート
-        data[1] = -30;
-        data[2] = 50;
-        data[3] = 100;
+        data[1] = 100;
+        data[2] = -50;
+        data[3] = 0;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
         data[1] = 0;
@@ -100,19 +100,19 @@ public:
         data[3] = 0;
         udp.send(data); // モーター止める
 
-        std::cout << "１段階格納[11]＋２段階格納[12]＋チルト格納[16]" << std::endl;
+        std::cout << "１段階格納[11]＋２段階格納[15]＋チルト格納[16]" << std::endl;
         data[11] = 0;
         data[15] = 0;
         data[16] = 0;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
 
-        std::cout << "格納off[15]" << std::endl;
+        std::cout << "格納off[18]" << std::endl;
         data[18] = 0;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
 
-        std::cout << "格納on[15]" << std::endl;
+        std::cout << "格納on[18]" << std::endl;
         data[18] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
@@ -131,7 +131,7 @@ public:
 
     static void pass_shoot_action(UDP &udp) { // パス、シュート
         std::cout << "パス、シュート開始" << std::endl;
-        std::cout << "１段階展開[11]＋２段階展開[12]" << std::endl;
+        std::cout << "１段階展開[11]＋２段階展開[15]" << std::endl;
         data[11] = 1;
         data[15] = 1;
         udp.send(data);
@@ -145,7 +145,7 @@ public:
         data[1] = 0;
         data[2] = 0;
         udp.send(data);
-        std::cout << "１段階格納[11]＋２段階格納[12]" << std::endl;
+        std::cout << "１段階格納[11]＋２段階格納[15]" << std::endl;
         data[11] = 0;
         data[15] = 0;
         udp.send(data);
@@ -154,15 +154,16 @@ public:
 
     static void ball_load_action(UDP &udp) { // ボール保持
         std::cout << "ボール保持開始" << std::endl;
-        std::cout << "１段階展開[1]" << std::endl;
-        data[15] = 1;
+        std::cout << "１段階展開[15]" << std::endl;
+        data[15] = 1; 
+        data[17] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000));
         data[1] = motor1;
         data[3] = -motor2;
         data[2] = motor2-20;
         udp.send(data);
-        std::cout << "１段階格納[11]" << std::endl;
+        std::cout << "１段階格納[15]" << std::endl;
         data[15] = 0;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -171,7 +172,7 @@ public:
             std::cout << "ボール保持" << std::endl;
             data[2] = 0;
             udp.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
             data[1] = 0;
             data[3] = 0;
             udp.send(data);
@@ -180,32 +181,38 @@ public:
             std::cout << "ボール保持失敗" << std::endl;
             data[2] = 0;
             udp.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
             data[1] = 0;
             data[3] = 0;
             udp.send(data);
         }
+        //std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        data[17] = 0;
+        udp.send(data);
+
     }
 
     static void dribble_action(UDP &udp) {
         std::cout << "ドリブル開始" << std::endl;
-        std::cout << "１段階展開[11]＋２段階展開[12]" << std::endl;
+        std::cout << "１段階展開[11]＋２段階展開[15]" << std::endl;
         data[11] = 1;
         data[15] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
         std::cout << "<ドリブル[2],[3]>" << std::endl;
         // data[1] = motor1;
-        data[1] = -10;
-        data[3] = 100;
+        data[1] = 100;
+        data[2] = 100;
+        data[3] = -100;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
         std::cout << "<回転終了>" << std::endl;
         // data[1]= 0;
         data[1] = 0;
+        data[2] = 0;
         data[3] = 0;
         udp.send(data);
-        std::cout << "１段階格納[11]＋２段階格納[12]" << std::endl;
+        std::cout << "１段階格納[11]＋２段階格納[15]" << std::endl;
         data[11] = 0;
         data[15] = 0;
         udp.send(data);
