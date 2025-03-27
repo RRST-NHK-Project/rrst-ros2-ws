@@ -1,5 +1,5 @@
 /*
-2025/02/15
+2025/03/27
 RRST NHK2025
 ダンク機の機構制御
 */
@@ -23,7 +23,7 @@ int motor1 = 50;
 int motor2 = 50;
 int motor3 = 50;
 int motor4 = 50;
-int hcsr04 = 0;
+//int hcsr04 = 0;
 // IPアドレスとポートの指定
 std::string udp_ip = "192.168.0.218"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
@@ -61,6 +61,7 @@ public:
     // 事故防止のため、ブームの展開状況を保存
     static bool ready_for_dunk;
 
+//ダンク準備　□ボタン
     static void ready_for_dunk_action(UDP &udp) {
         std::cout << "ダンク待機開始" << std::endl;
         std::cout << "１段階展開[1]" << std::endl;
@@ -71,6 +72,7 @@ public:
         std::cout << "完了." << std::endl;
     }
 
+//ダンクシュート　○ボタン
     static void dunk_shoot_action(UDP &udp) {
         std::cout << "<ダンクシーケンス開始>" << std::endl;
 
@@ -129,7 +131,8 @@ public:
         std::cout << "<ダンクシーケンス終了>" << std::endl;
     }
 
-    static void pass_shoot_action(UDP &udp) { // パス、シュート
+// パス、シュート　✕ボタン
+    static void pass_shoot_action(UDP &udp) { 
         std::cout << "パス、シュート開始" << std::endl;
         std::cout << "１段階展開[11]＋２段階展開[15]" << std::endl;
         data[11] = 1;
@@ -152,7 +155,8 @@ public:
         std::cout << "パス、シュート完了" << std::endl;
     }
 
-    static void ball_load_action(UDP &udp) { // ボール保持
+//// ボール保持　⇑ボタン
+    static void ball_load_action(UDP &udp) { 
         std::cout << "ボール保持開始" << std::endl;
         std::cout << "１段階展開[15]" << std::endl;
         data[15] = 1; 
@@ -177,14 +181,14 @@ public:
             data[3] = 0;
             udp.send(data);
             std::cout << "ボール保持完了" << std::endl;
-        } else { // 保持できてなかったらもう一回やる
-            std::cout << "ボール保持失敗" << std::endl;
-            data[2] = 0;
-            udp.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            data[1] = 0;
-            data[3] = 0;
-            udp.send(data);
+        // } else { // 保持できてなかったらもう一回やる
+        //     std::cout << "ボール保持失敗" << std::endl;
+        //     data[2] = 0;
+        //     udp.send(data);
+        //     std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        //     data[1] = 0;
+        //     data[3] = 0;
+        //     udp.send(data);
         }
         //std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         data[17] = 0;
@@ -192,6 +196,7 @@ public:
 
     }
 
+//ドリブル　△ボタン
     static void dribble_action(UDP &udp) {
         std::cout << "ドリブル開始" << std::endl;
         std::cout << "１段階展開[11]＋２段階展開[15]" << std::endl;
@@ -207,7 +212,6 @@ public:
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
         std::cout << "<回転終了>" << std::endl;
-        // data[1]= 0;
         data[1] = 0;
         data[2] = 0;
         data[3] = 0;
