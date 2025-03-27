@@ -293,10 +293,10 @@ private:
                     data[8] = 90 + SERVO2_CAL;
                     data[9] = 90 + SERVO3_CAL;
                     data[10] = 180 + SERVO4_CAL;
-                    data[1] = -yawspeed;
-                    data[2] = yawspeed;
-                    data[3] = -yawspeed;
-                    data[4] = yawspeed;
+                    data[1] = yawspeed;
+                    data[2] = -yawspeed;
+                    data[3] = yawspeed;
+                    data[4] = -yawspeed;
                 }
                 // 半時計回りYAW回転
                 if (0 < RS_X && fabs(RS_X) >= DEADZONE_R) {
@@ -304,10 +304,10 @@ private:
                     data[8] = 90 + SERVO2_CAL;
                     data[9] = 90 + SERVO3_CAL;
                     data[10] = 180 + SERVO4_CAL;
-                    data[1] = yawspeed;
-                    data[2] = -yawspeed;
-                    data[3] = yawspeed;
-                    data[4] = -yawspeed;
+                    data[1] = -yawspeed;
+                    data[2] = yawspeed;
+                    data[3] = -yawspeed;
+                    data[4] = yawspeed;
                 }
             }
             //反転モード
@@ -399,10 +399,10 @@ private:
                     data[8] = 90 + SERVO2_CAL;
                     data[9] = 90 + SERVO3_CAL;
                     data[10] = 180 + SERVO4_CAL;
-                    data[1] = -yawspeed;
-                    data[2] = yawspeed;
-                    data[3] = -yawspeed;
-                    data[4] = yawspeed;
+                    data[1] = yawspeed;
+                    data[2] = -yawspeed;
+                    data[3] = yawspeed;
+                    data[4] = -yawspeed;
                 }
                 // 半時計回りYAW回転
                 if (0 < RS_X && fabs(RS_X) >= DEADZONE_R) {
@@ -410,10 +410,10 @@ private:
                     data[8] = 90 + SERVO2_CAL;
                     data[9] = 90 + SERVO3_CAL;
                     data[10] = 180 + SERVO4_CAL;
-                    data[1] = yawspeed;
-                    data[2] = -yawspeed;
-                    data[3] = yawspeed;
-                    data[4] = -yawspeed;
+                    data[1] = -yawspeed;
+                    data[2] = yawspeed;
+                    data[3] = -yawspeed;
+                    data[4] = yawspeed;
                 }
             }
             last_share = SHARE;
@@ -588,7 +588,7 @@ private:
         //last_share = SHARE;
         CHANGEMODE = option_latch;
         //REVERSEMODE = share_latch;
-        std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4]<< std::endl;
+        //std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4]<< std::endl;
         //  std::cout << data[1] << ", " << speed_Output << ", " << speed_Integral << ", " << std::endl;
         udp_.send(data);
     }

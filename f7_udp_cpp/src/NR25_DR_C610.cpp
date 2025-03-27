@@ -17,7 +17,7 @@ RRST NHK2025
 // 自作クラス
 #include "include/UDP.hpp"
 
-#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
+#define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 int motor1 = 50;
 int motor2 = 50;
@@ -65,6 +65,7 @@ public:
         std::cout << "ダンク待機開始" << std::endl;
         std::cout << "１段階展開[1]" << std::endl;
         data[11] = 1;
+        data[16] = 1;
         udp.send(data);
         ready_for_dunk = true;
         std::cout << "完了." << std::endl;
@@ -74,7 +75,7 @@ public:
         std::cout << "<ダンクシーケンス開始>" << std::endl;
 
         std::cout << "２段階展開[12]＋トリガー[13]" << std::endl;
-        data[12] = 1;
+        data[15] = 1;
         data[13] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
@@ -85,7 +86,7 @@ public:
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
         std::cout << "格納[15]+チルト展開[16]" << std::endl;
-        data[15] = 1;
+        data[18] = 1;
         data[16] = 1;
         udp.send(data);
         std::cout << "モーター1[1]+モーター2[2]" << std::endl; // ダンクシュート
@@ -101,23 +102,23 @@ public:
 
         std::cout << "１段階格納[11]＋２段階格納[12]＋チルト格納[16]" << std::endl;
         data[11] = 0;
-        data[12] = 0;
+        data[15] = 0;
         data[16] = 0;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
 
         std::cout << "格納off[15]" << std::endl;
-        data[15] = 0;
+        data[18] = 0;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
 
         std::cout << "格納on[15]" << std::endl;
-        data[15] = 1;
+        data[18] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
 
         std::cout << "初期状態" << std::endl;
-        data[15] = 0;
+        data[18] = 0;
         data[14] = 0;
         data[13] = 0;
         udp.send(data);
@@ -132,7 +133,7 @@ public:
         std::cout << "パス、シュート開始" << std::endl;
         std::cout << "１段階展開[11]＋２段階展開[12]" << std::endl;
         data[11] = 1;
-        data[12] = 1;
+        data[15] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
         std::cout << "モーター回転" << std::endl;
@@ -146,7 +147,7 @@ public:
         udp.send(data);
         std::cout << "１段階格納[11]＋２段階格納[12]" << std::endl;
         data[11] = 0;
-        data[12] = 0;
+        data[15] = 0;
         udp.send(data);
         std::cout << "パス、シュート完了" << std::endl;
     }
@@ -154,15 +155,15 @@ public:
     static void ball_load_action(UDP &udp) { // ボール保持
         std::cout << "ボール保持開始" << std::endl;
         std::cout << "１段階展開[1]" << std::endl;
-        data[11] = 1;
+        data[15] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000));
         data[1] = motor1;
         data[3] = -motor2;
-        data[2] = motor2;
+        data[2] = motor2-20;
         udp.send(data);
         std::cout << "１段階格納[11]" << std::endl;
-        data[11] = 0;
+        data[15] = 0;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         // センサーが反応したら
@@ -190,13 +191,13 @@ public:
         std::cout << "ドリブル開始" << std::endl;
         std::cout << "１段階展開[11]＋２段階展開[12]" << std::endl;
         data[11] = 1;
-        data[12] = 1;
+        data[15] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
         std::cout << "<ドリブル[2],[3]>" << std::endl;
         // data[1] = motor1;
         data[1] = -10;
-        data[3] = 80;
+        data[3] = 100;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
         std::cout << "<回転終了>" << std::endl;
@@ -206,7 +207,7 @@ public:
         udp.send(data);
         std::cout << "１段階格納[11]＋２段階格納[12]" << std::endl;
         data[11] = 0;
-        data[12] = 0;
+        data[15] = 0;
         udp.send(data);
         std::cout << "ドリブル完了" << std::endl;
     }
