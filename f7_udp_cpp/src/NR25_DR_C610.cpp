@@ -1,5 +1,5 @@
 /*
-2025/03/27
+2025/02/15
 RRST NHK2025
 ダンク機の機構制御
 */
@@ -23,7 +23,7 @@ int motor1 = 50;
 int motor2 = 50;
 int motor3 = 50;
 int motor4 = 50;
-//int hcsr04 = 0;
+int hcsr04 = 0;
 // IPアドレスとポートの指定
 std::string udp_ip = "192.168.0.218"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
@@ -61,7 +61,6 @@ public:
     // 事故防止のため、ブームの展開状況を保存
     static bool ready_for_dunk;
 
-//ダンク準備　□ボタン
     static void ready_for_dunk_action(UDP &udp) {
         std::cout << "ダンク待機開始" << std::endl;
         std::cout << "１段階展開[1]" << std::endl;
@@ -72,15 +71,20 @@ public:
         std::cout << "完了." << std::endl;
     }
 
-//ダンクシュート　○ボタン
     static void dunk_shoot_action(UDP &udp) {
         std::cout << "<ダンクシーケンス開始>" << std::endl;
 
         std::cout << "２段階展開[15]＋トリガー[13]" << std::endl;
         data[15] = 1;
+        
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        std::cout << "２段階展開[15]＋トリガー[13]" << std::endl;
+        
         data[13] = 1;
         udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        //std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
         std::cout << "ストッパ[14]" << std::endl;
         data[14] = 1;
@@ -88,41 +92,54 @@ public:
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
         std::cout << "格納[18]+チルト展開[16]" << std::endl;
-        data[18] = 1;
-        data[16] = 1;
-        udp.send(data);
-        std::cout << "モーター1[1]+モーター2[2]" << std::endl; // ダンクシュート
+        // data[18] = 1;
+        // data[16] = 1;
         data[1] = 100;
         data[2] = -50;
         data[3] = 0;
+        data[17] = 1;
         udp.send(data);
+
+        std::cout << "モーター1[1]+モーター2[2]" << std::endl; // ダンクシュート
+        data[18] = 1;
+        data[16] = 1;
+        // data[1] = 100;
+        // data[2] = -50;
+        // data[3] = 0;
+        // data[17] = 1;
+         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
         data[1] = 0;
         data[2] = 0;
         data[3] = 0;
+        //data[18] = 1;
         udp.send(data); // モーター止める
 
         std::cout << "１段階格納[11]＋２段階格納[15]＋チルト格納[16]" << std::endl;
         data[11] = 0;
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(500)); // 要調整
+
         data[15] = 0;
         data[16] = 0;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
 
-        std::cout << "格納off[18]" << std::endl;
-        data[18] = 0;
-        udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
+        // std::cout << "格納off[18]" << std::endl;
+        // data[18] = 0;
+        // udp.send(data);
+        // std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 要調整
 
-        std::cout << "格納on[18]" << std::endl;
-        data[18] = 1;
-        udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
+        // std::cout << "格納on[18]" << std::endl;
+        // data[18] = 1;
+        // udp.send(data);
+        // std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
 
         std::cout << "初期状態" << std::endl;
         data[18] = 0;
         data[14] = 0;
         data[13] = 0;
+        data[17] = 0;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
 
@@ -131,17 +148,16 @@ public:
         std::cout << "<ダンクシーケンス終了>" << std::endl;
     }
 
-// パス、シュート　✕ボタン
-    static void pass_shoot_action(UDP &udp) { 
+    static void pass_shoot_action(UDP &udp) { // パス、シュート
         std::cout << "パス、シュート開始" << std::endl;
         std::cout << "１段階展開[11]＋２段階展開[15]" << std::endl;
         data[11] = 1;
         data[15] = 1;
         udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
+        std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
         std::cout << "モーター回転" << std::endl;
-        data[1] = 80;
-        data[2] = -80;
+        data[1] = 40;
+        data[2] = -100;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
         std::cout << "モーター停止" << std::endl;
@@ -150,13 +166,15 @@ public:
         udp.send(data);
         std::cout << "１段階格納[11]＋２段階格納[15]" << std::endl;
         data[11] = 0;
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(500)); // 要調整
+
         data[15] = 0;
         udp.send(data);
         std::cout << "パス、シュート完了" << std::endl;
     }
 
-//// ボール保持　⇑ボタン
-    static void ball_load_action(UDP &udp) { 
+    static void ball_load_action(UDP &udp) { // ボール保持
         std::cout << "ボール保持開始" << std::endl;
         std::cout << "１段階展開[15]" << std::endl;
         data[15] = 1; 
@@ -181,14 +199,14 @@ public:
             data[3] = 0;
             udp.send(data);
             std::cout << "ボール保持完了" << std::endl;
-        // } else { // 保持できてなかったらもう一回やる
-        //     std::cout << "ボール保持失敗" << std::endl;
-        //     data[2] = 0;
-        //     udp.send(data);
-        //     std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        //     data[1] = 0;
-        //     data[3] = 0;
-        //     udp.send(data);
+        } else { // 保持できてなかったらもう一回やる
+            std::cout << "ボール保持失敗" << std::endl;
+            data[2] = 0;
+            udp.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            data[1] = 0;
+            data[3] = 0;
+            udp.send(data);
         }
         //std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         data[17] = 0;
@@ -196,7 +214,6 @@ public:
 
     }
 
-//ドリブル　△ボタン
     static void dribble_action(UDP &udp) {
         std::cout << "ドリブル開始" << std::endl;
         std::cout << "１段階展開[11]＋２段階展開[15]" << std::endl;
@@ -212,6 +229,7 @@ public:
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
         std::cout << "<回転終了>" << std::endl;
+        // data[1]= 0;
         data[1] = 0;
         data[2] = 0;
         data[3] = 0;
