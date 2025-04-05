@@ -37,7 +37,7 @@ int roller_speed_shoot_ab = 90;
 int roller_speed_shoot_cd = 90;
 int roller_speed_reload = 35;
 
-std::vector<int16_t> data(19, 0);
+std::vector<int16_t> data(19, 0); // マイコンに送信される配列"data"
 /*
 マイコンに送信される配列"data"
 debug: マイコンのprintfを有効化, MD: モータードライバー, TR: トランジスタ

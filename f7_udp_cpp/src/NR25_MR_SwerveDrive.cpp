@@ -67,12 +67,12 @@ int measured_speed = 0;
 static double current_motor_command = 0.0;
 
 // サーボの組み付け時のズレを補正（度数法）
-int SERVO1_CAL = 7;
-int SERVO2_CAL = -2;
-int SERVO3_CAL = 14;
-int SERVO4_CAL = 10;
+int SERVO1_CAL = 0;
+int SERVO2_CAL = 0;
+int SERVO3_CAL = 0;
+int SERVO4_CAL = 0;
 
-std::vector<int16_t> data(19, 0);
+std::vector<int16_t> data(19, 0); // マイコンに送信される配列"data"
 /*
 マイコンに送信される配列"data"
 debug: マイコンのprintfを有効化, MD: モータードライバー, TR: トランジスタ

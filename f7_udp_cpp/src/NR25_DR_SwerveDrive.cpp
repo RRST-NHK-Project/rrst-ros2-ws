@@ -70,7 +70,7 @@ int SERVO2_CAL = 0;
 int SERVO3_CAL = 0;
 int SERVO4_CAL = 0;
 
-std::vector<int16_t> data(19, 0);
+std::vector<int16_t> data(19, 0); // マイコンに送信される配列"data"
 /*
 マイコンに送信される配列"data"
 debug: マイコンのprintfを有効化, MD: モータードライバー, TR: トランジスタ
