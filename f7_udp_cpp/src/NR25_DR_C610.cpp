@@ -1,7 +1,7 @@
 /*
 2025/02/15
 RRST NHK2025
-ダンク機の機構制御
+ダンク機の機構制御(ロボマス対応版)
 */
 
 // 標準
@@ -15,9 +15,10 @@ RRST NHK2025
 #include <std_msgs/msg/int32_multi_array.hpp>
 
 // 自作クラス
+#include "include/IP.hpp"
 #include "include/UDP.hpp"
 
-#define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
+#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 int motor1 = 50;
 int motor2 = 50;
@@ -65,6 +66,7 @@ public:
         std::cout << "ダンク待機開始" << std::endl;
         std::cout << "１段階展開[1]" << std::endl;
         data[11] = 1;
+        data[16] = 1;
         udp.send(data);
         ready_for_dunk = true;
         std::cout << "完了." << std::endl;
@@ -73,51 +75,72 @@ public:
     static void dunk_shoot_action(UDP &udp) {
         std::cout << "<ダンクシーケンス開始>" << std::endl;
 
-        std::cout << "２段階展開[12]＋トリガー[13]" << std::endl;
-        data[12] = 1;
+        std::cout << "２段階展開[15]＋トリガー[13]" << std::endl;
+        data[15] = 1;
+
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        std::cout << "２段階展開[15]＋トリガー[13]" << std::endl;
+
         data[13] = 1;
         udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        // std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
         std::cout << "ストッパ[14]" << std::endl;
         data[14] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-        std::cout << "格納[15]+チルト展開[16]" << std::endl;
-        data[15] = 1;
-        data[16] = 1;
+        std::cout << "格納[18]+チルト展開[16]" << std::endl;
+        // data[18] = 1;
+        // data[16] = 1;
+        data[1] = 100;
+        data[2] = -50;
+        data[3] = 0;
+        data[17] = 1;
         udp.send(data);
+
         std::cout << "モーター1[1]+モーター2[2]" << std::endl; // ダンクシュート
-        data[1] = -motor1;
-        data[2] = motor2;
+        data[18] = 1;
+        data[16] = 1;
+        // data[1] = 100;
+        // data[2] = -50;
+        // data[3] = 0;
+        // data[17] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
         data[1] = 0;
         data[2] = 0;
+        data[3] = 0;
+        // data[18] = 1;
         udp.send(data); // モーター止める
 
-        std::cout << "１段階格納[11]＋２段階格納[12]＋チルト格納[16]" << std::endl;
+        std::cout << "１段階格納[11]＋２段階格納[15]＋チルト格納[16]" << std::endl;
         data[11] = 0;
-        data[12] = 0;
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(500)); // 要調整
+
+        data[15] = 0;
         data[16] = 0;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
 
-        std::cout << "格納off[15]" << std::endl;
-        data[15] = 0;
-        udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
+        // std::cout << "格納off[18]" << std::endl;
+        // data[18] = 0;
+        // udp.send(data);
+        // std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 要調整
 
-        std::cout << "格納on[15]" << std::endl;
-        data[15] = 1;
-        udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
+        // std::cout << "格納on[18]" << std::endl;
+        // data[18] = 1;
+        // udp.send(data);
+        // std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
 
         std::cout << "初期状態" << std::endl;
-        data[15] = 0;
+        data[18] = 0;
         data[14] = 0;
         data[13] = 0;
+        data[17] = 0;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
 
@@ -128,76 +151,92 @@ public:
 
     static void pass_shoot_action(UDP &udp) { // パス、シュート
         std::cout << "パス、シュート開始" << std::endl;
-        std::cout << "１段階展開[11]＋２段階展開[12]" << std::endl;
+        std::cout << "１段階展開[11]＋２段階展開[15]" << std::endl;
         data[11] = 1;
-        data[12] = 1;
+        data[15] = 1;
         udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
+        std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
         std::cout << "モーター回転" << std::endl;
-        data[1] = motor1;
-        data[2] = -motor2;
+        data[1] = 40;
+        data[2] = -100;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
         std::cout << "モーター停止" << std::endl;
         data[1] = 0;
         data[2] = 0;
         udp.send(data);
-        std::cout << "１段階格納[11]＋２段階格納[12]" << std::endl;
+        std::cout << "１段階格納[11]＋２段階格納[15]" << std::endl;
         data[11] = 0;
-        data[12] = 0;
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(500)); // 要調整
+
+        data[15] = 0;
         udp.send(data);
         std::cout << "パス、シュート完了" << std::endl;
     }
 
     static void ball_load_action(UDP &udp) { // ボール保持
         std::cout << "ボール保持開始" << std::endl;
-        std::cout << "１段階展開[1]" << std::endl;
-        data[11] = 1;
+        std::cout << "１段階展開[15]" << std::endl;
+        data[15] = 1;
+        data[17] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000));
         data[1] = motor1;
-        data[2] = -motor2;
+        data[3] = -motor2;
+        data[2] = motor2 - 20;
         udp.send(data);
-        std::cout << "１段階格納[11]" << std::endl;
-        data[11] = 0;
+        std::cout << "１段階格納[15]" << std::endl;
+        data[15] = 0;
         udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         // センサーが反応したら
         if (hcsr04) {
             std::cout << "ボール保持" << std::endl;
-            data[1] = 0;
             data[2] = 0;
+            udp.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            data[1] = 0;
+            data[3] = 0;
             udp.send(data);
             std::cout << "ボール保持完了" << std::endl;
         } else { // 保持できてなかったらもう一回やる
             std::cout << "ボール保持失敗" << std::endl;
-            data[1] = 0;
             data[2] = 0;
             udp.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            data[1] = 0;
+            data[3] = 0;
+            udp.send(data);
         }
+        // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        data[17] = 0;
+        udp.send(data);
     }
 
     static void dribble_action(UDP &udp) {
         std::cout << "ドリブル開始" << std::endl;
-        std::cout << "１段階展開[11]＋２段階展開[12]" << std::endl;
+        std::cout << "１段階展開[11]＋２段階展開[15]" << std::endl;
         data[11] = 1;
-        data[12] = 1;
+        data[15] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
         std::cout << "<ドリブル[2],[3]>" << std::endl;
         // data[1] = motor1;
-        data[2] = motor2;
-        data[3] = motor3;
+        data[1] = 100;
+        data[2] = 100;
+        data[3] = -100;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
         std::cout << "<回転終了>" << std::endl;
         // data[1]= 0;
+        data[1] = 0;
         data[2] = 0;
         data[3] = 0;
         udp.send(data);
-        std::cout << "１段階格納[11]＋２段階格納[12]" << std::endl;
+        std::cout << "１段階格納[11]＋２段階格納[15]" << std::endl;
         data[11] = 0;
-        data[12] = 0;
+        data[15] = 0;
         udp.send(data);
         std::cout << "ドリブル完了" << std::endl;
     }
@@ -209,7 +248,7 @@ public:
     PS4_Listener(const std::string &ip, int port)
         : Node("nhk25_dr"), udp_(ip, port) {
         subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
-            "joy", 10,
+            "joy1", 10,
             std::bind(&PS4_Listener::ps4_listener_callback, this,
                       std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(),
@@ -353,7 +392,7 @@ int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
     rclcpp::executors::SingleThreadedExecutor exec;
-    auto ps4_listener = std::make_shared<PS4_Listener>(udp_ip, udp_port);
+    auto ps4_listener = std::make_shared<PS4_Listener>(IP_MR, PORT_MR);
     auto params_listener = std::make_shared<Params_Listener>();
     exec.add_node(ps4_listener);
     exec.add_node(params_listener);

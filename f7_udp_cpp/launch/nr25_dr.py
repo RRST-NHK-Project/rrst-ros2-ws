@@ -17,7 +17,7 @@ def generate_launch_description():
         ),
         Node(
             package='f7_udp_cpp',
-            executable='nr25_dr',
+            executable='nr25_dr_c610',
             output='screen',
         ),
     ])

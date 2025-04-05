@@ -77,7 +77,7 @@ ament_target_dependencies(nr25_enc_pid rclcpp std_msgs sensor_msgs geometry_msgs
 add_executable(nr25_pid src/NR25_PID.cpp src/include/UDP.cpp)
 ament_target_dependencies(nr25_pid rclcpp std_msgs sensor_msgs geometry_msgs)
 
-add_executable(nr25_dr_c610 src/NR25_DR_C610.cpp src/include/UDP.cpp)
+add_executable(nr25_dr_c610 src/NR25_DR_C610.cpp src/include/UDP.cpp src/include/IP.cpp)
 ament_target_dependencies(nr25_dr_c610 rclcpp std_msgs sensor_msgs geometry_msgs)
 
 add_executable(nr25_mr_servo_cal src/NR25_MR_Servo_Calibrator.cpp)
