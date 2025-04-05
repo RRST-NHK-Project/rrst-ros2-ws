@@ -198,7 +198,7 @@ private:
         if (OPTION && !last_option) {
             option_latch = !option_latch;
         }
-        if (SHARE && !last_share){
+        if (SHARE && !last_share) {
             share_latch = !share_latch;
         }
         // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
@@ -310,9 +310,9 @@ private:
                     data[4] = yawspeed;
                 }
             }
-            //反転モード
+            // 反転モード
             //
-            if (REVERSEMODE ==1){
+            if (REVERSEMODE == 1) {
                 truedeg = deg;
                 if ((0 <= truedeg) && (truedeg <= 180)) {
                     truedeg = truedeg;
@@ -418,7 +418,7 @@ private:
             }
             last_share = SHARE;
             REVERSEMODE = share_latch;
-            //std::cout << REVERSEMODE << std::endl;
+            // std::cout << REVERSEMODE << std::endl;
         }
         // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         // 加速する移動方法！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
@@ -585,11 +585,11 @@ private:
 
         // 現在の状態を次回のために保存
         last_option = OPTION;
-        //last_share = SHARE;
+        // last_share = SHARE;
         CHANGEMODE = option_latch;
-        //REVERSEMODE = share_latch;
-        //std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4]<< std::endl;
-        //  std::cout << data[1] << ", " << speed_Output << ", " << speed_Integral << ", " << std::endl;
+        // REVERSEMODE = share_latch;
+        // std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4]<< std::endl;
+        //   std::cout << data[1] << ", " << speed_Output << ", " << speed_Integral << ", " << std::endl;
         udp_.send(data);
     }
 

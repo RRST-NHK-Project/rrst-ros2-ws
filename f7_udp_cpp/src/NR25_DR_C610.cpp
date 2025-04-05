@@ -1,7 +1,7 @@
 /*
 2025/02/15
 RRST NHK2025
-ダンク機の機構制御
+ダンク機の機構制御(ロボマス対応版)
 */
 
 // 標準
@@ -15,6 +15,7 @@ RRST NHK2025
 #include <std_msgs/msg/int32_multi_array.hpp>
 
 // 自作クラス
+#include "include/IP.hpp"
 #include "include/UDP.hpp"
 
 #define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
@@ -76,15 +77,15 @@ public:
 
         std::cout << "２段階展開[15]＋トリガー[13]" << std::endl;
         data[15] = 1;
-        
+
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
         std::cout << "２段階展開[15]＋トリガー[13]" << std::endl;
-        
+
         data[13] = 1;
         udp.send(data);
-        //std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        // std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
         std::cout << "ストッパ[14]" << std::endl;
         data[14] = 1;
@@ -107,12 +108,12 @@ public:
         // data[2] = -50;
         // data[3] = 0;
         // data[17] = 1;
-         udp.send(data);
+        udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
         data[1] = 0;
         data[2] = 0;
         data[3] = 0;
-        //data[18] = 1;
+        // data[18] = 1;
         udp.send(data); // モーター止める
 
         std::cout << "１段階格納[11]＋２段階格納[15]＋チルト格納[16]" << std::endl;
@@ -177,13 +178,13 @@ public:
     static void ball_load_action(UDP &udp) { // ボール保持
         std::cout << "ボール保持開始" << std::endl;
         std::cout << "１段階展開[15]" << std::endl;
-        data[15] = 1; 
+        data[15] = 1;
         data[17] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000));
         data[1] = motor1;
         data[3] = -motor2;
-        data[2] = motor2-20;
+        data[2] = motor2 - 20;
         udp.send(data);
         std::cout << "１段階格納[15]" << std::endl;
         data[15] = 0;
@@ -208,10 +209,9 @@ public:
             data[3] = 0;
             udp.send(data);
         }
-        //std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         data[17] = 0;
         udp.send(data);
-
     }
 
     static void dribble_action(UDP &udp) {
@@ -392,7 +392,7 @@ int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
     rclcpp::executors::SingleThreadedExecutor exec;
-    auto ps4_listener = std::make_shared<PS4_Listener>(udp_ip, udp_port);
+    auto ps4_listener = std::make_shared<PS4_Listener>(IP_MR, PORT_MR);
     auto params_listener = std::make_shared<Params_Listener>();
     exec.add_node(ps4_listener);
     exec.add_node(params_listener);
