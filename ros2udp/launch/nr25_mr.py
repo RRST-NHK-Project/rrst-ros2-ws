@@ -1,27 +1,26 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
 
+
 def generate_launch_description():
-    return LaunchDescription([
-        Node(
-            package='joy',
-            executable='joy_node',
-            name='joy',
-            output='screen',
-            emulate_tty=True
-        ),
-        Node(
-            package='ros2udp',
-            executable='nr25_mr_omni',
-            name='mr_omni',
-            output='screen',
-            emulate_tty=True
-        ),
-        Node(
-            package='ros2udp',
-            executable='nr25_mr',
-            name='mr',
-            output='screen',
-            emulate_tty=True
-        ),
-    ])
+    return LaunchDescription(
+        [
+            Node(
+                package="joy",
+                executable="joy_node",
+                output="screen",
+                parameters=[{"device_id": 0}],  # ここで device_id を指定
+                remappings=[("/joy", "/joy0")],
+            ),
+            Node(
+                package="ros2udp",
+                executable="nr25_mr_sd",
+                output="screen",
+            ),
+            Node(
+                package="ros2udp",
+                executable="nr25_mr",
+                output="screen",
+            ),
+        ]
+    )
