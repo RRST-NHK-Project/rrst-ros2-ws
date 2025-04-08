@@ -21,7 +21,6 @@ sudo apt install ros-jazzy-nav2-lifecycle-manager
 sudo apt install libudev-dev
 sudo apt install -y ros-${ROS_DISTRO}-diagnostic-updater
 sudo apt install -y ros-${ROS_DISTRO}-nav2-util
-cp ~/ros2_ws/src/setup/ldlidar.yaml ~/ros2_ws/install/ldlidar_node/share/ldlidar_node/params/ -b
 
 # 他のスクリプトに一括で実行権限を渡す
 sudo chmod +x ~/ros2_ws/src/setup/*.sh
