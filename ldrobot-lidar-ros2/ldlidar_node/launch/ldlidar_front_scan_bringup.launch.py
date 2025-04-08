@@ -160,6 +160,11 @@ def generate_launch_description():
                 default_value='',
                 description='Name of an exister container to load the Lidar component. If empty a new container will be created.'
             ),
+            Node(
+                package="ros2udp",
+                executable="ld19_fs",
+                output="screen",
+            ),
             OpaqueFunction(function=launch_setup)
         ]
     )
