@@ -50,6 +50,12 @@ jobs:
           rosdep update
           rosdep install --from-paths src --ignore-src -r -y
 
+      - name: Run setup script
+        run: |
+          cd ros2_ws/src/setup
+          sudo chmod +x setup.sh
+          ./setup.sh
+
       - name: Build workspace
         run: |
           source /opt/ros/jazzy/setup.bash
