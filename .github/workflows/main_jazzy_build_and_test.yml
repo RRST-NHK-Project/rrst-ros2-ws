@@ -1,5 +1,5 @@
+# Github上でのCI/CDを使用して、ROS 2 Jazzyのビルドとテストを行うためのGitHub Actionsワークフロー
 name: ROS 2 Jazzy Build & Test
-
 
 on:
   push:
