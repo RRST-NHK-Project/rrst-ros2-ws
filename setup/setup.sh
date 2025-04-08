@@ -9,7 +9,6 @@
 
 # いつもの
 sudo apt update -y
-sudo apt upgrade -y
 
 # figletのインストール
 sudo apt install -y figlet
