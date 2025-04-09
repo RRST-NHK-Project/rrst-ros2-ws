@@ -27,19 +27,19 @@ cd ~/ros2_ws/src
 git clone https://github.com/RRST-NHK-Project/ros2udp.git .
 ```
   
-### ３,ビルド
-ビルドします。コードを編集するたびにビルドが必要です。
-```
-cd ~/ros2_ws
-colcon build
-```
-
-### ４，依存関係のインストール
+### ３，依存関係のインストール
 依存関係を一括インストールするスクリプトを実行します。
 ```
 cd ~/ros2_ws/src/setup
 sudo chmod +x setup.sh
 ./setup.sh
+```
+
+### ４,ビルド
+ビルドします。コードを編集するたびにビルドが必要です。
+```
+cd ~/ros2_ws
+colcon build
 ```
 
 ## Build & Test Status
