@@ -16,8 +16,8 @@ sudo apt-get install -y figlet
 # 以下LD19用
 cd ~/ros2_ws/src/ldrobot-lidar-ros2/scripts/
 ./create_udev_rules.sh
-sudo apt-get install ros-jazzy-nav2-lifecycle-manager
-sudo apt-get install libudev-dev
+sudo apt-get install -y ros-jazzy-nav2-lifecycle-manager
+sudo apt-get install -y libudev-dev
 sudo apt-get install -y ros-jazzy-diagnostic-updater
 sudo apt-get install -y ros-jazzy-nav2-util
 
