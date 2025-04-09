@@ -1,5 +1,5 @@
 /*
-RRST NHK2025
+RRST-NHK-Project 2025
 CUIパラメーター調整ノード
 使い方
 showで現在設定しているパラメーターが見れます

@@ -1,5 +1,5 @@
 /*
-RRST NHK2025
+RRST-NHK-Project 2025
 汎用機独ステ
 */
 

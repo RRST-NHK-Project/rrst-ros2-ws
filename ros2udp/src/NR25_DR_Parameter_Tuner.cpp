@@ -1,5 +1,5 @@
 /*
-RRST NHK2025
+RRST-NHK-Project 2025
 CUIパラメーター調整ノード
 使い方
 showで現在設定しているパラメーターが見れます
@@ -165,16 +165,16 @@ private:
             } else if (input == "show") {
                 show_parameters();
             } else {
-                 int idx, value;
-                 if (sscanf(input.c_str(), "%d %d", &idx, &value) == 2 && idx >= 0 &&
+                int idx, value;
+                if (sscanf(input.c_str(), "%d %d", &idx, &value) == 2 && idx >= 0 &&
                     idx < 4 && value >= -100 && value <= 100) {
                     params[idx] = value;
-               show_parameters();
+                    show_parameters();
                 } else {
-                   std::cout << "Invalid input. Use: <index> <value> (0-3, 0-100), 's' "
+                    std::cout << "Invalid input. Use: <index> <value> (0-3, 0-100), 's' "
                                  "(shoot), 'd' (dribble), or 'show'\n";
-                 }
-           }
+                }
+            }
         }
     }
 

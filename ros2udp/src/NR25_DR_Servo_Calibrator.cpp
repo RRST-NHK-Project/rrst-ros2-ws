@@ -1,5 +1,5 @@
 /*
-RRST NHK2025
+RRST-NHK-Project 2025
 サーボのキャリブレーション用
 使い方
 NR25_Parameter_Tuner.cppを参照
