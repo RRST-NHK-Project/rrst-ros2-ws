@@ -53,12 +53,9 @@ jobs:
 
       - name: Run setup script
         run: |
-          if [ -f ros2_ws/src/setup/setup.sh ]; then
-            chmod +x ros2_ws/src/setup/setup.sh
-            ros2_ws/src/setup/setup.sh
-          else
-            echo "setup.sh not found, skipping setup step"
-          fi
+          cd ros2_ws/src/setup
+          sudo chmod +x setup.sh
+          ./setup.sh
 
       - name: Build workspace
         run: |
