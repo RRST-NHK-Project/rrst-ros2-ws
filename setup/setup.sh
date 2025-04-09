@@ -22,4 +22,4 @@ sudo apt-get install -y ros-jazzy-diagnostic-updater
 sudo apt-get install -y ros-jazzy-nav2-util
 
 # 他のスクリプトに一括で実行権限を渡す
-sudo chmod +x ~/ros2_ws/src/setup/*.sh
+sudo chmod +x "${HOME}/ros2_ws/src/setup/"*.sh
