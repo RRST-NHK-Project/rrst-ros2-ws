@@ -8,14 +8,14 @@ LD19のスキャンデータをフィルタリングするノード
 #include <cmath>
 #include <limits>
 
+frort passed_range = 30.0; // ±30度の範囲を指定
+
 class LD19FrontScanNode : public rclcpp::Node {
 public:
     LD19FrontScanNode() : Node("LD19_FrontScan_Node") {
         publisher_ = this->create_publisher<sensor_msgs::msg::LaserScan>("filtered_scan", 10);
         subscription_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
             "/ldlidar_node/scan", 10, std::bind(&LD19FrontScanNode::scan_callback, this, std::placeholders::_1));
-
-        // ここでタイマー処理など他の設定をする場合も可能
     }
 
 private:
@@ -25,7 +25,7 @@ private:
 
         // ±10度範囲の最近傍距離を探す
         std::vector<float>::size_type angle_range = static_cast<std::vector<float>::size_type>(
-            30.0 * M_PI / 180.0 / msg->angle_increment); // ±30度
+            passed_range * M_PI / 180.0 / msg->angle_increment); // ±30度
         std::vector<float>::size_type start = center_index - angle_range;
         std::vector<float>::size_type end = center_index + angle_range;
 
