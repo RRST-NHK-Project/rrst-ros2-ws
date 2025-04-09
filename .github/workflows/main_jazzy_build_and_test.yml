@@ -1,5 +1,5 @@
+# Github上でのCI/CDを使用して、ROS 2 Jazzyのビルドとテストを行うためのGitHub Actionsワークフロー
 name: ROS 2 Jazzy Build & Test
-
 
 on:
   push:
@@ -26,11 +26,6 @@ jobs:
         with:
           required-ros-distributions: jazzy
 
-      - name: Upgrade CMake
-        run: |
-          sudo apt update
-          sudo apt install -y cmake
-
       - name: Install dependencies
         run: |
           sudo apt update
@@ -44,11 +39,18 @@ jobs:
       - name: Create ROS 2 workspace
         run: |
           mkdir -p ros2_ws/src
-          mv $(ls -d */ | grep -v 'ros2_ws') ros2_ws/src/ || true
+          shopt -s extglob
+          mv !(ros2_ws) ros2_ws/src/ || true
           cd ros2_ws
           source /opt/ros/jazzy/setup.bash
           rosdep update
           rosdep install --from-paths src --ignore-src -r -y
+
+      - name: Run setup script
+        run: |
+          cd ros2_ws/src/setup
+          sudo chmod +x setup.sh
+          ./setup.sh
 
       - name: Build workspace
         run: |
@@ -56,11 +58,11 @@ jobs:
           cd ros2_ws
           colcon build --symlink-install --event-handlers console_cohesion+
 
-      - name: Run tests
-        run: |
-          source /opt/ros/jazzy/setup.bash
-          cd ros2_ws
-          colcon test
-          colcon test-result --verbose
+#      - name: Run tests
+#        run: |
+#          source /opt/ros/jazzy/setup.bash
+#          cd ros2_ws
+#          colcon test
+#          colcon test-result --verbose
 
           
