@@ -8,7 +8,7 @@ LD19のスキャンデータをフィルタリングするノード
 #include <cmath>
 #include <limits>
 
-frort passed_range = 30.0; // ±30度の範囲を指定
+float passed_range = 30.0; // ±30度の範囲を指定
 
 class LD19FrontScanNode : public rclcpp::Node {
 public:
