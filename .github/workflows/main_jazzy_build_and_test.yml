@@ -26,13 +26,6 @@ jobs:
         with:
           required-ros-distributions: jazzy
 
-      - name: Install latest CMake
-        run: |
-          sudo apt update
-          sudo apt install -y wget
-          wget https://github.com/Kitware/CMake/releases/download/v3.25.2/cmake-3.25.2-linux-x86_64.sh
-          sudo bash cmake-3.25.2-linux-x86_64.sh --prefix=/usr/local --skip-license
-
       - name: Install dependencies
         run: |
           sudo apt update
