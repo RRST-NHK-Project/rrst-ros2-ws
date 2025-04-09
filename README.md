@@ -10,8 +10,38 @@ ros2udpパッケージのマイコン側プログラムのPlatformIOプロジェ
 ### -resouces/NUCLEO_F767ZI_MB
 メイン基板のKiCadデータ
 
+## Getting started
+### １，ワークスペースの作成（初回のみ）
+  
+```
+mkdir -p ~/ros2_ws/src
+```
+  
+### ２，リポジトリのクローン
+~/ros2_ws/srcに移動しパッケージをクローンします。
+```
+cd ~/ros2_ws/src
+git clone https://github.com/RRST-NHK-Project/ros2udp.git .
+```
+  
+### ３,ビルド
+ビルドします。コードを編集するたびにビルドが必要です。
+```
+cd ~/ros2_ws
+colcon build
+```
+
+### ４，依存関係のインストール
+依存関係を一括インストールするスクリプトを実行します。
+```
+cd ~/ros2_ws/src/setup
+sudo chmod +x setup.sh
+./setup.sh
+
+```
+
 ## Build & Test Status
-各ブランチのビルド状況です。
+各ブランチのビルド状況です。2024/04/09~ テストのみ無効化中
 ### main
 [![ROS 2 Jazzy Build & Test](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_test.yml/badge.svg?branch=main)](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_test.yml)  
 ### develop
