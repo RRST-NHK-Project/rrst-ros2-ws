@@ -5,6 +5,7 @@ LD19のスキャンデータをフィルタリングするノード
 
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
+#include "std_msgs/Float32MultiArray"
 #include <cmath>
 #include <limits>
 
@@ -13,7 +14,8 @@ float passed_range = 30.0; // ±30度の範囲を指定
 class LD19FrontScanNode : public rclcpp::Node {
 public:
     LD19FrontScanNode() : Node("LD19_FrontScan_Node") {
-        publisher_ = this->create_publisher<sensor_msgs::msg::LaserScan>("filtered_scan", 10);
+        publisher_filtered_scan_ = this->create_publisher<sensor_msgs::msg::LaserScan>("filtered_scan", 10);
+        publisher_nearest_point_ = this->create_publisher<std_msgs::msg::Float32MultiArray>("nearest_point", 10);
         subscription_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
             "/ldlidar_node/scan", 10, std::bind(&LD19FrontScanNode::scan_callback, this, std::placeholders::_1));
     }
@@ -39,12 +41,12 @@ private:
             }
         }
 
-        RCLCPP_INFO(this->get_logger(), "前方最近距離: %.2f m", min_distance);
+        RCLCPP_INFO(this->get_logger(), "前方最近傍点距離: %.2f m", min_distance);
 
         // フィルタリングされたLaserScanメッセージを作成
         sensor_msgs::msg::LaserScan filtered_scan_msg = *msg; // 元のメッセージをコピー
 
-        // ±10度範囲内のデータだけを保持
+        // フィルタリングされたデータだけを保持
         for (std::vector<float>::size_type i = 0; i < msg->ranges.size(); ++i) {
             if (i < start || i > end) {
                 filtered_scan_msg.ranges[i] = std::numeric_limits<float>::infinity(); // 範囲外のデータを無限大に設定
@@ -59,10 +61,14 @@ private:
         filtered_scan_msg.range_max = msg->range_max;             // 元のrange_maxを設定
 
         // フィルタリングされたLaserScanをpublish
-        publisher_->publish(filtered_scan_msg);
+        publisher_filtered_scan_->publish(filtered_scan_msg);
+
+        std_msgs::msg::Float32MultiArray nearest_point_msg[0] = min_distance; // 最近傍点のメッセージを作成
+        publisher_nearest_point_->publish(nerest_point_msg); // 最近傍点のメッセージをpublish
     }
 
-    rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr publisher_;
+    rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr publisher_filtered_scan_;
+    rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr publisher_nearest_point_;
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr subscription_;
 };
 

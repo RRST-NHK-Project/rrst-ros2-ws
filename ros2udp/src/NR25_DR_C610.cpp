@@ -11,7 +11,8 @@ RRST-NHK-Project 2025
 // ROS
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
-#include <std_msgs/msg/int32_multi_array.hpp>
+#include "std_msgs/msg/int32_multi_array.hpp"
+#include "std_msgs/Float32MultiArray"
 
 // 自作クラス
 #include "include/IP.hpp"
@@ -366,11 +367,12 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
 };
 
+// HCSR04（距離センサー）の値を受信するクラス(未使用)
 class hcsr04_Listener : public rclcpp::Node {
 public:
     hcsr04_Listener()
         : Node("nhk25_dr_hcsr04") {
-        subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
+        subscription_ = this->create_subscription<std_msgs::msg::Int32FloatArray>(
             "hcsr04", 10,
             std::bind(&hcsr04_Listener::hcsr04_listener_callback, this,
                       std::placeholders::_1));
@@ -386,6 +388,28 @@ private:
 
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
 };
+
+//LD19（LiDAR）から取得した最近傍点までの距離を受信するクラス FIXME: 中身の実装！！！！！！
+class hcsr04_Listener : public rclcpp::Node {
+    public:
+        hcsr04_Listener()
+            : Node("nhk25_dr_hcsr04") {
+            subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
+                "hcsr04", 10,
+                std::bind(&hcsr04_Listener::hcsr04_listener_callback, this,
+                          std::placeholders::_1));
+            RCLCPP_INFO(this->get_logger(),
+                        "NHK2025 HCSR04 Listener");
+        }
+    
+    private:
+        void hcsr04_listener_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+            hcsr04 = msg->data[4]; // FIXME: 適切なインデックスに変更
+            std::cout << hcsr04 << std::endl;
+        }
+    
+        rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
+    };
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
