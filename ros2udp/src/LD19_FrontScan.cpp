@@ -78,6 +78,12 @@ int main(int argc, char **argv) {
     // figletでノード名を表示
     std::string figletout = "figlet LD19 FrontScan";
     int result = std::system(figletout.c_str());
+    if (result != 0) {
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+        std::cerr << "Please install 'figlet' with the following command:" << std::endl;
+        std::cerr << "sudo apt install figlet" << std::endl;
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+    }
 
     rclcpp::spin(std::make_shared<LD19FrontScanNode>());
     rclcpp::shutdown();
