@@ -1,5 +1,5 @@
 /*
-RRST NHK2025
+RRST-NHK-Project 2025
 UDPで送信するクラス
 charからint16_tに変更することで通信量を削減
 */
@@ -7,7 +7,7 @@ charからint16_tに変更することで通信量を削減
 #include "UDP.hpp"
 
 #include <stdexcept>
-#include <unistd.h> 
+#include <unistd.h>
 
 UDP::UDP(const std::string &ip_address, int port) {
     try {
