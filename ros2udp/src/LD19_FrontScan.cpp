@@ -5,9 +5,10 @@ LD19のスキャンデータをフィルタリングするノード
 
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
-#include "std_msgs/Float32MultiArray"
+#include "std_msgs/msg/float64_multi_array.hpp"
 #include <cmath>
 #include <limits>
+#include <unistd.h>
 
 float passed_range = 30.0; // ±30度の範囲を指定
 
@@ -15,23 +16,27 @@ class LD19FrontScanNode : public rclcpp::Node {
 public:
     LD19FrontScanNode() : Node("LD19_FrontScan_Node") {
         publisher_filtered_scan_ = this->create_publisher<sensor_msgs::msg::LaserScan>("filtered_scan", 10);
-        publisher_nearest_point_ = this->create_publisher<std_msgs::msg::Float32MultiArray>("nearest_point", 10);
+        publisher_nearest_point_ = this->create_publisher<std_msgs::msg::Float64MultiArray>("nearest_point", 10);
         subscription_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
             "/ldlidar_node/scan", 10, std::bind(&LD19FrontScanNode::scan_callback, this, std::placeholders::_1));
+
+        nearest_point_msg_.data.resize(1, 0.0);
     }
 
 private:
     void scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
-        std::vector<float>::size_type center_index = msg->ranges.size() / 2; // インデックスの総数を2で割ることで中央のインデックスを取得
-        float min_distance = std::numeric_limits<float>::infinity();         // 初期は最大値
+        std::vector<float>::size_type center_index = msg->ranges.size() / 2;
+        float min_distance = std::numeric_limits<float>::infinity();
 
-        // ±10度範囲の最近傍距離を探す
+        // ±30度に相当するインデックス範囲を計算
+        float angle_width_rad = passed_range * M_PI / 180.0;
         std::vector<float>::size_type angle_range = static_cast<std::vector<float>::size_type>(
-            passed_range * M_PI / 180.0 / msg->angle_increment); // ±30度
-        std::vector<float>::size_type start = center_index - angle_range;
-        std::vector<float>::size_type end = center_index + angle_range;
+            angle_width_rad / msg->angle_increment);
 
-        // 最小距離を探す
+        std::vector<float>::size_type start = std::max(center_index > angle_range ? center_index - angle_range : 0, size_t(0));
+        std::vector<float>::size_type end = std::min(center_index + angle_range, msg->ranges.size() - 1);
+
+        // 最小距離を探索
         for (std::vector<float>::size_type i = start; i <= end; ++i) {
             if (i < msg->ranges.size() && std::isfinite(msg->ranges[i])) {
                 float distance = msg->ranges[i];
@@ -44,32 +49,27 @@ private:
         RCLCPP_INFO(this->get_logger(), "前方最近傍点距離: %.2f m", min_distance);
 
         // フィルタリングされたLaserScanメッセージを作成
-        sensor_msgs::msg::LaserScan filtered_scan_msg = *msg; // 元のメッセージをコピー
+        sensor_msgs::msg::LaserScan filtered_scan_msg = *msg;
 
-        // フィルタリングされたデータだけを保持
+        // 指定範囲以外のデータを無限大に設定
         for (std::vector<float>::size_type i = 0; i < msg->ranges.size(); ++i) {
             if (i < start || i > end) {
-                filtered_scan_msg.ranges[i] = std::numeric_limits<float>::infinity(); // 範囲外のデータを無限大に設定
+                filtered_scan_msg.ranges[i] = std::numeric_limits<float>::infinity();
             }
         }
 
-        // RVizに表示されるために必要なパラメータを設定
-        filtered_scan_msg.angle_min = msg->angle_min;             // 元のangle_minを設定
-        filtered_scan_msg.angle_max = msg->angle_max;             // 元のangle_maxを設定
-        filtered_scan_msg.angle_increment = msg->angle_increment; // 元のangle_incrementを設定
-        filtered_scan_msg.range_min = msg->range_min;             // 元のrange_minを設定
-        filtered_scan_msg.range_max = msg->range_max;             // 元のrange_maxを設定
-
-        // フィルタリングされたLaserScanをpublish
+        // フィルタリングされたLaserScanメッセージをパブリッシュ
         publisher_filtered_scan_->publish(filtered_scan_msg);
 
-        std_msgs::msg::Float32MultiArray nearest_point_msg[0] = min_distance; // 最近傍点のメッセージを作成
-        publisher_nearest_point_->publish(nerest_point_msg); // 最近傍点のメッセージをpublish
+        // 最近傍点距離をパブリッシュ
+        nearest_point_msg_.data[0] = min_distance;
+        publisher_nearest_point_->publish(nearest_point_msg_);
     }
 
     rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr publisher_filtered_scan_;
-    rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr publisher_nearest_point_;
+    rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr publisher_nearest_point_;
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr subscription_;
+    std_msgs::msg::Float64MultiArray nearest_point_msg_;
 };
 
 int main(int argc, char **argv) {

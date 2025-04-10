@@ -11,8 +11,8 @@ RRST-NHK-Project 2025
 // ROS
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
+#include "std_msgs/msg/float64_multi_array.hpp"
 #include "std_msgs/msg/int32_multi_array.hpp"
-#include "std_msgs/Float32MultiArray"
 
 // 自作クラス
 #include "include/IP.hpp"
@@ -25,6 +25,8 @@ int motor2 = 50;
 int motor3 = 50;
 int motor4 = 50;
 int hcsr04 = 0;
+float min_distance = 0;
+
 // IPアドレスとポートの指定
 std::string udp_ip = "192.168.0.218"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
@@ -372,7 +374,7 @@ class hcsr04_Listener : public rclcpp::Node {
 public:
     hcsr04_Listener()
         : Node("nhk25_dr_hcsr04") {
-        subscription_ = this->create_subscription<std_msgs::msg::Int32FloatArray>(
+        subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
             "hcsr04", 10,
             std::bind(&hcsr04_Listener::hcsr04_listener_callback, this,
                       std::placeholders::_1));
@@ -389,27 +391,27 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
 };
 
-//LD19（LiDAR）から取得した最近傍点までの距離を受信するクラス FIXME: 中身の実装！！！！！！
-class hcsr04_Listener : public rclcpp::Node {
-    public:
-        hcsr04_Listener()
-            : Node("nhk25_dr_hcsr04") {
-            subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
-                "hcsr04", 10,
-                std::bind(&hcsr04_Listener::hcsr04_listener_callback, this,
-                          std::placeholders::_1));
-            RCLCPP_INFO(this->get_logger(),
-                        "NHK2025 HCSR04 Listener");
-        }
-    
-    private:
-        void hcsr04_listener_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
-            hcsr04 = msg->data[4]; // FIXME: 適切なインデックスに変更
-            std::cout << hcsr04 << std::endl;
-        }
-    
-        rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
-    };
+// LD19（LiDAR）から取得した最近傍点までの距離を受信するクラス
+class LD19_Listener : public rclcpp::Node {
+public:
+    LD19_Listener() // ここがコンストラクタ！
+        : Node("nhk25_dr_ld19") {
+        subscription_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
+            "nearest_point", 10,
+            std::bind(&LD19_Listener::ld19_listener_callback, this,
+                      std::placeholders::_1));
+        RCLCPP_INFO(this->get_logger(),
+                    "NHK2025 LD19 Listener");
+    }
+
+private:
+    void ld19_listener_callback(const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
+        min_distance = msg->data[0];
+        std::cout << min_distance << std::endl;
+    }
+
+    rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr subscription_;
+};
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
@@ -417,8 +419,10 @@ int main(int argc, char *argv[]) {
     rclcpp::executors::SingleThreadedExecutor exec;
     auto ps4_listener = std::make_shared<PS4_Listener>(IP_MR, PORT_MR);
     auto params_listener = std::make_shared<Params_Listener>();
+    auto ld19_listener = std::make_shared<LD19_Listener>();
     exec.add_node(ps4_listener);
     exec.add_node(params_listener);
+    exec.add_node(ld19_listener);
 
     exec.spin();
 
