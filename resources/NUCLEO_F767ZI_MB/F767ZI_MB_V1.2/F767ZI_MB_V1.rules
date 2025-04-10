@@ -1,0 +1,88 @@
+
+(rules PCB F767ZI_MB_V1
+  (snap_angle 
+    fortyfive_degree
+  )
+  (autoroute_settings
+    (fanout off)
+    (autoroute on)
+    (postroute on)
+    (vias on)
+    (via_costs 50)
+    (plane_via_costs 5)
+    (start_ripup_costs 100)
+    (start_pass_no 13)
+    (layer_rule F.Cu
+      (active on)
+      (preferred_direction horizontal)
+      (preferred_direction_trace_costs 1.0)
+      (against_preferred_direction_trace_costs 2.2)
+    )
+    (layer_rule B.Cu
+      (active on)
+      (preferred_direction vertical)
+      (preferred_direction_trace_costs 1.0)
+      (against_preferred_direction_trace_costs 1.8)
+    )
+  )
+  (rule
+    (width 250.0)
+    (clear 200.0)
+    (clear 125.0 (type smd_to_turn_gap))
+  )
+  (padstack "Via[0-1]_800:400_um"
+    (shape
+      (circle F.Cu 800.0 0.0 0.0)
+    )
+    (shape
+      (circle B.Cu 800.0 0.0 0.0)
+    )
+    (attach off)
+  )
+  (via 
+    "Via[0-1]_800:400_um" "Via[0-1]_800:400_um" default
+  )
+  (via 
+    "Via[0-1]_800:400_um-kicad_default" "Via[0-1]_800:400_um" "kicad_default"
+  )
+  (via_rule
+    default "Via[0-1]_800:400_um"
+  )
+  (via_rule
+    "kicad_default" "Via[0-1]_800:400_um-kicad_default"
+  )
+  (class default
+    (clearance_class default)
+    (via_rule default)
+    (rule
+      (width 250.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+  (class "kicad_default"
+    GND +3.3V +5V "PD_1" "PD_0" "PC_0" "PG_1" "PF_2"
+    "PC_3" "PF_5" "PD_4" "PA_6" "PF_7" "PF_9" "PE_8" "PF_10"
+    "PD_11" "PB_11" "PB_10" "unconnected-(J1-Pin_26-Pad26)" "unconnected-(J1-Pin_4-Pad4)" "PE_7" "PG_14" "PD_13"
+    "PB_6" "PF_13" "unconnected-(J1-Pin_10-Pad10)" "PF_15" "unconnected-(J1-Pin_9-Pad9)" "unconnected-(J1-Pin_8-Pad8)" "unconnected-(J1-Pin_1-Pad1)" "unconnected-(J1-Pin_6-Pad6)"
+    "PD_12" "unconnected-(J1-Pin_31-Pad31)" "unconnected-(J1-Pin_28-Pad28)" "unconnected-(J1-Pin_15-Pad15)" "unconnected-(J1-Pin_3-Pad3)" "PG_9" "unconnected-(J1-Pin_33-Pad33)" "PA_0"
+    "PB_1" "unconnected-(J1-Pin_24-Pad24)" "unconnected-(J1-Pin_25-Pad25)" "unconnected-(J1-Pin_30-Pad30)" "unconnected-(J1-Pin_11-Pad11)" "PC_8" "PG_3" "PD_2"
+    "unconnected-(J2-Pin_1-Pad1)" "PC_11" "PG_2" "PC_10" VIN "PC_12" "unconnected-(J2-Pin_3-Pad3)" "PC_9"
+    "unconnected-(J2-Pin_5-Pad5)" "unconnected-(J3-Pin_13-Pad13)" "PB_13" "PF_12" "PB_8" "PC_6" "unconnected-(J3-Pin_17-Pad17)" "PC_7"
+    "unconnected-(J3-Pin_7-Pad7)" "unconnected-(J3-Pin_8-Pad8)" "unconnected-(J3-Pin_18-Pad18)" "unconnected-(J3-Pin_16-Pad16)" "unconnected-(J3-Pin_6-Pad6)" "PA_15" "unconnected-(J3-Pin_10-Pad10)" "PB_9"
+    "unconnected-(J3-Pin_19-Pad19)" "PB_15" "PB_3" "unconnected-(J3-Pin_14-Pad14)" "PD_3" "unconnected-(J5-Pin_24-Pad24)" "PE_3" "PD_6"
+    "unconnected-(J5-Pin_13-Pad13)" "PE_2" "unconnected-(J5-Pin_18-Pad18)" "unconnected-(J5-Pin_21-Pad21)" "PD_7" "unconnected-(J5-Pin_19-Pad19)" "PE_4" "Net-(Servo1-Pin_2)"
+    "unconnected-(J5-Pin_15-Pad15)" "PF_3" "PD_5" "unconnected-(J5-Pin_20-Pad20)" "unconnected-(J5-Pin_29-Pad29)" "PA_3" "unconnected-(VMD1/VMD2-Pin_10-Pad10)" "unconnected-(VMD1/VMD2-Pin_8-Pad8)"
+    "unconnected-(VMD1/VMD2-Pin_6-Pad6)" "unconnected-(VMD1/VMD2-Pin_2-Pad2)" "unconnected-(VMD1/VMD2-Pin_4-Pad4)" "unconnected-(VMD3/VMD4-Pin_8-Pad8)" "unconnected-(VMD3/VMD4-Pin_2-Pad2)" "unconnected-(VMD3/VMD4-Pin_10-Pad10)" "unconnected-(VMD3/VMD4-Pin_4-Pad4)" "unconnected-(VMD3/VMD4-Pin_6-Pad6)"
+    "unconnected-(VMD5/VMD6-Pin_10-Pad10)" "unconnected-(VMD5/VMD6-Pin_4-Pad4)" "unconnected-(VMD5/VMD6-Pin_8-Pad8)" "unconnected-(VMD5/VMD6-Pin_2-Pad2)" "unconnected-(VMD5/VMD6-Pin_6-Pad6)"
+    (clearance_class "kicad_default")
+    (via_rule "kicad_default")
+    (rule
+      (width 250.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+)
