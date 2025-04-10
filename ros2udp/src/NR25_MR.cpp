@@ -31,11 +31,11 @@ Dribble State: 0
 #define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 // 各ローラーの速度を指定(%)
-int roller_speed_dribble_ab = 30;
-int roller_speed_dribble_cd = 70;
-int roller_speed_shoot_ab = 90;
-int roller_speed_shoot_cd = 90;
-int roller_speed_reload = 35;
+int roller_speed_dribble_ab = 75;
+int roller_speed_dribble_cd = 75;
+int roller_speed_shoot_ab = 75;
+int roller_speed_shoot_cd = 75;
+int roller_speed_reload = 20;
 
 std::vector<int16_t> data(19, 0); // マイコンに送信される配列"data"
 /*
@@ -75,10 +75,10 @@ public:
         std::cout << "展開中..." << std::endl;
         data[11] = 1;
         data[13] = 1;
-        data[1] = roller_speed_reload;
+        data[1] = -roller_speed_reload;
         data[2] = roller_speed_reload;
         data[3] = -roller_speed_reload;
-        data[4] = -roller_speed_reload;
+        data[4] = roller_speed_reload;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         data[1] = 0;
@@ -86,11 +86,11 @@ public:
         data[3] = 0;
         data[4] = 0;
         udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        data[1] = -roller_speed_shoot_ab;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        data[1] = roller_speed_shoot_ab;
         data[2] = -roller_speed_shoot_ab;
         data[3] = roller_speed_shoot_cd;
-        data[4] = roller_speed_shoot_cd;
+        data[4] = -roller_speed_shoot_cd;
         udp.send(data);
         ready_for_shoot = true;
         std::cout << "完了." << std::endl;
@@ -123,10 +123,10 @@ public:
     static void dribble_action(UDP &udp) {
         std::cout << "<ドリブルシーケンス開始>" << std::endl;
         std::cout << "ドリブル準備中" << std::endl;
-        data[1] = roller_speed_dribble_ab;
+        data[1] = -roller_speed_dribble_ab;
         data[2] = roller_speed_dribble_ab;
         data[3] = -roller_speed_dribble_cd;
-        data[4] = -roller_speed_dribble_cd;
+        data[4] = roller_speed_dribble_cd;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         std::cout << "ドリブル" << std::endl;
