@@ -25,7 +25,6 @@ int motor2 = 50;
 int motor3 = 50;
 int motor4 = 50;
 int hcsr04 = 0;
-float min_distance = 0;
 
 // IPアドレスとポートの指定
 std::string udp_ip = "192.168.0.218"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
@@ -391,38 +390,24 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
 };
 
-// LD19（LiDAR）から取得した最近傍点までの距離を受信するクラス
-class LD19_Listener : public rclcpp::Node {
-public:
-    LD19_Listener() // ここがコンストラクタ！
-        : Node("nhk25_dr_ld19") {
-        subscription_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
-            "nearest_point", 10,
-            std::bind(&LD19_Listener::ld19_listener_callback, this,
-                      std::placeholders::_1));
-        RCLCPP_INFO(this->get_logger(),
-                    "NHK2025 LD19 Listener");
-    }
-
-private:
-    void ld19_listener_callback(const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
-        min_distance = msg->data[0];
-        std::cout << min_distance << std::endl;
-    }
-
-    rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr subscription_;
-};
-
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
+
+    // figletでノード名を表示
+    std::string figletout = "figlet RRST DR";
+    int result = std::system(figletout.c_str());
+    if (result != 0) {
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+        std::cerr << "Please install 'figlet' with the following command:" << std::endl;
+        std::cerr << "sudo apt install figlet" << std::endl;
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+    }
 
     rclcpp::executors::SingleThreadedExecutor exec;
     auto ps4_listener = std::make_shared<PS4_Listener>(IP_MR, PORT_MR);
     auto params_listener = std::make_shared<Params_Listener>();
-    auto ld19_listener = std::make_shared<LD19_Listener>();
     exec.add_node(ps4_listener);
     exec.add_node(params_listener);
-    exec.add_node(ld19_listener);
 
     exec.spin();
 

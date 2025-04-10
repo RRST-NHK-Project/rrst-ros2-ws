@@ -74,6 +74,11 @@ private:
 
 int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
+
+    // figletでノード名を表示
+    std::string figletout = "figlet LD19 FrontScan";
+    int result = std::system(figletout.c_str());
+
     rclcpp::spin(std::make_shared<LD19FrontScanNode>());
     rclcpp::shutdown();
     return 0;

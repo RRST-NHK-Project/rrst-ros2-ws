@@ -13,8 +13,9 @@ RRST-NHK-Project 2025
 // ROS
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
+#include "std_msgs/msg/float64_multi_array.hpp"
 #include "std_msgs/msg/int32.hpp"
-#include <std_msgs/msg/int32_multi_array.hpp>
+#include "std_msgs/msg/int32_multi_array.hpp"
 
 // 自作クラス
 #include "include/IP.hpp"
@@ -69,6 +70,9 @@ int SERVO1_CAL = 0;
 int SERVO2_CAL = 0;
 int SERVO3_CAL = 0;
 int SERVO4_CAL = 0;
+
+// 最近傍点距離の格納
+float min_distance = 0;
 
 std::vector<int16_t> data(19, 0); // マイコンに送信される配列"data"
 /*
@@ -525,6 +529,28 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
 };
 
+// LD19（LiDAR）から取得した最近傍点までの距離を受信するクラス
+class LD19_Listener : public rclcpp::Node {
+public:
+    LD19_Listener() // ここがコンストラクタ！
+        : Node("nhk25_dr_ld19") {
+        subscription_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
+            "nearest_point", 10,
+            std::bind(&LD19_Listener::ld19_listener_callback, this,
+                      std::placeholders::_1));
+        RCLCPP_INFO(this->get_logger(),
+                    "NHK2025 LD19 Listener");
+    }
+
+private:
+    void ld19_listener_callback(const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
+        min_distance = msg->data[0];
+        std::cout << min_distance << std::endl;
+    }
+
+    rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr subscription_;
+};
+
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
@@ -542,9 +568,11 @@ int main(int argc, char *argv[]) {
     auto ps4_listener = std::make_shared<PS4_Listener>(IP_DR_SD, PORT_DR_SD);
     auto servo_deg_publisher = std::make_shared<Servo_Deg_Publisher>();
     auto params_listener = std::make_shared<Params_Listener>();
+    auto ld19_listener = std::make_shared<LD19_Listener>();
     exec.add_node(ps4_listener);
     exec.add_node(servo_deg_publisher);
     exec.add_node(params_listener);
+    exec.add_node(ld19_listener);
 
     exec.spin();
 
