@@ -102,7 +102,7 @@ debug: マイコンのprintfを有効化, MD: モータードライバー, TR: �
 | data[18] | TR8 | 0 or 1|
 */
 
-// 自動化クラス
+// 自動化クラス（実装途中）
 class Automation {
 public:
     // 高速自動走行（自動加速、障害物を検知したら停止）
@@ -270,6 +270,7 @@ private:
 
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
+        //PSボタンで緊急停止 TODO:復帰機能の実装
         if (PS) {
             std::fill(data.begin(), data.end(), 0);                          // 配列をゼロで埋める
             for (int attempt = 0; attempt < 10; attempt++) {                 // 10回試行
