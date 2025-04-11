@@ -34,7 +34,7 @@ def generate_launch_description():
 
     # RVIZ2 settings
     rviz2_config = os.path.join(
-        get_package_share_directory("ldlidar_node"), "config", "ldlidar_filtered.rviz"
+        get_package_share_directory("ldlidar_node"), "config", "ldlidar.rviz"
     )
 
     # RVIZ2 node

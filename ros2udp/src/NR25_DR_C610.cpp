@@ -11,7 +11,8 @@ RRST-NHK-Project 2025
 // ROS
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
-#include <std_msgs/msg/int32_multi_array.hpp>
+#include "std_msgs/msg/float64_multi_array.hpp"
+#include "std_msgs/msg/int32_multi_array.hpp"
 
 // 自作クラス
 #include "include/IP.hpp"
@@ -24,6 +25,7 @@ int motor2 = 50;
 int motor3 = 50;
 int motor4 = 50;
 int hcsr04 = 0;
+
 // IPアドレスとポートの指定
 std::string udp_ip = "192.168.0.218"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
@@ -366,6 +368,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
 };
 
+// HCSR04（距離センサー）の値を受信するクラス(未使用)
 class hcsr04_Listener : public rclcpp::Node {
 public:
     hcsr04_Listener()
@@ -389,6 +392,16 @@ private:
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
+
+    // figletでノード名を表示
+    std::string figletout = "figlet RRST DR";
+    int result = std::system(figletout.c_str());
+    if (result != 0) {
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+        std::cerr << "Please install 'figlet' with the following command:" << std::endl;
+        std::cerr << "sudo apt install figlet" << std::endl;
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+    }
 
     rclcpp::executors::SingleThreadedExecutor exec;
     auto ps4_listener = std::make_shared<PS4_Listener>(IP_MR, PORT_MR);

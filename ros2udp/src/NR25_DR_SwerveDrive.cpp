@@ -13,8 +13,9 @@ RRST-NHK-Project 2025
 // ROS
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
+#include "std_msgs/msg/float64_multi_array.hpp"
 #include "std_msgs/msg/int32.hpp"
-#include <std_msgs/msg/int32_multi_array.hpp>
+#include "std_msgs/msg/int32_multi_array.hpp"
 
 // 自作クラス
 #include "include/IP.hpp"
@@ -70,6 +71,10 @@ int SERVO2_CAL = 0;
 int SERVO3_CAL = 0;
 int SERVO4_CAL = 0;
 
+// 最近傍点距離の格納
+float min_distance = 0;
+bool front_cleared = false;
+
 std::vector<int16_t> data(19, 0); // マイコンに送信される配列"data"
 /*
 マイコンに送信される配列"data"
@@ -96,6 +101,92 @@ debug: マイコンのprintfを有効化, MD: モータードライバー, TR: �
 | data[17] | TR7 | 0 or 1|
 | data[18] | TR8 | 0 or 1|
 */
+
+// 自動化クラス（実装途中）
+class Automation {
+public:
+    // 高速自動走行（自動加速、障害物を検知したら停止）
+    static void automatic_cruise(UDP &udp) {
+        const int steps = 100;         // 加速／減速のステップ数
+        const double maxOutput = 95.0; // 最大出力
+        // const int cruiseTimeMs = 2000; // 巡航時間（ミリ秒）
+        const int intervalMs = 10; // ステップごとの待機時間
+        bool skip_while = false;
+
+        std::cout << "<自動加速開始>" << std::endl;
+        // 加速フェーズ（0 → maxOutput）
+        for (int i = 0; i <= steps; ++i) {
+            if (front_cleared == false) {
+                std::cout << "<障害物検知>" << std::endl;
+                data[1] = 0;
+                data[2] = 0;
+                data[3] = 0;
+                data[4] = 0;
+                udp.send(data);
+                std::cout << "<停止！>" << std::endl;
+                skip_while = true;
+                break;
+            }
+            double t = static_cast<double>(i) / steps; // 0〜1
+            double output = maxOutput * t * t;         // 2次関数加速
+            data[1] = output;
+            data[2] = output;
+            data[3] = output;
+            data[4] = output;
+            std::cout << output << std::endl;
+            udp.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(intervalMs));
+        }
+
+        if (skip_while == false) {
+            while (1) {
+                // 巡航フェーズ（maxOutput）
+                if (front_cleared == false) {
+                    std::cout << "障害物検知" << std::endl;
+                    data[1] = 0;
+                    data[2] = 0;
+                    data[3] = 0;
+                    data[4] = 0;
+                    udp.send(data);
+                    std::cout << "<停止！>" << std::endl;
+                    break;
+                }
+                data[1] = maxOutput;
+                data[2] = maxOutput;
+                data[3] = maxOutput;
+                data[4] = maxOutput;
+                udp.send(data);
+                std::cout << "<巡航中>" << std::endl;
+                std::this_thread::sleep_for(std::chrono::milliseconds(intervalMs));
+            }
+        }
+
+        skip_while = false;
+
+        // 減速フェーズ（maxOutput → 0） 減速フェーズいらないかも？？？
+        // for (int i = 0; i <= steps; ++i) {
+        //     if (front_cleared == false) {
+        //         std::cout << "障害物検知" << std::endl;
+        //         data[1] = 0;
+        //         data[2] = 0;
+        //         data[3] = 0;
+        //         data[4] = 0;
+        //         udp.send(data);
+        //         std::cout << "<停止！>" << std::endl;
+        //         break;
+        //     }
+        //     double t = static_cast<double>(i) / steps;     // 0〜1
+        //     double output = maxOutput * (1 - t) * (1 - t); // 2次関数減速
+        //     data[1] = output;
+        //     data[2] = output;
+        //     data[3] = output;
+        //     data[4] = output;
+        //     std::cout << output << std::endl;
+        //     udp.send(data);
+        //     std::this_thread::sleep_for(std::chrono::milliseconds(intervalMs));
+        // }
+    }
+};
 
 class PS4_Listener : public rclcpp::Node {
 public:
@@ -152,16 +243,16 @@ private:
         // float RS_Y = msg->axes[4];
 
         // bool CROSS = msg->buttons[0];
-        // bool CIRCLE = msg->buttons[1];
-        // bool TRIANGLE = msg->buttons[2];
-        // bool SQUARE = msg->buttons[3];
+        //  bool CIRCLE = msg->buttons[1];
+        //  bool TRIANGLE = msg->buttons[2];
+        //  bool SQUARE = msg->buttons[3];
 
         bool LEFT = msg->axes[6] == 1.0;
         bool RIGHT = msg->axes[6] == -1.0;
         bool UP = msg->axes[7] == 1.0;
         bool DOWN = msg->axes[7] == -1.0;
 
-        // bool L1 = msg->buttons[4];
+        bool L1 = msg->buttons[4];
         bool R1 = msg->buttons[5];
 
         // float L2 = (-1 * msg->axes[2] + 1) / 2;
@@ -179,6 +270,7 @@ private:
 
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
+        //PSボタンで緊急停止 TODO:復帰機能の実装
         if (PS) {
             std::fill(data.begin(), data.end(), 0);                          // 配列をゼロで埋める
             for (int attempt = 0; attempt < 10; attempt++) {                 // 10回試行
@@ -187,6 +279,11 @@ private:
                 std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 100msの遅延
             }
             rclcpp::shutdown();
+        }
+
+        if (L1) {
+            Automation::automatic_cruise(udp_);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
 
         float rad = atan2(LS_Y, LS_X);
@@ -458,7 +555,7 @@ private:
             // std::cout << data[1] << std::endl;
         }
 
-        // デバッグ用（for文でcoutするとカクつく）
+        // デバッグ用 *NOTE:for文でcoutするとカクつくからこの記述
         // std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", ";
         // std::cout << data[4] << ", " << data[5] << ", " << data[6] << ", " << data[7] << ", ";
         // std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
@@ -525,6 +622,34 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
 };
 
+// LD19（LiDAR）から取得した最近傍点までの距離を受信するクラス
+class LD19_Listener : public rclcpp::Node {
+public:
+    LD19_Listener() // ここがコンストラクタ！
+        : Node("nhk25_dr_ld19") {
+        subscription_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
+            "nearest_point", 10,
+            std::bind(&LD19_Listener::ld19_listener_callback, this,
+                      std::placeholders::_1));
+        RCLCPP_INFO(this->get_logger(),
+                    "NHK2025 LD19 Listener");
+    }
+
+private:
+    void ld19_listener_callback(const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
+        min_distance = msg->data[0];
+        // std::cout << min_distance << std::endl;
+        // 障害物の有無（しきい値は要調整）
+        if (min_distance < 0.1) {
+            front_cleared = false;
+        } else {
+            front_cleared = true;
+        }
+    }
+
+    rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr subscription_;
+};
+
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
@@ -538,13 +663,15 @@ int main(int argc, char *argv[]) {
         std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
     }
 
-    rclcpp::executors::SingleThreadedExecutor exec;
+    rclcpp::executors::MultiThreadedExecutor exec; // マルチスレッドに変更（意味あるかは知らん）
     auto ps4_listener = std::make_shared<PS4_Listener>(IP_DR_SD, PORT_DR_SD);
     auto servo_deg_publisher = std::make_shared<Servo_Deg_Publisher>();
     auto params_listener = std::make_shared<Params_Listener>();
+    auto ld19_listener = std::make_shared<LD19_Listener>();
     exec.add_node(ps4_listener);
     exec.add_node(servo_deg_publisher);
     exec.add_node(params_listener);
+    exec.add_node(ld19_listener);
 
     exec.spin();
 
