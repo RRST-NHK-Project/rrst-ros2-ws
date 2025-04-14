@@ -107,7 +107,7 @@ class Automation {
 public:
     // 高速自動走行（自動加速、障害物を検知したら停止）
     static void automatic_cruise(UDP &udp) {
-        const int steps = 100;         // 加速／減速のステップ数
+        const int steps = 100;         // 加減速のステップ数
         const double maxOutput = 95.0; // 最大出力
         // const int cruiseTimeMs = 2000; // 巡航時間（ミリ秒）
         const int intervalMs = 10; // ステップごとの待機時間
@@ -270,7 +270,7 @@ private:
 
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
-        //PSボタンで緊急停止 TODO:復帰機能の実装
+        // PSボタンで緊急停止 TODO:復帰機能の実装
         if (PS) {
             std::fill(data.begin(), data.end(), 0);                          // 配列をゼロで埋める
             for (int attempt = 0; attempt < 10; attempt++) {                 // 10回試行
