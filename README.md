@@ -48,9 +48,3 @@ colcon build
 [![ROS 2 Jazzy Build](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_test.yml/badge.svg?branch=main)](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_test.yml)  
 ### develop（最新版）
 [![ROS 2 Jazzy Build](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_test.yml/badge.svg?branch=develop&event=push)](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_test.yml)
-
-## 📊 総コード行数
-[![Lines of Code](https://img.shields.io/badge/dynamic/json?label=Lines%20of%20Code&query=SUM.code&url=https%3A%2F%2Fraw.githubusercontent.com%2F<ユーザー名>%2F<リポジトリ名>%2Fdevelop%2Floc.json&color=blue)](./loc-badge.md)
-
-
-
