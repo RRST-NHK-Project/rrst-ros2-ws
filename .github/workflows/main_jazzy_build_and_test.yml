@@ -58,6 +58,27 @@ jobs:
           cd ros2_ws
           colcon build --symlink-install --event-handlers console_cohesion+
 
+      - name: Count Lines of Code
+        run: |
+          sudo apt-get install -y cloc jq
+          cloc ros2_ws/src --json > loc.json
+          CODE_LINES=$(jq '.SUM.code' loc.json)
+          echo "![Lines of Code](https://img.shields.io/badge/Lines%20of%20Code-${CODE_LINES}-blue)" > loc-badge.md
+
+      - name: Commit LOC badge to develop
+        env:
+          PAT_TOKEN: ${{ secrets.PAT }}
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git remote set-url origin https://x-access-token:${PAT_TOKEN}@github.com/${{ github.repository }}.git
+          git fetch origin
+          git checkout develop
+          git add loc-badge.md loc.json
+          git commit -m "Update LOC badge [skip ci]" || echo "No changes to commit"
+          git push origin develop
+      
+
 #      - name: Run tests
 #        run: |
 #          source /opt/ros/jazzy/setup.bash
