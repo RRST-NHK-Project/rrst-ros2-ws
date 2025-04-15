@@ -230,6 +230,11 @@ void receive(UDPSocket *receiver) { // UDP受信スレッド
 
     // recievefromIP = source.get_ip_address();
     // printf("Received %d bytes from %s\n", recv_size, recievefromIP);
+
+    if(data[0] == -1){
+      printf("Emergency Stop\n");
+      std::fill(data.begin() + 1, data.end(), 0); // 受信データを0で上書き
+    }
    
 
       //方向成分と速度成分を分離
@@ -247,7 +252,7 @@ void receive(UDPSocket *receiver) { // UDP受信スレッド
     SERVO3.pulsewidth_us(map(data[9], 0, 270, 500, 2500));
     SERVO4.pulsewidth_us(map(data[10], 0, 270, 500, 2500));
 
-    if(data[0]){
+    if(data[0] == 1 || data[0] == -1){
       printf("%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d\n",
         data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8],
         data[9], data[10], data[11], data[12], data[13], data[14], data[15], data[16], data[17], data[18]);
