@@ -287,15 +287,15 @@ private:
 
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
-        if (PS) {
-            std::fill(data.begin(), data.end(), 0);                          // 配列をゼロで埋める                                      // 最後の3つを-1に
-            for (int attempt = 0; attempt < 10; attempt++) {                 // 10回試行
-                udp_.send(data);                                             // データ送信
-                std::cout << "緊急停止！ 試行" << attempt + 1 << std::endl;  // 試行回数を表示
-                std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 100msの遅延
-            }
-            rclcpp::shutdown();
-        }
+        // if (PS) {
+        //     std::fill(data.begin(), data.end(), 0);                          // 配列をゼロで埋める                                      // 最後の3つを-1に
+        //     for (int attempt = 0; attempt < 10; attempt++) {                 // 10回試行
+        //         udp_.send(data);                                             // データ送信
+        //         std::cout << "緊急停止！ 試行" << attempt + 1 << std::endl;  // 試行回数を表示
+        //         std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 100msの遅延
+        //     }
+        //     rclcpp::shutdown();
+        // }
 
         // if (PS) {
         //     std::fill(data.begin(), data.end(), 0);                              // 配列をゼロで埋める

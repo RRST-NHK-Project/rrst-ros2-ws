@@ -141,22 +141,22 @@ private:
 
         // bool SHARE = msg->buttons[8];
         // bool OPTION = msg->buttons[9];
-        bool PS = msg->buttons[10];
+        // bool PS = msg->buttons[10];
 
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
 
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
-        if (PS) {
-            std::fill(data.begin(), data.end(), 0);                          // 配列をゼロで埋める
-            for (int attempt = 0; attempt < 10; attempt++) {                 // 10回試行
-                udp_.send(data);                                             // データ送信
-                std::cout << "緊急停止！ 試行" << attempt + 1 << std::endl;  // 試行回数を表示
-                std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 100msの遅延
-            }
-            rclcpp::shutdown();
-        }
+        // if (PS) {
+        //     std::fill(data.begin(), data.end(), 0);                          // 配列をゼロで埋める
+        //     for (int attempt = 0; attempt < 10; attempt++) {                 // 10回試行
+        //         udp_.send(data);                                             // データ送信
+        //         std::cout << "緊急停止！ 試行" << attempt + 1 << std::endl;  // 試行回数を表示
+        //         std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 100msの遅延
+        //     }
+        //     rclcpp::shutdown();
+        // }
 
         if (TRIANGLE) {
             Action::ready_for_dunk_action(udp_);
