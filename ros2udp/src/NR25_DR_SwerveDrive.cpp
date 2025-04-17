@@ -21,7 +21,7 @@ RRST-NHK-Project 2025
 #include "include/IP.hpp"
 #include "include/UDP.hpp"
 
-#define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
+#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 // スティックのデッドゾーン
 #define DEADZONE_L 0.3
