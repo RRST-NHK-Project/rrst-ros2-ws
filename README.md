@@ -42,9 +42,39 @@ cd ~/ros2_ws
 colcon build
 ```
 
+## 機体の立ち上げ（MR）
+１，機体のルーターを起動しアクセスポイントに接続する。(GL.iNet)
+```
+cd ~/ros2_ws/src/setup
+./boot_mr.sh
+```
+## 機体の立ち上げ（DR）
+１，機体のルーターを起動しアクセスポイントに接続する。（TP-Link）  
+２，SSHで機体のラズパイに接続する（User: dev, Pass: dev）
+```
+ssh dev@dev.local
+```
+ログインできたら
+```
+cd ~/ros2_ws/src/setup
+./boot_ld19_fs.sh
+```
+PCに戻って
+
+```
+cd ~/ros2_ws/src/setup
+./boot_dr.sh
+```
+
 ## Build Status
 各ブランチのビルド状況です。
 ### main（安定版）
 [![ROS 2 Jazzy Build](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_test.yml/badge.svg?branch=main)](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_test.yml)  
 ### develop（最新版）
 [![ROS 2 Jazzy Build](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_test.yml/badge.svg?branch=develop&event=push)](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_test.yml)
+
+## Powered by
+2024年度立命館大学ロボット技術研究会NHKプロジェクト  
+2024 NHK Project, RRST, Ritsumeikan University 
+
+![Logo](https://www.rrst.jp/img/logo.png)
