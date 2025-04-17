@@ -2,15 +2,12 @@
 RRST-NHK-Project 2025
 汎用機の機構制御
 
-クリコア　(ロンリウム)
-=== Current Parameters ===
-0: roller_speed_dribble_ab = 15
-1: roller_speed_dribble_cd = 75
-2: roller_speed_shoot_ab   = 35
-3: roller_speed_shoot_cd   = 35
-Shoot State: 0
-Dribble State: 0
-==========================
+二次ビ
+int roller_speed_dribble_ab = 10;
+int roller_speed_dribble_cd = 62;
+int roller_speed_shoot_ab = 35;
+int roller_speed_shoot_cd = 35;
+int reload = 15;
 */
 
 // 標準
@@ -33,8 +30,8 @@ Dribble State: 0
 // 各ローラーの速度を指定(%)
 int roller_speed_dribble_ab = 10;
 int roller_speed_dribble_cd = 62;
-int roller_speed_shoot_ab = 20;
-int roller_speed_shoot_cd = 20;
+int roller_speed_shoot_ab = 35;
+int roller_speed_shoot_cd = 35;
 int reload = 15;
 
 std::vector<int16_t> data(19, 0); // マイコンに送信される配列"data"
@@ -81,10 +78,10 @@ public:
         data[2] = reload;
         data[3] = -reload;
         data[4] = reload;
-
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
         udp.send(data);
         std::cout << data[1] << data[2] << data[3] << data[4] << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         data[1] = 0;
         data[2] = 0;
         data[3] = 0;
@@ -100,10 +97,11 @@ public:
         data[2] = -roller_speed_shoot_ab;
         data[3] = roller_speed_shoot_cd;
         data[4] = -roller_speed_shoot_cd;
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
         udp.send(data);
         shoot_state = true;
         std::cout << "完了." << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         std::cout << "シュート" << std::endl;
         data[12] = 1;
         udp.send(data);
@@ -136,7 +134,7 @@ public:
         data[3] = -roller_speed_dribble_cd;
         data[4] = roller_speed_dribble_cd;
         udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1200));
         std::cout << "ドリブル" << std::endl;
         data[13] = 1;
         udp.send(data);
