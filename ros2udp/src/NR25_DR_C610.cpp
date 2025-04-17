@@ -17,13 +17,15 @@ RRST NHK2025
 // 自作クラス
 #include "include/UDP.hpp"
 
-#define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
+#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 int motor1 = 50;
 int motor2 = 50;
 int motor3 = 50;
 int motor4 = 50;
 int hcsr04 = 0;
+bool REVERSEMODE = false;
+
 // IPアドレスとポートの指定
 std::string udp_ip = "192.168.0.218"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
@@ -174,10 +176,49 @@ public:
         std::cout << "パス、シュート完了" << std::endl;
     }
 
-    static void ball_load_action(UDP &udp) { // ボール保持
+    static void ball_load_action_1(UDP &udp) { // ボール保持
+        std::cout << "ボール保持開始" << std::endl;
+        std::cout << "HANNDO展開[16]" << std::endl;
+        data[16] = 1; 
+        //data[17] = 1;
+        udp.send(data);
+        //std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+        // data[1] = motor1;
+        // data[3] = -motor2;
+        // data[2] = motor2-20;
+        // udp.send(data);
+        // std::cout << "１段階格納[15]" << std::endl;
+        // data[15] = 0;
+        // udp.send(data);
+        // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        // センサーが反応したら
+        // if (hcsr04) {
+        //     std::cout << "ボール保持" << std::endl;
+        //     data[2] = 0;
+        //     udp.send(data);
+        //     std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        //     data[1] = 0;
+        //     data[3] = 0;
+        //     udp.send(data);
+        //     std::cout << "ボール保持完了" << std::endl;
+        // } else { // 保持できてなかったらもう一回やる
+        //     std::cout << "ボール保持失敗" << std::endl;
+        //     data[2] = 0;
+        //     udp.send(data);
+        //     std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        //     data[1] = 0;
+        //     data[3] = 0;
+        //     udp.send(data);
+        // }
+        //std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        //data[17] = 0;
+        //udp.send(data);
+
+    }
+    static void ball_load_action_2(UDP &udp) { // ボール保持
         std::cout << "ボール保持開始" << std::endl;
         std::cout << "１段階展開[15]" << std::endl;
-        data[15] = 1; 
+        data[16] = -0; 
         //data[17] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000));
@@ -188,29 +229,29 @@ public:
         std::cout << "１段階格納[15]" << std::endl;
         data[15] = 0;
         udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        //std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         // センサーが反応したら
-        if (hcsr04) {
-            std::cout << "ボール保持" << std::endl;
-            data[2] = 0;
-            udp.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            data[1] = 0;
-            data[3] = 0;
-            udp.send(data);
-            std::cout << "ボール保持完了" << std::endl;
-        } else { // 保持できてなかったらもう一回やる
-            std::cout << "ボール保持失敗" << std::endl;
-            data[2] = 0;
-            udp.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            data[1] = 0;
-            data[3] = 0;
-            udp.send(data);
-        }
+        // if (hcsr04) {
+        //     std::cout << "ボール保持" << std::endl;
+        //     data[2] = 0;
+        //     udp.send(data);
+        //     std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        //     data[1] = 0;
+        //     data[3] = 0;
+        //     udp.send(data);
+        //     std::cout << "ボール保持完了" << std::endl;
+        // } else { // 保持できてなかったらもう一回やる
+        //     std::cout << "ボール保持失敗" << std::endl;
+        //     data[2] = 0;
+        //     udp.send(data);
+        //     std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        //     data[1] = 0;
+        //     data[3] = 0;
+        //     udp.send(data);
+        // }
         //std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         //data[17] = 0;
-        udp.send(data);
+        //udp.send(data);
 
     }
 
@@ -223,16 +264,16 @@ public:
         std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
         std::cout << "<ドリブル[2],[3]>" << std::endl;
         // data[1] = motor1;
-        data[1] = 100;
-        data[2] = 100;
-        data[3] = -100;
+        //data[1] = 100;
+        //data[2] = 100;
+        //data[3] = -100;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // 要調整
         std::cout << "<回転終了>" << std::endl;
         // data[1]= 0;
-        data[1] = 0;
-        data[2] = 0;
-        data[3] = 0;
+        //data[1] = 0;
+        //data[2] = 0;
+        //data[3] = 0;
         udp.send(data);
         std::cout << "１段階格納[11]＋２段階格納[15]" << std::endl;
         data[11] = 0;
@@ -286,6 +327,9 @@ private:
 
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
+        static bool last_UP = false; // 前回の状態を保持する static 変数
+        // OPTION のラッチ状態を保持する static 変数（初期状態は OFF とする）
+        static bool UP_latch = false;
 
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
@@ -298,7 +342,9 @@ private:
             }
             rclcpp::shutdown();
         }
-
+        if (UP && !last_UP) {
+            UP_latch = !UP_latch;
+        }
         // if (PS) {
         //     std::fill(data.begin(), data.end(), 0);                              // 配列をゼロで埋める
         //     for (int attempt = 0; attempt < 10; attempt++) {                     // 10回試行
@@ -328,11 +374,17 @@ private:
             Action::pass_shoot_action(udp_);
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
-        if (UP) {
-            Action::ball_load_action(udp_);
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        if (UP==0) {
+            Action::ball_load_action_1(udp_);
+            //std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
-
+        if (UP==1) {
+            Action::ball_load_action_2(udp_);
+            //std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+        last_UP = UP;
+        REVERSEMODE = UP_latch;
+        std::cout << REVERSEMODE << std::endl;
         udp_.send(data);
     }
 

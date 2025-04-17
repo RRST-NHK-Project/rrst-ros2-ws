@@ -107,16 +107,17 @@ class Automation {
 public:
     // 高速自動走行（自動加速、障害物を検知したら停止）
     static void automatic_cruise(UDP &udp) {
-        const int steps = 100;         // 加速／減速のステップ数
-        const double maxOutput = 95.0; // 最大出力
+        const int steps = 20;          // 加減速のステップ数
+        const double maxOutput = 90.0; // 最大出力
         // const int cruiseTimeMs = 2000; // 巡航時間（ミリ秒）
-        const int intervalMs = 10; // ステップごとの待機時間
+        const int intervalMs = 50; // ステップごとの待機時間
         bool skip_while = false;
 
         std::cout << "<自動加速開始>" << std::endl;
         // 加速フェーズ（0 → maxOutput）
         for (int i = 0; i <= steps; ++i) {
-            if (front_cleared == false) {
+            // 前方の障害物及び緊急停止の検知
+            if (front_cleared == false || data[0] == -1) {
                 std::cout << "<障害物検知>" << std::endl;
                 data[1] = 0;
                 data[2] = 0;
@@ -141,7 +142,8 @@ public:
         if (skip_while == false) {
             while (1) {
                 // 巡航フェーズ（maxOutput）
-                if (front_cleared == false) {
+                // 前方の障害物及び緊急停止の検知
+                if (front_cleared == false || data[0] == -1) {
                     std::cout << "障害物検知" << std::endl;
                     data[1] = 0;
                     data[2] = 0;
@@ -260,7 +262,7 @@ private:
 
         // bool SHARE = msg->buttons[8];
         bool OPTION = msg->buttons[9];
-        bool PS = msg->buttons[10];
+        // bool PS = msg->buttons[10];
         static bool last_option = false; // 前回の状態を保持する static 変数
         // OPTION のラッチ状態を保持する static 変数（初期状態は OFF とする）
         static bool option_latch = false;
@@ -268,18 +270,22 @@ private:
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
 
-        data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
+        // PSボタンで緊急停止 TODO:復帰機能の実装
+        // if (PS && !ps_prev) {
+        //     ps_state = !ps_state; // トグル切り替え
+        //     std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        // }
+        // ps_prev = PS;       // 現在のPSボタンの状態を保存
+        // soft_es = ps_state; // 緊急停止状態を保存
 
-        //PSボタンで緊急停止 TODO:復帰機能の実装
-        if (PS) {
-            std::fill(data.begin(), data.end(), 0);                          // 配列をゼロで埋める
-            for (int attempt = 0; attempt < 10; attempt++) {                 // 10回試行
-                udp_.send(data);                                             // データ送信
-                std::cout << "緊急停止！ 試行" << attempt + 1 << std::endl;  // 試行回数を表示
-                std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 100msの遅延
-            }
-            rclcpp::shutdown();
-        }
+        // if (soft_es) {
+        //     data[0] = -1;
+        //     std::cout << "緊急停止！" << std::endl;
+        // } else if (MC_PRINTF == 0 || MC_PRINTF == 1) {
+        //     data[0] = MC_PRINTF;
+        // } else {
+        //     data[0] = 1;
+        // }
 
         if (L1) {
             Automation::automatic_cruise(udp_);
@@ -640,7 +646,7 @@ private:
         min_distance = msg->data[0];
         // std::cout << min_distance << std::endl;
         // 障害物の有無（しきい値は要調整）
-        if (min_distance < 0.1) {
+        if (min_distance < 0.5) {
             front_cleared = false;
         } else {
             front_cleared = true;
@@ -648,6 +654,53 @@ private:
     }
 
     rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr subscription_;
+};
+
+// ソフト緊停用のクラス,PS4_Listernerと並列してPSボタンを監視
+// PS4_Listener内で実装すると割り込みができないため分離
+class SoftES_Listener : public rclcpp::Node {
+public:
+    SoftES_Listener(const std::string &ip, int port)
+        : Node("dr_soft_es"), udp_(ip, port) {
+        subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
+            "joy1", 10,
+            std::bind(&SoftES_Listener::es_listener_callback, this,
+                      std::placeholders::_1));
+        RCLCPP_INFO(this->get_logger(),
+                    "NHK2025 DR SD initialized with IP: %s, Port: %d", ip.c_str(),
+                    port);
+    }
+
+private:
+    // コントローラーの入力を取得、使わない入力はコメントアウト推奨
+    void es_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
+
+        bool PS = msg->buttons[10];
+        // stticが大事！！
+        static bool ps_state = false; // トグル状態を保持する変数
+        static bool ps_prev = false;  // 前回のPSボタンの状態を記録
+        static bool soft_es = false;  // ソフトウェア緊急停止状態を保持する変数
+
+        // PSボタンで緊急停止
+        if (PS && !ps_prev) {
+            ps_state = !ps_state; // トグル切り替え
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+        ps_prev = PS;       // 現在のPSボタンの状態を保存
+        soft_es = ps_state; // 緊急停止状態を保存
+
+        if (soft_es) {
+            data[0] = -1;
+            std::cout << "緊急停止！" << std::endl;
+        } else if (MC_PRINTF == 0 || MC_PRINTF == 1) {
+            data[0] = MC_PRINTF;
+        } else {
+            data[0] = 1;
+        }
+        udp_.send(data);
+    }
+    rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
+    UDP udp_;
 };
 
 int main(int argc, char *argv[]) {
@@ -668,10 +721,12 @@ int main(int argc, char *argv[]) {
     auto servo_deg_publisher = std::make_shared<Servo_Deg_Publisher>();
     auto params_listener = std::make_shared<Params_Listener>();
     auto ld19_listener = std::make_shared<LD19_Listener>();
+    auto es_listener = std::make_shared<SoftES_Listener>(IP_DR_SD, PORT_DR_SD);
     exec.add_node(ps4_listener);
     exec.add_node(servo_deg_publisher);
     exec.add_node(params_listener);
     exec.add_node(ld19_listener);
+    exec.add_node(es_listener);
 
     exec.spin();
 
