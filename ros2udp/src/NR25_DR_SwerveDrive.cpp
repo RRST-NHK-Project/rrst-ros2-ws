@@ -116,7 +116,8 @@ public:
         std::cout << "<自動加速開始>" << std::endl;
         // 加速フェーズ（0 → maxOutput）
         for (int i = 0; i <= steps; ++i) {
-            if (front_cleared == false) {
+            // 前方の障害物及び緊急停止の検知
+            if (front_cleared == false || data[0] == -1) {
                 std::cout << "<障害物検知>" << std::endl;
                 data[1] = 0;
                 data[2] = 0;
@@ -141,7 +142,8 @@ public:
         if (skip_while == false) {
             while (1) {
                 // 巡航フェーズ（maxOutput）
-                if (front_cleared == false) {
+                // 前方の障害物及び緊急停止の検知
+                if (front_cleared == false || data[0] == -1) {
                     std::cout << "障害物検知" << std::endl;
                     data[1] = 0;
                     data[2] = 0;
@@ -654,6 +656,8 @@ private:
     rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr subscription_;
 };
 
+// ソフト緊停用のクラス,PS4_Listernerと並列してPSボタンを監視
+// PS4_Listener内で実装すると割り込みができないため分離
 class SoftES_Listener : public rclcpp::Node {
 public:
     SoftES_Listener(const std::string &ip, int port)
@@ -669,7 +673,6 @@ public:
 
 private:
     // コントローラーの入力を取得、使わない入力はコメントアウト推奨
-
     void es_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
 
         bool PS = msg->buttons[10];
@@ -678,7 +681,7 @@ private:
         static bool ps_prev = false;  // 前回のPSボタンの状態を記録
         static bool soft_es = false;  // ソフトウェア緊急停止状態を保持する変数
 
-        // PSボタンで緊急停止 TODO:復帰機能の実装
+        // PSボタンで緊急停止
         if (PS && !ps_prev) {
             ps_state = !ps_state; // トグル切り替え
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
