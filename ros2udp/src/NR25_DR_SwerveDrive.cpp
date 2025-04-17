@@ -260,7 +260,7 @@ private:
 
         // bool SHARE = msg->buttons[8];
         bool OPTION = msg->buttons[9];
-        bool PS = msg->buttons[10];
+        // bool PS = msg->buttons[10];
         static bool last_option = false; // 前回の状態を保持する static 変数
         // OPTION のラッチ状態を保持する static 変数（初期状態は OFF とする）
         static bool option_latch = false;
