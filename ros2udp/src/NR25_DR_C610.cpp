@@ -24,7 +24,7 @@ int motor2 = 50;
 int motor3 = 50;
 int motor4 = 50;
 int hcsr04 = 0;
-bool REVERSEMODE = false;
+bool UP_state = false;
 
 // IPアドレスとポートの指定
 std::string udp_ip = "192.168.0.218"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
@@ -374,17 +374,17 @@ private:
             Action::pass_shoot_action(udp_);
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
-        if (UP==0) {
+        if (UP_state==0) {
             Action::ball_load_action_1(udp_);
             //std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
-        if (UP==1) {
+        if (UP_state==1) {
             Action::ball_load_action_2(udp_);
             //std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
         last_UP = UP;
-        REVERSEMODE = UP_latch;
-        std::cout << REVERSEMODE << std::endl;
+        UP_state = UP_latch;
+        std::cout << UP_state << std::endl;
         udp_.send(data);
     }
 
