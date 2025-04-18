@@ -49,8 +49,8 @@ int desired_deg = 0;
 int measured_deg = 0;
 
 // 速度
-int wheelspeed = 30;
-int yawspeed = 10;
+int wheelspeed = 75;
+int yawspeed = -10;
 int yawspeed_auto = 20;
 
 // サーボの組み付け時のズレを補正（度数法）
@@ -130,7 +130,7 @@ private:
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
         float LS_X = -1 * msg->axes[0];
         float LS_Y = msg->axes[1];
-        float RS_X = -1 * msg->axes[3];
+        float RS_X =  -1 * msg->axes[3];
         // float RS_Y = msg->axes[4];
 
         bool CROSS = msg->buttons[0];
@@ -281,10 +281,10 @@ private:
                 data[8] = 90 + SERVO2_CAL;
                 data[9] = 90 + SERVO3_CAL;
                 data[10] = 180 + SERVO4_CAL;
-                data[1] = yawspeed;
-                data[2] = -yawspeed;
-                data[3] = yawspeed;
-                data[4] = -yawspeed;
+                data[1] = -yawspeed;
+                data[2] = yawspeed;
+                data[3] = -yawspeed;
+                data[4] = yawspeed;
             }
             // 半時計回りYAW回転
             if (0 < RS_X && fabs(RS_X) >= DEADZONE_R) {
@@ -292,10 +292,10 @@ private:
                 data[8] = 90 + SERVO2_CAL;
                 data[9] = 90 + SERVO3_CAL;
                 data[10] = 180 + SERVO4_CAL;
-                data[1] = -yawspeed;
-                data[2] = yawspeed;
-                data[3] = -yawspeed;
-                data[4] = yawspeed;
+                data[1] = yawspeed;
+                data[2] = -yawspeed;
+                data[3] = yawspeed;
+                data[4] = -yawspeed;
             }
         }
         // 反転モード
@@ -402,10 +402,10 @@ private:
                 data[8] = 90 + SERVO2_CAL;
                 data[9] = 90 + SERVO3_CAL;
                 data[10] = 180 + SERVO4_CAL;
-                data[1] = yawspeed;
-                data[2] = -yawspeed;
-                data[3] = yawspeed;
-                data[4] = -yawspeed;
+                data[1] = -yawspeed;
+                data[2] = yawspeed;
+                data[3] = -yawspeed;
+                data[4] = yawspeed;
             }
             // 半時計回りYAW回転
             if (0 < RS_X && fabs(RS_X) >= DEADZONE_R) {
@@ -413,10 +413,10 @@ private:
                 data[8] = 90 + SERVO2_CAL;
                 data[9] = 90 + SERVO3_CAL;
                 data[10] = 180 + SERVO4_CAL;
-                data[1] = -yawspeed;
-                data[2] = yawspeed;
-                data[3] = -yawspeed;
-                data[4] = yawspeed;
+                data[1] = yawspeed;
+                data[2] = -yawspeed;
+                data[3] = yawspeed;
+                data[4] = -yawspeed;
             }
         }
 
