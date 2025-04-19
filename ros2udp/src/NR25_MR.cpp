@@ -30,10 +30,12 @@ int reload = 15;
 // 各ローラーの速度を指定(%)
 int roller_speed_dribble_ab = 11;
 int roller_speed_dribble_cd = 62;
+//ロングシュート4242
+//3ポイントシュート3535
 int roller_speed_shoot_ab = 35;
 int roller_speed_shoot_cd = 35;
-int roller_speed_pass_ab = 25;
-int roller_speed_pass_cd = 25;
+int roller_speed_pass_ab = 34;
+int roller_speed_pass_cd = 30;
 int reload = 15;
 
 std::vector<int16_t> data(19, 0); // マイコンに送信される配列"data"
