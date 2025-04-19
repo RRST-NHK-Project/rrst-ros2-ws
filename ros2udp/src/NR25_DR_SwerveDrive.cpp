@@ -58,7 +58,7 @@ double speed_Output = 0.0;
 const double dt = 0.05; // 50ms
 
 // 速度
-int wheelspeed = 30;
+int wheelspeed = 75;
 int yawspeed = 10;
 int previous_speed = 0;
 int desired_speed = 30;
@@ -66,10 +66,10 @@ int measured_speed = 0;
 static double current_motor_command = 0.0;
 
 // サーボの組み付け時のズレを補正（度数法）
-int SERVO1_CAL = 0;
-int SERVO2_CAL = 0;
-int SERVO3_CAL = 0;
-int SERVO4_CAL = 0;
+int SERVO1_CAL = 15;
+int SERVO2_CAL = -3;
+int SERVO3_CAL = 10;
+int SERVO4_CAL = 17;
 
 // 最近傍点距離の格納
 float min_distance = 0;

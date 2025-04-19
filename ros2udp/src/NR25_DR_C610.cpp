@@ -85,7 +85,7 @@ public:
         
         data[13] = 1;
         udp.send(data);
-
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
         std::cout << "ストッパ[14]" << std::endl;
         data[14] = 1;
         udp.send(data);
@@ -237,25 +237,28 @@ private:
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
 
-        if (TRIANGLE) {
-            // std::cout << "<ロボマス回転>" << std::endl;
-            Action::dribble_action(udp_);
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        }
-        if (CROSS) {
-            Action::pass_shoot_action(udp_);
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        }
-        // if (UP_state==0) {
-        //     Action::ball_load_action_1(udp_);
-        //     //std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        // if (TRIANGLE) {
+        //     // std::cout << "<ロボマス回転>" << std::endl;
+        //     Action::dribble_action(udp_);
+        //     std::this_thread::sleep_for(std::chrono::milliseconds(500));
         // }
-        // if (UP_state==1) {
-        //     Action::ball_load_action_2(udp_);
-        //     //std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        // if (CROSS) {
+        //     Action::pass_shoot_action(udp_);
+        //     std::this_thread::sleep_for(std::chrono::milliseconds(500));
         // }
-        data[16]= UP_state;
 
+        //１段階展開[11]＋２段階展開[15]を同時に行うボタン
+        // if (UP==0) {
+        //     data[11]= UP;
+        //     data[15]= UP;
+        //     //std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        // }
+        // if (UP==1) {
+        //     data[11]= UP;
+        //     data[15]= UP;
+        //     //std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        // }
+        
         last_UP = UP;
         UP_state = UP_latch;
         //std::cout << data[16] << std::endl;
