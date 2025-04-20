@@ -58,7 +58,7 @@ double speed_Output = 0.0;
 const double dt = 0.05; // 50ms
 
 // 速度
-int wheelspeed = 30;
+int wheelspeed = 75;
 int yawspeed = 10;
 int previous_speed = 0;
 int desired_speed = 30;
@@ -66,10 +66,10 @@ int measured_speed = 0;
 static double current_motor_command = 0.0;
 
 // サーボの組み付け時のズレを補正（度数法）
-int SERVO1_CAL = 0;
-int SERVO2_CAL = 0;
-int SERVO3_CAL = 0;
-int SERVO4_CAL = 0;
+int SERVO1_CAL = 15;
+int SERVO2_CAL = -3;
+int SERVO3_CAL = 10;
+int SERVO4_CAL = 17;
 
 // 最近傍点距離の格納
 float min_distance = 0;
@@ -108,7 +108,7 @@ public:
     // 高速自動走行（自動加速、障害物を検知したら停止）
     static void automatic_cruise(UDP &udp) {
         const int steps = 20;          // 加減速のステップ数
-        const double maxOutput = 90.0; // 最大出力
+        const double maxOutput = 20.0; // 最大出力
         // const int cruiseTimeMs = 2000; // 巡航時間（ミリ秒）
         const int intervalMs = 50; // ステップごとの待機時間
         bool skip_while = false;
@@ -130,10 +130,10 @@ public:
             }
             double t = static_cast<double>(i) / steps; // 0〜1
             double output = maxOutput * t * t;         // 2次関数加速
-            data[1] = output;
-            data[2] = output;
-            data[3] = output;
-            data[4] = output;
+            data[1] = -output;
+            data[2] = -output;
+            data[3] = -output;
+            data[4] = -output;
             std::cout << output << std::endl;
             udp.send(data);
             std::this_thread::sleep_for(std::chrono::milliseconds(intervalMs));
@@ -153,10 +153,10 @@ public:
                     std::cout << "<停止！>" << std::endl;
                     break;
                 }
-                data[1] = maxOutput;
-                data[2] = maxOutput;
-                data[3] = maxOutput;
-                data[4] = maxOutput;
+                data[1] = -maxOutput;
+                data[2] = -maxOutput;
+                data[3] = -maxOutput;
+                data[4] = -maxOutput;
                 udp.send(data);
                 std::cout << "<巡航中>" << std::endl;
                 std::this_thread::sleep_for(std::chrono::milliseconds(intervalMs));
@@ -646,7 +646,7 @@ private:
         min_distance = msg->data[0];
         // std::cout << min_distance << std::endl;
         // 障害物の有無（しきい値は要調整）
-        if (min_distance < 0.5) {
+        if (min_distance < 1.1) {
             front_cleared = false;
         } else {
             front_cleared = true;

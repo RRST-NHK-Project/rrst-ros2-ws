@@ -25,13 +25,17 @@ int reload = 15;
 #include "include/IP.hpp"
 #include "include/UDP.hpp"
 
-#define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
+#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 // 各ローラーの速度を指定(%)
-int roller_speed_dribble_ab = 10;
+int roller_speed_dribble_ab = 11;
 int roller_speed_dribble_cd = 62;
+//ロングシュート4242
+//3ポイントシュート3535
 int roller_speed_shoot_ab = 35;
 int roller_speed_shoot_cd = 35;
+int roller_speed_pass_ab = 34;
+int roller_speed_pass_cd = 30;
 int reload = 15;
 
 std::vector<int16_t> data(19, 0); // マイコンに送信される配列"data"
@@ -125,6 +129,40 @@ public:
         std::cout << "<射出シーケンス終了>" << std::endl;
     }
 
+ // パスシーケンス
+    static void pass_action(UDP &udp) {
+        data[1] = roller_speed_pass_ab;
+        data[2] = -roller_speed_pass_ab;
+        data[3] = roller_speed_pass_cd;
+        data[4] = -roller_speed_pass_cd;
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        udp.send(data);
+        shoot_state = true;
+        std::cout << "完了." << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        std::cout << "パス" << std::endl;
+        data[12] = 1;
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        std::cout << "格納準備中..." << std::endl;
+        data[12] = 0;
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        std::cout << "格納中..." << std::endl;
+        data[11] = 0;
+        data[13] = 0;
+        data[1] = 0;
+        data[2] = 0;
+        data[3] = 0;
+        data[4] = 0;
+        udp.send(data);
+        reload_state = false;
+        shoot_state = false;
+
+        std::cout << "完了." << std::endl;
+        std::cout << "<パスシーケンス終了>" << std::endl;
+    }
+
     // ドリブルシーケンス
     static void dribble_action(UDP &udp) {
         std::cout << "<ドリブルシーケンス開始>" << std::endl;
@@ -194,7 +232,7 @@ private:
         bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
         bool TRIANGLE = msg->buttons[2];
-        // bool SQUARE = msg->buttons[3];
+        bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
         // bool RIGHT = msg->axes[6] == -1.0;
@@ -239,6 +277,10 @@ private:
 
         if (TRIANGLE && !Action::shoot_state) {
             Action::dribble_action(udp_);
+        }
+        
+        if (SQUARE && Action::shoot_state) {
+            Action::pass_action(udp_);
         }
 
         // if (OPTION) {
