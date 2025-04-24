@@ -12,32 +12,32 @@ ROS 2とマイコンをUDP経由で通信するパッケージとその関連フ
 
 
 # ディレクトリ構成
-### /ros2udp
+## /ros2udp
 [f7_udpパッケージ](https://github.com/KouTashi/f7_udp)のC++移植版、NHKロボコン2025で使用予定。  
 ### /ldrobot-lidar-ros2
 LD19用のパッケージです。既存の[パッケージ](https://github.com/Myzhar/ldrobot-lidar-ros2.git)を改変したものです。
-### /resouces/ros2udp_pio
+## /resouces/ros2udp_pio
 ros2udpパッケージのマイコン側プログラムのPlatformIOプロジェクト群です。
-### /resouces/NUCLEO_F767ZI_MB
+## /resouces/NUCLEO_F767ZI_MB
 メイン基板のKiCadデータ
-### /setup
+## /setup
 初期設定や機体立ち上げのスクリプトをまとめています。
 
 # Getting started
-### １，ワークスペースの作成（初回のみ）
+## １，ワークスペースの作成（初回のみ）
   
 ```
 mkdir -p ~/ros2_ws/src
 ```
   
-### ２，リポジトリのクローン
+## ２，リポジトリのクローン
 ~/ros2_ws/srcに移動しパッケージをクローンします。
 ```
 cd ~/ros2_ws/src
 git clone https://github.com/RRST-NHK-Project/ros2udp.git .
 ```
   
-### ３，依存関係のインストール
+## ３，依存関係のインストール
 依存関係を一括インストールするスクリプトを実行します。
 ```
 cd ~/ros2_ws/src/setup
@@ -45,7 +45,7 @@ sudo chmod +x setup.sh
 ./setup.sh
 ```
 
-### ４,ビルド
+## ４,ビルド
 ビルドします。コードを編集するたびにビルドが必要です。
 ```
 cd ~/ros2_ws
