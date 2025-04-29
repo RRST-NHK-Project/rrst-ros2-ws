@@ -58,11 +58,11 @@ colcon build
 
 | パス | 説明 |
 |:---|:---|
-| `/ros2udp` | [f7_udpパッケージ](https://github.com/KouTashi/f7_udp)のC++移植版。 |
-| `/ldrobot-lidar-ros2` | LD19用パッケージ。元パッケージを改変。 |
-| `/resources/ros2udp_pio` | マイコン用PlatformIOプログラム。 |
-| `/resources/NUCLEO_F767ZI_MB` | メイン基板のKiCadデータ。 |
-| `/setup` | 初期設定や立ち上げスクリプト群。 |
+| `/ros2udp` | ros2udpパッケージ |
+| `/ldrobot-lidar-ros2` | LD19用パッケージ。[既存パッケージ](https://github.com/Myzhar/ldrobot-lidar-ros2.git)を改変 |
+| `/resources/ros2udp_pio` | マイコン用PlatformIOプロジェクト群 |
+| `/resources/NUCLEO_F767ZI_MB` | メイン基板のKiCadデータ |
+| `/setup` | 初期設定や立ち上げスクリプト群 |
 
 ---
 
@@ -172,8 +172,6 @@ debug: マイコンのprintfを有効化, MD: モータードライバー, TR: �
 | モーター1を20%で逆転 | `data[1] = -20;` |
 | サーボ2を90度 | `data[8] = 90;` |
 | ソレノイド1をON | `data[11] = 1;` |
-
-ノードが起動した後、これらの変更は自動的に通信されます。
 
 ---
 
