@@ -3,10 +3,10 @@
 # **ros2udp パッケージ**
 
 ## 1. 🚀 概要
-
+**NHK学生ロボコン2025**で使用中！
 **ROS 2**とマイコン（NUCLEO-F767ZI、Raspberry Pi Pico）との通信を**UDP**を使用して行うパッケージです。  
 このリポジトリのみで機体を構成できるようにマイコン側プログラム、基板データ、スクリプトファイルが含まれています。有線/無線でNUCLEO-F767ZI, Raspberry Pi Picoと通信可能（ルーター必須）です。汎用性を高めるために各種設定はソースから行うようにしています。
-本パッケージは、**キャチロボ2024**に向けて開発した[f7_udpパッケージ](https://github.com/RRST-NHK-Project/f7_udp_catchrobo24.git)をベースに**NHK学生ロボコン2025**用にC++へ移植したものです。
+本パッケージは、**キャチロボ2024**に向けて開発した[f7_udpパッケージ](https://github.com/RRST-NHK-Project/f7_udp_catchrobo24.git)のC++移植版です。
 
 
 ## 2. ⚙️ 動作環境
@@ -17,7 +17,7 @@
 | ROS | ROS 2 Jazzy |
 | RAM | 16GB以上推奨 |
 
-> 💡 **注意**: ビルド中にフリーズする場合は、スワップ領域を追加してください。
+> 💡 **注意**: ビルド中にフリーズする場合は、RAMが足りていない可能性があります。スワップ領域を追加すると解決します。
 
 ---
 
@@ -132,7 +132,8 @@ cd ~/ros2_ws/src/setup
 
 ## 7. 📊 配列仕様（メイン基板 V1.3以降）
 
-ROS 2ノードからマイコンに送信される配列`data`は19個の要素を持っています。各要素の詳細をここにまとめます。  
+ROS 2ノードからマイコンに送信される配列`data`は19個の要素を持っています。各要素の詳細をここにまとめます。   
+全ての機能を利用するにはメイン基板 V1.3以降が必要です。  
 debug: マイコンのprintfを有効化, MD: モータードライバー, TR: トランジスタ
 
 | data[n] | 詳細 | 範囲 |
@@ -174,7 +175,7 @@ debug: マイコンのprintfを有効化, MD: モータードライバー, TR: �
 
 ---
 
-## 9. 🌐 IPアドレス割り当て（NHK 2025）
+## 9. 🌐 IPアドレス使用状況（NHK 2025）
 
 動的IPに対応していますが、マイコンとのIP競合を防ぐためにIPアドレスの固定を推奨します。
 
@@ -197,12 +198,12 @@ debug: マイコンのprintfを有効化, MD: モータードライバー, TR: �
 ## 10. 🏷️ 命名規則
 
 - `NR25_` は**NHKロボコン2025**向けコードを意味します。
-- 新しいノードを作成する際は、この命名規則に従ってください。
+- 新しいノードを作成する際は、これらのファイルを参考にしてください。
 
 ---
 
 ## 11. 🛠️ Build Status
-
+各ブランチのビルド状況です。
 ### 11.1 main（安定版）
 
 [![ROS 2 Jazzy Build](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_test.yml/badge.svg?branch=main)](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_test.yml)
