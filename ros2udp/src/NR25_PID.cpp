@@ -1,7 +1,6 @@
 /*
 RRST NHK2025
 PID on ROS
-いろいろやってみたけど無理そうなので凍結
 */
 
 // 標準
@@ -42,6 +41,8 @@ float prev_error[NUM_JOINTS] = {0.0, 0.0, 0.0, 0.0, 0.0}; // 前回の誤差
 float integral[NUM_JOINTS] = {0.0, 0.0, 0.0, 0.0, 0.0};   // 積分項
 float u[NUM_JOINTS] = {0.0, 0.0, 0.0, 0.0, 0.0};          // PID出力
 
+int control_period_ms = 50; // PID制御の周期（ms）
+
 class ENC_Listener : public rclcpp::Node {
 public:
     ENC_Listener(const std::string &ip, int port)
@@ -55,12 +56,11 @@ public:
 
         // PID制御の実行（100msごとに更新）
         timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(10),
+            std::chrono::milliseconds(control_period_ms),
             std::bind(&ENC_Listener::pid_control, this));
     }
 
 private:
-    int count_;
     void enc_listener_callback(std_msgs::msg::Float32MultiArray::SharedPtr msg) {
         v[1] = msg->data[0];
         v[2] = msg->data[1];
@@ -74,16 +74,18 @@ private:
     }
 
     void pid_control() {
-        float dt = 0.01; // 100msごとに更新
+        float dt = static_cast<float>(control_period_ms) / 1000.0; // 100msごとに更新
 
-        // **目標角度の更新** (1秒ごとに90度ずつ遷移)
-        if (count_ % 200 == 0) {
-            for (int i = 1; i < NUM_JOINTS; i++) {
-                d_target[i] += 6.28;
-                std::cout << "Joint " << i << " target updated to: " << d_target[i] << "°" << std::endl;
-            }
-        }
-        count_++;
+        // **目標角度の更新**
+
+        // for (int i = 1; i < NUM_JOINTS; i++) {
+        //     d_target[i] += sin(count_);
+        //     // std::cout << "Joint " << i << " target updated to: " << d_target[i] << "°" << std::endl;
+        // }
+
+        // count_++;
+
+        d_target[1] = 6.28;
 
         for (int i = 1; i < NUM_JOINTS; i++) {
             float error = d_target[i] - d[i];                       // 目標値との差
