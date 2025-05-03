@@ -177,9 +177,9 @@ private:
         //  float RS_X = -1 * msg->axes[3];
         //  float RS_Y = msg->axes[4];
 
-        //bool CROSS = msg->buttons[0];
+        // bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
-        //bool TRIANGLE = msg->buttons[2];
+        // bool TRIANGLE = msg->buttons[2];
         bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
@@ -321,6 +321,19 @@ private:
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
+
+    // figletでノード名を表示
+    std::string figletout = "figlet RRST DR";
+    int result = std::system(figletout.c_str());
+    if (result != 0) {
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                  << std::endl;
+        std::cerr << "Please install 'figlet' with the following command:"
+                  << std::endl;
+        std::cerr << "sudo apt install figlet" << std::endl;
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                  << std::endl;
+    }
 
     rclcpp::executors::SingleThreadedExecutor exec;
     auto ps4_listener = std::make_shared<PS4_Listener>(udp_ip, udp_port);
