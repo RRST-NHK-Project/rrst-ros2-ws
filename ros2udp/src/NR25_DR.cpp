@@ -124,8 +124,8 @@ private:
         //  float RS_Y = msg->axes[4];
 
         // bool CROSS = msg->buttons[0];
-        bool CIRCLE = msg->buttons[1];
-        bool TRIANGLE = msg->buttons[2];
+        // bool CIRCLE = msg->buttons[1];
+        // bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
