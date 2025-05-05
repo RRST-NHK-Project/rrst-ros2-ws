@@ -67,9 +67,9 @@ static double current_motor_command = 0.0;
 
 // サーボの組み付け時のズレを補正（度数法）
 int SERVO1_CAL = 15;
-int SERVO2_CAL = -3;
+int SERVO2_CAL = -6;
 int SERVO3_CAL = 10;
-int SERVO4_CAL = 17;
+int SERVO4_CAL = 20;
 
 // 最近傍点距離の格納
 float min_distance = 0;

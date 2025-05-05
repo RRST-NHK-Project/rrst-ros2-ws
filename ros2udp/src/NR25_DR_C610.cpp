@@ -71,18 +71,18 @@ public:
         ready_for_dunk = true;
         std::cout << "完了." << std::endl;
     }
-    //16は一番上の掴むところ
+    // 16は一番上の掴むところ
     static void dunk_shoot_action(UDP &udp) {
         std::cout << "<ダンクシーケンス開始>" << std::endl;
 
         std::cout << "２段階展開[15]＋トリガー[13]" << std::endl;
         data[15] = 1;
-        
+
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
         std::cout << "２段階展開[15]＋トリガー[13]" << std::endl;
-        
+
         data[13] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
@@ -90,7 +90,7 @@ public:
         data[14] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(730));
-        //シュートはsleep 660
+        // シュートはsleep 660
         std::cout << "格納[18]+チルト展開[16]" << std::endl;
         data[18] = 1;
         data[16] = 1;
@@ -109,7 +109,7 @@ public:
         std::cout << "初期状態" << std::endl;
         data[13] = 0;
         udp.send(data);
-        //std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
+        // std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 要調整
         ready_for_dunk = false;
         std::cout << "完了." << std::endl;
         std::cout << "<ダンクシーケンス終了>" << std::endl;
@@ -125,7 +125,7 @@ public:
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(400)); // 要調整
         std::cout << "ハンド展開" << std::endl;
-        data[16] = 1 ;
+        data[16] = 1;
         udp.send(data);
         std::cout << "１段階格納[11]＋２段階格納[15]" << std::endl;
         data[15] = 0;
@@ -177,9 +177,9 @@ private:
         //  float RS_X = -1 * msg->axes[3];
         //  float RS_Y = msg->axes[4];
 
-        bool CROSS = msg->buttons[0];
+        // bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
-        bool TRIANGLE = msg->buttons[2];
+        // bool TRIANGLE = msg->buttons[2];
         bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
@@ -190,7 +190,7 @@ private:
         // bool L1 = msg->buttons[4];
         // bool R1 = msg->buttons[5];
 
-        // float L2 = (-1 * msg->axes[2] + 1) / 2;
+        float L2 = (-1 * msg->axes[2] + 1) / 2;
         // float R2 = (-1 * msg->axes[5] + 1) / 2;
 
         // bool SHARE = msg->buttons[8];
@@ -247,21 +247,23 @@ private:
         //     std::this_thread::sleep_for(std::chrono::milliseconds(500));
         // }
 
-        //１段階展開[11]＋２段階展開[15]を同時に行うボタン
-        // if (UP==0) {
-        //     data[11]= UP;
-        //     data[15]= UP;
-        //     //std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        // }
-        // if (UP==1) {
-        //     data[11]= UP;
-        //     data[15]= UP;
-        //     //std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        // }
-        
+        // １段階展開[11]＋２段階展開[15] を同時に行うボタン
+        if (L2 < 0.5) {
+            data[11] = 0;
+            data[15] = 0;
+            // std::cout << "格納"<< std::endl;
+            //  std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+        if (L2 >= 0.5) {
+            data[11] = 1;
+            data[15] = 1;
+            // std::cout << "展開"<< std::endl;
+            //  std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+
         last_UP = UP;
         UP_state = UP_latch;
-        //std::cout << data[16] << std::endl;
+        // std::cout << data[16] << std::endl;
         udp_.send(data);
     }
 
@@ -319,6 +321,19 @@ private:
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
+
+    // figletでノード名を表示
+    std::string figletout = "figlet RRST DR";
+    int result = std::system(figletout.c_str());
+    if (result != 0) {
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                  << std::endl;
+        std::cerr << "Please install 'figlet' with the following command:"
+                  << std::endl;
+        std::cerr << "sudo apt install figlet" << std::endl;
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                  << std::endl;
+    }
 
     rclcpp::executors::SingleThreadedExecutor exec;
     auto ps4_listener = std::make_shared<PS4_Listener>(udp_ip, udp_port);

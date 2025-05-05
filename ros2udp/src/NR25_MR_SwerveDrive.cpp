@@ -49,8 +49,8 @@ int desired_deg = 0;
 int measured_deg = 0;
 
 // 速度
-int wheelspeed = 75;
-int yawspeed = -15;
+int wheelspeed = 50;
+int yawspeed = -10;
 int yawspeed_auto = 20;
 
 // サーボの組み付け時のズレを補正（度数法）
@@ -130,7 +130,7 @@ private:
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
         float LS_X = -1 * msg->axes[0];
         float LS_Y = msg->axes[1];
-        float RS_X =  -1 * msg->axes[3];
+        float RS_X = -1 * msg->axes[3];
         // float RS_Y = msg->axes[4];
 
         bool CROSS = msg->buttons[0];

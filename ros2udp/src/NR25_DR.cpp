@@ -124,8 +124,8 @@ private:
         //  float RS_Y = msg->axes[4];
 
         // bool CROSS = msg->buttons[0];
-        bool CIRCLE = msg->buttons[1];
-        bool TRIANGLE = msg->buttons[2];
+        // bool CIRCLE = msg->buttons[1];
+        // bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
@@ -136,7 +136,7 @@ private:
         // bool L1 = msg->buttons[4];
         // bool R1 = msg->buttons[5];
 
-        // float L2 = (-1 * msg->axes[2] + 1) / 2;
+        float L2 = (-1 * msg->axes[2] + 1) / 2;
         // float R2 = (-1 * msg->axes[5] + 1) / 2;
 
         // bool SHARE = msg->buttons[8];
@@ -158,15 +158,15 @@ private:
         //     rclcpp::shutdown();
         // }
 
-        if (TRIANGLE) {
-            Action::ready_for_dunk_action(udp_);
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        }
+        // if (TRIANGLE) {
+        //     Action::ready_for_dunk_action(udp_);
+        //     std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        // }
 
-        if (CIRCLE && Action::ready_for_dunk) {
-            Action::dunk_shoot_action(udp_);
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        }
+        // if (CIRCLE && Action::ready_for_dunk) {
+        //     Action::dunk_shoot_action(udp_);
+        //     std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        // }
 
         // if (SQUARE) {
         //     data[8] = 45;
@@ -174,6 +174,10 @@ private:
         //     //std::cout << "S" << std::endl;
         //     std::this_thread::sleep_for(std::chrono::milliseconds(500));
         // }
+
+        if (L2 >= 0.5) {
+            std::cout << "L2" << std::endl;
+        }
 
         udp_.send(data);
     }
