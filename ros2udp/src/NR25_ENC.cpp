@@ -62,8 +62,7 @@ private:
         socklen_t addr_len = sizeof(sender_addr);
         char buffer[BUFFER_SIZE];
 
-        // UDPデータ受信
-        ssize_t len = recvfrom(udp_socket_, buffer, sizeof(buffer) - 1, 0,
+        ssize_t len = recvfrom(udp_socket_, buffer, sizeof(buffer), 0,
                                (struct sockaddr *)&sender_addr, &addr_len);
 
         if (len < 0) {
@@ -71,17 +70,16 @@ private:
             return;
         }
 
-        buffer[len] = '\0'; // 文字列の終端を設定
-        // RCLCPP_INFO(this->get_logger(), "Received raw: %s", buffer);
-        // RCLCPP_INFO(this->get_logger(), "Received %ld bytes", len);
-
-        // カンマ区切りのデータをパース
         std_msgs::msg::Float32MultiArray msg;
-        std::vector<float> data = parse_udp_data(buffer);
-        msg.data = data;
 
-        // データをPublish
-        publisher_->publish(msg);
+        if (len == 16) {
+            float values[4];
+            std::memcpy(values, buffer, 16);
+            msg.data.assign(values, values + 4);
+            publisher_->publish(msg);
+        } else {
+            RCLCPP_WARN(this->get_logger(), "Unexpected data length: %ld", len);
+        }
     }
 
     std::vector<float> parse_udp_data(const std::string &data_str) {
