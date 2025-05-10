@@ -70,7 +70,7 @@ def encoder_loop():
 
                 last_states[i] = (a_val, b_val)
         lock.release()
-        utime.sleep_us(100)
+        # utime.sleep_us(1)
 
 
 # ===== Core1起動 =====

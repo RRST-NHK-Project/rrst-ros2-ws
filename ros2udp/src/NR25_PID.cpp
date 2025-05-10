@@ -115,7 +115,7 @@ private:
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
-    rclcpp::executors::SingleThreadedExecutor exec;
+    rclcpp::executors::MultiThreadedExecutor exec;
     auto enc_listener = std::make_shared<ENC_Listener>(udp_ip, udp_port);
     exec.add_node(enc_listener);
 
