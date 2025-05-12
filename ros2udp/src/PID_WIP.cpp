@@ -146,7 +146,7 @@ private:
             last_Error[i] = Error[i];
             output[i] = ((Kp * Error[i]) + (Ki * Integral[i]) +
                          (Kd * Differential[i])); // PID
-            output[i] = std::clamp(output[i], -30.0f, 30.0f);
+            output[i] = std::clamp(output[i], -50.0f, 50.0f);
             data[i + 1] = (int)output[i];
         }
         // std::cout << output[0] << ", ";
