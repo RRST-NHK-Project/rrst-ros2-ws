@@ -1,7 +1,7 @@
 /*
 RRST-NHK-Project 2025
 PID on ROS 2, Work In Progress
-生成AIコードの挿入を禁止
+生成AIコードの挿入禁止
 */
 
 // 標準
