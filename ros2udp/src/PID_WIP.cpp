@@ -1,12 +1,11 @@
 /*
 RRST-NHK-Project 2025
-汎用機の機構制御
-
-生成AIコードの挿入を禁ずる
+PID on ROS 2, Work In Progress
+生成AIコードの挿入を禁止
 */
 
 // 標準
-#include <algorithm> // std::clamp を使用するために必要
+#include <algorithm> // std::clamp
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
@@ -145,8 +144,8 @@ private:
 
             last_Error[i] = Error[i];
             output[i] = ((Kp * Error[i]) + (Ki * Integral[i]) +
-                         (Kd * Differential[i])); // PID
-            output[i] = std::clamp(output[i], -50.0f, 50.0f);
+                         (Kd * Differential[i]));             // PID
+            output[i] = std::clamp(output[i], -50.0f, 50.0f); //-50 ~ 50に収める
             data[i + 1] = (int)output[i];
         }
         // std::cout << output[0] << ", ";
