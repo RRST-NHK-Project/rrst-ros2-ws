@@ -1,3 +1,8 @@
+/*
+RRST-NHK-Project 2025
+PS4コントローラーの入力を取得するサンプルプログラム
+*/
+
 // 標準
 #include <chrono>
 #include <cstdlib>
@@ -21,7 +26,6 @@ public:
     }
 
 private:
-    // コントローラーの入力を取得、使わない入力はコメントアウト推奨
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
 
         bool CIRCLE = msg->buttons[1];
