@@ -67,8 +67,8 @@ private:
         bool CIRCLE = msg->buttons[1];
         if (CIRCLE) {
             std::cout << "CIRCLE" << std::endl;
-            data[1] = 20; // １番に20を代入
-            udp_.send()   // データ送信
+            data[1] = 20;    // １番に20を代入
+            udp_.send(data); // データ送信
         }
         std::fill(data.begin(), data.end(), 0);
         udp_.send(data); // データ送信
