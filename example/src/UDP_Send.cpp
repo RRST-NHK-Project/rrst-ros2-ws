@@ -4,16 +4,9 @@ UDP通信を行うサンプルプログラム
 動作確認まだ！注意！！
 */
 
-// 標準
-#include <chrono>
-#include <cstdlib>
-#include <iostream>
-#include <thread>
-
 // ROS
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
-#include <std_msgs/msg/int32_multi_array.hpp>
 
 // 自作クラス
 #include "include/IP.hpp"
@@ -63,6 +56,8 @@ public:
 private:
     // コントローラーの入力を取得、使わない入力はコメントアウト推奨
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
+
+        data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
         bool CIRCLE = msg->buttons[1];
         if (CIRCLE) {
