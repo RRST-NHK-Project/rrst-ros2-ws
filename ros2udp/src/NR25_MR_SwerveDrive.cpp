@@ -195,6 +195,7 @@ private:
 
         // XY座標での正しい角度truedeg
         if (REVERSEMODE == 0) {
+            data[11] = 0;//テープLED消灯
             truedeg = deg;
             if ((0 <= truedeg) && (truedeg <= 180)) {
                 truedeg = truedeg;
@@ -302,6 +303,7 @@ private:
         // 反転モード
         //
         if (REVERSEMODE == 1) {
+            data[11] = 1;//テープLED点灯
             truedeg = deg;
             if ((0 <= truedeg) && (truedeg <= 180)) {
                 truedeg = truedeg;

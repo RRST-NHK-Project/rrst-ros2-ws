@@ -132,12 +132,10 @@ install(TARGETS
   nr25_dr_hcsr04
   mb_tester
   ld19_fs
-<<<<<<< HEAD
   pid_wip
   pid_tuner
-=======
   nr25_led
->>>>>>> ef14226 (状態表示試験)
+
   DESTINATION lib/${PROJECT_NAME})
 
 # figletがインストールされていない場合、警告を表示
