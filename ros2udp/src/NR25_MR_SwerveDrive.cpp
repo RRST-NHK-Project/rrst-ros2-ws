@@ -49,7 +49,7 @@ int desired_deg = 0;
 int measured_deg = 0;
 
 // 速度
-int wheelspeed = 50;
+int wheelspeed = 75;
 int yawspeed = -10;
 int yawspeed_auto = 20;
 
@@ -197,9 +197,8 @@ private:
 
         // XY座標での正しい角度truedeg
 
-        
         if (REVERSEMODE == 0) {
-            data[11] = 0;//テープLED消灯
+            data[11] = 0; // テープLED消灯
             data[12] = 0;
             data[13] = 0;
             truedeg = deg;
@@ -309,7 +308,7 @@ private:
         // 反転モード
         //
         if (REVERSEMODE == 1) {
-            data[11] = 1;//テープLED点灯
+            data[11] = 1; // テープLED点灯
             data[12] = 1;
             data[13] = 1;
             truedeg = deg;

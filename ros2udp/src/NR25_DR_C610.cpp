@@ -177,7 +177,7 @@ private:
         //  float RS_X = -1 * msg->axes[3];
         //  float RS_Y = msg->axes[4];
 
-        // bool CROSS = msg->buttons[0];
+        bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
         // bool TRIANGLE = msg->buttons[2];
         bool SQUARE = msg->buttons[3];
@@ -259,6 +259,9 @@ private:
             data[15] = 1;
             // std::cout << "展開"<< std::endl;
             //  std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+        if (CROSS) {
+            data[7] = 90;
         }
 
         last_UP = UP;
