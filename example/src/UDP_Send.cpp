@@ -60,13 +60,10 @@ private:
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
         bool CIRCLE = msg->buttons[1];
-        if (CIRCLE) {
-            std::cout << "CIRCLE" << std::endl;
-            data[1] = 20;    // １番に20を代入
-            udp_.send(data); // データ送信
-        }
-        std::fill(data.begin(), data.end(), 0);
-        udp_.send(data); // データ送信
+        float R2 = (-1 * msg->axes[5] + 1) / 2;
+
+        data[3] = 20 * R2; // １番に20を代入
+        udp_.send(data);   // データ送信
     }
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
