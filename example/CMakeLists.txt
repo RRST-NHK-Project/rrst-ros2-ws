@@ -27,12 +27,16 @@ ament_target_dependencies(simple_pub rclcpp std_msgs)
 add_executable(simple_sub src/Simple_Subscriber.cpp)
 ament_target_dependencies(simple_sub rclcpp std_msgs)
 
+add_executable(usb_seral src/Simple_Subscriber.cpp)
+ament_target_dependencies(usb_serial rclcpp std_msgs)
+
 # インストール設定
 install(TARGETS
   ps4_listener
   udp_send
   simple_pub
   simple_sub
+  usb_seral
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
