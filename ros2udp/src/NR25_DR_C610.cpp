@@ -262,6 +262,8 @@ private:
         }
         if (CROSS) {
             data[7] = 90;
+        } else {
+            data[7] = 0;
         }
 
         last_UP = UP;
