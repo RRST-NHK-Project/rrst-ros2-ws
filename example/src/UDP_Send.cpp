@@ -62,7 +62,7 @@ private:
         bool CIRCLE = msg->buttons[1];
         float R2 = (-1 * msg->axes[5] + 1) / 2;
 
-        data[3] = 20 * R2; // １番に20を代入
+        data[3] = 50 * R2; // １番に20を代入
         udp_.send(data);   // データ送信
     }
 
