@@ -199,7 +199,7 @@ private:
 
         if (REVERSEMODE == 0) {
             data[11] = 0; // テープLED消灯
-            data[12] = 0;
+            data[12] = 1;
             data[13] = 0;
             truedeg = deg;
             if ((0 <= truedeg) && (truedeg <= 180)) {
@@ -309,7 +309,7 @@ private:
         //
         if (REVERSEMODE == 1) {
             data[11] = 1; // テープLED点灯
-            data[12] = 1;
+            data[12] = 0;
             data[13] = 1;
             truedeg = deg;
             if ((0 <= truedeg) && (truedeg <= 180)) {
