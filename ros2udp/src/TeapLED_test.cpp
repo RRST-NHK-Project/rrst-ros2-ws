@@ -49,7 +49,7 @@ int desired_deg = 0;
 int measured_deg = 0;
 
 // 速度
-int wheelspeed = 75;
+int wheelspeed = 50;
 int yawspeed = -10;
 int yawspeed_auto = 20;
 
@@ -86,38 +86,13 @@ debug: マイコンのprintfを有効化, MD: モータードライバー, TR: �
 | data[18] | TR8 | 0 or 1|
 */
 
-// 自動化クラス
-class Automation {
-public:
-    // 自動ターン（決め打ち）
-    // 反転モードと同時に180度回転する
-    static void auto_turn(UDP &udp) {
-        std::cout << "自動ターン開始" << std::endl;
-        data[7] = 180 + SERVO1_CAL;
-        data[8] = 90 + SERVO2_CAL;
-        data[9] = 90 + SERVO3_CAL;
-        data[10] = 180 + SERVO4_CAL;
-        data[1] = -yawspeed_auto;
-        data[2] = yawspeed_auto;
-        data[3] = -yawspeed_auto;
-        data[4] = yawspeed_auto;
-        udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        std::cout << "自動ターン終了" << std::endl;
-        data[1] = 0;
-        data[2] = 0;
-        data[3] = 0;
-        data[4] = 0;
-        udp.send(data);
-    }
-};
 
 class PS4_Listener : public rclcpp::Node {
 public:
     PS4_Listener(const std::string &ip, int port)
         : Node("nhk25_mr_sd"), udp_(ip, port) {
         subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
-            "joy0", 10,
+            "joy", 10,
             std::bind(&PS4_Listener::ps4_listener_callback, this,
                       std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(),
@@ -152,7 +127,6 @@ private:
         bool SHARE = msg->buttons[8];
         bool OPTION = msg->buttons[9];
         bool PS = msg->buttons[10];
-
         static bool last_option = false; // 前回の状態を保持する static 変数
         static bool last_share = false;
         // OPTION のラッチ状態を保持する static 変数（初期状態は OFF とする）
@@ -192,15 +166,10 @@ private:
 
         last_share = SHARE;
         REVERSEMODE = share_latch;
-        last_option = OPTION;
-        CHANGEMODE = option_latch;
 
         // XY座標での正しい角度truedeg
-
         if (REVERSEMODE == 0) {
-            data[11] = 0; // テープLED消灯
-            data[12] = 1;
-            data[13] = 0;
+            data[11]=0;
             truedeg = deg;
             if ((0 <= truedeg) && (truedeg <= 180)) {
                 truedeg = truedeg;
@@ -308,9 +277,7 @@ private:
         // 反転モード
         //
         if (REVERSEMODE == 1) {
-            data[11] = 1; // テープLED点灯
-            data[12] = 0;
-            data[13] = 1;
+            data[11]=1;
             truedeg = deg;
             if ((0 <= truedeg) && (truedeg <= 180)) {
                 truedeg = truedeg;
@@ -441,7 +408,6 @@ private:
         // std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
         // std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
         // std::cout << data[16] << ", " << data[17] << ", " << data[18] << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
         // std::cout << REVERSEMODE << std::endl;
         udp_.send(data);

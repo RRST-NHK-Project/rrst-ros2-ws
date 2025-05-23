@@ -1,9 +1,10 @@
 /*
 RRST NHK2025
 IPアドレスは適宜変更
-エンコーダーから計算した変位と速度をUDPで送信する
+FB制御に対応
+UDPでエンコーダーの角度を送信しROS側でPID制御する
 メイン基板V1.3
-2025/03/18
+2025/05/12
 */
 
 #include "EthernetInterface.h"
@@ -191,6 +192,7 @@ int main() {
     Pulse[2] = ENC3.getPulses();
     Pulse[3] = ENC4.getPulses();
 
+    //エンコーダーのパルスを角度に変換
     Deg[0] = 360.0 / (float)PPRx2 * (float)Pulse[0];
     Deg[1] = 360.0 / (float)PPRx2 * (float)Pulse[1];
     Deg[2] = 360.0 / (float)PPRx2 * (float)Pulse[2];
@@ -204,9 +206,6 @@ int main() {
     } else {
         //printf("送信した角度: %.2f, %.2f, %.2f, %.2f\n", send_data[0], send_data[1], send_data[2], send_data[3]);
     }
-
-    //printf("%d\n",Pulse[3]);
-    //printf("%f\n",Deg[3]);
 
     ThisThread::sleep_for(10ms);
   }

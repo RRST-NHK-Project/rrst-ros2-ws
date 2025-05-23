@@ -38,7 +38,7 @@ RRST-NHK-Project 2025
 #define speed_limit 30
 #define deg_limit 360
 #define DPAD_SPEED 30 // 方向パッド入力時の目標速度
-bool CHANGEMODE = false;
+bool AGRESSIVEMODE = false;//暴走モードの初期値0
 
 // グローバル変数（角度一覧）
 int deg = 0;
@@ -58,12 +58,12 @@ double speed_Output = 0.0;
 const double dt = 0.05; // 50ms
 
 // 速度
-int wheelspeed = 75;
+int wheelspeed = 50;
 int yawspeed = 10;
 int previous_speed = 0;
 int desired_speed = 30;
 int measured_speed = 0;
-static double current_motor_command = 0.0;
+//static double current_motor_command = 0.0;
 
 // サーボの組み付け時のズレを補正（度数法）
 int SERVO1_CAL = 15;
@@ -255,7 +255,7 @@ private:
         bool DOWN = msg->axes[7] == -1.0;
 
         bool L1 = msg->buttons[4];
-        bool R1 = msg->buttons[5];
+        //bool R1 = msg->buttons[5];
 
         // float L2 = (-1 * msg->axes[2] + 1) / 2;
         float R2 = (-1 * msg->axes[5] + 1) / 2;
@@ -266,6 +266,23 @@ private:
         static bool last_option = false; // 前回の状態を保持する static 変数
         // OPTION のラッチ状態を保持する static 変数（初期状態は OFF とする）
         static bool option_latch = false;
+
+    if (OPTION && !last_option) {
+            option_latch = !option_latch;
+        }
+
+        last_option = OPTION;
+        AGRESSIVEMODE = option_latch;
+
+        if(AGRESSIVEMODE == 0){
+            wheelspeed = 50;
+            data[11] = 0;//LED光らない
+        }
+        if(AGRESSIVEMODE == 1){
+            wheelspeed = 75;
+            data[11] = 1;//LED光る
+
+        }
 
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
@@ -294,13 +311,6 @@ private:
 
         float rad = atan2(LS_Y, LS_X);
         deg = rad * 180 / M_PI;
-        if (OPTION && !last_option) {
-            option_latch = !option_latch;
-        }
-        // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
-        // もとの移動方法！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
-        // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
-        if (CHANGEMODE == 0) {
             // XY座標での正しい角度truedeg
             truedeg = deg;
             if ((0 <= truedeg) && (truedeg <= 180)) {
@@ -404,162 +414,7 @@ private:
                 data[3] = yawspeed;
                 data[4] = -yawspeed;
             }
-        }
-        // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
-        // 加速する移動方法！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
-        // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
-        if (CHANGEMODE == 1) {
-            speed_Output = -PID(measured_speed);
-
-            // XY座標での正しい角度truedeg
-            truedeg = deg;
-            if ((0 <= truedeg) && (truedeg <= 180)) {
-                truedeg = truedeg;
-            }
-            if ((-180 <= truedeg) && (truedeg <= 0)) {
-                truedeg = -truedeg + 360;
-            }
-
-            // ！！！！！最重要！！！！！
-            //  XY座標での９０度の位置に１３５度を変換して計算
-            if ((-180 <= deg) && (deg <= -135)) {
-                deg = -deg - 135;
-            } else {
-                deg = 225 - deg;
-            }
-
-            data[1] = speed_Output;
-            data[2] = speed_Output;
-            data[3] = speed_Output;
-            data[4] = speed_Output;
-
-            if (LEFT) {
-                deg = 45;
-                speed_Output = speed_Output;
-                data[1] = speed_Output;
-                data[2] = speed_Output;
-                data[3] = speed_Output;
-                data[4] = speed_Output;
-            }
-            if (RIGHT) {
-                deg = 45;
-                speed_Output = -speed_Output;
-                data[1] = speed_Output;
-                data[2] = speed_Output;
-                data[3] = speed_Output;
-                data[4] = speed_Output;
-            }
-            if (UP) {
-                deg = 135;
-                speed_Output = speed_Output;
-                data[1] = speed_Output;
-                data[2] = speed_Output;
-                data[3] = speed_Output;
-                data[4] = speed_Output;
-            }
-            if (DOWN) {
-                deg = 135;
-                speed_Output = -speed_Output;
-                data[1] = speed_Output;
-                data[2] = speed_Output;
-                data[3] = speed_Output;
-                data[4] = speed_Output;
-            }
-
-            // 後ろに下がる動き
-            if ((225 < deg) && (deg <= 360) && (R1)) {
-                deg = deg - 180;
-
-                data[7] = deg + SERVO1_CAL;
-                data[8] = deg + SERVO2_CAL;
-                data[9] = deg + SERVO3_CAL;
-                data[10] = deg + SERVO4_CAL;
-                speed_Output = -speed_Output;
-                data[1] = speed_Output;
-                data[2] = speed_Output;
-                data[3] = speed_Output;
-                data[4] = speed_Output;
-            }
-            if ((0 <= deg) && (deg < 45) && (R1)) {
-                deg = deg + 180;
-                data[7] = deg + SERVO1_CAL;
-                data[8] = deg + SERVO2_CAL;
-                data[9] = deg + SERVO3_CAL;
-                data[10] = deg + SERVO4_CAL;
-                speed_Output = -speed_Output;
-                data[1] = speed_Output;
-                data[2] = speed_Output;
-                data[3] = speed_Output;
-                data[4] = speed_Output;
-            }
-
-            data[7] = deg + SERVO1_CAL;
-            data[8] = deg + SERVO2_CAL;
-            data[9] = deg + SERVO3_CAL;
-            data[10] = deg + SERVO4_CAL;
-
-            previous_deg = desired_deg;
-
-            // 時計回りYAW回転
-            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R) {
-                speed_Output = -yawspeed;
-                data[7] = 180 + SERVO1_CAL;
-                data[8] = 90 + SERVO2_CAL;
-                data[9] = 90 + SERVO3_CAL;
-                data[10] = 180 + SERVO4_CAL;
-                data[1] = speed_Output;
-                data[2] = -speed_Output;
-                data[3] = speed_Output;
-                data[4] = -speed_Output;
-            }
-            // 半時計回りYAW回転
-            if (0 < RS_X && fabs(RS_X) >= DEADZONE_R) {
-                speed_Output = yawspeed;
-                data[7] = 180 + SERVO1_CAL;
-                data[8] = 90 + SERVO2_CAL;
-                data[9] = 90 + SERVO3_CAL;
-                data[10] = 180 + SERVO4_CAL;
-                data[1] = speed_Output;
-                data[2] = -speed_Output;
-                data[3] = speed_Output;
-                data[4] = -speed_Output;
-            }
-            // deadzone追加
-            if ((fabs(LS_X) <= DEADZONE_R) && (fabs(LS_Y) <= DEADZONE_R) && (fabs(RS_X) <= DEADZONE_L) && (!LEFT && !RIGHT && !UP && !DOWN)) {
-                deg = 135;
-                desired_speed = 0;
-                measured_speed = 0;
-
-                speed_Integral = 0;
-                speed_Differential = 0;
-
-                double decay_rate = 0.05; // 0～1の値。大きいほど速く0に近づく
-
-                if (previous_speed > 0) {
-                    current_motor_command += (0 - current_motor_command) * decay_rate;
-                    speed_Output = current_motor_command;
-                } else if (previous_speed < 0) {
-                    current_motor_command += (0 - current_motor_command) * decay_rate;
-                    speed_Output = current_motor_command;
-                }
-
-                data[1] = speed_Output;
-                data[2] = speed_Output;
-                data[3] = speed_Output;
-                data[4] = speed_Output;
-                data[7] = deg + SERVO1_CAL;
-                data[8] = deg + SERVO2_CAL;
-                data[9] = deg + SERVO3_CAL;
-                data[10] = deg + SERVO4_CAL;
-            } else {
-                desired_speed = 30;
-                current_motor_command = speed_Output;
-            }
-
-            previous_speed = speed_Output;
-            previous_deg = deg;
-            // std::cout << data[1] << std::endl;
-        }
+        
 
         // デバッグ用 *NOTE:for文でcoutするとカクつくからこの記述
         // std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", ";
@@ -567,10 +422,12 @@ private:
         // std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
         // std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
         // std::cout << data[16] << ", " << data[17] << ", " << data[18] << std::endl;
+        //std::cout << data[1] << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
         // 現在の状態を次回のために保存
         last_option = OPTION;
-        CHANGEMODE = option_latch;
+        AGRESSIVEMODE = option_latch;
 
         udp_.send(data);
     }
