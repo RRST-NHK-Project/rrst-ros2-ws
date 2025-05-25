@@ -40,6 +40,7 @@ RRST-NHK-Project 2025
 
 bool CHANGEMODE = false;
 bool REVERSEMODE = false;
+bool YAWMODE = false;
 
 // グローバル変数（角度一覧）
 int deg = 0;
@@ -155,12 +156,15 @@ private:
 
         static bool last_option = false; // 前回の状態を保持する static 変数
         static bool last_share = false;
+        
         // OPTION のラッチ状態を保持する static 変数（初期状態は OFF とする）
         static bool option_latch = false;
         static bool share_latch = false;
 
         // bool L3 = msg->buttons[11];
-        // bool R3 = msg->buttons[12];
+        bool R3 = msg->buttons[12];
+        static bool last_R3 = false;
+        static bool R3_latch = false;
 
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
@@ -185,6 +189,9 @@ private:
             share_latch = !share_latch;
             // Automation::auto_turn(udp_);
         }
+        if(R3 && !last_R3){
+            R3_latch = !R3_latch;
+        }
 
         // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         // もとの移動方法！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
@@ -194,6 +201,8 @@ private:
         REVERSEMODE = share_latch;
         last_option = OPTION;
         CHANGEMODE = option_latch;
+        last_R3 = R3;
+        YAWMODE = R3_latch;
 
         // XY座標での正しい角度truedeg
 
@@ -268,7 +277,7 @@ private:
                 data[3] = wheelspeed * R2;
                 data[4] = wheelspeed * R2;
             }
-
+            
             // 独ステが扱えない範囲の変換
             if ((270 < deg) && (deg < 360)) {
                 deg = deg - 180;
@@ -281,7 +290,19 @@ private:
                 data[9] = deg + SERVO3_CAL;
                 data[10] = deg + SERVO4_CAL;
             }
-
+            //角度だけYAW
+            if(R3==0){
+                data[7] = deg + SERVO1_CAL;
+                data[8] = deg + SERVO2_CAL;
+                data[9] = deg + SERVO3_CAL;
+                data[10] = deg + SERVO4_CAL;
+            }
+            if(R3==1){
+                data[7] = 180 + SERVO1_CAL;
+                data[8] = 90 + SERVO2_CAL;
+                data[9] = 90 + SERVO3_CAL;
+                data[10] = 180 + SERVO4_CAL;
+            }
             // 時計回りYAW回転
             if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R) {
                 data[7] = 180 + SERVO1_CAL;
@@ -304,6 +325,7 @@ private:
                 data[3] = yawspeed;
                 data[4] = -yawspeed;
             }
+            
         }
         // 反転モード
         //
@@ -405,7 +427,19 @@ private:
                 data[9] = deg + SERVO3_CAL;
                 data[10] = deg + SERVO4_CAL;
             }
-
+            //角度だけYAW
+            if(R3==0){
+                data[7] = deg + SERVO1_CAL;
+                data[8] = deg + SERVO2_CAL;
+                data[9] = deg + SERVO3_CAL;
+                data[10] = deg + SERVO4_CAL;
+            }
+            if(R3==1){
+                data[7] = 180 + SERVO1_CAL;
+                data[8] = 90 + SERVO2_CAL;
+                data[9] = 90 + SERVO3_CAL;
+                data[10] = 180 + SERVO4_CAL;
+            }
             // 時計回りYAW回転
             if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R) {
                 data[7] = 180 + SERVO1_CAL;
