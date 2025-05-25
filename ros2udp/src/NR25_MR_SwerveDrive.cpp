@@ -49,7 +49,7 @@ int desired_deg = 0;
 int measured_deg = 0;
 
 // 速度
-int wheelspeed = 75;
+int wheelspeed = 20;
 int yawspeed = -10;
 int yawspeed_auto = 20;
 
