@@ -475,6 +475,7 @@ private:
         // std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
         // std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
         // std::cout << data[16] << ", " << data[17] << ", " << data[18] << std::endl;
+        //std::cout << data[11] << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
         // std::cout << REVERSEMODE << std::endl;

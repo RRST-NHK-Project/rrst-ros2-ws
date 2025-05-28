@@ -25,6 +25,7 @@ int motor3 = 50;
 int motor4 = 50;
 int hcsr04 = 0;
 bool UP_state = false;
+bool Nomal_mode = false;
 
 // IPアドレスとポートの指定
 std::string udp_ip = "192.168.0.218"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
@@ -188,13 +189,13 @@ private:
         // bool DOWN = msg->axes[7] == -1.0;
 
         // bool L1 = msg->buttons[4];
-        // bool R1 = msg->buttons[5];
+         //bool R1 = msg->buttons[5];
 
         float L2 = (-1 * msg->axes[2] + 1) / 2;
         // float R2 = (-1 * msg->axes[5] + 1) / 2;
 
         // bool SHARE = msg->buttons[8];
-        // bool OPTION = msg->buttons[9];
+        bool OPTION = msg->buttons[9];
         bool PS = msg->buttons[10];
 
         // bool L3 = msg->buttons[11];
@@ -203,6 +204,22 @@ private:
         // OPTION のラッチ状態を保持する static 変数（初期状態は OFF とする）
         static bool UP_latch = false;
 
+        static bool last_OPTION = false; // 前回の状態を保持する static 変数
+        // option のラッチ状態を保持する static 変数（初期状態は OFF とする）
+        static bool OPTION_latch = false;
+        if (OPTION && !last_OPTION) {
+            OPTION_latch = !OPTION_latch;
+        }
+        last_OPTION= OPTION;
+        Nomal_mode = OPTION_latch;
+        
+    if(Nomal_mode == 0){
+           data[11] = 0;
+        }
+        if(Nomal_mode == 1){
+            data[11] = 1;
+
+        }
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
         if (PS) {
@@ -217,6 +234,9 @@ private:
         if (UP && !last_UP) {
             UP_latch = !UP_latch;
         }
+        
+        
+
         // if (PS) {
         //     std::fill(data.begin(), data.end(), 0);                              // 配列をゼロで埋める
         //     for (int attempt = 0; attempt < 10; attempt++) {                     // 10回試行
@@ -248,7 +268,7 @@ private:
         // }
 
         // １段階展開[11]＋２段階展開[15] を同時に行うボタン
-        if (L2 < 0.5) {
+        if (L2 < 0.5 && Nomal_mode==0) {
             data[11] = 0;
             data[15] = 0;
             // std::cout << "格納"<< std::endl;
@@ -265,11 +285,25 @@ private:
         } else {
             data[7] = 0;
         }
+        
+
 
         last_UP = UP;
         UP_state = UP_latch;
+        last_OPTION = OPTION;
+        Nomal_mode = OPTION;
         // std::cout << data[16] << std::endl;
+
+        // デバッグ用 *NOTE:for文でcoutするとカクつくからこの記述
+         //std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", ";
+         //std::cout << data[4] << ", " << data[5] << ", " << data[6] << ", " << data[7] << ", ";
+        //std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
+        //std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
+        ///std::cout << data[16] << ", " << data[17] << ", " << data[18] << std::endl;
+        //std::cout << data[11] << std::endl;
+        // std::cout << msg->buttons[5] << std::endl;
         udp_.send(data);
+        
     }
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
