@@ -154,15 +154,16 @@ private:
         bool OPTION = msg->buttons[9];
         bool PS = msg->buttons[10];
 
+        // bool L3 = msg->buttons[11];
+        bool R3 = msg->buttons[12];
+
         static bool last_option = false; // 前回の状態を保持する static 変数
         static bool last_share = false;
-        
+
         // OPTION のラッチ状態を保持する static 変数（初期状態は OFF とする）
         static bool option_latch = false;
         static bool share_latch = false;
 
-        // bool L3 = msg->buttons[11];
-        bool R3 = msg->buttons[12];
         static bool last_R3 = false;
         static bool R3_latch = false;
 
@@ -189,7 +190,7 @@ private:
             share_latch = !share_latch;
             // Automation::auto_turn(udp_);
         }
-        if(R3 && !last_R3){
+        if (R3 && !last_R3) {
             R3_latch = !R3_latch;
         }
 
@@ -277,7 +278,7 @@ private:
                 data[3] = wheelspeed * R2;
                 data[4] = wheelspeed * R2;
             }
-            
+
             // 独ステが扱えない範囲の変換
             if ((270 < deg) && (deg < 360)) {
                 deg = deg - 180;
@@ -290,14 +291,14 @@ private:
                 data[9] = deg + SERVO3_CAL;
                 data[10] = deg + SERVO4_CAL;
             }
-            //角度だけYAW
-            if(R3==0){
+            // 角度だけYAW
+            if (R3_latch == 0) {
                 data[7] = deg + SERVO1_CAL;
                 data[8] = deg + SERVO2_CAL;
                 data[9] = deg + SERVO3_CAL;
                 data[10] = deg + SERVO4_CAL;
             }
-            if(R3==1){
+            if (R3_latch == 1) {
                 data[7] = 180 + SERVO1_CAL;
                 data[8] = 90 + SERVO2_CAL;
                 data[9] = 90 + SERVO3_CAL;
@@ -325,7 +326,6 @@ private:
                 data[3] = yawspeed;
                 data[4] = -yawspeed;
             }
-            
         }
         // 反転モード
         //
@@ -427,14 +427,14 @@ private:
                 data[9] = deg + SERVO3_CAL;
                 data[10] = deg + SERVO4_CAL;
             }
-            //角度だけYAW
-            if(R3==0){
+            // 角度だけYAW
+            if (R3_latch == 0) {
                 data[7] = deg + SERVO1_CAL;
                 data[8] = deg + SERVO2_CAL;
                 data[9] = deg + SERVO3_CAL;
                 data[10] = deg + SERVO4_CAL;
             }
-            if(R3==1){
+            if (R3_latch == 1) {
                 data[7] = 180 + SERVO1_CAL;
                 data[8] = 90 + SERVO2_CAL;
                 data[9] = 90 + SERVO3_CAL;
@@ -475,7 +475,7 @@ private:
         // std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
         // std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
         // std::cout << data[16] << ", " << data[17] << ", " << data[18] << std::endl;
-        //std::cout << data[11] << std::endl;
+        // std::cout << data[11] << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
         // std::cout << REVERSEMODE << std::endl;
