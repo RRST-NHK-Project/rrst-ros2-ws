@@ -26,7 +26,6 @@ int motor4 = 50;
 int hcsr04 = 0;
 bool UP_state = false;
 bool Nomal_mode = false;
-//rbool data[14]=false;
 // IPアドレスとポートの指定
 std::string udp_ip = "192.168.0.218"; // 送信先IPアドレス、宛先マイコンで設定したIPv4アドレスを指定
 int udp_port = 5000;                  // 送信元ポート番号、宛先マイコンで設定したポート番号を指定
