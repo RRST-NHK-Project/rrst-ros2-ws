@@ -56,15 +56,15 @@ int yawspeed = -10;
 int yawspeed_auto = 20;
 
 // サーボの組み付け時のズレを補正（度数法）
-int SERVO1_CAL = 6;
-int SERVO2_CAL = -1;
-int SERVO3_CAL = 11;
-int SERVO4_CAL = 10;
+int SERVO1_CAL = 10;
+int SERVO2_CAL = 8;
+int SERVO3_CAL = 23;
+int SERVO4_CAL = 20;
 
 // 最近傍点距離の格納
 float min_distance = 0;
 bool front_cleared = false;
-float front_cleared_distance = 0.5; // 障害物検知のしきい値（要調整）
+float front_cleared_distance = 0.8; // 障害物検知のしきい値（要調整）
 
 std::vector<int16_t> data(19, 0); // マイコンに送信される配列"data"
 /*
@@ -201,7 +201,7 @@ private:
         }
 
         if (front_cleared == false) {
-            std::cout << "障害物検知！" << std::endl;
+            // std::cout << "障害物検知！" << std::endl;
             data[13] = 1;
             udp_.send(data);
         } else {
