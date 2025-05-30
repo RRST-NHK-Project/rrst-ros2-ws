@@ -39,6 +39,7 @@ RRST-NHK-Project 2025
 #define deg_limit 360
 #define DPAD_SPEED 30       // 方向パッド入力時の目標速度
 bool AGRESSIVEMODE = false; // 暴走モードの初期値0
+bool LATERALMOTIONMODE = false;
 
 // グローバル変数（角度一覧）
 int deg = 0;
@@ -63,6 +64,7 @@ int yawspeed = 10;
 int previous_speed = 0;
 int desired_speed = 30;
 int measured_speed = 0;
+int LATERALMOTION_speed = 15;
 // static double current_motor_command = 0.0;
 
 // サーボの組み付け時のズレを補正（度数法）
@@ -263,16 +265,28 @@ private:
         // bool SHARE = msg->buttons[8];
         bool OPTION = msg->buttons[9];
         // bool PS = msg->buttons[10];
+
+        // bool L3 = msg->buttons[11];
+        bool R3 = msg->buttons[12];
+
         static bool last_option = false; // 前回の状態を保持する static 変数
         // OPTION のラッチ状態を保持する static 変数（初期状態は OFF とする）
         static bool option_latch = false;
 
+        static bool last_R3 = false;
+        static bool R3_latch = false;
+
         if (OPTION && !last_option) {
             option_latch = !option_latch;
+        }
+        if (R3 && !last_R3) {
+            R3_latch = !R3_latch;
         }
 
         last_option = OPTION;
         AGRESSIVEMODE = option_latch;
+        last_R3 = R3;
+        LATERALMOTIONMODE = R3_latch;
 
         if (AGRESSIVEMODE == 0) {
             wheelspeed = 75;
@@ -389,6 +403,32 @@ private:
             data[8] = deg + SERVO2_CAL;
             data[9] = deg + SERVO3_CAL;
             data[10] = deg + SERVO4_CAL;
+        }
+
+        // 角度だけ横移動
+        if (R3_latch == 0) {
+                data[7] = deg + SERVO1_CAL;
+                data[8] = deg + SERVO2_CAL;
+                data[9] = deg + SERVO3_CAL;
+                data[10] = deg + SERVO4_CAL;
+        }
+        if (R3_latch == 1) {
+                data[7] = 45 + SERVO1_CAL;
+                data[8] = 45 + SERVO2_CAL;
+                data[9] = 45 + SERVO3_CAL;
+                data[10] = 45 + SERVO4_CAL;
+            if (LEFT) {
+                data[1] = -LATERALMOTION_speed;
+                data[2] = -LATERALMOTION_speed ;
+                data[3] = -LATERALMOTION_speed ;
+                data[4] = -LATERALMOTION_speed ;
+            }
+            if (RIGHT) {
+                data[1] = LATERALMOTION_speed ;
+                data[2] = LATERALMOTION_speed ;
+                data[3] = LATERALMOTION_speed ;
+                data[4] = LATERALMOTION_speed ;
+            }
         }
 
         // 時計回りYAW回転
