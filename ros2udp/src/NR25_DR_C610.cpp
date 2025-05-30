@@ -113,44 +113,44 @@ public:
         std::cout << "<ダンクシーケンス終了>" << std::endl;
     }
 
-   /* static void pass_shoot_action(UDP &udp) { // パス、シュート
-        std::cout << "パス、シュート開始" << std::endl;
-        std::cout << "１段階展開[11]＋２段階展開[12]" << std::endl;
-        data[11] = 1;
-        udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        data[12] = 1;
-        udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(400)); // 要調整
-        std::cout << "ハンド展開" << std::endl;
-        data[16] = 1;
-        udp.send(data);
-        std::cout << "１段階格納[11]＋２段階格納[15]" << std::endl;
-        data[15] = 0;
-        udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(500)); // 要調整
-        data[11] = 0;
-        udp.send(data);
-        std::cout << "パス、シュート完了" << std::endl;
-    }
-*/
-  /*  static void dribble_action(UDP &udp) {
-        std::cout << "ドリブル開始" << std::endl;
-        std::cout << "１段階展開[11]＋２段階展開[15]" << std::endl;
-        data[11] = 1;
-        data[15] = 1;
-        udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(730)); // 要調整
-        std::cout << "<ドリブル[2],[3]>" << std::endl;
-        data[16] = 1;
-        udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 要調整
-        std::cout << "１段階格納[11]＋２段階格納[15]" << std::endl;
-        data[11] = 0;
-        data[15] = 0;
-        udp.send(data);
-        std::cout << "ドリブル完了" << std::endl;
-    }*/
+    /* static void pass_shoot_action(UDP &udp) { // パス、シュート
+         std::cout << "パス、シュート開始" << std::endl;
+         std::cout << "１段階展開[11]＋２段階展開[12]" << std::endl;
+         data[11] = 1;
+         udp.send(data);
+         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+         data[12] = 1;
+         udp.send(data);
+         std::this_thread::sleep_for(std::chrono::milliseconds(400)); // 要調整
+         std::cout << "ハンド展開" << std::endl;
+         data[16] = 1;
+         udp.send(data);
+         std::cout << "１段階格納[11]＋２段階格納[15]" << std::endl;
+         data[15] = 0;
+         udp.send(data);
+         std::this_thread::sleep_for(std::chrono::milliseconds(500)); // 要調整
+         data[11] = 0;
+         udp.send(data);
+         std::cout << "パス、シュート完了" << std::endl;
+     }
+ */
+    /*  static void dribble_action(UDP &udp) {
+          std::cout << "ドリブル開始" << std::endl;
+          std::cout << "１段階展開[11]＋２段階展開[15]" << std::endl;
+          data[11] = 1;
+          data[15] = 1;
+          udp.send(data);
+          std::this_thread::sleep_for(std::chrono::milliseconds(730)); // 要調整
+          std::cout << "<ドリブル[2],[3]>" << std::endl;
+          data[16] = 1;
+          udp.send(data);
+          std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 要調整
+          std::cout << "１段階格納[11]＋２段階格納[15]" << std::endl;
+          data[11] = 0;
+          data[15] = 0;
+          udp.send(data);
+          std::cout << "ドリブル完了" << std::endl;
+      }*/
 };
 bool Action::ready_for_dunk = false;
 
@@ -186,7 +186,7 @@ private:
         // bool DOWN = msg->axes[7] == -1.0;
 
         // bool L1 = msg->buttons[4];
-         //bool R1 = msg->buttons[5];
+        // bool R1 = msg->buttons[5];
 
         float L2 = (-1 * msg->axes[2] + 1) / 2;
         // float R2 = (-1 * msg->axes[5] + 1) / 2;
@@ -207,15 +207,14 @@ private:
         if (OPTION && !last_OPTION) {
             OPTION_latch = !OPTION_latch;
         }
-        last_OPTION= OPTION;
+        last_OPTION = OPTION;
         Nomal_mode = OPTION_latch;
-        
-    if(Nomal_mode == 0){
-           data[11] = 0;
-        }
-        if(Nomal_mode == 1){
-            data[11] = 1;
 
+        if (Nomal_mode == 0) {
+            data[11] = 0;
+        }
+        if (Nomal_mode == 1) {
+            data[11] = 1;
         }
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
@@ -231,8 +230,6 @@ private:
         if (UP && !last_UP) {
             UP_latch = !UP_latch;
         }
-        
-        
 
         // if (PS) {
         //     std::fill(data.begin(), data.end(), 0);                              // 配列をゼロで埋める
@@ -265,8 +262,8 @@ private:
         // }
 
         // １段階展開[11]＋２段階展開[15] を同時に行うボタン
-        if (L2 < 0.5 ) {
-           // data[11] = 0;
+        if (L2 < 0.5) {
+            // data[11] = 0;
             data[12] = 0;
             // std::cout << "格納"<< std::endl;
             //  std::this_thread::sleep_for(std::chrono::milliseconds(500));
@@ -282,8 +279,6 @@ private:
         } else {
             data[7] = 0;
         }
-        
-
 
         last_UP = UP;
         UP_state = UP_latch;
@@ -292,15 +287,14 @@ private:
         // std::cout << data[16] << std::endl;
 
         // デバッグ用 *NOTE:for文でcoutするとカクつくからこの記述
-         std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", ";
-         std::cout << data[4] << ", " << data[5] << ", " << data[6] << ", " << data[7] << ", ";
-        std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
-        std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
-        std::cout << data[16] << ", " << data[17] << ", " << data[18] << std::endl;
-        //std::cout << data[11] << std::endl;
+        //  std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", ";
+        //  std::cout << data[4] << ", " << data[5] << ", " << data[6] << ", " << data[7] << ", ";
+        // std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
+        // std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
+        // std::cout << data[16] << ", " << data[17] << ", " << data[18] << std::endl;
+        // std::cout << data[11] << std::endl;
         // std::cout << msg->buttons[5] << std::endl;
         udp_.send(data);
-        
     }
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
