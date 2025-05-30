@@ -28,17 +28,17 @@ int reload = 15;
 #define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 // 各ローラーの速度を指定(%)
-int roller_speed_dribble_ab = 15;
-int roller_speed_dribble_cd = 75;
-//ロングシュート4242
-//3ポイントシュート3535
-int roller_speed_shoot_ab = 27;
-int roller_speed_shoot_cd = 27;
-int roller_speed_pass_ab = 23;
-int roller_speed_pass_cd = 23;
+int roller_speed_dribble_ab = 10;
+int roller_speed_dribble_cd = 45;
+// ロングシュート4242
+// 3ポイントシュート3535
+int roller_speed_shoot_ab = 25;
+int roller_speed_shoot_cd = 25;
+int roller_speed_pass_ab = 22;
+int roller_speed_pass_cd = 22;
 int roller_speed_long_distance_shoot_ab = 35;
 int roller_speed_long_distance_shoot_cd = 35;
-int reload = 18;
+int reload = 20;
 
 std::vector<int16_t> data(19, 0); // マイコンに送信される配列"data"
 /*
@@ -109,11 +109,11 @@ public:
         std::cout << "完了." << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         std::cout << "シュート" << std::endl;
-        data[12] = 1;
+        data[14] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         std::cout << "格納準備中..." << std::endl;
-        data[12] = 0;
+        data[14] = 0;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         std::cout << "格納中..." << std::endl;
@@ -131,7 +131,7 @@ public:
         std::cout << "<射出シーケンス終了>" << std::endl;
     }
 
- // パスシーケンス
+    // パスシーケンス
     static void pass_action(UDP &udp) {
         data[1] = roller_speed_pass_ab;
         data[2] = -roller_speed_pass_ab;
@@ -143,11 +143,11 @@ public:
         std::cout << "完了." << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         std::cout << "パス" << std::endl;
-        data[12] = 1;
+        data[14] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         std::cout << "格納準備中..." << std::endl;
-        data[12] = 0;
+        data[14] = 0;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         std::cout << "格納中..." << std::endl;
@@ -177,11 +177,11 @@ public:
         std::cout << "完了." << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         std::cout << "ロングシュート" << std::endl;
-        data[12] = 1;
+        data[14] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         std::cout << "格納準備中..." << std::endl;
-        data[12] = 0;
+        data[14] = 0;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         std::cout << "格納中..." << std::endl;
@@ -314,7 +314,7 @@ private:
         if (TRIANGLE && !Action::shoot_state) {
             Action::dribble_action(udp_);
         }
-        
+
         if (SQUARE && Action::shoot_state) {
             Action::pass_action(udp_);
         }
