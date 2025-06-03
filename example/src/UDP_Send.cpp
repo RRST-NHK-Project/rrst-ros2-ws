@@ -59,7 +59,6 @@ private:
 
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
-        bool CIRCLE = msg->buttons[1];
         float R2 = (-1 * msg->axes[5] + 1) / 2;
 
         data[3] = 50 * R2; // １番に20を代入

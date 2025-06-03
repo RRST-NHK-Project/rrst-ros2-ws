@@ -89,6 +89,12 @@ public:
         std::cout << "完了." << std::endl;
         std::cout << "<ダンクシーケンス終了>" << std::endl;
     }
+    static void nomal_mode(UDP &udp) {
+        std::cout << "１段階展開[11]" << std::endl;
+        data[11] = 1;
+        udp.send(data);
+        std::cout << "完了." << std::endl;
+    }
 };
 bool Action::ready_for_dunk = false;
 
@@ -134,13 +140,13 @@ private:
         // bool DOWN = msg->axes[7] == -1.0;
 
         // bool L1 = msg->buttons[4];
-        // bool R1 = msg->buttons[5];
+        bool R1 = msg->buttons[5];
 
         float L2 = (-1 * msg->axes[2] + 1) / 2;
         // float R2 = (-1 * msg->axes[5] + 1) / 2;
 
         // bool SHARE = msg->buttons[8];
-        // bool OPTION = msg->buttons[9];
+        bool OPTION = msg->buttons[9];
         // bool PS = msg->buttons[10];
 
         // bool L3 = msg->buttons[11];
@@ -174,9 +180,15 @@ private:
         //     //std::cout << "S" << std::endl;
         //     std::this_thread::sleep_for(std::chrono::milliseconds(500));
         // }
-
+        if (R1) {
+            std::cout << "nomalmode" << std::endl;
+             Action::nomal_mode(udp_);
+        }
         if (L2 >= 0.5) {
             std::cout << "L2" << std::endl;
+        }
+        if(OPTION) {
+           data[11] = 0;
         }
 
         udp_.send(data);

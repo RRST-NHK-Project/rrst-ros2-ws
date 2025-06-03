@@ -28,15 +28,17 @@ int reload = 15;
 #define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 // 各ローラーの速度を指定(%)
-int roller_speed_dribble_ab = 11;
-int roller_speed_dribble_cd = 62;
-//ロングシュート4242
-//3ポイントシュート3535
-int roller_speed_shoot_ab = 35;
-int roller_speed_shoot_cd = 35;
-int roller_speed_pass_ab = 34;
-int roller_speed_pass_cd = 30;
-int reload = 15;
+int roller_speed_dribble_ab = 10;
+int roller_speed_dribble_cd = 45;
+// ロングシュート4242
+// 3ポイントシュート3535
+int roller_speed_shoot_ab = 25;
+int roller_speed_shoot_cd = 25;
+int roller_speed_pass_ab = 22;
+int roller_speed_pass_cd = 22;
+int roller_speed_long_distance_shoot_ab = 35;
+int roller_speed_long_distance_shoot_cd = 35;
+int reload = 20;
 
 std::vector<int16_t> data(19, 0); // マイコンに送信される配列"data"
 /*
@@ -107,11 +109,11 @@ public:
         std::cout << "完了." << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         std::cout << "シュート" << std::endl;
-        data[12] = 1;
+        data[14] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         std::cout << "格納準備中..." << std::endl;
-        data[12] = 0;
+        data[14] = 0;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         std::cout << "格納中..." << std::endl;
@@ -129,7 +131,7 @@ public:
         std::cout << "<射出シーケンス終了>" << std::endl;
     }
 
- // パスシーケンス
+    // パスシーケンス
     static void pass_action(UDP &udp) {
         data[1] = roller_speed_pass_ab;
         data[2] = -roller_speed_pass_ab;
@@ -141,11 +143,11 @@ public:
         std::cout << "完了." << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         std::cout << "パス" << std::endl;
-        data[12] = 1;
+        data[14] = 1;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         std::cout << "格納準備中..." << std::endl;
-        data[12] = 0;
+        data[14] = 0;
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         std::cout << "格納中..." << std::endl;
@@ -161,6 +163,40 @@ public:
 
         std::cout << "完了." << std::endl;
         std::cout << "<パスシーケンス終了>" << std::endl;
+    }
+
+    // 遠距離シュートシーケンス
+    static void long_shoot_action(UDP &udp) {
+        data[1] = roller_speed_long_distance_shoot_ab;
+        data[2] = -roller_speed_long_distance_shoot_ab;
+        data[3] = roller_speed_long_distance_shoot_cd;
+        data[4] = -roller_speed_long_distance_shoot_cd;
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        udp.send(data);
+        shoot_state = true;
+        std::cout << "完了." << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        std::cout << "ロングシュート" << std::endl;
+        data[14] = 1;
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        std::cout << "格納準備中..." << std::endl;
+        data[14] = 0;
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        std::cout << "格納中..." << std::endl;
+        data[11] = 0;
+        data[13] = 0;
+        data[1] = 0;
+        data[2] = 0;
+        data[3] = 0;
+        data[4] = 0;
+        udp.send(data);
+        reload_state = false;
+        shoot_state = false;
+
+        std::cout << "完了." << std::endl;
+        std::cout << "<ロングシュートシーケンス終了>" << std::endl;
     }
 
     // ドリブルシーケンス
@@ -239,7 +275,7 @@ private:
         // bool UP = msg->axes[7] == 1.0;
         // bool DOWN = msg->axes[7] == -1.0;
 
-        // bool L1 = msg->buttons[4];
+        bool L1 = msg->buttons[4];
         // bool R1 = msg->buttons[5];
 
         // float L2 = (-1 * msg->axes[2] + 1) / 2;
@@ -278,9 +314,13 @@ private:
         if (TRIANGLE && !Action::shoot_state) {
             Action::dribble_action(udp_);
         }
-        
+
         if (SQUARE && Action::shoot_state) {
             Action::pass_action(udp_);
+        }
+
+        if (L1 && Action::shoot_state) {
+            Action::long_shoot_action(udp_);
         }
 
         // if (OPTION) {
