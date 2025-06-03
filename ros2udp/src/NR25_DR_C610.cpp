@@ -63,19 +63,20 @@ public:
     // 事故防止のため、ブームの展開状況を保存
     static bool ready_for_dunk;
 
-    static void ready_for_dunk_action(UDP &udp) {
-        std::cout << "ダンク待機開始" << std::endl;
-        std::cout << "１段階展開[11]" << std::endl;
-        data[11] = 1;
-        udp.send(data);
-        ready_for_dunk = true;
-        std::cout << "完了." << std::endl;
-    }
+    // static void ready_for_dunk_action(UDP &udp) {
+    //     std::cout << "ダンク待機開始" << std::endl;
+    //     std::cout << "１段階展開[11]" << std::endl;
+    //     data[11] = 1;
+    //     udp.send(data);
+    //     ready_for_dunk = true;
+    //     std::cout << "完了." << std::endl;
+    // }
     // 16は一番上の掴むところ
     static void dunk_shoot_action(UDP &udp) {
         std::cout << "<ダンクシーケンス開始>" << std::endl;
 
         std::cout << "２段階展開[12]＋トリガー[13]" << std::endl;
+        data[11] = 1;
         data[12] = 1;
 
         udp.send(data);
@@ -177,7 +178,7 @@ private:
 
         bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
-        // bool TRIANGLE = msg->buttons[2];
+        bool TRIANGLE = msg->buttons[2];
         bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
@@ -241,12 +242,12 @@ private:
         //     rclcpp::shutdown();
         // }
 
-        if (SQUARE) {
-            Action::ready_for_dunk_action(udp_);
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        }
+        // if (SQUARE) {
+        //     Action::ready_for_dunk_action(udp_);
+        //     std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        // }
 
-        if (CIRCLE && Action::ready_for_dunk) {
+        if (CIRCLE && TRIANGLE) {
             Action::dunk_shoot_action(udp_);
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
