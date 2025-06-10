@@ -28,14 +28,14 @@ int reload = 15;
 #define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 // 各ローラーの速度を指定(%)
-int roller_speed_dribble_ab = 10;
+int roller_speed_dribble_ab = 7;
 int roller_speed_dribble_cd = 45;
 // ロングシュート4242
 // 3ポイントシュート3535
 int roller_speed_shoot_ab = 25;
 int roller_speed_shoot_cd = 25;
-int roller_speed_pass_ab = 22;
-int roller_speed_pass_cd = 22;
+int roller_speed_pass_ab = 20;
+int roller_speed_pass_cd = 20;
 int roller_speed_long_distance_shoot_ab = 35;
 int roller_speed_long_distance_shoot_cd = 35;
 int reload = 20;

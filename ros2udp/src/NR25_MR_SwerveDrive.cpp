@@ -51,8 +51,8 @@ int desired_deg = 0;
 int measured_deg = 0;
 
 // 速度
-int wheelspeed = 20;
-int yawspeed = -10;
+int wheelspeed = 25;
+int yawspeed = -12;
 int yawspeed_auto = 20;
 
 // サーボの組み付け時のズレを補正（度数法）
