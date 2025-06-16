@@ -112,7 +112,7 @@ target_include_directories(pid_tuner PRIVATE ${nlohmann_json_SOURCE_DIR}/single_
 add_executable(nr25_led src/TeapLED_test.cpp src/include/UDP.cpp src/include/IP.cpp)
 ament_target_dependencies(nr25_led rclcpp std_msgs sensor_msgs geometry_msgs)
 
-add_executable(temp src/Temp.cpp src/include/UDP_Lite.cpp src/include/IP.cpp)
+add_executable(temp src/Temp.cpp src/include/UDP.cpp src/include/IP.cpp src/include/UDP_Lite.cpp)
 ament_target_dependencies(temp rclcpp std_msgs sensor_msgs geometry_msgs)
 
 # インストール設定

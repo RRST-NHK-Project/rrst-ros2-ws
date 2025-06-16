@@ -8,10 +8,12 @@ extern const std::string IP_MR_SD;
 extern const std::string IP_MR;
 extern const std::string IP_DR_SD;
 extern const std::string IP_DR;
+extern const std::string IP_TEST;
 
 extern const int PORT_MR_SD;
 extern const int PORT_MR;
 extern const int PORT_DR_SD;
 extern const int PORT_DR;
+extern const int PORT_TEST;
 
 #endif // IP_HPP
