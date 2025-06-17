@@ -64,7 +64,7 @@ colcon build
 
 ---
 
-## 11. 🛠️ Build Status
+## 5. 🛠️ Build Status
 各ブランチのビルド状況です。
 ### main（安定版）
 
@@ -76,7 +76,7 @@ colcon build
 
 ---
 
-## 12. 🌟 Powered by
+## 6. 🌟 Powered by
 
 2024年度立命館大学ロボット技術研究会 NHKプロジェクト  
 2024 NHK Project, RRST, Ritsumeikan University

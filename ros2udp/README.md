@@ -53,21 +53,9 @@ colcon build
 
 ---
 
-## 4. 📁 ディレクトリ構成
+## 4. 🏎️ 機体立ち上げ手順
 
-| パス | 説明 |
-|:---|:---|
-| `/ros2udp` | ros2udpパッケージ |
-| `/ldrobot-lidar-ros2` | LD19用パッケージ。[既存パッケージ](https://github.com/Myzhar/ldrobot-lidar-ros2.git)を改変 |
-| `/resources/ros2udp_pio` | マイコン用PlatformIOプロジェクト群 |
-| `/resources/NUCLEO_F767ZI_MB` | メイン基板のKiCadデータ |
-| `/setup` | 初期設定や立ち上げスクリプト群 |
-
----
-
-## 5. 🏎️ 機体立ち上げ手順
-
-### 5.1 MR機体の立ち上げ
+### 4.1 MR機体の立ち上げ
 
 1. 機体のルーター（GL.iNet）を起動し、PCをアクセスポイントに接続。
 2. 以下のスクリプトを実行して機体を立ち上げます。
@@ -77,7 +65,7 @@ cd ~/ros2_ws/src/setup
 ./boot_mr.sh
 ```
 
-### 5.2 DR機体の立ち上げ
+### 4.2 DR機体の立ち上げ
 
 1. 機体のルーター（TP-Link）を起動し、PCを接続。
 2. ラズパイにSSHで接続。
@@ -102,35 +90,35 @@ cd ~/ros2_ws/src/setup
 
 ---
 
-## 6. 💻 機体への実装方法
+## 5. 💻 機体への実装方法
 
-### 6.1 マイコンプログラム書き込み
+### 5.1 マイコンプログラム書き込み
 
 - NUCLEO-F767ZIにプログラムを書き込む。このときコード内のIPv4アドレスを任意のものに変更する。複数のマイコンを使うときはそれぞれに異なるIPを割り当てる。
 
-### 6.2 ネットワーク接続
+### 5.2 ネットワーク接続
 
 - マイコンとルーターをLANケーブルで接続、PCも有線or無線でルーターに接続する。（無線の場合は5GHz帯を推奨）
 
-### 6.3 ROS2側IP設定
+### 5.3 ROS2側IP設定
 
 - `/src/include/IP.cpp`ファイル内で、宛先IPアドレスを一括設定する。
 
-### 6.4 ROS2ノードの準備
+### 5.4 ROS2ノードの準備
 
 - ROS2ノード内で、`data`配列を使いアクチュエータ制御の指令を記述する。
 
-### 6.5 Run
+### 5.5 Run
 
 - ビルドして各ノードを走らせる。  
 
-### 6.6 動作確認
+### 5.6 動作確認
 
 - マイコン側のLANポートのアクセスランプが点滅していれば通信は成功。安全な環境で動作確認を行う。
 
 ---
 
-## 7. 📊 配列仕様（メイン基板 V1.3以降）
+## 6. 📊 配列仕様（メイン基板 V1.3以降）
 
 ROS 2ノードからマイコンに送信される配列`data`は19個の要素を持っています。各要素の詳細をここにまとめます。   
 全ての機能を利用するにはメイン基板 V1.3以降が必要です。  
@@ -160,9 +148,9 @@ debug: マイコンのprintfを有効化, MD: モータードライバー, SV: �
 
 ---
 
-## 8. 📚 リファレンス
+## 7. 📚 リファレンス
 
-### 8.1 基本的な使い方
+### 7.1 基本的な使い方
 
 - `data`配列に数値を代入することで、各アクチュエータを制御します。以下はその例です。
 
@@ -175,7 +163,7 @@ debug: マイコンのprintfを有効化, MD: モータードライバー, SV: �
 
 ---
 
-## 9. 🌐 IPアドレス使用状況（NHK 2025）
+## 8. 🌐 IPアドレス使用状況（NHK 2025）
 
 動的IPに対応していますが、マイコンとのIP競合を防ぐためにIPアドレスの固定を推奨します。
 
@@ -204,26 +192,12 @@ debug: マイコンのprintfを有効化, MD: モータードライバー, SV: �
 | 192.168.0.124 | F767ZI | 検証用 |
 ---
 
-## 10. 🏷️ 命名規則
+## 9. 🏷️ 命名規則
 
 - `NR25_` は**NHKロボコン2025**向けコードを意味します。
 - 新しいノードを作成する際は、これらのファイルを参考にしてください。
 
----
-
-## 11. 🛠️ Build Status
-各ブランチのビルド状況です。
-### 11.1 main（安定版）
-
-[![ROS 2 Jazzy Build](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_test.yml/badge.svg?branch=main)](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_test.yml)
-
-### 11.2 develop（最新版）
-
-[![ROS 2 Jazzy Build](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_test.yml/badge.svg?branch=develop&event=push)](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_test.yml)
-
----
-
-## 12. 🌟 Powered by
+## 10. 🌟 Powered by
 
 2024年度立命館大学ロボット技術研究会 NHKプロジェクト  
 2024 NHK Project, RRST, Ritsumeikan University
