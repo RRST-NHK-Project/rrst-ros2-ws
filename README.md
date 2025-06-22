@@ -1,6 +1,13 @@
 
 
 # **rrst-ros2-workspace**
+### main（安定版）
+
+[![ROS 2 Jazzy Build](https://github.com/RRST-NHK-Project/rrst-ros2-ws/actions/workflows/main_jazzy_build_and_test.yml/badge.svg?branch=main)](https://github.com/RRST-NHK-Project/rrst-ros2-ws/actions/workflows/main_jazzy_build_and_test.yml)
+
+### develop（最新版）
+
+[![ROS 2 Jazzy Build](https://github.com/RRST-NHK-Project/rrst-ros2-ws/actions/workflows/main_jazzy_build_and_test.yml/badge.svg?branch=develop&event=push)](https://github.com/RRST-NHK-Project/rrst-ros2-ws/actions/workflows/main_jazzy_build_and_test.yml)
 
 ## 1. 🚀 概要
 RRST, NHKプロジェクトのROS 2 ワークスペースです。現在使用中の各種パッケージ、回路データなどを格納しています。不要になったパッケージやデータは別リポジトリに移動してアーカイブしてください。
@@ -64,19 +71,7 @@ colcon build
 
 ---
 
-## 11. 🛠️ Build Status
-各ブランチのビルド状況です。
-### 11.1 main（安定版）
-
-[![ROS 2 Jazzy Build](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_test.yml/badge.svg?branch=main)](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_test.yml)
-
-### 11.2 develop（最新版）
-
-[![ROS 2 Jazzy Build](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_test.yml/badge.svg?branch=develop&event=push)](https://github.com/RRST-NHK-Project/ros2udp/actions/workflows/main_jazzy_build_and_test.yml)
-
----
-
-## 12. 🌟 Powered by
+## 5. 🌟 Powered by
 
 2024年度立命館大学ロボット技術研究会 NHKプロジェクト  
 2024 NHK Project, RRST, Ritsumeikan University
