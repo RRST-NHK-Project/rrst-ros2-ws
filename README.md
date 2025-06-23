@@ -75,7 +75,7 @@ colcon build
 ## 5. 🌟 Powered by
 
 2024年度立命館大学ロボット技術研究会 NHKプロジェクト  
-2024 NHK Project, RRST, Ritsumeikan University
+2024, NHK Project, RRST, Ritsumeikan University
 
 ![Logo](https://www.rrst.jp/img/logo.png)
 
