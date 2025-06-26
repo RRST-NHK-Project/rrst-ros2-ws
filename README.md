@@ -37,7 +37,7 @@ mkdir -p ~/ros2_ws/src
 
 ```bash
 cd ~/ros2_ws/src
-git clone https://github.com/RRST-NHK-Project/ros2udp.git .
+git clone https://github.com/RRST-NHK-Project/rrst-ros2-ws.git .
 ```
 
 ### 3.3 🔧 依存関係のインストール
