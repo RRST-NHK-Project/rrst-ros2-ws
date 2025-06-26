@@ -18,9 +18,13 @@ find_package(geometry_msgs REQUIRED)
 add_executable(mros_wip src/mROS_WIP.cpp)
 ament_target_dependencies(mros_wip rclcpp std_msgs sensor_msgs)
 
+add_executable(mb_tester src/MB_TESTER.cpp)
+ament_target_dependencies(mb_tester rclcpp std_msgs sensor_msgs)
+
 # インストール設定
 install(TARGETS
   mros_wip
+  mb_tester
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
