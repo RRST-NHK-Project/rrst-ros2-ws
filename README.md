@@ -37,7 +37,7 @@ mkdir -p ~/ros2_ws/src
 
 ```bash
 cd ~/ros2_ws/src
-git clone https://github.com/RRST-NHK-Project/ros2udp.git .
+git clone https://github.com/RRST-NHK-Project/rrst-ros2-ws.git .
 ```
 
 ### 3.3 🔧 依存関係のインストール
@@ -64,6 +64,7 @@ colcon build
 | `/example` | 講習関連 |
 | `/ros2udp` | ros2udpパッケージ、詳細はパッケージ内のReadmeを参照 |
 | `/ros2udp_core` | ros2udpパッケージの最小構成 |
+| `/ros2esp` | ros2espパッケージ、詳細はパッケージ内のReadmeを参照 |
 | `/ldrobot-lidar-ros2` | LD19用パッケージ。[既存パッケージ](https://github.com/Myzhar/ldrobot-lidar-ros2.git)を改変 |
 | `/resources/microcontroller` | マイコン用プログラム |
 | `/resources/mainboard` | メイン基板のKiCadデータ |
@@ -74,7 +75,7 @@ colcon build
 ## 5. 🌟 Powered by
 
 2024年度立命館大学ロボット技術研究会 NHKプロジェクト  
-2024 NHK Project, RRST, Ritsumeikan University
+2024, NHK Project, RRST, Ritsumeikan University
 
 ![Logo](https://www.rrst.jp/img/logo.png)
 
