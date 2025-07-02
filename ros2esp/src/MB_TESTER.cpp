@@ -56,7 +56,7 @@ private:
             }
 
             data[index] = value;
-            data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
+            // data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
             std::cout << "Updated data[" << index << "] = " << value << std::endl;
             print_data();
