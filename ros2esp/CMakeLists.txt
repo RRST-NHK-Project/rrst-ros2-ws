@@ -21,10 +21,14 @@ ament_target_dependencies(mros_wip rclcpp std_msgs sensor_msgs)
 add_executable(mb_tester src/MB_TESTER.cpp)
 ament_target_dependencies(mb_tester rclcpp std_msgs sensor_msgs)
 
+add_executable(nr25_mr_sd src/NR25_MR_SwerveDrive.cpp)
+ament_target_dependencies(nr25_mr_sd rclcpp std_msgs sensor_msgs geometry_msgs)
+
 # インストール設定
 install(TARGETS
   mros_wip
   mb_tester
+  nr25_mr_sd
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
