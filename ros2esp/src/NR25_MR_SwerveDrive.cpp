@@ -14,7 +14,7 @@ PS4コントローラーの入力を取得するサンプルプログラム
 #include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/int32_multi_array.hpp"
 
-#define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
+#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 std::vector<int32_t> data(19, 0); // マイコンに送信される配列"data"
 /*
@@ -101,7 +101,7 @@ private:
             data[2] = 0; // CIRCLEボタンが押されていない場合は0に設定
         }
 
-        data[3] = R2 * 100;
+        data[3] = R2 * 255;
         publish_data();
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }

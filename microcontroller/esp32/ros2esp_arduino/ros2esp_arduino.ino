@@ -21,9 +21,11 @@ int32_t buffer[MAX_ARRAY_SIZE];
 // ★ 受信データ格納用（グローバル）
 volatile int32_t received_data[MAX_ARRAY_SIZE];  // 最新の受信データ
 volatile size_t received_size = 0;               // 受信データのサイズ
-volatile bool new_data_received = false;         // 新しいデータの有無フラグ
 
-#define RCCHECK(fn) { if ((fn) != RCL_RET_OK) error_loop(); }
+#define RCCHECK(fn) \
+  { \
+    if ((fn) != RCL_RET_OK) error_loop(); \
+  }
 
 void error_loop() {
   while (1) {
@@ -44,7 +46,6 @@ void subscription_callback(const void *msgin) {
   }
 
   received_size = len;
-  new_data_received = true;
 }
 
 void setup() {
@@ -52,7 +53,6 @@ void setup() {
   delay(2000);
 
   set_microros_transports();
-  SerialBT.println("Bluetooth Serial Started.");
 
   allocator = rcl_get_default_allocator();
 
@@ -77,26 +77,27 @@ void setup() {
   RCCHECK(rclc_executor_init(&executor, &support.context, 1, &allocator));
   RCCHECK(rclc_executor_add_subscription(&executor, &subscriber, &msg, &subscription_callback, ON_NEW_DATA));
 
+  //以下ピンの定義
   pinMode(5, OUTPUT);
+  pinMode(4, OUTPUT);
 }
 
 void loop() {
   RCCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(5)));
 
-  // ★ 新しいデータがあれば処理
-  if (new_data_received) {
-    new_data_received = false;
-
+  if (received_data[0] == 1) {  //Bluetoothデバッグ
     SerialBT.print("Received: ");
     for (size_t i = 0; i < received_size; i++) {
       SerialBT.print(received_data[i]);
       SerialBT.print(", ");
     }
     SerialBT.println();
-
-    // 例：LEDを制御
-    digitalWrite(5, received_data[2] == 1 ? HIGH : LOW);
   }
+
+  // 例：LEDを制御
+  digitalWrite(5, received_data[2] == 1 ? HIGH : LOW);
+  analogWrite(4,received_data[3]);
+
 
   //delay(10);
 }
