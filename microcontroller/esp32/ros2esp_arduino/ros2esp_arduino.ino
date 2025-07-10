@@ -81,7 +81,7 @@ void setup() {
 }
 
 void loop() {
-  RCCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(10)));
+  RCCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(5)));
 
   // ★ 新しいデータがあれば処理
   if (new_data_received) {
