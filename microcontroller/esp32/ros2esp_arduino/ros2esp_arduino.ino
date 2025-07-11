@@ -1,14 +1,60 @@
+/*
+2025, RRST-NHK-Project
+ros2espパッケージ、マイコン側プログラム
+microROSで受信したデータをもとにピン操作
+ワイヤレスデバッグ(Bluetooth Serial)に対応しています。スマホアプリもしくはTeratermでデバッグ可能です。現時点では時間経過でスタックするバグがあります。ROS側からオンオフ切り替えできます。
+４MB版のESPでは容量が不足するためTools/PartitionSchemeからNO OTA(2MB APP/2MB SPIFFS)を選択してください。
+*/
+
+//microROS関連
 #include <micro_ros_arduino.h>
 #include <rcl/rcl.h>
 #include <rcl/error_handling.h>
 #include <rclc/rclc.h>
 #include <rclc/executor.h>
 #include <std_msgs/msg/int32_multi_array.h>
-#include "BluetoothSerial.h"
 
+//ワイヤレスデバッグで使う
+#include "BluetoothSerial.h"
 BluetoothSerial SerialBT;
 
 #define MAX_ARRAY_SIZE 19
+
+// ピンの定義 //
+
+//通信状態表示
+#define LED 2
+
+// #define MD1P PA_0
+// #define MD2P PA_3
+// #define MD3P PC_7
+// #define MD4P PC_6
+// #define MD5P PC_8
+// #define MD6P PC_9
+
+// // MD DIR
+// #define MD1D PD_2
+// #define MD2D PG_2
+// #define MD3D PD_5
+// #define MD4D PD_6
+// #define MD5D PD_7
+// #define MD6D PC_10
+
+// // サーボ
+// #define SERVO1 PB_1
+// #define SERVO2 PB_6
+// #define SERVO3 PD_13
+// #define SERVO4 PB_8
+
+// // トランジスタ（ソレノイド・表示灯）
+// #define TR1 PF_0
+// #define TR2 PF_1
+// #define TR3 PF_15
+// #define TR4 PC_11
+// #define TR5 PC_12
+// #define TR6 PF_14
+// #define TR7 PF_12
+// #define TR8 PF_13
 
 rcl_subscription_t subscriber;
 std_msgs__msg__Int32MultiArray msg;
@@ -56,6 +102,10 @@ void setup() {
 
   allocator = rcl_get_default_allocator();
 
+  //通信状態表示LED
+  pinMode(LED, OUTPUT);
+  digitalWrite(LED, HIGH);
+
   // ★ エージェントと接続できるまでリトライ
   while (rclc_support_init(&support, 0, NULL, &allocator) != RCL_RET_OK) {
     SerialBT.println("Waiting for agent...");
@@ -77,15 +127,48 @@ void setup() {
   RCCHECK(rclc_executor_init(&executor, &support.context, 1, &allocator));
   RCCHECK(rclc_executor_add_subscription(&executor, &subscriber, &msg, &subscription_callback, ON_NEW_DATA));
 
-  //以下ピンの定義
-  pinMode(5, OUTPUT);
-  pinMode(4, OUTPUT);
+  // ピンの初期化 //
+
+  // MD DIR
+  // pinMode(MD1P, OUTPUT);
+  // pinMode(MD2P, OUTPUT);
+  // pinMode(MD3P, OUTPUT);
+  // pinMode(MD4P, OUTPUT);
+  // pinMode(MD5P, OUTPUT);
+  // pinMode(MD6P, OUTPUT);
+
+  // // MD PWM
+  // pinMode(MD1D, OUTPUT);
+  // pinMode(MD2D, OUTPUT);
+  // pinMode(MD3D, OUTPUT);
+  // pinMode(MD4D, OUTPUT);
+  // pinMode(MD5D, OUTPUT);
+  // pinMode(MD6D, OUTPUT);
+
+  // // サーボ
+  // pinMode(SERVO1, OUTPUT);
+  // pinMode(SERVO2, OUTPUT);
+  // pinMode(SERVO3, OUTPUT);
+  // pinMode(SERVO4, OUTPUT);
+
+  // // トランジスタ(ソレノイド・表示灯)
+  // pinMode(TR1, OUTPUT);
+  // pinMode(TR2, OUTPUT);
+  // pinMode(TR3, OUTPUT);
+  // pinMode(TR4, OUTPUT);
+  // pinMode(TR5, OUTPUT);
+  // pinMode(TR6, OUTPUT);
 }
 
 void loop() {
   RCCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(5)));
 
-  if (received_data[0] == 1) {  //Bluetoothデバッグ
+  digitalWrite(LED, HIGH);
+
+  //以下メインの処理
+
+  //デバッグ用
+  if (received_data[0] == 1) {
     SerialBT.print("Received: ");
     for (size_t i = 0; i < received_size; i++) {
       SerialBT.print(received_data[i]);
@@ -94,10 +177,9 @@ void loop() {
     SerialBT.println();
   }
 
-  // 例：LEDを制御
-  digitalWrite(5, received_data[2] == 1 ? HIGH : LOW);
-  analogWrite(4,received_data[3]);
+  //ピンの操作
 
+  //ここまで
 
   //delay(10);
 }
