@@ -260,6 +260,7 @@ public:
 private:
     // コントローラーの入力を取得、使わない入力はコメントアウト推奨
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
+        // コントローラーの入力を取得、使わない入力はコメントアウト推奨
         //  float LS_X = -1 * msg->axes[0];
         //  float LS_Y = msg->axes[1];
         //  float RS_X = -1 * msg->axes[3];
