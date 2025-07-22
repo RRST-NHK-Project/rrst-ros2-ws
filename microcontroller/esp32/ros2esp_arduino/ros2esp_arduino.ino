@@ -2,7 +2,7 @@
 2025, RRST-NHK-Project
 ros2espパッケージ、マイコン側プログラム
 microROSで受信したデータをもとにピン操作
-ワイヤレスデバッグ(Bluetooth Serial)に対応しています。スマホアプリもしくはTeratermでデバッグ可能です。現時点では時間経過でスタックするバグがあります。ROS側からオンオフ切り替えできます。
+ワイヤレスデバッグ(Bluetooth Serial)に対応しています。ROS側からオンオフ切り替えできます。スマホアプリもしくはTeratermでデバッグ可能です。現時点では時間経過でスタックするバグがあります。
 ４MB版のESPでは容量が不足するためTools/PartitionSchemeからNO OTA(2MB APP/2MB SPIFFS)を選択してください。
 */
 
