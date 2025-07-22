@@ -65,8 +65,7 @@ colcon build
 | `/ros2udp` | ros2udpパッケージ、詳細はパッケージ内のReadmeを参照 |
 | `/ros2udp_core` | ros2udpパッケージの最小構成 |
 | `/ros2esp` | ros2espパッケージ、詳細はパッケージ内のReadmeを参照 |
-| `/ldrobot-lidar-ros2` | LD19用パッケージ。[既存パッケージ](https://github.com/Myzhar/ldrobot-lidar-ros2.git)を改変 |
-| `/resources/microcontroller` | マイコン用プログラム |
+| `/microcontroller` | マイコン用プログラム |
 | `/resources/mainboard` | メイン基板のKiCadデータ |
 | `/setup` | 初期設定や立ち上げスクリプト群 |
 
