@@ -18,8 +18,13 @@ jobs:
   jazzy-build-and-test:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout repository
+#      - name: Checkout repository
+#        uses: actions/checkout@v4
+
+      - name: Checkout repository (with submodules)
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup ROS 2
         uses: ros-tooling/setup-ros@v0.7
@@ -46,11 +51,11 @@ jobs:
           rosdep update
           rosdep install --from-paths src --ignore-src -r -y
 
-      - name: Run setup script
-        run: |
-          cd ros2_ws/src/setup
-          sudo chmod +x setup.sh
-          ./setup.sh
+#      - name: Run setup script
+#       run: |
+#        cd ros2_ws/src/setup
+#       sudo chmod +x setup.sh
+#      ./setup.sh
 
       - name: Build workspace
         run: |

@@ -1,0 +1,18 @@
+[submodule "ros2udp"]
+	path = ros2udp
+	url = https://github.com/RRST-NHK-Project/ros2udp.git
+[submodule "ros2udp_core"]
+	path = ros2udp_core
+	url = https://github.com/RRST-NHK-Project/ros2udp_core.git
+[submodule "ros2esp"]
+	path = ros2esp
+	url = https://github.com/RRST-NHK-Project/ros2esp.git
+[submodule "example"]
+	path = example
+	url = https://github.com/RRST-NHK-Project/example.git
+[submodule "microcontroller-ws"]
+	path = microcontroller-ws
+	url = https://github.com/RRST-NHK-Project/microcontroller-ws
+[submodule "kicad-ws"]
+	path = kicad-ws
+	url = https://github.com/RRST-NHK-Project/kicad-ws
