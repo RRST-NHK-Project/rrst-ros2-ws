@@ -1,0 +1,3 @@
+[submodule "ros2udp"]
+	path = ros2udp
+	url = https://github.com/RRST-NHK-Project/ros2udp.git
