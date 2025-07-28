@@ -18,8 +18,13 @@ jobs:
   jazzy-build-and-test:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout repository
+#      - name: Checkout repository
+#        uses: actions/checkout@v4
+
+      - name: Checkout repository (with submodules)
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup ROS 2
         uses: ros-tooling/setup-ros@v0.7
