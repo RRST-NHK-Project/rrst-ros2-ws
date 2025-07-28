@@ -10,7 +10,7 @@
 [![ROS 2 Jazzy Build](https://github.com/RRST-NHK-Project/rrst-ros2-ws/actions/workflows/main_jazzy_build_and_test.yml/badge.svg?branch=develop&event=push)](https://github.com/RRST-NHK-Project/rrst-ros2-ws/actions/workflows/main_jazzy_build_and_test.yml)
 
 ## 1. 🚀 概要
-RRST, NHKプロジェクトのROS 2 ワークスペースです。現在使用中の各種パッケージ、回路データなどを格納しています。不要になったパッケージやデータは別リポジトリに移動してアーカイブしてください。
+RRST, NHKプロジェクトのROS 2 ワークスペースです。現在使用中の各種パッケージ、回路データなどをサブモジュール化して格納しています。不要になったものはサブモジュール化を解除後に別リポジトリに移動しアーカイブしてください。
 
 
 ## 2. ⚙️ 動作環境
@@ -38,17 +38,10 @@ mkdir -p ~/ros2_ws/src
 ```bash
 cd ~/ros2_ws/src
 git clone https://github.com/RRST-NHK-Project/rrst-ros2-ws.git .
+git submodule update --init --recursive
 ```
 
-### 3.3 🔧 依存関係のインストール
-パッケージの追加などで依存関係が増えた場合はスクリプトに追加してください。
-```bash
-cd ~/ros2_ws/src/setup
-sudo chmod +x setup.sh
-./setup.sh
-```
-
-### 3.4 🛠️ ビルド
+### 3.3 🛠️ ビルド
 
 ```bash
 cd ~/ros2_ws
@@ -65,10 +58,8 @@ colcon build
 | `/ros2udp` | ros2udpパッケージ、詳細はパッケージ内のReadmeを参照 |
 | `/ros2udp_core` | ros2udpパッケージの最小構成 |
 | `/ros2esp` | ros2espパッケージ、詳細はパッケージ内のReadmeを参照 |
-| `/microcontroller` | マイコン用プログラム |
-| `/resources/mainboard` | メイン基板のKiCadデータ |
-| `/setup` | 初期設定や立ち上げスクリプト群 |
-
+| `/microcontrollerーws` | マイコン用プログラム |
+| `/kicad-ws` | メイン基板のKiCadデータ |
 ---
 
 ## 5. 🌟 Powered by
