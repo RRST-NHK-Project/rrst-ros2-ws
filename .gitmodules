@@ -1,6 +1,0 @@
-[submodule "microcontroller-ws"]
-	path = microcontroller-ws
-	url = https://github.com/RRST-NHK-Project/microcontroller-ws
-[submodule "kicad-ws"]
-	path = kicad-ws
-	url = https://github.com/RRST-NHK-Project/kicad-ws
