@@ -1,0 +1,3 @@
+[submodule "microcontroller-ws"]
+	path = microcontroller-ws
+	url = https://github.com/RRST-NHK-Project/microcontroller-ws.git
