@@ -26,6 +26,8 @@ int speed_lift;
 // 射出機構の速
 int speed_shoot;
 
+int z_speed = 75; // Z軸の速度
+
 // ラッチ用の文字設定
 int SHOOTMODE = 0;
 
@@ -64,11 +66,11 @@ public:
     static bool folk_state; // フォークの状態保存
 
     static void folk_init(UDP &udp) {
+        data[1] = 0; // ポンプ
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         data[7] = 90; // サーボ
         data[8] = 0;  // サーボ
-        udp.send(data);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        data[1] = 0; // ポンプ
         udp.send(data);
         std::cout << "フォーク初期化" << std::endl;
         folk_state = false;
@@ -93,7 +95,8 @@ public:
     }
 
     static void hashira_pickup_action(UDP &udp) {
-        data[8] = 90; // サーボ
+        data[7] = 0; // サーボ
+        data[1] = 50;
         udp.send(data);
         std::cout << "柱回収" << std::endl;
     }
@@ -202,13 +205,25 @@ private:
         }
 
         if (TRIANGLE && triangle_latch) {
-            Action::folk_tenkai(udp_);
-        } else if (TRIANGLE && !triangle_latch) {
             Action::hashira_pickup_action(udp_);
         }
 
         if (CROSS) {
             Action::folk_init(udp_);
+        }
+
+        if (UP) {
+            data[4] = -z_speed;
+            udp_.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            data[4] = 0;
+        }
+
+        if (DOWN) {
+            data[4] = z_speed;
+            udp_.send(data);
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            data[4] = 0;
         }
 
         // if (OPTION) {
