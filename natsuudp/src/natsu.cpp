@@ -19,12 +19,10 @@ RRST-NHK-Project 2010 夏ロボ
 #include "include/UDP.hpp"
 
 
-#define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
+#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 // 各機構の速さの指定(%)
-int speed_lift_up = 60;
-int speed_lift_down = -60;
-
+int speed_lift;
 
 //射出機構の速
 int speed_shoot;
@@ -99,27 +97,16 @@ public:
 // リフト機構のシーケンスを格納するクラス
 class Lift_Action{
 public: 
-    static void lift_up_action(UDP &udp) {
-            std::cout << "リフト準備開始" << std::endl;
-            data[4] = speed_lift_up = 60;
-            std::this_thread::sleep_for(std::chrono::milliseconds(20000));
+    static void lift_action(UDP &udp) {
+            data[4] = speed_lift;
             udp.send(data);
-            std::cout << "リフト上昇中..." << std::endl;
-            data[4] = 0;
-            udp.send(data);
-            std::cout << "リフト上昇完了." << std::endl;
     }
 
-    static void lift_down_action(UDP &udp) {
-            std::cout << "リフト準備開始" << std::endl;
-            data[4] = speed_lift_down = -60;
-            std::this_thread::sleep_for(std::chrono::milliseconds(20000));
-            udp.send(data);
-            std::cout << "リフト下降中..." << std::endl;
+      static void init_lift_action(UDP &udp) {
             data[4] = 0;
             udp.send(data);
-            std::cout << "リフト下降完了." << std::endl;
     }
+
 };
 
 //フォークの機構のシーケンスを格納
@@ -145,7 +132,8 @@ public:
     }
 
     static void folk_action(UDP &udp) {
-            std::cout << "準備中" << std::endl;
+            std::cout << "準備中" << std::endl; data[4] = 0;
+            udp.send(data);
             data[1] = 50;
             data[2] = 50;
             data[7] = 90;
@@ -182,14 +170,12 @@ class Ball_Action{
 public:
     //ボール(餅)回収シーケンス
     static void init_ball_action(UDP &udp){
-            std::cout << "準備中" << std::endl;
             data[9] =0;
             udp.send(data);
             std::cout << "サーボ０" << std::endl;
     }
 
     static void ball_action(UDP &udp){
-            std::cout << "餅回収..." << std::endl;
             data[9] = 90;
             udp.send(data);
             std::cout << "サーボ９０" << std::endl;
@@ -199,16 +185,14 @@ public:
 
 class Shoot_Yaw_Action{
 public:
-    //ボール(餅)回収シーケンス
+    //射出の角度シーケンス
     static  void init_shoot_yaw_action(UDP &udp){
-            std::cout << "準備中" << std::endl;
             data[10] =0;
             udp.send(data);
             std::cout << "サーボ０" << std::endl;
     }
 
     static void shoot_yaw_action(UDP &udp){
-            std::cout << "餅回収..." << std::endl;
             data[10] = 90;
             udp.send(data);
             std::cout << "サーボ９０" << std::endl;
@@ -302,11 +286,16 @@ private:
         static bool last_circle = false; // 前回の状態を保持する static 変数
         static bool last_triangle= false;
         static bool last_square= false;
+        static bool last_up= false;
+        static bool last_down= false;
 
         // ラッチstatic 変数（初期状態は OFF とする）
         static bool circle_latch = false;
         static bool triangle_latch = false;
+        static bool up_latch = false;
+        static bool down_latch = false;
         static int square_mode = 0;
+ 
 
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
@@ -331,55 +320,87 @@ private:
         if (SQUARE && !last_square) {
             square_mode = (square_mode + 1  ) % 4;
         }
+        if (UP && !last_up) {
+            up_latch = !up_latch;
+        }
+        if (DOWN && !last_down) {
+            down_latch = !down_latch;
+        }
+     
+     
+        
 
         //ラッチのボタンとモードの指定
         last_circle = CIRCLE;
         last_triangle = TRIANGLE;
         last_square = SQUARE;
+        last_up = UP;
+        last_down = DOWN;
         SHOOTMODE = square_mode;
+
 
 
     
         //機構を初期状態にする
         if (CROSS) {
+                circle_latch = false;
+                triangle_latch = false;
+                square_mode = 0;
+                std::cout << "1" << std::endl;
                 Init::init(udp_);
+            
         }
 
         //シュート機構
         // ボタンを一回押すごとに速度変更
-            if (SHOOTMODE == 0){
-                Shoot_Action::init_shoot_action(udp_);
-                speed_shoot = 0;
-            }
+        if (SHOOTMODE == 0){
+            speed_shoot = 0;
+            Shoot_Action::init_shoot_action(udp_);
+        }
 
-        
-            if (SHOOTMODE == 1){
-                Shoot_Action::shoot_action(udp_);
-                speed_shoot = 50;
-                std::cout << "50" << std::endl;
-            }
+    
+        if (SHOOTMODE == 1){
+            speed_shoot = 50;
+            Shoot_Action::shoot_action(udp_);
+            std::cout << "50" << std::endl;
+        }
 
-            if (SHOOTMODE == 2){
-                Shoot_Action::shoot_action(udp_);
-                speed_shoot = 60;
-                std::cout << "60" << std::endl;
-            }
+        if (SHOOTMODE == 2){
+            speed_shoot = 60;
+            Shoot_Action::shoot_action(udp_);
+            std::cout << "60" << std::endl;
+        }
 
-            if (SHOOTMODE == 3) {
-                Shoot_Action::shoot_action(udp_);
-                speed_shoot = 70;
-                std::cout << "70" << std::endl;
-            }
-        
+        if (SHOOTMODE == 3) {
+            speed_shoot = 70;
+            Shoot_Action::shoot_action(udp_);
+
+            std::cout << "70" << std::endl;
+        }
+    
   
         //リフト機構
-        if (UP) {
-            Lift_Action::lift_up_action(udp_);
-        }
 
-        if (DOWN) {
-            Lift_Action::lift_down_action(udp_);
+        if (up_latch == 1) {
+            speed_lift= 60;
+           data[4] = speed_lift;
+         }
+        
+                
+        if (up_latch == 0) {
+            data[4] = 0;
+          
         }
+        if (down_latch == 1) {
+            speed_lift= -60;
+            data[4] = speed_lift;
+             
+        }
+        if (down_latch == 0) {
+           data[4] = 0;
+       
+        }
+     
 
         //ボール回収機構
         if(R1) {
@@ -463,11 +484,9 @@ public:
 private:
     void params_listener_callback(
         const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
-        speed_lift_up = msg->data[0];
-        speed_lift_down  = msg->data[1];
-        speed_shoot = msg->data[2];
-        std::cout << speed_lift_up;
-        std::cout << speed_lift_down;
+        speed_lift= msg->data[0];
+        speed_shoot = msg->data[1];
+        std::cout << speed_lift;
         std::cout << speed_shoot << std::endl;
     }
 
