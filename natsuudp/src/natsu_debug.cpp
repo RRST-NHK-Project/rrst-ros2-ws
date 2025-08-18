@@ -64,8 +64,8 @@ public:
     static bool folk_state; // フォークの状態保存
 
     static void folk_init(UDP &udp) {
-        data[7] = 0; // サーボ
-        data[8] = 0; // サーボ
+        data[7] = 90; // サーボ
+        data[8] = 90; // サーボ
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         data[1] = 0; // ポンプ
@@ -75,7 +75,7 @@ public:
     }
 
     static void folk_tenkai(UDP &udp) {
-        data[7] = 90; // サーボ
+        data[7] = 0;  // サーボ
         data[1] = 50; // ポンプ
         udp.send(data);
         std::cout << "フォーク展開" << std::endl;
