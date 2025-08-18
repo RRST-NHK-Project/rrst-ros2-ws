@@ -65,7 +65,7 @@ public:
 
     static void folk_init(UDP &udp) {
         data[7] = 90; // サーボ
-        data[8] = 90; // サーボ
+        data[8] = 0;  // サーボ
         udp.send(data);
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         data[1] = 0; // ポンプ
@@ -84,9 +84,18 @@ public:
     }
 
     static void munagi_pickup_action(UDP &udp) {
+        data[1] = 50; // ポンプ
+        udp.send(data);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
         data[8] = 90; // サーボ
         udp.send(data);
         std::cout << "ムナギ回収" << std::endl;
+    }
+
+    static void hashira_pickup_action(UDP &udp) {
+        data[8] = 90; // サーボ
+        udp.send(data);
+        std::cout << "柱回収" << std::endl;
     }
 };
 
@@ -189,9 +198,13 @@ private:
         SHOOTMODE = square_mode;
 
         if (CIRCLE && circle_latch) {
-            Action::folk_tenkai(udp_);
-        } else if (CIRCLE && !circle_latch) {
             Action::munagi_pickup_action(udp_);
+        }
+
+        if (TRIANGLE && triangle_latch) {
+            Action::folk_tenkai(udp_);
+        } else if (TRIANGLE && !triangle_latch) {
+            Action::hashira_pickup_action(udp_);
         }
 
         if (CROSS) {
