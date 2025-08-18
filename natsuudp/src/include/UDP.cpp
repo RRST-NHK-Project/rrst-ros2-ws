@@ -6,6 +6,12 @@ charからint16_tに変更することで通信量を削減
 
 #include "UDP.hpp"
 
+// 標準
+#include <chrono>
+#include <cstdlib>
+#include <iostream>
+#include <thread>
+
 #include <stdexcept>
 #include <unistd.h>
 
@@ -52,4 +58,13 @@ void UDP::send(const std::vector<int16_t> &data) {
     if (sent_bytes < 0) {
         std::cerr << "Failed to send data: " << strerror(errno) << std::endl;
     }
+
+    // デバッグ用（for文でcoutするとカクつく）
+    // std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", ";
+    // std::cout << data[4] << ", " << data[5] << ", " << data[6] << ", " << data[7] << ", ";
+    // std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
+    // std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
+    // std::cout << data[16] << ", " << data[17] << ", " << data[18] << std::endl;
+    // std::cout << data[11] << std::endl;
+    // std::this_thread::sleep_for(std::chrono::milliseconds(10));
 }

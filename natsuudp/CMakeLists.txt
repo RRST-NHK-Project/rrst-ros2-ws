@@ -49,12 +49,16 @@ ament_target_dependencies(nr25_natsu_sd rclcpp std_msgs sensor_msgs geometry_msg
 
 add_executable(nr25_natsu src/natsu.cpp src/include/UDP.cpp src/include/IP.cpp)
 ament_target_dependencies(nr25_natsu rclcpp std_msgs sensor_msgs geometry_msgs)
+
+add_executable(natsu_debug src/natsu_debug.cpp src/include/UDP.cpp src/include/IP.cpp)
+ament_target_dependencies(natsu_debug rclcpp std_msgs sensor_msgs geometry_msgs)
  
 
 # インストール設定
 install(TARGETS
   nr25_natsu_sd
   nr25_natsu
+  natsu_debug
   DESTINATION lib/${PROJECT_NAME})
 
 # figletがインストールされていない場合、警告を表示
