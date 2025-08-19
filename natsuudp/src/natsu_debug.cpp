@@ -28,6 +28,8 @@ int speed_shoot;
 
 int z_speed = 75; // Z軸の速度
 
+bool init_all_state = false; // 機構全体の初期化状態保存
+
 // ラッチ用の文字設定
 int SHOOTMODE = 0;
 
@@ -63,7 +65,14 @@ debug: マイコンのprintfを有効化, MD: モータードライバー, TR: �
 // 各機構のシーケンスを格納するクラス
 class Action {
 public:
-    static bool folk_state; // フォークの状態保存
+    // static bool folk_state; // フォークの状態保存
+    static bool folk_init_state; // フォークが初期化されているか保存
+
+    static void all_init(UDP &udp) {
+        data[7] = 90;
+        udp.send(data);
+        std::cout << "機構初期化" << std::endl;
+    }
 
     static void folk_init(UDP &udp) {
         data[1] = 0; // ポンプ
@@ -73,17 +82,17 @@ public:
         data[8] = 0;  // サーボ
         udp.send(data);
         std::cout << "フォーク初期化" << std::endl;
-        folk_state = false;
+        folk_init_state = true;
     }
 
-    static void folk_tenkai(UDP &udp) {
-        data[7] = 0;  // サーボ
-        data[1] = 50; // ポンプ
-        udp.send(data);
-        std::cout << "フォーク展開" << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        folk_state = true;
-    }
+    // static void folk_tenkai(UDP &udp) {
+    //     data[7] = 0;  // サーボ
+    //     data[1] = 50; // ポンプ
+    //     udp.send(data);
+    //     std::cout << "フォーク展開" << std::endl;
+    //     std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    //     folk_state = true;
+    // }
 
     static void munagi_pickup_action(UDP &udp) {
         data[1] = 50; // ポンプ
@@ -92,6 +101,7 @@ public:
         data[8] = 90; // サーボ
         udp.send(data);
         std::cout << "ムナギ回収" << std::endl;
+        folk_init_state = false;
     }
 
     static void hashira_pickup_action(UDP &udp) {
@@ -99,10 +109,12 @@ public:
         data[1] = 50;
         udp.send(data);
         std::cout << "柱回収" << std::endl;
+        folk_init_state = false;
     }
 };
 
-bool Action::folk_state = false; // フォークの状態初期化
+// bool Action::folk_state = false; // フォークの状態初期化
+bool Action::folk_init_state = false; // フォークが初期化されているか保存
 
 class PS4_Listener : public rclcpp::Node {
 public:
@@ -164,6 +176,11 @@ private:
 
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
+        if (!init_all_state) {
+            Action::all_init(udp_);
+            init_all_state = true;
+        }
+
         if (PS) {
             std::fill(data.begin(), data.end(), 0);          // 配列をゼロで埋める
             for (int attempt = 0; attempt < 10; attempt++) { // 10回試行
@@ -200,11 +217,11 @@ private:
         last_down = DOWN;
         SHOOTMODE = square_mode;
 
-        if (CIRCLE && circle_latch) {
+        if (CIRCLE && init_all_state) {
             Action::munagi_pickup_action(udp_);
         }
 
-        if (TRIANGLE && triangle_latch) {
+        if (TRIANGLE && init_all_state) {
             Action::hashira_pickup_action(udp_);
         }
 
