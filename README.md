@@ -29,7 +29,7 @@ RRST, NHKプロジェクトのROS 2 ワークスペースです。現在使用�
 ## 3. 🛠️ Getting Started
 
 ### 3.1 📝 ワークスペースの作成
-
+作成済みの場合は3.2へ
 ```bash
 mkdir -p ~/ros2_ws/src
 ```
@@ -55,6 +55,7 @@ git submodule update --init --recursive
 ```
 
 ソフト班向け
+```bash
 cd ~/ros2_ws/src
 ```
 ```bash
