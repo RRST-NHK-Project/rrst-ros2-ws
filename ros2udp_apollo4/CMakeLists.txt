@@ -40,17 +40,10 @@ find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
-FetchContent_MakeAvailable(nlohmann_json)
 
-find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(std_msgs REQUIRED)
-find_package(sensor_msgs REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(tf2 REQUIRED)
-find_package(tf2_ros REQUIRED)
-find_package(tf2_geometry_msgs REQUIRED)
-find_package(visualization_msgs REQUIRED)
+# ターゲットの定義と依存関係の追加
+add_executable(ap4_main src/apollo4_main.cpp src/include/UDP.cpp src/include/IP.cpp)
+ament_target_dependencies(ap4_main rclcpp std_msgs sensor_msgs geometry_msgs)
 
 # インストール設定
 install(TARGETS
@@ -70,7 +63,5 @@ if(NOT figlet_installed EQUAL 0)
   message(WARNING "Please install 'figlet' with the following command. \nsudo apt install figlet")
 endif()
 
-install(DIRECTORY launch/
-  DESTINATION share/${PROJECT_NAME}/launch)
 
 ament_package()
