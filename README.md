@@ -50,7 +50,7 @@ develop（最新版）
 cd ~/ros2_ws/src
 ```
 ```bash
-git clone https://github.com/RRST-NHK-Project/rrst-ros2-ws.git -b develop.
+git clone https://github.com/RRST-NHK-Project/rrst-ros2-ws.git -b develop .
 git submodule update --init --recursive
 ```
 
@@ -59,7 +59,7 @@ git submodule update --init --recursive
 cd ~/ros2_ws/src
 ```
 ```bash
-git clone git@github.com:RRST-NHK-Project/rrst-ros2-ws.git -b develop.
+git clone git@github.com:RRST-NHK-Project/rrst-ros2-ws.git -b develop .
 git submodule update --init --recursive
 ```
 
