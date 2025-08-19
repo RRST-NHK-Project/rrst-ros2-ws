@@ -18,7 +18,7 @@ RRST-NHK-Project 2010 夏ロボ
 #include "include/IP.hpp"
 #include "include/UDP.hpp"
 
-#define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
+#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 // 各機構の速さの指定(%)
 int speed_lift;
@@ -275,7 +275,7 @@ private:
             shoot_mode++;
         }
 
-        std::cout << SHOOTMODE << std::endl;
+        // std::cout << SHOOTMODE << std::endl;
 
         if (SHOOTMODE == 0) {
             speed_shoot = 0;
