@@ -232,14 +232,14 @@ private:
         if (UP) {
             data[4] = -z_speed;
             udp_.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
             data[4] = 0;
         }
 
         if (DOWN) {
             data[4] = z_speed;
             udp_.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
             data[4] = 0;
         }
 
