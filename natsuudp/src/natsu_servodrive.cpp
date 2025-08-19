@@ -58,9 +58,9 @@ int yawspeed_auto = 20;
 
 // サーボの組み付け時のズレを補正（度数法）
 int SERVO1_CAL = 10;
-int SERVO2_CAL = 8;
-int SERVO3_CAL = 23;
-int SERVO4_CAL = 20;
+int SERVO2_CAL = 12;
+int SERVO3_CAL = 10;
+int SERVO4_CAL = 10;
 
 // 最近傍点距離の格納
 float min_distance = 0;
@@ -138,22 +138,22 @@ private:
         float LS_X = -1 * msg->axes[0];
         float LS_Y = msg->axes[1];
         float RS_X = -1 * msg->axes[3];
-        //float RS_Y = msg->axes[4];
+        // float RS_Y = msg->axes[4];
 
         // bool CROSS = msg->buttons[0];
         // bool CIRCLE = msg->buttons[1];
         // bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
 
-        //bool LEFT = msg->axes[6] == 1.0;
-        //bool RIGHT = msg->axes[6] == -1.0;
-        //bool UP = msg->axes[7] == 1.0;
-        //bool DOWN = msg->axes[7] == -1.0;
+        // bool LEFT = msg->axes[6] == 1.0;
+        // bool RIGHT = msg->axes[6] == -1.0;
+        // bool UP = msg->axes[7] == 1.0;
+        // bool DOWN = msg->axes[7] == -1.0;
 
         // bool L1 = msg->buttons[4];
         // bool R1 = msg->buttons[5];
 
-        //float L2 = (-1 * msg->axes[2] + 1) / 2;
+        // float L2 = (-1 * msg->axes[2] + 1) / 2;
         float R2 = (-1 * msg->axes[5] + 1) / 2;
 
         bool SHARE = msg->buttons[8];
@@ -479,9 +479,9 @@ private:
             }
         }
 
-    //    if (SHARE) {
-            // Automation::auto_turn(udp_);
-    //    }
+        //    if (SHARE) {
+        // Automation::auto_turn(udp_);
+        //    }
         // std::cout << REVERSEMODE << std::endl;
 
         // デバッグ用（for文でcoutするとカクつく）
@@ -531,7 +531,7 @@ class Params_Listener : public rclcpp::Node {
 public:
     Params_Listener() : Node("nr25_natsu_servo_cal_listener") {
         subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
-            "natsu_servo_cal", 10,
+            "mr_servo_cal", 10,
             std::bind(&Params_Listener::params_listener_callback, this,
                       std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(), "NATSUROBO Servo Calibrator Listener");
@@ -548,8 +548,6 @@ private:
 
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
 };
-
-
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
