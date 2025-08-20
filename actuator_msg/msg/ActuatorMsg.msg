@@ -7,12 +7,12 @@ bool enable                # 有効・無効
 # --- モタドラ用 ---
 int32 motor_duty           # [%]
 int32 motor_target_rpm     # [RPM]
-int32 motor_target_pos     # [encoder countなど]
-int32 motor_target_torque  # [Nmなど]
+int32 motor_target_pos     # 
+int32 motor_target_torque  # 
 
 # --- サーボ用 ---
 int32 servo_angle_degree   # [deg]
-int32 servo_speed          # [deg/s]
+int32 servo_speed          # 
 
 # --- ソレノイドバルブ用 ---
 bool solenoid_state        # [True/False]
