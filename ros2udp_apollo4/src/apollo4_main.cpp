@@ -29,8 +29,7 @@ RRST-NHK-Project 2025
 #define DEADZONE_R2 0.5
 
 //R1,R2,TRIANGLEの切り替えに必要
-int R1_count = 0;           // R1が押された回数
-int R2_count = 0;           // R2が押された回数
+int R_count = 0;           // R1、R2が押された回数
 int TRIANGLE_count = 0;     // TRIANGLEが押された回数
 bool prev_R1 = false;       // 前回のR1の状態
 bool prev_R2 = false;       // 前回のR1の状態
@@ -135,7 +134,7 @@ private:
         if(L2 <= DEADZONE_L2){
             L2 = 0; 
         }
-        if(R1 <= DEADZONE_R2){
+        if(R2 <= DEADZONE_R2){
             R2 = 0; 
         }
         // 前回の状態を保持する static 変数
@@ -151,17 +150,7 @@ private:
         }
         last_PS = PS;
         CHANGEMODE = PS_latch;
-        if (PS) {
-            std::fill(data.begin(), data.end(), 0);          // 配列をゼロで埋める
-            for (int attempt = 0; attempt < 10; attempt++) { // 10回試行
-                udp_.send(data);                             // データ送信
-                std::cout << "緊急停止！ 試行" << attempt + 1
-                          << std::endl; // 試行回数を表示
-                std::this_thread::sleep_for(
-                    std::chrono::milliseconds(100)); // 100msの遅延
-            }
-            rclcpp::shutdown();
-        }
+        
         // RθZの操作!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         // R軸の操作
         if (UP) {       // 正転
@@ -190,102 +179,64 @@ private:
 
         // 展開指変更!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         //R2順方向
-        if(R2>0){   //ゼロイチ判断
+        if(R2 > 0){   //ゼロイチ判断
             R2 = 1;
+        }else{
+            R2 = 0;
         }
         // 0 → 1 に変化したときだけカウントしR2_countが加算されていく
         if (R2 && !prev_R2) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
-            R2_count++;
-        }
-        if(R2_count %6 == 0) {  // 垂直の状態
-            data[9] = 90 + SERVO1_CAL;
-            data[10] = 90 + SERVO2_CAL;
-            data[11] = 90 + SERVO3_CAL;
-            data[12] = 90 + SERVO4_CAL;
-            data[13] = 90 + SERVO5_CAL;
-        }
-        if(R2_count %6 == 1) {  // 取る状態1
-            data[9] = 45 + SERVO1_CAL;
-            data[10] = 100 + SERVO2_CAL;
-            data[11] = 100 + SERVO3_CAL;
-            data[12] = 100 + SERVO4_CAL;
-            data[13] = 100 + SERVO5_CAL;
-        }
-        if(R2_count %6 == 2) {  // 取る状態2
-            data[9] = 100 + SERVO1_CAL;
-            data[10] = 45 + SERVO2_CAL;
-            data[11] = 100 + SERVO3_CAL;
-            data[12] = 100 + SERVO4_CAL;
-            data[13] = 100 + SERVO5_CAL;
-        }
-        if(R2_count %6 == 3) {  // 取る状態3
-            data[9] = 100 + SERVO1_CAL;
-            data[10] = 100 + SERVO2_CAL;
-            data[11] = 45 + SERVO3_CAL;
-            data[12] = 100 + SERVO4_CAL;
-            data[13] = 100 + SERVO5_CAL;
-        }
-        if(R2_count %6 == 4){   // 取る状態4
-            data[9] = 100 + SERVO1_CAL;
-            data[10] = 100 + SERVO2_CAL;
-            data[11] = 100 + SERVO3_CAL;
-            data[12] = 45 + SERVO4_CAL;
-            data[13] = 100 + SERVO5_CAL;
-        }
-        if(R2_count %6 == 5){   // 取る状態5
-            data[9] = 100 + SERVO1_CAL;
-            data[10] = 100 + SERVO2_CAL;
-            data[11] = 100 + SERVO3_CAL;
-            data[12] = 100 + SERVO4_CAL;
-            data[13] = 45 + SERVO5_CAL;
+            R_count++;
         }
         //R1逆方向
         // 0 → 1 に変化したときだけカウントしR1_countが加算されていく
-        if (R1 && !prev_R1) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
-            R1_count = R1_count + 5;
+        else if (R1 && !prev_R1) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
+            R_count = R_count + 5;
         }
-        if(R1_count %6 == 0) {  // 垂直の状態
+
+        if(R_count %6 == 0) {  // 垂直の状態
             data[9] = 90 + SERVO1_CAL;
             data[10] = 90 + SERVO2_CAL;
             data[11] = 90 + SERVO3_CAL;
             data[12] = 90 + SERVO4_CAL;
             data[13] = 90 + SERVO5_CAL;
         }
-        if(R1_count %6 == 1) {  // 取る状態1
+        else if(R_count %6 == 1) {  // 取る状態1
             data[9] = 45 + SERVO1_CAL;
             data[10] = 100 + SERVO2_CAL;
             data[11] = 100 + SERVO3_CAL;
             data[12] = 100 + SERVO4_CAL;
             data[13] = 100 + SERVO5_CAL;
         }
-        if(R1_count %6 == 2) {  // 取る状態2
+        else if(R_count %6 == 2) {  // 取る状態2
             data[9] = 100 + SERVO1_CAL;
             data[10] = 45 + SERVO2_CAL;
             data[11] = 100 + SERVO3_CAL;
             data[12] = 100 + SERVO4_CAL;
             data[13] = 100 + SERVO5_CAL;
         }
-        if(R1_count %6 == 3) {  // 取る状態3
+        else if(R_count %6 == 3) {  // 取る状態3
             data[9] = 100 + SERVO1_CAL;
             data[10] = 100 + SERVO2_CAL;
             data[11] = 45 + SERVO3_CAL;
             data[12] = 100 + SERVO4_CAL;
             data[13] = 100 + SERVO5_CAL;
         }
-        if(R1_count %6 == 4){   // 取る状態4
+        else if(R_count %6 == 4){   // 取る状態4
             data[9] = 100 + SERVO1_CAL;
             data[10] = 100 + SERVO2_CAL;
             data[11] = 100 + SERVO3_CAL;
             data[12] = 45 + SERVO4_CAL;
             data[13] = 100 + SERVO5_CAL;
         }
-        if(R1_count %6 == 5){   // 取る状態5
+        else if(R_count %6 == 5){   // 取る状態5
             data[9] = 100 + SERVO1_CAL;
             data[10] = 100 + SERVO2_CAL;
             data[11] = 100 + SERVO3_CAL;
             data[12] = 100 + SERVO4_CAL;
             data[13] = 45 + SERVO5_CAL;
         }
+        
 
         // サーボの手先角度操作!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         // ボタン入力に応じて角度を変化
@@ -352,6 +303,7 @@ private:
 
 
         // デバッグ用（for文でcoutするとカクつく）
+        //std::cout << R2_count << std::endl;
         //std::cout << data[4] << ", " << data[5] << std::endl; //吸着できているか確認する用
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
