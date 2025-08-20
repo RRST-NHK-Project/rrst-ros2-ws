@@ -31,6 +31,8 @@ ament_target_dependencies(actuator_msg_publisher rclcpp actuator_msg)
 add_executable(actuator_msg_subscriber src/ActuatorMsgSubscriber.cpp)
 ament_target_dependencies(actuator_msg_subscriber rclcpp actuator_msg)
 
+add_executable(actuator_msg_handler src/ActuatorMsgHandler.cpp)
+ament_target_dependencies(actuator_msg_handler rclcpp actuator_msg)
 
 # インストール設定
 install(TARGETS
