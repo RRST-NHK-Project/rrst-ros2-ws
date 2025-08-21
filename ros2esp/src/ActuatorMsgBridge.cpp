@@ -45,20 +45,29 @@ public:
     }
 
 private:
-    void callback(const actuator_msg::msg::ActuatorMsg::SharedPtr msg) {
-        // RCLCPP_INFO(this->get_logger(), "Recv ID=%d Type=%s",
-        //             msg->actuator_id, msg->actuator_type_name.c_str());
+    int get_index(int type, int id) {
+        if (type == 1 && id >= 0 && id < MD) {
+            return 1 + id; // モータ
+        } else if (type == 2 && id >= 0 && id < SERVO) {
+            return 1 + MD + id; // サーボ
+        } else if (type == 3 && id >= 0 && id < SV) {
+            return 1 + MD + SERVO + id; // ソレノイド
+        }
+        return -1; // 無効
+    }
 
-        // if (msg->actuator_type == 1) { // モータードライバ
-        //     RCLCPP_INFO(this->get_logger(), "Motor Duty=%d, RPM=%d",
-        //                 msg->motor_duty, msg->motor_target_rpm);
-        // } else if (msg->actuator_type == 2) { // サーボ
-        //     RCLCPP_INFO(this->get_logger(), "Servo Angle=%d deg",
-        //                 msg->servo_angle_degree);
-        // } else if (msg->actuator_type == 3) { // ソレノイド
-        //     RCLCPP_INFO(this->get_logger(), "Solenoid State=%s",
-        //                 msg->solenoid_state ? "ON" : "OFF");
-        // }
+    void callback(const actuator_msg::msg::ActuatorMsg::SharedPtr msg) {
+        int idx = get_index(msg->actuator_type, msg->actuator_id);
+        if (idx == -1)
+            return;
+
+        if (msg->actuator_type == 1) {
+            data[idx] = static_cast<int16_t>(msg->motor_duty);
+        } else if (msg->actuator_type == 2) {
+            data[idx] = static_cast<int16_t>(msg->servo_angle_degree);
+        } else if (msg->actuator_type == 3) {
+            data[idx] = static_cast<int16_t>(msg->solenoid_state ? 1 : 0);
+        }
     }
 
     rclcpp::Subscription<actuator_msg::msg::ActuatorMsg>::SharedPtr sub_;
