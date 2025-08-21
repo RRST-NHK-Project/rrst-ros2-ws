@@ -34,6 +34,8 @@ bool solenoid_state        # [True/False]
 
 #define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
+std::vector<int16_t> data(1 + MD + SERVO + SV, 0); // マイコンに送信される配列"data"
+
 class ActuatorSub : public rclcpp::Node {
 public:
     ActuatorSub() : Node("actuator_subscriber") {
