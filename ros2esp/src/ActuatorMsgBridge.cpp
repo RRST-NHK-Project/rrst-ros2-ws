@@ -1,9 +1,10 @@
 /*
 2025, RRST-NHK-Project
+各ノードとマイコンの橋渡しを行う。
 */
 
 #include "actuator_msg/msg/actuator_msg.hpp" //自作メッセージ
-/*
+/*メッセージの定義
 # 共通
 int32 actuator_id          # アクチュエータの種別ごと（例：MD1とSERVO1は共存可能）
 int32 actuator_type        # アクチュエータ種別 (0:デバッグ, 1:モタドラ, 2:サーボ, 3:ソレノイド)

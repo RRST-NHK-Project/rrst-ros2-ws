@@ -31,8 +31,8 @@ ament_target_dependencies(actuator_msg_publisher rclcpp actuator_msg)
 add_executable(actuator_msg_subscriber src/ActuatorMsgSubscriber.cpp)
 ament_target_dependencies(actuator_msg_subscriber rclcpp actuator_msg)
 
-add_executable(actuator_msg_handler src/ActuatorMsgHandler.cpp)
-ament_target_dependencies(actuator_msg_handler rclcpp actuator_msg)
+add_executable(actuator_msg_bridge src/ActuatorMsgBridge.cpp)
+ament_target_dependencies(actuator_msg_bridge rclcpp actuator_msg)
 
 # インストール設定
 install(TARGETS
@@ -41,6 +41,7 @@ install(TARGETS
   nr25_mr_sd
   actuator_msg_publisher
   actuator_msg_subscriber
+  actuator_msg_bridge
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
