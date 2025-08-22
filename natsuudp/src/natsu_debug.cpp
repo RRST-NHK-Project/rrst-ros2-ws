@@ -23,6 +23,8 @@ RRST-NHK-Project 2010 夏ロボ
 // 各機構の速さの指定(%)
 int speed_lift;
 
+int omoti_deg;
+
 // 射出機構の速
 int speed_shoot = 0;
 
@@ -48,10 +50,10 @@ debug: マイコンのprintfを有効化, MD: モータードライバー, TR: �
 | data[4] | MD4 | -100 ~ 100 |
 | data[5] | MD5 | -100 ~ 100 |
 | data[6] | MD6 | -100 ~ 100 |
-| data[7] | Servo1 | 0 ~ 80 |
-| data[8] | Servo2 | 0 ~ 80 |
-| data[9] | Servo3 | 0 ~ 80 |
-| data[10] | Servo4 | 0 ~ 80 |
+| data[7] | Servo1 | 0 ~ 180 |
+| data[8] | Servo2 | 0 ~ 180 |
+| data[9] | Servo3 | 0 ~ 180 |
+| data[10] | Servo4 | 0 ~ 180 |
 | data[11] | TR1 | 0 or 1|  //VGOAL
 | data[12] | TR2 | 0 or 1|
 | data[13] | TR3 | 0 or 1|  //ポンプ１
@@ -149,7 +151,7 @@ private:
         bool DOWN = msg->axes[7] == -1.0;
 
         bool L1 = msg->buttons[4];
-        // bool R1 = msg->buttons[5];
+        bool R1 = msg->buttons[5];
 
         float L2 = (-1 * msg->axes[2] + 1) / 2;
         // float R2 = (-1 * msg->axes[5] + 1) / 2;
@@ -239,14 +241,18 @@ private:
 
         if (!square_latch) {
             data[9] = 0;
-            shoot_enable = false; // シュート機構を無効化
+            shoot_enable = true; // シュート機構を有効化
         } else if (square_latch) {
             data[9] = 90;
-            shoot_enable = true; // シュート機構を有効化
+            shoot_enable = false; // シュート機構を無効化
         }
 
         if (L2 > 0.5 && shoot_enable) {
-            data[9] = 180;
+            data[9] = 35;
+        }
+
+        if (R1 && L1 && L2 > 0.5) {
+            data[11] = 1;
         }
 
         // if (UP) {
@@ -280,11 +286,11 @@ private:
         if (SHOOTMODE == 0) {
             speed_shoot = 0;
         } else if (SHOOTMODE == 1) {
-            speed_shoot = 50;
+            speed_shoot = 30;
         } else if (SHOOTMODE == 2) {
-            speed_shoot = 60;
+            speed_shoot = 43;
         } else if (SHOOTMODE == 3) {
-            speed_shoot = 70;
+            speed_shoot = 53;
         }
         data[3] = speed_shoot; // 射出機構の速度設定
 
@@ -292,12 +298,12 @@ private:
         //     Ball_Action::tester(udp_);
         // }
         // デバッグ用（for文でcoutするとカクつく）
-        //  std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", ";
-        //  std::cout << data[4] << ", " << data[5] << ", " << data[6] << ", " << data[7] << ", ";
-        //  std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
-        //  std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
-        //  std::cout << data[16] << ", " << data[17] << ", " << data[18] << std::endl;
-        //  std::cout << data[11] << std::endl;
+        // std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", ";
+        // std::cout << data[4] << ", " << data[5] << ", " << data[6] << ", " << data[7] << ", ";
+        // std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
+        // std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
+        // std::cout << data[16] << ", " << data[17] << ", " << data[18] << std::endl;
+        // std::cout << data[11] << std::endl;
         // std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
         udp_.send(data);
