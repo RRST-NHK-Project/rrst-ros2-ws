@@ -26,12 +26,14 @@ PS4コントローラーの入力を取得するサンプルプログラム
 #define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 // L2,R2のデッドゾーン(0~1のうち0.3以上押されないと実行されないために？)
-#define DEADZONE_L2 0.3
-#define DEADZONE_R2 0.3
+//#define DEADZONE_L2 0.3
+//#define DEADZONE_R2 0.3
 
 //CIRCLE,TRIANGLEが押された回数で変える
 int CIRCLE_count = 0; // CIRCLEで掴む外すをやりたい
 int SQUARE_count = 0; // SQUAREでハンドの上げ下げをしたい
+static bool last_circle = false; // 前回のCIRCLEの状態
+static bool last_square = false; // 前回のSQUAREの状態
 
 // 速度
 int wheelspeed = 10;
@@ -89,8 +91,6 @@ private:
         //float L2 = (-1 * msg->axes[2] + 1) / 2;
         //float R2 = (-1 * msg->axes[5] + 1) / 2;
         //float LS_X = -1 * msg->axes[0];
-
-        udp_.send(data);   // データ送信
         
         //bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
@@ -110,19 +110,19 @@ private:
         
         //θ軸の操作
         if (LEFT) {     // 正転
-            data[2] = wheelspeed;
-        }else if (RIGHT) {    // 逆転
-            data[2] = -wheelspeed;
-        }else{
-            data[2] = 0;
-        }
-        // R軸の操作
-        if (UP) {       // 正転
             data[1] = wheelspeed;
-        }else if (DOWN) {     // 逆転
+        }else if (RIGHT) {    // 逆転
             data[1] = -wheelspeed;
         }else{
             data[1] = 0;
+        }
+        // R軸の操作
+        if (UP) {       // 正転
+            data[2] = wheelspeed;
+        }else if (DOWN) {     // 逆転
+            data[2] = -wheelspeed;
+        }else{
+            data[2] = 0;
         }
 
         //if (CROSS) {
@@ -130,18 +130,26 @@ private:
         //}
 
         //ハンド掴むエアシリンダー
-        if (CIRCLE_count % 2 == 0) {
+        // 0 → 1 に変化したときだけカウントしCIRCLE_countが加算されていく
+        if (CIRCLE && !last_circle) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
+            CIRCLE_count++;
+        }
+        if (CIRCLE_count == 0) {
             data[15] = 0;
         }
-        else if(CIRCLE_count % 2 == 1){
+        else if(CIRCLE_count == 1){
             data[15] = 1;
         }
 
         //ハンド上げ下げのエアシリンダー
-        if (SQUARE_count %2 == 0) {
+        // 0 → 1 に変化したときだけカウントしSQUARE_countが加算されていく
+        if (SQUARE && !last_square) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
+            SQUARE_count++;
+        }
+        if (SQUARE_count == 0) {
             data[16] = 0;
         }
-        else if(SQUARE_count % 2 == 1){
+        else if(SQUARE_count == 1){
             data[16] = 1;
         }
         //if (L1) {
@@ -159,6 +167,9 @@ private:
         //if (PS) {
             //std::cout << "PS" << std::endl;
         //}
+
+        udp_.send(data);   // データ送信
+
     }
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
