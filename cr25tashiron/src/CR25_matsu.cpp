@@ -7,8 +7,8 @@ microROSで受信したデータをもとにピン操作
 
 TODO:時間経過でスタックするバグの修正
 */
-//#include <Arduino.h>
-//#include <esp32-hal-ledc.h>
+#include <Arduino.h>
+#include <esp32-hal-ledc.h>
 #include <CAN.h>
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!//
 // **複数のESPを使用する場合はIDを変更** //
