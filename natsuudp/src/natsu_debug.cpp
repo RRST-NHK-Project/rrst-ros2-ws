@@ -23,15 +23,18 @@ RRST-NHK-Project 2010 夏ロボ
 // 各機構の速さの指定(%)
 int speed_lift;
 
+int omoti_deg;
+
 // 射出機構の速
-int speed_shoot;
+int speed_shoot = 0;
 
 int z_speed = 75; // Z軸の速度
 
 bool init_all_state = false; // 機構全体の初期化状態保存
 
-// ラッチ用の文字設定
 int SHOOTMODE = 0;
+
+bool shoot_enable = false;
 
 std::vector<int16_t> data(19, 0); // マイコンに送信される配列"data"
 
@@ -47,10 +50,10 @@ debug: マイコンのprintfを有効化, MD: モータードライバー, TR: �
 | data[4] | MD4 | -100 ~ 100 |
 | data[5] | MD5 | -100 ~ 100 |
 | data[6] | MD6 | -100 ~ 100 |
-| data[7] | Servo1 | 0 ~ 80 |
-| data[8] | Servo2 | 0 ~ 80 |
-| data[9] | Servo3 | 0 ~ 80 |
-| data[10] | Servo4 | 0 ~ 80 |
+| data[7] | Servo1 | 0 ~ 180 |
+| data[8] | Servo2 | 0 ~ 180 |
+| data[9] | Servo3 | 0 ~ 180 |
+| data[10] | Servo4 | 0 ~ 180 |
 | data[11] | TR1 | 0 or 1|  //VGOAL
 | data[12] | TR2 | 0 or 1|
 | data[13] | TR3 | 0 or 1|  //ポンプ１
@@ -130,7 +133,6 @@ public:
     }
 
 private:
-    // コントローラーの入力を取得、使わない入力はコメントアウト推奨
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
         // コントローラーの入力を取得、使わない入力はコメントアウト推奨
         //  float LS_X = -1 * msg->axes[0];
@@ -143,19 +145,19 @@ private:
         bool TRIANGLE = msg->buttons[2];
         bool SQUARE = msg->buttons[3];
 
-        bool LEFT = msg->axes[6] == 1.0;
-        bool RIGHT = msg->axes[6] == -1.0;
+        // bool LEFT = msg->axes[6] == 1.0;
+        // bool RIGHT = msg->axes[6] == -1.0;
         bool UP = msg->axes[7] == 1.0;
         bool DOWN = msg->axes[7] == -1.0;
 
         bool L1 = msg->buttons[4];
         bool R1 = msg->buttons[5];
 
-        // float L2 = (-1 * msg->axes[2] + 1) / 2;
+        float L2 = (-1 * msg->axes[2] + 1) / 2;
         // float R2 = (-1 * msg->axes[5] + 1) / 2;
 
-        bool SHARE = msg->buttons[8];
-        // bool OPTION = msg->buttons[9];
+        // bool SHARE = msg->buttons[8];
+        //  bool OPTION = msg->buttons[9];
         bool PS = msg->buttons[10];
 
         // bool L3 = msg->buttons[11];
@@ -170,9 +172,11 @@ private:
         // ラッチstatic 変数（初期状態は OFF とする）
         static bool circle_latch = false;
         static bool triangle_latch = false;
+        static bool square_latch = false;
         static bool up_latch = false;
         static bool down_latch = false;
-        static int square_mode = 0;
+        static int l1_mode = 0;
+        static bool last_l1 = false; // L1ボタンの前回状態
 
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
@@ -200,7 +204,10 @@ private:
             triangle_latch = !triangle_latch;
         }
         if (SQUARE && !last_square) {
-            square_mode = (square_mode + 1) % 4;
+            square_latch = !square_latch;
+        }
+        if (L1 && !last_l1) {
+            l1_mode = (l1_mode + 1) % 4;
         }
         if (UP && !last_up) {
             up_latch = !up_latch;
@@ -215,7 +222,10 @@ private:
         last_square = SQUARE;
         last_up = UP;
         last_down = DOWN;
-        SHOOTMODE = square_mode;
+        last_l1 = L1;
+        SHOOTMODE = l1_mode;
+
+        int shoot_mode = 0;
 
         if (CIRCLE && init_all_state) {
             Action::munagi_pickup_action(udp_);
@@ -229,30 +239,71 @@ private:
             Action::folk_init(udp_);
         }
 
-        if (UP) {
-            data[4] = -z_speed;
-            udp_.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            data[4] = 0;
+        if (!square_latch) {
+            data[9] = 0;
+            shoot_enable = true; // シュート機構を有効化
+        } else if (square_latch) {
+            data[9] = 90;
+            shoot_enable = false; // シュート機構を無効化
         }
 
-        if (DOWN) {
-            data[4] = z_speed;
-            udp_.send(data);
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            data[4] = 0;
+        if (L2 > 0.5 && shoot_enable) {
+            data[9] = 35;
         }
+
+        if (R1 && L1 && L2 > 0.5) {
+            data[11] = 1;
+        }
+
+        // if (UP) {
+        //     data[4] = -z_speed;
+        //     udp_.send(data);
+        //     std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        //     data[4] = 0;
+        // }
+
+        // if (DOWN) {
+        //     data[4] = z_speed;
+        //     udp_.send(data);
+        //     std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        //     data[4] = 0;
+        // }
+
+        if (UP) {
+            data[4] = -z_speed; // 押している間だけ上方向
+        } else if (DOWN) {
+            data[4] = z_speed; // 押している間だけ下方向
+        } else {
+            data[4] = 0; // どちらも押していなければ停止
+        }
+
+        if (L1 && !last_l1) {
+            shoot_mode++;
+        }
+
+        // std::cout << SHOOTMODE << std::endl;
+
+        if (SHOOTMODE == 0) {
+            speed_shoot = 0;
+        } else if (SHOOTMODE == 1) {
+            speed_shoot = 30;
+        } else if (SHOOTMODE == 2) {
+            speed_shoot = 43;
+        } else if (SHOOTMODE == 3) {
+            speed_shoot = 53;
+        }
+        data[3] = speed_shoot; // 射出機構の速度設定
 
         // if (OPTION) {
         //     Ball_Action::tester(udp_);
         // }
         // デバッグ用（for文でcoutするとカクつく）
-        //  std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", ";
-        //  std::cout << data[4] << ", " << data[5] << ", " << data[6] << ", " << data[7] << ", ";
-        //  std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
-        //  std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
-        //  std::cout << data[16] << ", " << data[17] << ", " << data[18] << std::endl;
-        //  std::cout << data[11] << std::endl;
+        // std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", ";
+        // std::cout << data[4] << ", " << data[5] << ", " << data[6] << ", " << data[7] << ", ";
+        // std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
+        // std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
+        // std::cout << data[16] << ", " << data[17] << ", " << data[18] << std::endl;
+        // std::cout << data[11] << std::endl;
         // std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
         udp_.send(data);

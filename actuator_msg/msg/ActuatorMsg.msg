@@ -1,20 +1,18 @@
-# アクチュエータ駆動用の自作メッセージ
+# 共通
+int32 actuator_id          # アクチュエータの種別ごと（例：MD1とSERVO1は共存可能）
+int32 actuator_type        # アクチュエータ種別 (0:デバッグ, 1:モタドラ, 2:サーボ, 3:ソレノイド)
+string actuator_type_name  # "MD", "SERVO", "SV"
+bool enable                # 有効・無効
 
-int32 id # アクチュエータ種別(0:デバッグなど, 1:モタドラ, 2:サーボ, 3:ソレノイドバルブ)
-string type # "MD", "SERVO", "SV" 
+# --- モタドラ用 ---
+int32 motor_duty           # [%]
+int32 motor_target_rpm     # [RPM]
+int32 motor_target_pos     # 
+int32 motor_target_torque  # 
 
-# 有効・無効
-bool enable
+# --- サーボ用 ---
+int32 servo_angle_degree   # [deg]
+int32 servo_speed          # 
 
-# モタドラ
-int32 duty # [%]
-int32 target_rpm # [RPM]
-int32 target_pos 
-int32 target_torque 
-
-# サーボ
-int32 angle_degree # [deg]
-int32 servo_speed #
-
-# ソレノイドバルブ
-bool state # [True/False]
+# --- ソレノイドバルブ用 ---
+bool solenoid_state        # [True/False]
