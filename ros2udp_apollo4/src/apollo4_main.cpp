@@ -145,7 +145,7 @@ private:
 
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
-        if (PS && !last_PS) {
+        if (PS && !last_PS) { // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             PS_latch = !PS_latch;
         }
         last_PS = PS;
@@ -170,11 +170,11 @@ private:
         }
         // Z軸の操作
         if(L1) {         // 正転
-            data[6] = -wheelspeed; 
+            data[3] = -wheelspeed; 
         }else if(L2>0) {       // 逆転
-            data[6] = wheelspeed;
+            data[3] = wheelspeed;
         }else{
-            data[6] = 0;
+            data[3] = 0;
         }
 
         // 展開指変更!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
