@@ -82,7 +82,7 @@ private:
         //  bool R1 = msg->buttons[5];
 
         // float L2 = (-1 * msg->axes[2] + 1) / 2;
-        float R2 = (-1 * msg->axes[5] + 1) / 2;
+        //float R2 = (-1 * msg->axes[5] + 1) / 2;
 
         // bool SHARE = msg->buttons[8];
         // bool OPTION = msg->buttons[9];
@@ -97,11 +97,9 @@ private:
             std::cout << "CIRCLE" << std::endl;
             data[2] = 1;
             publish_data();
-        } else {
-            data[2] = 0; // CIRCLEボタンが押されていない場合は0に設定
         }
 
-        data[3] = R2 * 255;
+        //data[3] = R2 * 255;
         publish_data();
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
@@ -124,8 +122,28 @@ int main(int argc, char *argv[]) {
 
     rclcpp::executors::SingleThreadedExecutor exec;
     auto ps4_listener = std::make_shared<PS4_Listener>();
+    auto node = rclcpp::Node::make_shared("actuator_publisher");
+    auto pub = node->create_publisher<actuator_msg::msg::ActuatorMsg>("actuator_cmd", 10);
+    rclcpp::Rate rate(10);
+
     exec.add_node(ps4_listener);
     exec.spin();
+
+    while (rclcpp::ok()) {
+        actuator_msg::msg::ActuatorMsg msg;
+
+        // 例: モータードライバにDuty指令
+        msg.actuator_id = 1;
+        msg.actuator_type = 1; // モタドラ
+        msg.actuator_type_name = "MD";
+        msg.enable = true;
+
+        msg.motor_duty = 50;
+        msg.motor_target_rpm = 1000;
+
+        pub->publish(msg);
+        rate.sleep();
+    }
 
     rclcpp::shutdown();
     return 0;
