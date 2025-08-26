@@ -4,7 +4,7 @@ ros2espパッケージ、マイコン側プログラム
 microROSで受信したデータをもとにピン操作
 ワイヤレスデバッグ(Bluetooth Serial)に対応。スマホアプリもしくはTeratermでデバッグ可能。
 4MB版のESPでは容量が不足するためTools/PartitionSchemeからNO OTA(2MB APP/2MB SPIFFS)を選択すること。
-
+松枝版
 TODO:時間経過でスタックするバグの修正
 */
 #include <Arduino.h>
