@@ -32,25 +32,9 @@ PS4コントローラーの入力を取得するサンプルプログラム
 //CIRCLE,TRIANGLEが押された回数で変える
 int CIRCLE_count = 0; // CIRCLEで巻き上げ、下ろすのをやりたい
 int TRIANGLE_count = 0; // TRIANGLEでアームを伸び縮みさせたい
-bool
-bool
 
 // 速度
-int wheelspeed = ??;
-
-// サーボ
-int servo_angle = ??;
-
-// サーボの組み付け時のズレを補正(度数法)
-int SERVO1_CAL = ??;
-int SERVO2_CAL = ??;
-int SERVO3_CAL = ??;
-int SERVO4_CAL = ??;
-int SERVO5_CAL = ??;
-int SERVO6_CAL = ??;
-int SERVO7_CAL = ??;
-int SERVO8_CAL = ??;
-
+int wheelspeed = 10;
 
 std::vector<int16_t> data(22, 0); // マイコンに送信される配列"data" std~は型　int16は16bit（通信量）
 /*
@@ -114,8 +98,6 @@ private:
         bool SQUARE = msg->buttons[3];
         bool L1 = msg->buttons[4];
         bool R1 = msg->buttons[5];
-        bool L2 = msg->buttons[6];
-        bool R2 = msg->buttons[7];
         bool SHARE = msg->buttons[8];
         bool OPTIONS = msg->buttons[9];
         bool PS = msg->buttons[10];
@@ -129,9 +111,6 @@ private:
         }
         if (CIRCLE) {
             std::cout << "CIRCLE" << std::endl;
-        }
-        if (TRINAGLE) {
-            std::cout << "TRIANGLE" << std::endl;
         }
         if (SQUARE) {
             std::cout << "SQUARE" << std::endl;
