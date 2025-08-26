@@ -23,17 +23,17 @@ PS4コントローラーの入力を取得するサンプルプログラム
 #include "include/IP.hpp"
 #include "include/UDP.hpp"
 
-#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
+#define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 // L2,R2のデッドゾーン(0~1のうち0.3以上押されないと実行されないために？)
 //#define DEADZONE_L2 0.3
 //#define DEADZONE_R2 0.3
 
 //CIRCLE,TRIANGLEが押された回数で変える
-int CIRCLE_count = 0; // CIRCLEで掴む外すをやりたい
-int SQUARE_count = 0; // SQUAREでハンドの上げ下げをしたい
-static bool last_circle = false; // 前回のCIRCLEの状態
-static bool last_square = false; // 前回のSQUAREの状態
+static int CIRCLE_count = 0; // CIRCLEで掴む外すをやりたい
+static bool last_CIRCLE = false;
+static int SQUARE_count = 0; // SQUAREでハンドの上げ下げをしたい
+static bool last_SQUARE = false;
 
 // 速度
 int wheelspeed = 10;
@@ -129,11 +129,24 @@ private:
             //std::cout << "CROSS" << std::endl;
         //}
 
-        //ハンド掴むエアシリンダー
-        // 0 → 1 に変化したときだけカウントしCIRCLE_countが加算されていく
-        if (CIRCLE && !last_circle) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
+        if (CIRCLE && !last_CIRCLE) {
+            CIRCLE_count = (CIRCLE_count + 1) % 2;
+        }
+        if (SQUARE && !last_SQUARE) {
+            SQUARE_count = (SQUARE_count + 1) % 2;
+        }
+
+        last_CIRCLE = CIRCLE;
+        last_SQUARE = SQUARE;       
+        
+        if (CIRCLE && !last_CIRCLE) {
             CIRCLE_count++;
         }
+        if (SQUARE && !last_SQUARE) {
+            SQUARE_count++;
+        }
+        
+        //ハンド掴むエアシリンダー
         if (CIRCLE_count == 0) {
             data[15] = 0;
         }
@@ -142,10 +155,6 @@ private:
         }
 
         //ハンド上げ下げのエアシリンダー
-        // 0 → 1 に変化したときだけカウントしSQUARE_countが加算されていく
-        if (SQUARE && !last_square) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
-            SQUARE_count++;
-        }
         if (SQUARE_count == 0) {
             data[16] = 0;
         }
