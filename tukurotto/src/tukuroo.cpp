@@ -23,7 +23,34 @@ PS4コントローラーの入力を取得するサンプルプログラム
 #include "include/IP.hpp"
 #include "include/UDP.hpp"
 
-#define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
+#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
+
+// L2,R2のデッドゾーン(0~1のうち0.3以上押されないと実行されないために？)
+#define DEADZONE_L2 0.3
+#define DEADZONE_R2 0.3
+
+//CIRCLE,TRIANGLEが押された回数で変える
+int CIRCLE_count = 0; // CIRCLEで巻き上げ、下ろすのをやりたい
+int TRIANGLE_count = 0; // TRIANGLEでアームを伸び縮みさせたい
+bool
+bool
+
+// 速度
+int wheelspeed = ??;
+
+// サーボ
+int servo_angle = ??;
+
+// サーボの組み付け時のズレを補正(度数法)
+int SERVO1_CAL = ??;
+int SERVO2_CAL = ??;
+int SERVO3_CAL = ??;
+int SERVO4_CAL = ??;
+int SERVO5_CAL = ??;
+int SERVO6_CAL = ??;
+int SERVO7_CAL = ??;
+int SERVO8_CAL = ??;
+
 
 std::vector<int16_t> data(22, 0); // マイコンに送信される配列"data" std~は型　int16は16bit（通信量）
 /*
