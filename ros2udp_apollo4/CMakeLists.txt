@@ -45,10 +45,13 @@ find_package(visualization_msgs REQUIRED)
 add_executable(ap4_main src/apollo4_main.cpp src/include/UDP.cpp src/include/IP.cpp)
 ament_target_dependencies(ap4_main rclcpp std_msgs sensor_msgs geometry_msgs)
 
+add_executable(ap4_main src/apollo4_shoot.cpp src/include/UDP.cpp src/include/IP.cpp)
+ament_target_dependencies(ap4_main rclcpp std_msgs sensor_msgs geometry_msgs)
+
 # インストール設定
 install(TARGETS
   ap4_main
-
+  ap4_shoot
   DESTINATION lib/${PROJECT_NAME})
 
 # figletがインストールされていない場合、警告を表示
