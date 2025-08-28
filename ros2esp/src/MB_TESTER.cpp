@@ -1,3 +1,7 @@
+/*
+ESP32-IO-Boardのテストノード
+*/
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -9,9 +13,9 @@
 #include "rclcpp/rclcpp.hpp"
 #include <std_msgs/msg/int32_multi_array.hpp>
 
-#define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
+#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
-std::vector<int16_t> data(19, 0);
+std::vector<int16_t> data(25, 0);
 
 class KeyboardInputHandler {
 public:
@@ -32,7 +36,7 @@ private:
     void keyboard_input_loop() {
         while (running_) {
             int index, value;
-            std::cout << "Enter index (0-18) and value: ";
+            std::cout << "Enter index (0-24) and value: ";
 
             if (!(std::cin >> index >> value)) {
                 std::cerr << "Invalid input! Please enter two integers." << std::endl;
@@ -41,17 +45,17 @@ private:
                 continue;
             }
 
-            if (index < 0 || index >= 19) {
-                std::cerr << "Invalid index! Enter a value between 0 and 18." << std::endl;
+            if (index < 0 || index >= 24) {
+                std::cerr << "Invalid index! Enter a value between 0 and 24." << std::endl;
                 continue;
             }
 
             // データ範囲のチェック
-            if (index >= 1 && index <= 6) { // MD1~MD6
+            if (index >= 1 && index <= 8) { // MD1~MD6
                 value = std::clamp(value, -100, 100);
-            } else if (index >= 7 && index <= 10) { // サーボ
+            } else if (index >= 9 && index <= 16) { // サーボ
                 value = std::clamp(value, 0, 270);
-            } else if (index >= 11 && index <= 18) { // TR
+            } else if (index >= 17 && index <= 24) { // TR
                 value = (value != 0) ? 1 : 0;
             }
 

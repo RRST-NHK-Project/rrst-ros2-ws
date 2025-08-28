@@ -1,6 +1,7 @@
 /*
 RRST-NHK-Project 2025
 PS4コントローラーの入力を取得するサンプルプログラム
+esp32マイコンにアクチュエータ指令を送るサンプルプログラム
 */
 
 // 標準
@@ -13,35 +14,33 @@ PS4コントローラーの入力を取得するサンプルプログラム
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/int32_multi_array.hpp"
+#include "actuator_msg/msg/actuator_msg.hpp"
+/*メッセージの定義
+# 共通
+int32 actuator_id          # アクチュエータの種別ごと（例：MD1とSERVO1は共存可能）
+int32 actuator_type        # アクチュエータ種別 (0:デバッグ, 1:モタドラ, 2:サーボ, 3:ソレノイド)
+string actuator_type_name  # "MD", "SERVO", "SV"
+bool enable                # 有効・無効
+
+# --- モタドラ用 ---
+int32 motor_duty           # [%]
+int32 motor_target_rpm     # [RPM]
+int32 motor_target_pos     #
+int32 motor_target_torque  #
+
+# --- サーボ用 ---
+int32 servo_angle_degree   # [deg]
+int32 servo_speed          #
+
+# --- ソレノイドバルブ用 ---
+bool solenoid_state        # [True/False]
+*/
+
 
 #define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
+
 std::vector<int32_t> data(19, 0); // マイコンに送信される配列"data"
-/*
-マイコンに送信される配列"data"
-debug: マイコンのprintfを有効化, MD: モータードライバー, TR: トランジスタ
-| data[n] | 詳細 | 範囲 |
-| ---- | ---- | ---- |
-| data[0] | debug | 0 or 1 |
-| data[1] | MD1 | -100 ~ 100 |
-| data[2] | MD2 | -100 ~ 100 |
-| data[3] | MD3 | -100 ~ 100 |
-| data[4] | MD4 | -100 ~ 100 |
-| data[5] | MD5 | -100 ~ 100 |
-| data[6] | MD6 | -100 ~ 100 |
-| data[7] | Servo1 | 0 ~ 270 |
-| data[8] | Servo2 | 0 ~ 270 |
-| data[9] | Servo3 | 0 ~ 270 |
-| data[10] | Servo4 | 0 ~ 270 |
-| data[11] | TR1 | 0 or 1|
-| data[12] | TR2 | 0 or 1|
-| data[13] | TR3 | 0 or 1|
-| data[14] | TR4 | 0 or 1|
-| data[15] | TR5 | 0 or 1|
-| data[16] | TR6 | 0 or 1|
-| data[17] | TR7 | 0 or 1|
-| data[18] | TR8 | 0 or 1|
-*/
 
 class PS4_Listener : public rclcpp::Node {
 public:
@@ -82,7 +81,7 @@ private:
         //  bool R1 = msg->buttons[5];
 
         // float L2 = (-1 * msg->axes[2] + 1) / 2;
-        float R2 = (-1 * msg->axes[5] + 1) / 2;
+        //float R2 = (-1 * msg->axes[5] + 1) / 2;
 
         // bool SHARE = msg->buttons[8];
         // bool OPTION = msg->buttons[9];
@@ -96,12 +95,10 @@ private:
         if (CIRCLE) {
             std::cout << "CIRCLE" << std::endl;
             data[2] = 1;
-            publish_data();
-        } else {
-            data[2] = 0; // CIRCLEボタンが押されていない場合は0に設定
-        }
+         publish_data();
+         }
 
-        data[3] = R2 * 255;
+        
         publish_data();
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
@@ -119,14 +116,35 @@ private:
     rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr publisher_;
 };
 
+
+
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
     rclcpp::executors::SingleThreadedExecutor exec;
     auto ps4_listener = std::make_shared<PS4_Listener>();
+    auto node = rclcpp::Node::make_shared("actuator_publisher");
+    auto pub = node->create_publisher<actuator_msg::msg::ActuatorMsg>("actuator_cmd", 10);
+    rclcpp::Rate rate(10);
+    
     exec.add_node(ps4_listener);
     exec.spin();
 
+    while (rclcpp::ok()) {
+        actuator_msg::msg::ActuatorMsg msg;
+
+        // 例: モータードライバにDuty指令
+        msg.actuator_id = 1;
+        msg.actuator_type = 1; // モタドラ
+        msg.actuator_type_name = "MD";
+        msg.enable = true;
+
+        msg.motor_duty = 50;
+        msg.motor_target_rpm = 1000;
+
+        pub->publish(msg);
+        rate.sleep();
+    }
     rclcpp::shutdown();
     return 0;
 }
