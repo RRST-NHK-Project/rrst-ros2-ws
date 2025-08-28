@@ -98,7 +98,7 @@ private:
          publish_data();
          }
 
-        //data[3] = R2 * 255;
+        
         publish_data();
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
