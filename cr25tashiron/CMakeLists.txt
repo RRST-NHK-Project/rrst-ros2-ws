@@ -17,7 +17,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(actuator_msg REQUIRED)
 
 add_executable(cr25_matsu src/CR25_matsu.cpp)
-ament_target_dependencies(cr25_matsu rclcpp std_msgs sensor_msgs geometry_msgs)
+ament_target_dependencies(cr25_matsu rclcpp actuator_msg std_msgs sensor_msgs geometry_msgs)
 
 add_executable(actuator_msg_publisher src/ActuatorMsgPublisher.cpp)
 ament_target_dependencies(actuator_msg_publisher rclcpp actuator_msg)
