@@ -26,22 +26,34 @@ bool solenoid_state        # [True/False]
 */
 
 #include "rclcpp/rclcpp.hpp"
+#include <std_msgs/msg/int32_multi_array.hpp>
+
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!//
+// **複数のESPを使用する場合はIDを変更** //
+#define ID 0
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!//
 
 // 各アクチュエータの総数を定義
 #define MD 8
 #define SERVO 8
 #define SV 8
 
-#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
+#define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 std::vector<int16_t> data(1 + MD + SERVO + SV, 0); // マイコンに送信される配列"data"
 
+// ノード名とトピック名の定義（ID付き）
+const std::string node_name = "esp32node_" + std::to_string(ID);
+const std::string subscriber_topic_name = "from_esp32_" + std::to_string(ID);
+const std::string publisher_topic_name = "to_esp32_" + std::to_string(ID);
+
 class ActuatorSub : public rclcpp::Node {
 public:
-    ActuatorSub() : Node("actuator_subscriber") {
+    ActuatorSub() : Node(node_name.c_str()) {
         sub_ = this->create_subscription<actuator_msg::msg::ActuatorMsg>(
             "actuator_cmd", 10,
             std::bind(&ActuatorSub::callback, this, std::placeholders::_1));
+        pub_ = this->create_publisher<std_msgs::msg::Int32MultiArray>(publisher_topic_name.c_str(), 10);
     }
 
 private:
@@ -57,6 +69,9 @@ private:
     }
 
     void callback(const actuator_msg::msg::ActuatorMsg::SharedPtr msg) {
+
+        data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
+
         int idx = get_index(msg->actuator_type, msg->actuator_id);
         if (idx == -1)
             return;
@@ -70,15 +85,22 @@ private:
         }
 
         // デバッグ用（for文でcoutするとカクつく）
-        std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", ";
-        std::cout << data[4] << ", " << data[5] << ", " << data[6] << ", " << data[7] << ", ";
-        std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
-        std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
-        std::cout << data[16] << ", " << data[17] << ", " << data[18] << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        // std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", ";
+        // std::cout << data[4] << ", " << data[5] << ", " << data[6] << ", " << data[7] << ", ";
+        // std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
+        // std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
+        // std::cout << data[16] << ", " << data[17] << ", " << data[18] << ", " << data[19] << ", ";
+        // std::cout << data[20] << ", " << data[21] << ", " << data[22] << ", " << data[23] << ", ";
+        // std::cout << data[24] << std::endl;
+        // std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+        auto msg_out = std_msgs::msg::Int32MultiArray();
+        msg_out.data.assign(data.begin(), data.end());
+        pub_->publish(msg_out);
     }
 
     rclcpp::Subscription<actuator_msg::msg::ActuatorMsg>::SharedPtr sub_;
+    rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr pub_;
 };
 
 int main(int argc, char *argv[]) {
