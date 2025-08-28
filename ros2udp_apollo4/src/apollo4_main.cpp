@@ -34,6 +34,7 @@ int TRIANGLE_count = 0;     // TRIANGLEが押された回数
 bool prev_R1 = false;       // 前回のR1の状態
 bool prev_R2 = false;       // 前回のR1の状態
 bool prev_TRIANGLE = false;       // 前回のTRIANGLEの状態
+bool prev_CROSS = false;        //前回のCROSSの状態
 
 //モード切り替え
 bool CHANGEMODE = false;
@@ -145,7 +146,7 @@ private:
 
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
-        if (PS && !last_PS) {
+        if (PS && !last_PS) { // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             PS_latch = !PS_latch;
         }
         last_PS = PS;
@@ -170,11 +171,11 @@ private:
         }
         // Z軸の操作
         if(L1) {         // 正転
-            data[6] = -wheelspeed; 
+            data[3] = -wheelspeed; 
         }else if(L2>0) {       // 逆転
-            data[6] = wheelspeed;
+            data[3] = wheelspeed;
         }else{
-            data[6] = 0;
+            data[3] = 0;
         }
 
         // 展開指変更!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -262,50 +263,46 @@ private:
         if (TRIANGLE && !prev_TRIANGLE) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             TRIANGLE_count++;
         }
+        if(CROSS && !prev_CROSS) {
+            TRIANGLE_count = 1;         // 吸着割り込み(☓のときAモードにする)
+        }
         if(TRIANGLE_count %3 == 0) {  // 全OFF(Cモード)
             data[4] = 0;
             data[5] = 0;
-            if(CROSS){                // 吸着割り込み(☓のときAモードにする)
-                data[4] = absorbspeed;
-                data[5] = absorbspeed;
-            }
         }
-        if(TRIANGLE_count %3 == 1) {  // 全ON(Aモード)
+        else if(TRIANGLE_count %3 == 1) {  // 全ON(Aモード)
             data[4] = absorbspeed;
             data[5] = absorbspeed;
         }
-        if(TRIANGLE_count %3 == 2) {  // 上ON/下OFF(Bモード)
+        else if(TRIANGLE_count %3 == 2) {  // 上ON/下OFF(Bモード)
             data[4] = absorbspeed;
             data[5] = 0;
-            if(CROSS){                // 吸着割り込み(☓のときAモードにする)
-                data[4] = absorbspeed;
-                data[5] = absorbspeed;
-            }
         }
-
-        // if(CHANGEMODE == 0){
-        //     data[9] = 90 + SERVO1_CAL;
-        //     data[10] = 90 + SERVO2_CAL;
-        //     data[11] = 90 + SERVO3_CAL;
-        //     data[12] = 90 + SERVO4_CAL;
-        //     data[13] = 90 + SERVO5_CAL;
-        // }
-        // if(CHANGEMODE == 1){
-            
-        // }
+        
+        
+        // PSによるモード切替
+        if(CHANGEMODE == 1){            //　受け渡しモード
+            data[9] = 90 + SERVO1_CAL;
+            data[10] = 90 + SERVO2_CAL;
+            data[11] = 90 + SERVO3_CAL;
+            data[12] = 90 + SERVO4_CAL;
+            data[13] = 90 + SERVO5_CAL;
+        }
 
 
         // 状態を更新
         prev_R1 = R1; 
         prev_R2 = R2;
         prev_TRIANGLE = TRIANGLE;
+        prev_CROSS = CROSS;
 
 
 
         // デバッグ用（for文でcoutするとカクつく）
         //std::cout << R2_count << std::endl;
         //std::cout << data[4] << ", " << data[5] << std::endl; //吸着できているか確認する用
-
+        std::cout << data[9] << ", " << data[10] << ", " << data[11] << ", " << data[12] << ", " << data[13] << std::endl;
+        //std::cout << data[14] << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
         udp_.send(data);

@@ -1,12 +1,5 @@
 /*
-RRST-NHK-Project 2025
-UDP通信を行うサンプルプログラム
-動作確認まだ！注意！！
-*/
-
-/*
-RRST-NHK-Project 2025
-PS4コントローラーの入力を取得するサンプルプログラム
+キャチ.1
 */
 
 // 標準
@@ -23,7 +16,20 @@ PS4コントローラーの入力を取得するサンプルプログラム
 #include "include/IP.hpp"
 #include "include/UDP.hpp"
 
-#define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
+#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
+
+// L2,R2のデッドゾーン
+//#define DEADZONE_L2 0.3
+//#define DEADZONE_R2 0.3
+
+//CIRCLE,TRIANGLEが押された回数で変える
+static int CIRCLE_count = 0; // CIRCLEで掴む外すをやりたい
+static bool last_CIRCLE = false;
+static int SQUARE_count = 0; // SQUAREでハンドの上げ下げをしたい
+static bool last_SQUARE = false;
+
+// 速度
+int wheelspeed = 10;
 
 std::vector<int16_t> data(22, 0); // マイコンに送信される配列"data" std~は型　int16は16bit（通信量）
 /*
@@ -75,55 +81,97 @@ private:
 
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
-        float L2 = (-1 * msg->axes[2] + 1) / 2;
-        float R2 = (-1 * msg->axes[5] + 1) / 2;
-
-        data[3] = 50 * R2; // 3番の最大を５０に設定
-        udp_.send(data);   // データ送信
+        //float L2 = (-1 * msg->axes[2] + 1) / 2;
+        //float R2 = (-1 * msg->axes[5] + 1) / 2;
+        //float LS_X = -1 * msg->axes[0];
         
-        bool CROSS = msg->buttons[0];
+        //bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
-        bool TRIANGLE = msg->buttons[2];
+        //bool TRIANGLE = msg->buttons[2];
         bool SQUARE = msg->buttons[3];
-        bool L1 = msg->buttons[4];
-        bool R1 = msg->buttons[5];
-        bool L2 = msg->buttons[6];
-        bool R2 = msg->buttons[7];
-        bool SHARE = msg->buttons[8];
-        bool OPTIONS = msg->buttons[9];
-        bool PS = msg->buttons[10];
+        //bool L1 = msg->buttons[4];
+        //bool R1 = msg->buttons[5];
+        //bool SHARE = msg->buttons[8];
+        //bool OPTIONS = msg->buttons[9];
+        //bool PS = msg->buttons[10];
+
         bool LEFT = msg->axes[6] == 1.0;
         bool RIGHT = msg->axes[6] == -1.0;
+        
         bool UP = msg->axes[7] == 1.0;
         bool DOWN = msg->axes[7] == -1.0;
         
-        if (CROSS) {
-            std::cout << "CROSS" << std::endl;
+        //θ軸の操作
+        if (LEFT) {     // 正転
+            data[1] = wheelspeed;
+        }else if (RIGHT) {    // 逆転
+            data[1] = -wheelspeed;
+        }else{
+            data[1] = 0;
         }
-        if (CIRCLE) {
-            std::cout << "CIRCLE" << std::endl;
+        // R軸の操作
+        if (UP) {       // 正転
+            data[2] = wheelspeed;
+        }else if (DOWN) {     // 逆転
+            data[2] = -wheelspeed;
+        }else{
+            data[2] = 0;
         }
-        if (TRINAGLE) {
-            std::cout << "TRIANGLE" << std::endl;
+
+        //if (CROSS) {
+            //std::cout << "CROSS" << std::endl;
+        //}
+
+        if (CIRCLE && !last_CIRCLE) {
+            CIRCLE_count = (CIRCLE_count + 1) % 2;
         }
-        if (SQUARE) {
-            std::cout << "SQUARE" << std::endl;
+        if (SQUARE && !last_SQUARE) {
+            SQUARE_count = (SQUARE_count + 1) % 2;
         }
-        if (L1) {
-            std::cout << "L1" << std::endl;
+
+        last_CIRCLE = CIRCLE;
+        last_SQUARE = SQUARE;       
+        
+        if (CIRCLE && !last_CIRCLE) {
+            CIRCLE_count++;
         }
-        if (R1) {
-            std::cout << "R1" << std::endl;
+        if (SQUARE && !last_SQUARE) {
+            SQUARE_count++;
         }
-        if (SHARE) {
-            std::cout << "SHARE" << std::endl;
+        
+        //ハンド掴むエアシリンダー
+        if (CIRCLE_count == 0) {
+            data[15] = 0;
         }
-        if (OPTIONS) {
-            std::cout << "OPTIONS" << std::endl;
+        else if(CIRCLE_count == 1){
+            data[15] = 1;
         }
-        if (PS) {
-            std::cout << "PS" << std::endl;
+
+        //ハンド上げ下げのエアシリンダー
+        if (SQUARE_count == 0) {
+            data[16] = 0;
         }
+        else if(SQUARE_count == 1){
+            data[16] = 1;
+        }
+        //if (L1) {
+            //std::cout << "L1" << std::endl;
+        //}
+        //if (R1) {
+            //std::cout << "R1" << std::endl;
+        //}
+        //if (SHARE) {
+            //std::cout << "SHARE" << std::endl;
+        //}
+        //if (OPTIONS) {
+            //std::cout << "OPTIONS" << std::endl;
+        //}
+        //if (PS) {
+            //std::cout << "PS" << std::endl;
+        //}
+
+        udp_.send(data);   // データ送信
+
     }
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
