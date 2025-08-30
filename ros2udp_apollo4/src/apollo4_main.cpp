@@ -41,7 +41,7 @@ bool CHANGEMODE = false;
 
 // 速度
 int wheelspeed = 50;
-int absorbspeed = 30;
+int absorbspeed = 50;
 
 //サーボ
 int servo_angle = 90;        // 現在の角度（初期は90度）
@@ -63,7 +63,7 @@ debug: マイコンのprintfを有効化, MD: モータードライバー, TR: �
 | data[n] | 詳細 | 範囲 |
 | ---- | ---- | ---- |
 | data[0] | debug | 0 or 1 |
-MD1,2,3でアームを制御(R,θ,Z)軸,MD4,5でDCを５個ずつ制御
+MD1,2,3でアームを制御(R,θ,Z)軸,MD5,6でDCを５個ずつ制御
 | data[1] | MD1 | -100 ~ 100 |
 | data[2] | MD2 | -100 ~ 100 |
 | data[3] | MD3 | -100 ~ 100 |
@@ -267,16 +267,16 @@ private:
             TRIANGLE_count = 1;         // 吸着割り込み(☓のときAモードにする)
         }
         if(TRIANGLE_count %3 == 0) {  // 全OFF(Cモード)
-            data[4] = 0;
             data[5] = 0;
+            data[6] = 0;
         }
         else if(TRIANGLE_count %3 == 1) {  // 全ON(Aモード)
-            data[4] = absorbspeed;
             data[5] = absorbspeed;
+            data[6] = absorbspeed;
         }
         else if(TRIANGLE_count %3 == 2) {  // 上ON/下OFF(Bモード)
-            data[4] = absorbspeed;
-            data[5] = 0;
+            data[5] = absorbspeed;
+            data[6] = 0;
         }
         
         
@@ -300,8 +300,8 @@ private:
 
         // デバッグ用（for文でcoutするとカクつく）
         //std::cout << R2_count << std::endl;
-        //std::cout << data[4] << ", " << data[5] << std::endl; //吸着できているか確認する用
-        std::cout << data[9] << ", " << data[10] << ", " << data[11] << ", " << data[12] << ", " << data[13] << std::endl;
+        std::cout << data[4] << ", " << data[5] << std::endl; //吸着できているか確認する用
+        //std::cout << data[9] << ", " << data[10] << ", " << data[11] << ", " << data[12] << ", " << data[13] << std::endl;
         //std::cout << data[14] << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
