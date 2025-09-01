@@ -16,7 +16,7 @@
 #include "include/IP.hpp"
 #include "include/UDP.hpp"
 
-#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
+#define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 // L2,R2のデッドゾーン
 //#define DEADZONE_L2 0.3
@@ -29,7 +29,7 @@ static int SQUARE_count = 0; // SQUAREでハンドの上げ下げをしたい
 static bool last_SQUARE = false;
 
 // 速度
-int wheelspeed = 10;
+int wheelspeed = 30;
 
 std::vector<int16_t> data(22, 0); // マイコンに送信される配列"data" std~は型　int16は16bit（通信量）
 /*
@@ -82,7 +82,8 @@ private:
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
         //float L2 = (-1 * msg->axes[2] + 1) / 2;
-        //float R2 = (-1 * msg->axes[5] + 1) / 2;
+        float R2 = (-1 * msg->axes[5] + 1) / 2;
+        data[3] = 50 * R2;
         //float LS_X = -1 * msg->axes[0];
         
         //bool CROSS = msg->buttons[0];
