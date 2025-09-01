@@ -239,7 +239,7 @@ private:
         }
         
 
-        // サーボの手先角度操作!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        // サーボの手先角度3作!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         // ボタン入力に応じて角度を変化
         // DS3218proなので270度までいけます
         if (SQUARE && !CIRCLE){
@@ -300,9 +300,9 @@ private:
 
         // デバッグ用（for文でcoutするとカクつく）
         //std::cout << R2_count << std::endl;
-        std::cout << data[4] << ", " << data[5] << std::endl; //吸着できているか確認する用
+        //std::cout << data[4] << ", " << data[5] << std::endl; //吸着できているか確認する用
         //std::cout << data[9] << ", " << data[10] << ", " << data[11] << ", " << data[12] << ", " << data[13] << std::endl;
-        //std::cout << data[14] << std::endl;
+        //std::cout << data[1] << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
         udp_.send(data);
