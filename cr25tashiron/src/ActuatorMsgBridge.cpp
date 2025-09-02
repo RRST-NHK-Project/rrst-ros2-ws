@@ -7,8 +7,8 @@
 /*メッセージの定義
 # 共通
 int32 actuator_id          # アクチュエータの種別ごと（例：MD1とSERVO1は共存可能）
-int32 actuator_type        # アクチュエータ種別 (0:デバッグ, 1:モタドラ, 2:サーボ, 3:ソレノイド)
-string actuator_type_name  # "MD", "SERVO", "SV"
+int32 actuator_type        # アクチュエータ種別 (0:デバッグ, 1:モタドラ, 2:サーボ, 3:ソレノイド, 4:ロボマス)
+string actuator_type_name  # "MD", "SERVO", "SV", "ROBOMAS"
 bool enable                # 有効・無効
 
 # --- モタドラ用 ---
@@ -23,7 +23,12 @@ int32 servo_speed          #
 
 # --- ソレノイドバルブ用 ---
 bool solenoid_state        # [True/False]
+
+# --- ロボマス用 ---
+int32 robomas_target_angle # [degree]
 */
+
+
 
 #include "rclcpp/rclcpp.hpp"
 #include <std_msgs/msg/int32_multi_array.hpp>
@@ -37,10 +42,11 @@ bool solenoid_state        # [True/False]
 #define MD 8
 #define SERVO 8
 #define SV 8
+#define ROBOMAS 8
 
 #define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
 
-std::vector<int16_t> data(1 + MD + SERVO + SV, 0); // マイコンに送信される配列"data"
+std::vector<int16_t> data(1 + MD + SERVO + SV + ROBOMAS, 0); // マイコンに送信される配列"data"
 
 // ノード名とトピック名の定義（ID付き）
 const std::string node_name = "esp32node_" + std::to_string(ID);
@@ -64,7 +70,10 @@ private:
             return 1 + MD + id; // サーボ
         } else if (type == 3 && id >= 0 && id < SV) {
             return 1 + MD + SERVO + id; // ソレノイド
+        }else if (type == 4 && id >= 0 && id < ROBOMAS) {
+            return 1 + MD + SERVO + SV + id; // ロボマス
         }
+
         return -1; // 無効
     }
 
@@ -82,6 +91,8 @@ private:
             data[idx] = static_cast<int16_t>(msg->servo_angle_degree);
         } else if (msg->actuator_type == 3) {
             data[idx] = static_cast<int16_t>(msg->solenoid_state ? 1 : 0);
+        } else if (msg->actuator_type == 4) {
+            data[idx] = static_cast<int16_t>(msg->robomas_target_angle);
         }
 
         // デバッグ用（for文でcoutするとカクつく）
