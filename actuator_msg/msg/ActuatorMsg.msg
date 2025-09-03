@@ -16,3 +16,6 @@ int32 servo_speed          #
 
 # --- ソレノイドバルブ用 ---
 bool solenoid_state        # [True/False]
+
+# --- ロボマス用 ---
+int32 robomas_target_angle # [degree]

@@ -26,6 +26,9 @@ private:
         } else if (msg->actuator_type == 3) { // ソレノイド
             RCLCPP_INFO(this->get_logger(), "Solenoid State=%s",
                         msg->solenoid_state ? "ON" : "OFF");
+        } else if (msg->actuator_type == 4) { // ロボマス
+            RCLCPP_INFO(this->get_logger(), "Robomas Target Angle=%d",
+                        msg->robomas_target_angle);
         }
     }
 

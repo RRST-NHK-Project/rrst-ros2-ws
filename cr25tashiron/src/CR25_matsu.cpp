@@ -18,8 +18,8 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 /*メッセージの定義
 # 共通
 int32 actuator_id          # アクチュエータの種別ごと（例：MD1とSERVO1は共存可能）
-int32 actuator_type        # アクチュエータ種別 (0:デバッグ, 1:モタドラ, 2:サーボ, 3:ソレノイド)
-string actuator_type_name  # "MD", "SERVO", "SV"
+int32 actuator_type        # アクチュエータ種別 (0:デバッグ, 1:モタドラ, 2:サーボ, 3:ソレノイド, 4:ロボマス)
+string actuator_type_name  # "MD", "SERVO", "SV", "ROBOMAS"
 bool enable                # 有効・無効
 
 # --- モタドラ用 ---
@@ -34,8 +34,10 @@ int32 servo_speed          #
 
 # --- ソレノイドバルブ用 ---
 bool solenoid_state        # [True/False]
-*/
 
+# --- ロボマス用 ---
+int32 robomas_target_angle # [degree]
+*/
 
 #define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
