@@ -40,8 +40,8 @@ bool prev_CROSS = false;        //前回のCROSSの状態
 bool CHANGEMODE = false;
 
 // 速度
-int wheelspeed = 50;
-int absorbspeed = 50;
+int wheelspeed = 60;
+int absorbspeed = 98;
 
 //サーボ
 int servo_angle = 90;        // 現在の角度（初期は90度）
@@ -49,7 +49,7 @@ int servo_step = 2;          // 1回の更新で動く角度
 
 // サーボの組み付け時のズレを補正（度数法）
 int SERVO1_CAL = 0;
-int SERVO2_CAL = 0;
+int SERVO2_CAL = -40;
 int SERVO3_CAL = 0;
 int SERVO4_CAL = 0;
 int SERVO5_CAL = 0;
@@ -300,7 +300,7 @@ private:
 
         // デバッグ用（for文でcoutするとカクつく）
         //std::cout << R2_count << std::endl;
-        //std::cout << data[4] << ", " << data[5] << std::endl; //吸着できているか確認する用
+        //std::cout << data[5] << ", " << data[6] << std::endl; //吸着できているか確認する用
         //std::cout << data[9] << ", " << data[10] << ", " << data[11] << ", " << data[12] << ", " << data[13] << std::endl;
         //std::cout << data[1] << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
