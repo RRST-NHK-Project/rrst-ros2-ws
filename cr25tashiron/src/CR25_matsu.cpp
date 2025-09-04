@@ -70,7 +70,7 @@ private:
         //  float RS_X = -1 * msg->axes[3];
         //  float RS_Y = msg->axes[4];
 
-        // bool CROSS = msg->buttons[0];
+        bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
         // bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
@@ -98,6 +98,13 @@ private:
         if (CIRCLE) {
            // std::cout << "CIRCLE" << std::endl;
            data[24] = 90; //ロボマスモータに90度指令
+           // std::cout << data[24] << std::endl;
+
+         publish_data();
+         }
+         if (CROSS) {
+           // std::cout << "CIRCLE" << std::endl;
+           data[24] = 0; //ロボマスモータに90度指令
            // std::cout << data[24] << std::endl;
 
          publish_data();
