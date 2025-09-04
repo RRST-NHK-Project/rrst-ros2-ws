@@ -103,7 +103,7 @@ private:
          publish_data();
          }
          if (CROSS) {
-           // std::cout << "CIRCLE" << std::endl;
+           //std::cout << "CIRCLE" << std::endl;
            data[24] = 0; //ロボマスモータに90度指令
            // std::cout << data[24] << std::endl;
 
@@ -133,8 +133,11 @@ private:
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
-    auto ps4_listener = std::make_shared<PS4_Listener>();
-    auto node = rclcpp::Node::make_shared("actuator_publisher");
+    
+    //exec.spin();
+    rclcpp::executors::MultiThreadedExecutor exec;
+     auto ps4_listener = std::make_shared<PS4_Listener>();
+  auto node = rclcpp::Node::make_shared("actuator_publisher");
     auto pub = node->create_publisher<actuator_msg::msg::ActuatorMsg>("actuator_cmd", 10);
     auto timer = node->create_wall_timer(std::chrono::milliseconds(100), [pub](){
     
@@ -160,9 +163,7 @@ int main(int argc, char *argv[]) {
         msg.robomas_target_angle = 90; // 目標角度90度
         pub->publish(msg);
     });
-    
-    //exec.spin();
-    rclcpp::executors::MultiThreadedExecutor exec;
+   
     exec.add_node(ps4_listener);
     exec.add_node(node);
     exec.spin();
