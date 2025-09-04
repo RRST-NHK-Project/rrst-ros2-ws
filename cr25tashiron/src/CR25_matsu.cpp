@@ -143,14 +143,21 @@ int main(int argc, char *argv[]) {
         actuator_msg::msg::ActuatorMsg msg;
 
         // 例: モータードライバにDuty指令
+        // msg.actuator_id = 1;
+        // msg.actuator_type = 1; // モタドラ
+        // msg.actuator_type_name = "MD";
+        // msg.enable = true;
+
+        // msg.motor_duty = 50;
+        // msg.motor_target_rpm = 1000;
+
+        // 例: robomas指令
         msg.actuator_id = 1;
-        msg.actuator_type = 1; // モタドラ
-        msg.actuator_type_name = "MD";
+        msg.actuator_type = 4; // ロボマス
+        msg.actuator_type_name = "ROBOMAS";
         msg.enable = true;
 
-        msg.motor_duty = 50;
-        msg.motor_target_rpm = 1000;
-
+        msg.robomas_target_angle = 90; // 目標角度90度
         pub->publish(msg);
     });
     
