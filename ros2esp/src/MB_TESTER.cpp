@@ -52,7 +52,7 @@ private:
 
             // データ範囲のチェック
             if (index >= 1 && index <= 8) { // MD1~MD6
-                value = std::clamp(value, -100, 100);
+                value = std::clamp(value, -3600, 3600);
             } else if (index >= 9 && index <= 16) { // サーボ
                 value = std::clamp(value, 0, 270);
             } else if (index >= 17 && index <= 24) { // TR
