@@ -267,16 +267,22 @@ private:
             TRIANGLE_count = 1;         // 吸着割り込み(☓のときAモードにする)
         }
         if(TRIANGLE_count %3 == 0) {  // 全OFF(Cモード)
-            data[5] = 0;
+            data[5] = 0;                //上data5,6
             data[6] = 0;
+            data[7] = 0;                //下data7,8
+            data[8] = 0;
         }
         else if(TRIANGLE_count %3 == 1) {  // 全ON(Aモード)
-            data[5] = absorbspeed;
-            data[6] = absorbspeed;
+            //data[5] = absorbspeed;          //上data5,6                
+            //data[6] = absorbspeed;
+            data[7] = absorbspeed;          //下data7,8
+            data[8] = absorbspeed;
         }
         else if(TRIANGLE_count %3 == 2) {  // 上ON/下OFF(Bモード)
-            data[5] = absorbspeed;
-            data[6] = 0;
+            data[5] = absorbspeed;          //上data5,6
+            data[6] = absorbspeed;
+            data[7] = 0;                    //下data7,8
+            data[8] = 0;
         }
         
         
