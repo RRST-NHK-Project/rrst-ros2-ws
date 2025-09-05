@@ -15,6 +15,7 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 #include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/int32_multi_array.hpp"
 #include "actuator_msg/msg/actuator_msg.hpp"
+#include <vector>
 /*メッセージの定義
 # 共通
 int32 actuator_id          # アクチュエータの種別ごと（例：MD1とSERVO1は共存可能）
@@ -42,7 +43,7 @@ int32 robomas_target_angle # [degree]
 #define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 
-std::vector<int32_t> data(19, 0); // マイコンに送信される配列"data"
+std::vector<int32_t> data(33, 0); // マイコンに送信される配列"data"
 
 class PS4_Listener : public rclcpp::Node {
 public:
@@ -54,7 +55,7 @@ public:
             std::bind(&PS4_Listener::ps4_listener_callback, this,
                       std::placeholders::_1));
 
-        publisher_ = this->create_publisher<std_msgs::msg::Int32MultiArray>("mr_swerve_drive", 10);
+        publisher_ = this->create_publisher<std_msgs::msg::Int32MultiArray>("cr25_matsu", 10);
 
         RCLCPP_INFO(this->get_logger(),
                     "PS4 Listener initialized");
@@ -69,7 +70,7 @@ private:
         //  float RS_X = -1 * msg->axes[3];
         //  float RS_Y = msg->axes[4];
 
-        // bool CROSS = msg->buttons[0];
+        bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
         // bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
@@ -95,12 +96,21 @@ private:
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
         if (CIRCLE) {
-            std::cout << "CIRCLE" << std::endl;
-            data[2] = 1;
+           // std::cout << "CIRCLE" << std::endl;
+           data[24] = 90; //ロボマスモータに90度指令
+           // std::cout << data[24] << std::endl;
+
+         publish_data();
+         }
+         if (CROSS) {
+           //std::cout << "CIRCLE" << std::endl;
+           data[24] = 0; //ロボマスモータに90度指令
+           // std::cout << data[24] << std::endl;
+
          publish_data();
          }
 
-        
+         std::cout << data[24] << std::endl;
         publish_data();
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
@@ -123,30 +133,41 @@ private:
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
-    rclcpp::executors::SingleThreadedExecutor exec;
-    auto ps4_listener = std::make_shared<PS4_Listener>();
-    auto node = rclcpp::Node::make_shared("actuator_publisher");
-    auto pub = node->create_publisher<actuator_msg::msg::ActuatorMsg>("actuator_cmd", 10);
-    rclcpp::Rate rate(10);
     
-    exec.add_node(ps4_listener);
-    exec.spin();
-
-    while (rclcpp::ok()) {
+    //exec.spin();
+    rclcpp::executors::MultiThreadedExecutor exec;
+     auto ps4_listener = std::make_shared<PS4_Listener>();
+  auto node = rclcpp::Node::make_shared("actuator_publisher");
+    auto pub = node->create_publisher<actuator_msg::msg::ActuatorMsg>("actuator_cmd", 10);
+    auto timer = node->create_wall_timer(std::chrono::milliseconds(100), [pub](){
+    
+    //exec.add_node(ps4_listener);
+   
         actuator_msg::msg::ActuatorMsg msg;
 
         // 例: モータードライバにDuty指令
+        // msg.actuator_id = 1;
+        // msg.actuator_type = 1; // モタドラ
+        // msg.actuator_type_name = "MD";
+        // msg.enable = true;
+
+        // msg.motor_duty = 50;
+        // msg.motor_target_rpm = 1000;
+
+        // 例: robomas指令
         msg.actuator_id = 1;
-        msg.actuator_type = 1; // モタドラ
-        msg.actuator_type_name = "MD";
+        msg.actuator_type = 4; // ロボマス
+        msg.actuator_type_name = "ROBOMAS";
         msg.enable = true;
 
-        msg.motor_duty = 50;
-        msg.motor_target_rpm = 1000;
-
+        msg.robomas_target_angle = 90; // 目標角度90度
         pub->publish(msg);
-        rate.sleep();
-    }
+    });
+   
+    exec.add_node(ps4_listener);
+    exec.add_node(node);
+    exec.spin();
+    
     rclcpp::shutdown();
     return 0;
 }
