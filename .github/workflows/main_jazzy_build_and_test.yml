@@ -69,27 +69,3 @@ jobs:
 #          cd ros2_ws
 #          colcon test
 #          colcon test-result --verbose
-
-      - name: Build .deb packages
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-bloom fakeroot debhelper
-          cd ros2_ws/src
-          for pkg in */; do
-            cd "$pkg"
-            bloom-generate rosdebian --ros-distro jazzy
-            cd ../..
-            fakeroot debian/rules binary || true
-          done
-          cd ..
-          mkdir -p debs
-          find . -name "*.deb" -exec mv {} debs/ \;
-
-      - name: Upload .deb to Release
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: ros2_ws/debs/*.deb
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
