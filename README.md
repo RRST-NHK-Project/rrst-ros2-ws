@@ -10,6 +10,9 @@
 
 [![ROS 2 Jazzy Build](https://github.com/RRST-NHK-Project/rrst-ros2-ws/actions/workflows/main_jazzy_build_and_test.yml/badge.svg?branch=develop&event=push)](https://github.com/RRST-NHK-Project/rrst-ros2-ws/actions/workflows/main_jazzy_build_and_test.yml)
 
+### Docker
+[![Build and Push Docker Image](https://github.com/RRST-NHK-Project/rrst-ros2-ws/actions/workflows/docker-publish.yml/badge.svg?branch=develop)](https://github.com/RRST-NHK-Project/rrst-ros2-ws/actions/workflows/docker-publish.yml)
+
 ## 1. 🚀 概要
 RRST, NHKプロジェクトのROS 2 ワークスペースです。現在使用中の各種パッケージ、回路データ、マイコン側プログラムを格納しています。不要になったものは別リポジトリに移動しアーカイブしてください。
 
