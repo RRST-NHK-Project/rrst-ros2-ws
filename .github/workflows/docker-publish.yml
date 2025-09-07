@@ -35,5 +35,5 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/rrst-nhk-project/rrst-ros2-ws-docker:latest
-            ghcr.io/rrst-nhk-project/rrst-ros2-ws-docker:${{ github.sha }}
+            ghcr.io/rrst-nhk-project/rrst-ros2-ws:latest
+            ghcr.io/rrst-nhk-project/rrst-ros2-ws:${{ github.sha }}
