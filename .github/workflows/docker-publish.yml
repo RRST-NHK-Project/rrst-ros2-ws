@@ -20,6 +20,9 @@ jobs:
         with:
           submodules: recursive  # サブモジュールを含める
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
@@ -30,11 +33,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image
+      - name: Build and push Docker image (multi-arch)
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: |
             ghcr.io/rrst-nhk-project/rrst-ros2-ws:latest
             ghcr.io/rrst-nhk-project/rrst-ros2-ws:${{ github.sha }}
