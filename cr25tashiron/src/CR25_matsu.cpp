@@ -97,14 +97,14 @@ private:
 
         if (CIRCLE) {
            // std::cout << "CIRCLE" << std::endl;
-           data[24] = 90; //ロボマスモータに90度指令
+           data[1] = 0; //ロボマスモータに90度指令
            // std::cout << data[24] << std::endl;
 
          publish_data();
          }
          if (CROSS) {
            //std::cout << "CIRCLE" << std::endl;
-           data[24] = 0; //ロボマスモータに90度指令
+           data[1] = 90; //ロボマスモータに90度指令
            // std::cout << data[24] << std::endl;
 
          publish_data();
