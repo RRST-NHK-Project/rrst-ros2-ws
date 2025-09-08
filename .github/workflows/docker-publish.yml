@@ -38,7 +38,7 @@ jobs:
         with:
           context: .
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
           tags: |
             ghcr.io/rrst-nhk-project/rrst-ros2-ws:latest
             ghcr.io/rrst-nhk-project/rrst-ros2-ws:${{ github.sha }}
