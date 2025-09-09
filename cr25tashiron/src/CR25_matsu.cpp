@@ -73,7 +73,7 @@ private:
         bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
         // bool TRIANGLE = msg->buttons[2];
-        // bool SQUARE = msg->buttons[3];
+        bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
         // bool RIGHT = msg->axes[6] == -1.0;
@@ -84,7 +84,7 @@ private:
         //  bool R1 = msg->buttons[5];
 
         // float L2 = (-1 * msg->axes[2] + 1) / 2;
-        //float R2 = (-1 * msg->axes[5] + 1) / 2;
+        float R2 = (-1 * msg->axes[5] + 1) / 2;
 
         // bool SHARE = msg->buttons[8];
         // bool OPTION = msg->buttons[9];
@@ -98,12 +98,21 @@ private:
         if (CIRCLE) {
            // std::cout << "CIRCLE" << std::endl;
             data[1] = 720;
+            data[2] = 720;
+           // data[3] = 3;
             //publish_data();
         }else if(CROSS){
              data[1] = 0; // CIRCLEボタンが押されていない場合は0に設定
-        }  
-
-         std::cout << data[1] << std::endl;
+            data[2] = 0;
+           // data[3] = 10;
+        }else if(SQUARE){
+             data[1] = -720; // CIRCLEボタンが押されていない場合は0に設定
+            data[2] = 720;
+            //data[3] = 0;
+        }else{
+        data[3] = R2*500; // CIRCLEボタンが押されていない場合は0に設定
+        }
+         std::cout << data[3] << std::endl;
         publish_data();
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
