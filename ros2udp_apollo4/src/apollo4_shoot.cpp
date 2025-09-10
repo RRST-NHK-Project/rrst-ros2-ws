@@ -18,16 +18,44 @@ constexpr float TRIGGER_DEADZONE = 0.1;
 // [θ1, θ2, θ3, θ4, θ5, グリッパー] の指令値を格納
 std::vector<int16_t> data(6, 0);
 /*
-| data[n] | 制御対象 | 操作ボタン                  |
-|:-------:|:---------|:----------------------------|
-| data[0] | θ1 (旋回) | 十字キー 左右             |
-| data[1] | θ2       | (未割り当て)                |
-| data[2] | θ3 (昇降) | L1 (上) / L2 (下)           |
-| data[3] | θ4 (手首上下) | R1 (上) / R2 (下)           |
-| data[4] | θ5 (手首回転) | 十字キー 上下             |
-| data[5] | グリッパー | 〇 (開閉トグル) (0:開, 1:閉)|
+マイコンに送信される配列"data"
+debug: マイコンのprintfを有効化, MD: モータードライバー, TR: トランジスタ
+| data[n] | 詳細 | 範囲 |
+| ---- | ---- | ---- |
+| data[0] | debug | 0 or 1 |
+| data[1] | MD1 | -100 ~ 100 |
+| data[2] | MD2 | -100 ~ 100 |
+| data[3] | MD3 | -100 ~ 100 |
+| data[4] | MD4 | -100 ~ 100 |
+| data[5] | MD5 | -100 ~ 100 |
+| data[6] | MD6 | -100 ~ 100 |
+| data[7] | Servo1 | 0 ~ 270 |
+| data[8] | Servo2 | 0 ~ 270 |
+| data[9] | Servo3 | 0 ~ 270 |
+| data[10] | Servo4 | 0 ~ 270 |
+| data[11] | TR1 | 0 or 1|
+| data[12] | TR2 | 0 or 1|
+| data[13] | TR3 | 0 or 1|
+| data[14] | TR4 | 0 or 1|
+| data[15] | TR5 | 0 or 1|
+| data[16] | TR6 | 0 or 1|
+| data[17] | TR7 | 0 or 1|
+| data[18] | TR8 | 0 or 1|
 */
 
+class PS4_Listener : public rclcpp::Node {
+    public:
+        PS4_Listener(const std::string &ip, int port)
+            : Node("nhk25_mr_sd"), udp_(ip, port) {
+            subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
+                "joy", 10,
+                std::bind(&PS4_Listener::ps4_listener_callback, this,
+                          std::placeholders::_1));
+            RCLCPP_INFO(this->get_logger(),
+                        "NHK2025 MR SD initialized with IP: %s, Port: %d", ip.c_str(),
+                        port);
+        }
+    
 class ArmControllerNode : public rclcpp::Node {
 public:
     ArmControllerNode() : Node("arm_controller_node") {
@@ -157,6 +185,32 @@ int main(int argc, char* argv[]) {
     rclcpp::init(argc, argv);
     auto node = std::make_shared<ArmControllerNode>();
     rclcpp::spin(node);
+    rclcpp::shutdown();
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    rclcpp::init(argc, argv);
+
+    // figletでノード名を表示
+    std::string figletout = "figlet APOLLO4SHOOT";
+    int result = std::system(figletout.c_str());
+    if (result != 0) {
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                  << std::endl;
+        std::cerr << "Please install 'figlet' with the following command:"
+                  << std::endl;
+        std::cerr << "sudo apt install figlet" << std::endl;
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                  << std::endl;
+    }
+
+    rclcpp::executors::MultiThreadedExecutor exec;
+    auto ps4_listener = std::make_shared<PS4_Listener>(IP_AP4_SHOOT, PORT_AP4_SHOOT);
+    exec.add_node(ps4_listener);
+
+    exec.spin();
+
     rclcpp::shutdown();
     return 0;
 }

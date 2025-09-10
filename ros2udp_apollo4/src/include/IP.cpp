@@ -15,6 +15,7 @@ RRST-NHK-Project 2025
 // const std::string IP_DR = "192.168.0.218";
 // const std::string IP_TEST = "192.168.128.205";
 const std::string IP_AP4_MAIN = "192.168.8.215";
+const std::string IP AP4_SHOOT = "192.168.8.216"
 // 送信先ポート番号、宛先マイコンで設定したポート番号を指定
 // const int PORT_MR_SD = 5000;
 // const int PORT_MR = 5000;
@@ -22,3 +23,5 @@ const std::string IP_AP4_MAIN = "192.168.8.215";
 // const int PORT_DR = 5000;
 // const int PORT_TEST = 5000;
 const int PORT_AP4_MAIN = 5000;
+const int PORT_AP4_SHOOT = 5000;
+
