@@ -90,13 +90,13 @@ Servo1~5がMG90D,Servo6がDS3218
 class PS4_Listener : public rclcpp::Node {
 public:
     PS4_Listener(const std::string &ip, int port)
-        : Node("nhk25_mr_sd"), udp_(ip, port) {
+        : Node("ap4_main"), udp_(ip, port) {
         subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
             "joy", 10,
             std::bind(&PS4_Listener::ps4_listener_callback, this,
                       std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(),
-                    "NHK2025 MR SD initialized with IP: %s, Port: %d", ip.c_str(),
+                    "AP4_MAIN initialized with IP: %s, Port: %d", ip.c_str(),
                     port);
     }
 
@@ -318,16 +318,40 @@ private:
     UDP udp_;
 };
 
+class Servo_Deg_Publisher : public rclcpp::Node {
+public:
+    Servo_Deg_Publisher() : Node("mr_servo_deg_publisher") {
+        // Publisherの作成
+        publisher_ = this->create_publisher<std_msgs::msg::Int32MultiArray>(
+            "mr_servo_deg", 10);
 
+        // タイマーを使って定期的にメッセージをpublish
+        timer_ = this->create_wall_timer(
+            std::chrono::milliseconds(10),
+            std::bind(&Servo_Deg_Publisher::publish_message, this));
+    }
+
+private:
+    void publish_message() {
+        auto message = std_msgs::msg::Int32MultiArray();
+        message.data = {data[5], data[6], data[7], data[8]};
+
+        // RCLCPP_INFO(this->get_logger(), "Publishing: '%d'", message.data);
+        publisher_->publish(message); // メッセージをpublish
+    }
+
+    rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr publisher_;
+    rclcpp::TimerBase::SharedPtr timer_;
+};
 
 class Params_Listener : public rclcpp::Node {
 public:
-    Params_Listener() : Node("nr25_mr_servo_cal_listener") {
+    Params_Listener() : Node("ap4_main_servo_cal_listener") {
         subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
             "mr_servo_cal", 10,
             std::bind(&Params_Listener::params_listener_callback, this,
                       std::placeholders::_1));
-        RCLCPP_INFO(this->get_logger(), "MR Servo Calibrator Listener");
+        RCLCPP_INFO(this->get_logger(), "AP4 Servo Calibrator Listener");
     }
 
 private:
@@ -364,7 +388,9 @@ int main(int argc, char *argv[]) {
     rclcpp::executors::MultiThreadedExecutor exec;
     auto ps4_listener = std::make_shared<PS4_Listener>(IP_AP4_MAIN, PORT_AP4_MAIN);
     auto params_listener = std::make_shared<Params_Listener>();
+    auto servo_deg_publisher = std::make_shared<Servo_Deg_Publisher>();
     exec.add_node(ps4_listener);
+    exec.add_node(servo_deg_publisher);
     exec.add_node(params_listener);
 
     exec.spin();

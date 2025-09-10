@@ -10,6 +10,7 @@ endif()
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
+
 # figletがインストールされていない場合、警告を表示
 if(NOT DEFINED ENV{FIGLET_CHECKED})
   execute_process(
@@ -48,10 +49,15 @@ ament_target_dependencies(ap4_main rclcpp std_msgs sensor_msgs geometry_msgs)
 add_executable(ap4_shoot src/apollo4_shoot.cpp src/include/UDP.cpp src/include/IP.cpp)
 ament_target_dependencies(ap4_shoot rclcpp std_msgs sensor_msgs geometry_msgs)
 
+add_executable(ap4_main_cal src/apollo4_main_calibrator.cpp)
+ament_target_dependencies(ap4_main_cal rclcpp std_msgs sensor_msgs geometry_msgs)
+target_include_directories(ap4_main_cal PRIVATE ${nlohmann_json_SOURCE_DIR}/single_include)
+
 # インストール設定
 install(TARGETS
   ap4_main
   ap4_shoot
+  ap4_main_cal
 
   DESTINATION lib/${PROJECT_NAME})
 

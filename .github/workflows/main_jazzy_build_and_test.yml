@@ -69,5 +69,3 @@ jobs:
 #          cd ros2_ws
 #          colcon test
 #          colcon test-result --verbose
-
-          
