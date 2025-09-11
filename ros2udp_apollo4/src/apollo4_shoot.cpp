@@ -47,9 +47,9 @@ bool prev_LEFT = false;     //前回のLEFTの状態
 bool prev_RIGHT = false;    //前回のRIGHTの状態
 
 //サーボ
-int SERVO1_angle = 0;       //サーボ1
-int SERVO2_angle = 0;       //サーボ2
-int SERVO3_angle = 0;       //サーボ3
+int SERVO1_angle = 90;       //サーボ1
+int SERVO2_angle = 90;       //サーボ2
+int SERVO3_angle = 90;       //サーボ3
 
 // サーボの組み付け時のズレを補正（度数法）
 int SERVO1_CAL = 0;
