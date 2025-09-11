@@ -90,7 +90,7 @@ class PS4_Listener : public rclcpp::Node {
         PS4_Listener(const std::string &ip, int port)
             : Node("ap4_shoot"), udp_(ip, port) {
             subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
-                "joy", 10,
+                "joy1", 10,
                 std::bind(&PS4_Listener::ps4_listener_callback, this,
                           std::placeholders::_1));
             RCLCPP_INFO(this->get_logger(),
