@@ -84,7 +84,7 @@ private:
         //  bool R1 = msg->buttons[5];
 
         // float L2 = (-1 * msg->axes[2] + 1) / 2;
-        float R2 = (-1 * msg->axes[5] + 1) / 2;
+        //float R2 = (-1 * msg->axes[5] + 1) / 2;
 
         // bool SHARE = msg->buttons[8];
         // bool OPTION = msg->buttons[9];
@@ -97,20 +97,20 @@ private:
 
         if (CIRCLE) {
            // std::cout << "CIRCLE" << std::endl;
-            data[1] = 720;
+            data[1] = 1800;
             data[2] = 720;
-           // data[3] = 3;
+            data[3] = 100;
             //publish_data();
         }else if(CROSS){
              data[1] = 0; // CIRCLEボタンが押されていない場合は0に設定
             data[2] = 0;
-           // data[3] = 10;
+            data[3] = 0;
         }else if(SQUARE){
-             data[1] = -720; // CIRCLEボタンが押されていない場合は0に設定
+            // data[1] = -720; // CIRCLEボタンが押されていない場合は0に設定
             data[2] = 720;
-            //data[3] = 0;
+            data[3] = 500;
         }else{
-        data[3] = R2*500; // CIRCLEボタンが押されていない場合は0に設定
+        //data[3] = R2*500; // CIRCLEボタンが押されていない場合は0に設定
         }
          std::cout << data[3] << std::endl;
         publish_data();
