@@ -103,16 +103,20 @@ private:
            // std::cout << "CIRCLE" << std::endl;
             data[1] = 720;
             data[2] = 720;
-            
+            data[9] = 90; // サーボ1の角度指令
+           data[10] = 90; // サーボ2の角度指令
             //publish_data();
         }else if(CROSS){
              data[1] = -720; // CIRCLEボタンが押されていない場合は0に設定
             data[2] = -720;
             data[3] = 0;
+            data[9] = 0; // サーボ1の角度指令
+           data[10] = 0; // サーボ2の角度指令
         }else if(SQUARE){
             // data[1] = -720; // CIRCLEボタンが押されていない場合は0に設定
            // data[2] = 720;
            // data[3] = 500;
+           
         }else if(UP){//後退
         data[1] = -720; // CIRCLEボタンが押されてい
         data[2] = 720;
@@ -122,9 +126,9 @@ private:
         data[2] = -1000;
         }
         else if(L1){
-        data[3] = -100; // CIRCLEボタンが押されていない場合は0に設定
+        data[3] = -50; // CIRCLEボタンが押されていない場合は0に設定
         }else if(R1){
-        data[3] = 100; // CIRCLEボタンが押されていない場合は0に設定
+        data[3] = 50; // CIRCLEボタンが押されていない場合は0に設定
         }
     
     
