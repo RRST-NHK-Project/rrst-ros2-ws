@@ -72,16 +72,16 @@ private:
 
         bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
-        // bool TRIANGLE = msg->buttons[2];
+        bool TRIANGLE = msg->buttons[2];
         bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
         // bool RIGHT = msg->axes[6] == -1.0;
-        // bool UP = msg->axes[7] == 1.0;
-        // bool DOWN = msg->axes[7] == -1.0;
+         bool UP = msg->axes[7] == 1.0;
+         bool DOWN = msg->axes[7] == -1.0;
 
-        // bool L1 = msg->buttons[4];
-        //  bool R1 = msg->buttons[5];
+        bool L1 = msg->buttons[4];
+        bool R1 = msg->buttons[5];
 
         // float L2 = (-1 * msg->axes[2] + 1) / 2;
         //float R2 = (-1 * msg->axes[5] + 1) / 2;
@@ -95,24 +95,40 @@ private:
 
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
-        if (CIRCLE) {
+        if(CIRCLE){
+            data[1] = 0;
+            data[2] = 0;
+        }
+        if (TRIANGLE) {
            // std::cout << "CIRCLE" << std::endl;
-            data[1] = 1800;
+            data[1] = 720;
             data[2] = 720;
-            data[3] = 100;
+            
             //publish_data();
         }else if(CROSS){
-             data[1] = 0; // CIRCLEボタンが押されていない場合は0に設定
-            data[2] = 0;
+             data[1] = -720; // CIRCLEボタンが押されていない場合は0に設定
+            data[2] = -720;
             data[3] = 0;
         }else if(SQUARE){
             // data[1] = -720; // CIRCLEボタンが押されていない場合は0に設定
-            data[2] = 720;
-            data[3] = 500;
-        }else{
-        //data[3] = R2*500; // CIRCLEボタンが押されていない場合は0に設定
+           // data[2] = 720;
+           // data[3] = 500;
+        }else if(UP){//後退
+        data[1] = -720; // CIRCLEボタンが押されてい
+        data[2] = 720;
+        
+        }else if(DOWN){//前進
+        data[1] = 1000; // CIRCLEボタンが押されていない場合は0に設定
+        data[2] = -1000;
         }
-         std::cout << data[3] << std::endl;
+        else if(L1){
+        data[3] = -100; // CIRCLEボタンが押されていない場合は0に設定
+        }else if(R1){
+        data[3] = 100; // CIRCLEボタンが押されていない場合は0に設定
+        }
+    
+    
+         //std::cout << data[3] << std::endl;
         publish_data();
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
