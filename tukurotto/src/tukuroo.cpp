@@ -16,7 +16,7 @@
 #include "include/IP.hpp"
 #include "include/UDP.hpp"
 
-#define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
+#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 // L2,R2のデッドゾーン
 //#define DEADZONE_L2 0.3
