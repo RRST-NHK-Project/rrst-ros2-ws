@@ -83,9 +83,11 @@ private:
         bool L1 = msg->buttons[4];
         bool R1 = msg->buttons[5];
 
-        // float L2 = (-1 * msg->axes[2] + 1) / 2;
-        //float R2 = (-1 * msg->axes[5] + 1) / 2;
+        // float L2_DIGITAL = (-1 * msg->axes[2] + 1) / 2;
+        //float R2_DIGITAL = (-1 * msg->axes[5] + 1) / 2;
 
+        //bool L2 = msg->buttons[6];
+        //bool R2 = msg->buttons[7];
         // bool SHARE = msg->buttons[8];
         // bool OPTION = msg->buttons[9];
         // bool PS = msg->buttons[10];
