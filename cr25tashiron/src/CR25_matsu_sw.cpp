@@ -20,7 +20,7 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 #define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 
-std::vector<int16_t> data(25, 0); // マイコンに送信される配列"data"
+std::vector<int16_t> out_data(25, 0); // マイコンに送信される配列"data"
 
 class Angle_Listener : public rclcpp::Node {
 public:
@@ -28,8 +28,8 @@ public:
         : Node("angle_listener") {
 
         subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
-            "from_esp32", 10,
-            std::bind(&Angele_Listener::angle_listener_callback, this,
+            "from_esp32_1", 10,
+            std::bind(&Angle_Listener::angle_listener_callback, this,
                       std::placeholders::_1));
 
         publisher_ = this->create_publisher<std_msgs::msg::Int32MultiArray>("to_esp32_0", 10);
@@ -40,7 +40,7 @@ public:
 
 
 private:   
-    void angle_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
+    void angle_listener_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
         int sw1 = msg->data[0]; // ボタンの状態を取得
         int angle1 = msg->data[8]; // 現在の角度を取得
        
@@ -50,26 +50,35 @@ private:
             zero_set_1 = true;
             RCLCPP_INFO(this->get_logger(), "Zero set at angle=%d", angle1);
         }
-        last_sw_1 = sw;
+        last_sw_1 = sw1;
 
         int corrected_angle1 = angle1;
-        if (zero_set_) {
+        if (zero_set_1) {
             corrected_angle1 = angle1 - zero_offset_1;
         }
         
-        auto msg = std_msgs::msg::Int32MultiArray();
-        out_msg.data = msg->data;//元データコピー
-        out_msg.data[8] = corrected_angle1;
-        publisher_->publish(out_msg);
+       out_data[1] = corrected_angle1; // サーボ1の角度指令
+        publish_data();
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+
     }
+    void publish_data() {
+        auto msg = std_msgs::msg::Int32MultiArray();
+        msg.data.reserve(out_data.size());
+        for (auto &v : out_data) {
+            msg.data.push_back(static_cast<int32_t>(v));
+        }
+        publisher_->publish(msg);
+    }
+
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
-    rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr publisher
+    rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr publisher_;
 
     int last_sw_1 = 0;
     int zero_offset_1 = 0;
     bool zero_set_1 = false;
 
-}
+};
 
 
 int main(int argc, char *argv[]) {
