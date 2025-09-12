@@ -16,6 +16,11 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 #include "std_msgs/msg/int32_multi_array.hpp"
 #include "actuator_msg/msg/actuator_msg.hpp"
 #include <vector>
+
+// 計算
+//#include <cmath>
+
+
 /*メッセージの定義
 # 共通
 int32 actuator_id          # アクチュエータの種別ごと（例：MD1とSERVO1は共存可能）
@@ -85,10 +90,10 @@ public:
         data[17] = 0;
     }
     static void left(){
-        data[6] = -50;
+        data[6] = -100;
     }
     static void right(){
-        data[6] = 50;
+        data[6] = 100;
     }
     static void forward_m(){
         data[4] = 50;
@@ -177,11 +182,18 @@ private:
         last_share = SHARE;
         MANUALMODE = share_latch;
 
+        
+
         //自動モード
         if (MANUALMODE == false)
         {
             //std::cout << "自動モード" << std::endl;
+
+            // data[1] = 0;
+            // data[2] = 0;
+            // data[3] = 0;
             data[7] = 0;
+
             if (CIRCLE)
             {
                Action::sand();
@@ -220,14 +232,16 @@ private:
         {
             //std::cout << "手動モード" << std::endl;
         
+            // data[1] = 0;
+            // data[2] = 0;
+            // data[3] = 0;
             data[7] = 1;
-
-            data[1] = 0;
-            data[2] = 0;
-            data[3] = 0;
             data[4] = 0;
             data[5] = 0;
             data[6] = 0;
+             //永井清流逆運動学
+            //arctan2(Y, X)でラジアン、atan2(Y, X)*180/M_PIで度
+            //atan2(LS_X, LS_Y)*180/M_PI = data[3]
             
             
             if (CIRCLE)
@@ -266,6 +280,9 @@ private:
             // data[5] = 0;
             // data[6] = 0;
         }
+
+       
+
         if (PS == true){
             
             data[1] = 0;
