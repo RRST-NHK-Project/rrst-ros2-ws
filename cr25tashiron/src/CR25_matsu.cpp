@@ -159,7 +159,7 @@ private:
 
         bool SHARE = msg->buttons[8];
         // bool OPTION = msg->buttons[9];
-        // bool PS = msg->buttons[10];
+        bool PS = msg->buttons[10];
 
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
@@ -180,6 +180,8 @@ private:
         //自動モード
         if (MANUALMODE == false)
         {
+            //std::cout << "自動モード" << std::endl;
+            data[7] = 0;
             if (CIRCLE)
             {
                Action::sand();
@@ -216,6 +218,18 @@ private:
         //手動モード
         else if (MANUALMODE == true)
         {
+            //std::cout << "手動モード" << std::endl;
+        
+            data[7] = 1;
+
+            data[1] = 0;
+            data[2] = 0;
+            data[3] = 0;
+            data[4] = 0;
+            data[5] = 0;
+            data[6] = 0;
+            
+            
             if (CIRCLE)
             {
                Action::sand();
@@ -248,6 +262,15 @@ private:
             {
                 Action::right(); // CIRCLEボタンが押されていない場合は0に設定
             }
+            // data[4] = 0;
+            // data[5] = 0;
+            // data[6] = 0;
+        }
+        if (PS == true){
+            
+            data[1] = 0;
+            data[2] = 0;
+            data[3] = 0;
             data[4] = 0;
             data[5] = 0;
             data[6] = 0;
