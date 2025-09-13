@@ -159,7 +159,6 @@ private:
         last_ps_state_ = PS;
 
         //サーボ1の制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        //R2順方向
         if(R2 > 0){   //ゼロイチ判断
             R2 = 1;
         }else{
@@ -169,7 +168,6 @@ private:
         if (R2 && !prev_R2) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             SERVO1_angle = SERVO1_angle +10;
         }
-        //R1逆方向
         // 0 → 1 に変化したときだけサーボ1が10ずつ減算されていく
         else if (R1 && !prev_R1) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             SERVO1_angle = SERVO1_angle -10;
@@ -183,7 +181,6 @@ private:
         data[7] = SERVO1_angle + SERVO1_CAL;
 
         //サーボ2の制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        //L2順方向
         if(L2 > 0){   //ゼロイチ判断
             L2 = 1;
         }else{
@@ -193,7 +190,6 @@ private:
         if (L2 && !prev_L2) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             SERVO2_angle = SERVO2_angle +10;
         }
-        //R1逆方向
         // 0 → 1 に変化したときだけサーボ2が10ずつ減算されていく
         else if (L1 && !prev_L1) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             SERVO2_angle = SERVO2_angle -10;
@@ -280,7 +276,7 @@ private:
         prev_LEFT = LEFT;
         prev_RIGHT = RIGHT;
 
-        std::cout << data[7] << ", " << data[8] << ", " << data[9] << std::endl;
+        //std::cout << data[7] << ", " << data[8] << ", " << data[9] << std::endl;
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
