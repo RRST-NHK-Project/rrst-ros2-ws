@@ -10,6 +10,7 @@
 // extern const std::string IP_DR;
 // extern const std::string IP_TEST;
 extern const std::string IP_AP4_MAIN;
+extern const std::string IP_AP4_SHOOT;
 
 // extern const int PORT_MR_SD;
 // extern const int PORT_MR;
@@ -17,5 +18,6 @@ extern const std::string IP_AP4_MAIN;
 // extern const int PORT_DR;
 // extern const int PORT_TEST;
 extern const int PORT_AP4_MAIN;
+extern const int PORT_AP4_SHOOT;
 
 #endif // IP_HPP
