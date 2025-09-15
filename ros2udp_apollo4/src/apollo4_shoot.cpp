@@ -45,20 +45,28 @@ bool prev_L1 = false;       //前回のL1の状態
 bool prev_L2 = false;       //前回のL2の状態
 bool prev_LEFT = false;     //前回のLEFTの状態
 bool prev_RIGHT = false;    //前回のRIGHTの状態
+bool prev_UP = false;       //前回のUPの状態
+bool prev_DOWN = false;     //前回のDOWNの状態
+bool prev_SQUARE = false;   //前回のSQUAREの状態
+bool prev_CIRCLE = false;   //前回のCIRCLEの状態
 
 //サーボ
-int SERVO1_angle = 90;       //サーボ1
-int SERVO2_angle = 90;       //サーボ2
-int SERVO3_angle = 90;       //サーボ3
+int SERVO1_angle = 0;      //サーボ1
+int SERVO2_angle = 70;      //サーボ2
+int SERVO3_angle = 70;      //サーボ3
+int SERVO4_angle = 70;      //サーボ4
+int SERVO5_angle = 70;      //サーボ5
 
 // サーボの組み付け時のズレを補正（度数法）
 int SERVO1_CAL = 0;
 int SERVO2_CAL = 0;
 int SERVO3_CAL = 0;
+int SERVO4_CAL = 0;
+int SERVO5_CAL = 0;
 
 // マイコンに送信されるデータ配列
 // [θ1, θ2, θ3, θ4, θ5, グリッパー] の指令値を格納
-std::vector<int16_t> data(19, 0);
+std::vector<int16_t> data(23, 0);
 /*
 マイコンに送信される配列"data"
 debug: マイコンのprintfを有効化, MD: モータードライバー, TR: トランジスタ
@@ -83,6 +91,36 @@ debug: マイコンのprintfを有効化, MD: モータードライバー, TR: �
 | data[16] | TR6 | 0 or 1|
 | data[17] | TR7 | 0 or 1|
 | data[18] | TR8 | 0 or 1|
+*/
+
+/*
+マイコンに送信される配列"data"
+debug: マイコンのprintfを有効化, MD: モータードライバー, TR: トランジスタ
+| data[n] | 詳細 | 範囲 |
+| ---- | ---- | ---- |
+| data[0] | debug | 0 or 1 |
+| data[1] | MD1 | -100 ~ 100 |
+| data[2] | MD2 | -100 ~ 100 |
+| data[3] | MD3 | -100 ~ 100 |
+| data[4] | MD4 | -100 ~ 100 |
+| data[5] | MD5 | -100 ~ 100 |
+| data[6] | MD6 | -100 ~ 100 |
+| data[7] | Servo1 | 0 ~ 270 |
+| data[8] | Servo2 | 0 ~ 270 |
+| data[9] | Servo3 | 0 ~ 270 |
+| data[10] | Servo4 | 0 ~ 270 |
+| data[11] | Servo5 | 0 ~ 270 |
+| data[12] | Servo6 | 0 ~ 270 |
+| data[13] | Servo7 | 0 ~ 270 | 
+| data[14] | Servo8 | 0 ~ 270 |
+| data[15] | TR1 | 0 or 1|
+| data[16] | TR2 | 0 or 1|
+| data[17] | TR3 | 0 or 1|
+| data[18] | TR4 | 0 or 1|
+| data[19] | TR5 | 0 or 1|
+| data[20] | TR6 | 0 or 1|
+| data[21] | TR7 | 0 or 1|
+| data[12] | TR8 | 0 or 1|
 */
 
 class PS4_Listener : public rclcpp::Node {
@@ -114,9 +152,9 @@ private:
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
         // --- 1. コントローラー入力の読み取りと整形 ---
         // 各ボタンの状態を分かりやすい変数に格納
-        //bool SQUARE   = msg->buttons[3];
-        //bool CIRCLE   = msg->buttons[1];
-        //bool TRIANGLE = msg->buttons[2];
+        bool SQUARE   = msg->buttons[3];
+        bool CIRCLE   = msg->buttons[1];
+        bool TRIANGLE = msg->buttons[2];
         //bool CROSS    = msg->buttons[0];
 
         bool L1 = msg->buttons[4];
@@ -126,8 +164,8 @@ private:
         bool PS     = msg->buttons[10];
 
         // 十字キー (アナログ軸として入力される)
-        //bool UP    = msg->axes[7] == 1.0;
-        //bool DOWN  = msg->axes[7] == -1.0;
+        bool UP    = msg->axes[7] == 1.0;
+        bool DOWN  = msg->axes[7] == -1.0;
         bool LEFT  = msg->axes[6] == 1.0;
         bool RIGHT = msg->axes[6] == -1.0;
 
@@ -166,19 +204,19 @@ private:
         }
         // 0 → 1 に変化したときだけサーボ1が10ずつ加算されていく
         if (R2 && !prev_R2) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
-            SERVO1_angle = SERVO1_angle +10;
+            SERVO1_angle = SERVO1_angle +5;
         }
         // 0 → 1 に変化したときだけサーボ1が10ずつ減算されていく
         else if (R1 && !prev_R1) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
-            SERVO1_angle = SERVO1_angle -10;
+            SERVO1_angle = SERVO1_angle -5;
         }
-        if (SERVO1_angle > 180){
-            SERVO1_angle = 180;
+        if (SERVO1_angle > 270){
+            SERVO1_angle = 270;
         }else if(SERVO1_angle < 0){
             SERVO1_angle = 0;
         }
         //サーボ1に指令
-        data[7] = SERVO1_angle + SERVO1_CAL;
+        data[11] = SERVO1_angle + SERVO1_CAL;
 
         //サーボ2の制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         if(L2 > 0){   //ゼロイチ判断
@@ -188,36 +226,77 @@ private:
         }
         // 0 → 1 に変化したときだけサーボ2が10ずつが加算されていく
         if (L2 && !prev_L2) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
-            SERVO2_angle = SERVO2_angle +10;
+            SERVO2_angle = SERVO2_angle +5;
         }
         // 0 → 1 に変化したときだけサーボ2が10ずつ減算されていく
         else if (L1 && !prev_L1) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
-            SERVO2_angle = SERVO2_angle -10;
+            SERVO2_angle = SERVO2_angle -5;
         }
-        if (SERVO2_angle > 180){
-            SERVO2_angle = 180;
+        if (SERVO2_angle > 70){
+            SERVO2_angle = 70;
         }else if(SERVO2_angle < 0){
             SERVO2_angle = 0;
         }
         //サーボ2に指令
-        data[8] = SERVO2_angle + SERVO2_CAL;
+        data[12] = SERVO2_angle + SERVO2_CAL;
 
         //サーボ3の制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         // 0 → 1 に変化したときだけサーボ3が10ずつが加算されていく
         if (LEFT && !prev_LEFT) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
-            SERVO3_angle = SERVO3_angle +10;
+            SERVO3_angle = SERVO3_angle +5;
         }
         // 0 → 1 に変化したときだけサーボ3が10ずつ減算されていく
         else if (RIGHT && !prev_RIGHT) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
-            SERVO3_angle = SERVO3_angle -10;
+            SERVO3_angle = SERVO3_angle -5;
         }
-        if (SERVO3_angle > 180){
-            SERVO3_angle = 180;
+        if (SERVO3_angle > 70){
+            SERVO3_angle = 70;
         }else if(SERVO3_angle < 0){
             SERVO3_angle = 0;
         }
         //サーボ3に指令
-        data[9] = SERVO3_angle + SERVO3_CAL;
+        data[13] = SERVO3_angle + SERVO3_CAL;
+
+        //サーボ4の制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        // 0 → 1 に変化したときだけサーボ4が10ずつが加算されていく
+        if (UP && !prev_UP) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
+            SERVO4_angle = SERVO4_angle +5;
+        }
+        // 0 → 1 に変化したときだけサーボ4が10ずつ減算されていく
+        else if (DOWN && !prev_DOWN) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
+            SERVO4_angle = SERVO4_angle -5;
+        }
+        if (SERVO4_angle > 70){
+            SERVO4_angle = 70;
+        }else if(SERVO4_angle < 0){
+            SERVO4_angle = 0;
+        }
+        //サーボ4に指令
+        data[14] = SERVO4_angle + SERVO4_CAL;
+
+        //サーボ5の制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        // 0 → 1 に変化したときだけサーボ5が10ずつが加算されていく
+        if (SQUARE && !prev_SQUARE) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
+            SERVO5_angle = SERVO5_angle +5;
+        }
+        // 0 → 1 に変化したときだけサーボ5が10ずつ減算されていく
+        else if (CIRCLE && !prev_CIRCLE) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
+            SERVO5_angle = SERVO5_angle -5;
+        }
+        if (SERVO5_angle > 70){
+            SERVO5_angle = 70;
+        }else if(SERVO5_angle < 0){
+            SERVO5_angle = 0;
+        }
+        //サーボ5に指令
+        data[10] = SERVO5_angle + SERVO5_CAL;
+
+        //エアシリンダの制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        if(TRIANGLE){
+            data[15] = 1;
+        }else{
+            data[15] = 0;
+        }
 
 
         // 停止状態なら、全モーター指令を0にして処理を中断
@@ -275,8 +354,12 @@ private:
         prev_L2 = L2;
         prev_LEFT = LEFT;
         prev_RIGHT = RIGHT;
+        prev_UP = UP;
+        prev_DOWN = DOWN;
+        prev_SQUARE = SQUARE;
+        prev_CIRCLE = CIRCLE;
 
-        //std::cout << data[7] << ", " << data[8] << ", " << data[9] << std::endl;
+        std::cout << data[11] << ", " << data[12] << ", " << data[13] << std::endl;
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
