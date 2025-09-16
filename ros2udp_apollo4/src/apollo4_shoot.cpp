@@ -51,10 +51,10 @@ bool prev_SQUARE = false;   //前回のSQUAREの状態
 bool prev_CIRCLE = false;   //前回のCIRCLEの状態
 
 //サーボ
-int SERVO1_angle = 0;      //サーボ1
+int SERVO1_angle = 70;      //サーボ1
 int SERVO2_angle = 70;      //サーボ2
 int SERVO3_angle = 70;      //サーボ3
-int SERVO4_angle = 70;      //サーボ4
+int SERVO4_angle = 65;      //サーボ4
 int SERVO5_angle = 70;      //サーボ5
 
 // サーボの組み付け時のズレを補正（度数法）
@@ -83,14 +83,15 @@ debug: マイコンのprintfを有効化, MD: モータードライバー, TR: �
 | data[8] | Servo2 | 0 ~ 270 |
 | data[9] | Servo3 | 0 ~ 270 |
 | data[10] | Servo4 | 0 ~ 270 |
-| data[11] | TR1 | 0 or 1|
-| data[12] | TR2 | 0 or 1|
-| data[13] | TR3 | 0 or 1|
-| data[14] | TR4 | 0 or 1|
-| data[15] | TR5 | 0 or 1|
-| data[16] | TR6 | 0 or 1|
-| data[17] | TR7 | 0 or 1|
-| data[18] | TR8 | 0 or 1|
+| data[11] | Servo5 | 0 ~ 270 |
+| data[12] | TR1 | 0 or 1|
+| data[13] | TR2 | 0 or 1|
+| data[14] | TR3 | 0 or 1|
+| data[15] | TR4 | 0 or 1|
+| data[16] | TR5 | 0 or 1|
+| data[17] | TR6 | 0 or 1|
+| data[18] | TR7 | 0 or 1|
+| data[19] | TR8 | 0 or 1|
 */
 
 /*
@@ -210,13 +211,13 @@ private:
         else if (R1 && !prev_R1) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             SERVO1_angle = SERVO1_angle -5;
         }
-        if (SERVO1_angle > 270){
-            SERVO1_angle = 270;
+        if (SERVO1_angle > 70){
+            SERVO1_angle = 70;
         }else if(SERVO1_angle < 0){
             SERVO1_angle = 0;
         }
         //サーボ1に指令
-        data[11] = SERVO1_angle + SERVO1_CAL;
+        data[7] = SERVO1_angle + SERVO1_CAL;
 
         //サーボ2の制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         if(L2 > 0){   //ゼロイチ判断
@@ -238,7 +239,7 @@ private:
             SERVO2_angle = 0;
         }
         //サーボ2に指令
-        data[12] = SERVO2_angle + SERVO2_CAL;
+        data[8] = SERVO2_angle + SERVO2_CAL;
 
         //サーボ3の制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         // 0 → 1 に変化したときだけサーボ3が10ずつが加算されていく
@@ -255,7 +256,7 @@ private:
             SERVO3_angle = 0;
         }
         //サーボ3に指令
-        data[13] = SERVO3_angle + SERVO3_CAL;
+        data[9] = SERVO3_angle + SERVO3_CAL;
 
         //サーボ4の制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         // 0 → 1 に変化したときだけサーボ4が10ずつが加算されていく
@@ -266,13 +267,13 @@ private:
         else if (DOWN && !prev_DOWN) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             SERVO4_angle = SERVO4_angle -5;
         }
-        if (SERVO4_angle > 70){
-            SERVO4_angle = 70;
+        if (SERVO4_angle > 65){
+            SERVO4_angle = 65;
         }else if(SERVO4_angle < 0){
             SERVO4_angle = 0;
         }
         //サーボ4に指令
-        data[14] = SERVO4_angle + SERVO4_CAL;
+        data[10] = SERVO4_angle + SERVO4_CAL;
 
         //サーボ5の制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         // 0 → 1 に変化したときだけサーボ5が10ずつが加算されていく
@@ -283,19 +284,19 @@ private:
         else if (CIRCLE && !prev_CIRCLE) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             SERVO5_angle = SERVO5_angle -5;
         }
-        if (SERVO5_angle > 70){
-            SERVO5_angle = 70;
+        if (SERVO5_angle > 75){
+            SERVO5_angle = 75;
         }else if(SERVO5_angle < 0){
             SERVO5_angle = 0;
         }
         //サーボ5に指令
-        data[10] = SERVO5_angle + SERVO5_CAL;
+        data[11] = SERVO5_angle + SERVO5_CAL;
 
         //エアシリンダの制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         if(TRIANGLE){
-            data[15] = 1;
+            data[12] = 1;
         }else{
-            data[15] = 0;
+            data[12] = 0;
         }
 
 
@@ -359,7 +360,8 @@ private:
         prev_SQUARE = SQUARE;
         prev_CIRCLE = CIRCLE;
 
-        std::cout << data[11] << ", " << data[12] << ", " << data[13] << std::endl;
+        //std::cout << data[11] << std::endl;
+        std::cout << data[7] << ", " << data[8] << ", " << data[9] <<", "<< data[10] << ", " << data[11] << ", " << data[12]<< std::endl;
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
