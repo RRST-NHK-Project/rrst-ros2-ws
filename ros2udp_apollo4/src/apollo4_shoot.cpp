@@ -54,8 +54,8 @@ bool prev_CIRCLE = false;   //前回のCIRCLEの状態
 int SERVO1_angle = 70;      //サーボ1
 int SERVO2_angle = 70;      //サーボ2
 int SERVO3_angle = 70;      //サーボ3
-int SERVO4_angle = 65;      //サーボ4
-int SERVO5_angle = 70;      //サーボ5
+int SERVO4_angle = 0;      //サーボ4
+int SERVO5_angle = 5;      //サーボ5
 
 // サーボの組み付け時のズレを補正（度数法）
 int SERVO1_CAL = 0;
@@ -211,8 +211,8 @@ private:
         else if (R1 && !prev_R1) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             SERVO1_angle = SERVO1_angle -5;
         }
-        if (SERVO1_angle > 70){
-            SERVO1_angle = 70;
+        if (SERVO1_angle > 270){
+            SERVO1_angle = 270;
         }else if(SERVO1_angle < 0){
             SERVO1_angle = 0;
         }
@@ -284,8 +284,8 @@ private:
         else if (CIRCLE && !prev_CIRCLE) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             SERVO5_angle = SERVO5_angle -5;
         }
-        if (SERVO5_angle > 75){
-            SERVO5_angle = 75;
+        if (SERVO5_angle > 90){
+            SERVO5_angle = 90;
         }else if(SERVO5_angle < 0){
             SERVO5_angle = 0;
         }
