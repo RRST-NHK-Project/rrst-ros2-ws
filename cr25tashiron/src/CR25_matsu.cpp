@@ -46,6 +46,9 @@ int32 robomas_target_angle # [degree]
 */
 
 #define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
+#define front_speed 50 //前後の角度変化
+#define updown_speed 50 //上下の角度変化
+#define turn_speed 10 //回転の角度変化
 
 bool MANUALMODE = false;
 
@@ -56,32 +59,32 @@ std::vector<int16_t> data(25, 0); // マイコンに送信される配列"data"
 class Action{
 public:
     static void first_position(){
-        data[3] = -45;
+        data[3] = -turn_speed;
     }
     static void second_position(){
         data[3] = 0;
     }
     static void third_position(){
-        data[3] = 45;
+        data[3] = turn_speed;
     }
     static void shoot(){
         data[3] = -90;
     }
     static void forward(){
-        data[1] = 1000;
-        data[2] = -1000;
+        data[1] = front_speed;
+        data[2] = -front_speed;
     }
     static void back(){
-        data[1] = -1000;
-        data[2] = 1000;
+        data[1] = -front_speed;
+        data[2] = front_speed;
     }
     static void up(){
-        data[1] = 720;
-        data[2] = 720;
+        data[1] = updown_speed;
+        data[2] = updown_speed;
     }
     static void down(){
-        data[1] = -720;
-        data[2] = -720;
+        data[1] = -updown_speed;
+        data[2] = -updown_speed;
     }
     static void sand(){
         data[17] = 1;
@@ -96,20 +99,20 @@ public:
         data[6] = 100;
     }
     static void forward_m(){
-        data[4] = 50;
-        data[5] = -50;
+        data[4] = 100;
+        data[5] = -100;
     }
     static void back_m(){
-        data[4] = -50;
-        data[5] = 50;
+        data[4] = -100;
+        data[5] = 100;
     }
     static void up_m(){
-        data[4] = 50;
-        data[5] = 50;
+        data[4] = 100;
+        data[5] = 100;
     }
     static void down_m(){
-        data[4] = -50;
-        data[5] = -50;
+        data[4] = -100;
+        data[5] = -100;
     }
     
 
@@ -159,8 +162,8 @@ private:
         // float L2_DIGITAL = (-1 * msg->axes[2] + 1) / 2;
         // float R2_DIGITAL = (-1 * msg->axes[5] + 1) / 2;
 
-        // bool L2 = msg->buttons[6];
-        // bool R2 = msg->buttons[7];
+        bool L2 = msg->buttons[6];
+        bool R2 = msg->buttons[7];
 
         bool SHARE = msg->buttons[8];
         // bool OPTION = msg->buttons[9];
@@ -189,11 +192,21 @@ private:
         {
             //std::cout << "自動モード" << std::endl;
 
-            // data[1] = 0;
-            // data[2] = 0;
-            // data[3] = 0;
+            data[1] = 0;
+            data[2] = 0;
+            data[3] = 0;
             data[7] = 0;
-
+            data[8]= 0; 
+            if(L2)
+            {
+            Action::forward();
+            data[8]= 1;
+            }
+            if(R2)
+            {
+            Action::back();
+            data[8]= 1;
+            }
             if (CIRCLE)
             {
                Action::sand();
@@ -201,10 +214,12 @@ private:
             if (TRIANGLE)
             {
                Action::forward();
+               data[8]= 1;
             }
             else if (CROSS)
             {
                Action::back();
+               data[8]= 1;
             }
             else if (SQUARE)
             {
@@ -213,18 +228,22 @@ private:
             else if (UP)
             {                   // 後退
                 Action::up();
+                data[8]= 1;
             }
             else if (DOWN)
             {                   // 前進
                Action::down();
+               data[8]= 1;
             }
             else if (L1)
             {
                Action::first_position(); // CIRCLEボタンが押されていない場合は0に設定
+               data[8]= 1;
             }
             else if (R1)
             {
                 Action::third_position(); // CIRCLEボタンが押されていない場合は0に設定
+                data[8]= 1;
             }
         }
         //手動モード
@@ -293,11 +312,14 @@ private:
             data[6] = 0;
         }
         // デバッグ用（for文でcoutするとカクつく）
-        std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", ";
-        std::cout << data[4] << ", " << data[5] << ", " << data[6] << ", " << data[7] << ", ";
-        std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
-        std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
-        std::cout << data[16] << ", " << data[17] << ", " << data[18] << std::endl;
+        // std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", ";
+        // std::cout << data[4] << ", " << data[5] << ", " << data[6] << ", " << data[7] << ", ";
+        // std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
+        // std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
+        // std::cout << data[16] << ", " << data[17] << ", " << data[18] << std::endl;
+        //std::cout << "MANUALMODE = " << data[7] << std::endl;
+        //std::cout << "MANUALMODE = " << data[8] << std::endl;
+        std::cout << data[1] << ", " << data[2] << ", " << data[8] << std::endl;
 
         publish_data();
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
