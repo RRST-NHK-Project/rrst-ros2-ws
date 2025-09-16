@@ -244,16 +244,16 @@ private:
         // DS3218proなので270度までいけます
         if (SQUARE && !CIRCLE){
         // 徐々に正転
-        servo_angle += servo_step;
-        if (servo_angle > 270) {// 上限で止める
-            servo_angle = 270;
-            }
-        } else if (CIRCLE && !SQUARE){
-        // 徐々に逆転
         servo_angle -= servo_step;
         if (servo_angle < 0) {// 下限で止める
             servo_angle = 0;
             }
+        } else if (CIRCLE && !SQUARE){
+        // 徐々に逆転
+        servo_angle += servo_step;
+        if (servo_angle > 270) {// 上限で止める
+            servo_angle = 270;
+            }    
         }
         // サーボ指令
         data[14] = servo_angle + SERVO6_CAL;
