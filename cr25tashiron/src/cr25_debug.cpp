@@ -15,15 +15,14 @@ RRST-NHK-Project 2025
 #include "std_msgs/msg/int32_multi_array.hpp"
 #include <vector>
 
-*/
-// #define MC_PRINTF 0      // マイコン側のprintfを無効化・有効化(0 or 1)
+#define MC_PRINTF 0      // マイコン側のprintfを無効化・有効化(0 or 1)
 #define front_speed 360  // 前後の角度変化
 #define updown_speed 150 // 上下の角度変化
 #define speed 200        // 移動の速度
 #define turn_speed 20    // 回転の角度変化
 #define deg 2.22
 
-    bool MANUALMODE = true;
+bool MANUALMODE = true;
 
 std::vector<int16_t> data(25, 0); // マイコンに送信される配列"data"
 
@@ -91,7 +90,7 @@ private:
         last_share = SHARE;
         MANUALMODE = share_latch;
 
-             publish_data();
+        publish_data();
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
