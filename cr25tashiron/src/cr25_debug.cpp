@@ -90,6 +90,14 @@ private:
         last_share = SHARE;
         MANUALMODE = share_latch;
 
+        // L1押下で増加、R1押下で減少
+        if (L1) {
+            data[3] = 30;
+        }
+        if (R1) {
+            data[3] = -30;
+        }
+
         publish_data();
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
