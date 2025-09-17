@@ -361,7 +361,7 @@ private:
         prev_CIRCLE = CIRCLE;
 
         //std::cout << data[11] << std::endl;
-        std::cout << data[7] << ", " << data[8] << ", " << data[9] <<", "<< data[10] << ", " << data[11] << ", " << data[12]<< std::endl;
+        //std::cout << data[7] << ", " << data[8] << ", " << data[9] <<", "<< data[10] << ", " << data[11] << ", " << data[12]<< std::endl;
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 

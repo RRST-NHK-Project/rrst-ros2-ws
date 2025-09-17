@@ -49,7 +49,7 @@ int servo_step = 2;          // 1回の更新で動く角度
 
 // サーボの組み付け時のズレを補正（度数法）
 int SERVO1_CAL = 0;
-int SERVO2_CAL = -40;
+int SERVO2_CAL = 0;
 int SERVO3_CAL = 0;
 int SERVO4_CAL = 0;
 int SERVO5_CAL = 0;
@@ -200,42 +200,42 @@ private:
             data[10] = 90 + SERVO2_CAL;
             data[11] = 90 + SERVO3_CAL;
             data[12] = 90 + SERVO4_CAL;
-            data[13] = 90 + SERVO5_CAL;
+            data[13] = 100 + SERVO5_CAL;
         }
         else if(R_count %6 == 1) {  // 取る状態1
-            data[9] = 45 + SERVO1_CAL;
-            data[10] = 100 + SERVO2_CAL;
-            data[11] = 100 + SERVO3_CAL;
-            data[12] = 100 + SERVO4_CAL;
-            data[13] = 100 + SERVO5_CAL;
+            data[9] = 0 + SERVO1_CAL;
+            data[10] = 150 + SERVO2_CAL;
+            data[11] = 0 + SERVO3_CAL;
+            data[12] = 150 + SERVO4_CAL;
+            data[13] = 150 + SERVO5_CAL;
         }
         else if(R_count %6 == 2) {  // 取る状態2
-            data[9] = 100 + SERVO1_CAL;
-            data[10] = 45 + SERVO2_CAL;
-            data[11] = 100 + SERVO3_CAL;
-            data[12] = 100 + SERVO4_CAL;
-            data[13] = 100 + SERVO5_CAL;
+            data[9] = 150 + SERVO1_CAL;
+            data[10] = 0 + SERVO2_CAL;
+            data[11] = 0 + SERVO3_CAL;
+            data[12] = 150 + SERVO4_CAL;
+            data[13] = 150 + SERVO5_CAL;
         }
         else if(R_count %6 == 3) {  // 取る状態3
-            data[9] = 100 + SERVO1_CAL;
-            data[10] = 100 + SERVO2_CAL;
-            data[11] = 45 + SERVO3_CAL;
-            data[12] = 100 + SERVO4_CAL;
-            data[13] = 100 + SERVO5_CAL;
+            data[9] = 150 + SERVO1_CAL;
+            data[10] = 150 + SERVO2_CAL;
+            data[11] = 0 + SERVO3_CAL;
+            data[12] = 150 + SERVO4_CAL;
+            data[13] = 150 + SERVO5_CAL;
         }
         else if(R_count %6 == 4){   // 取る状態4
-            data[9] = 100 + SERVO1_CAL;
-            data[10] = 100 + SERVO2_CAL;
-            data[11] = 100 + SERVO3_CAL;
-            data[12] = 45 + SERVO4_CAL;
-            data[13] = 100 + SERVO5_CAL;
+            data[9] = 150 + SERVO1_CAL;
+            data[10] = 150 + SERVO2_CAL;
+            data[11] = 0 + SERVO3_CAL;
+            data[12] = 0 + SERVO4_CAL;
+            data[13] = 150 + SERVO5_CAL;
         }
         else if(R_count %6 == 5){   // 取る状態5
-            data[9] = 100 + SERVO1_CAL;
-            data[10] = 100 + SERVO2_CAL;
-            data[11] = 100 + SERVO3_CAL;
-            data[12] = 100 + SERVO4_CAL;
-            data[13] = 45 + SERVO5_CAL;
+            data[9] = 150 + SERVO1_CAL;
+            data[10] = 150 + SERVO2_CAL;
+            data[11] = 0 + SERVO3_CAL;
+            data[12] = 150 + SERVO4_CAL;
+            data[13] = 0 + SERVO5_CAL;
         }
         
 
@@ -307,7 +307,7 @@ private:
         // デバッグ用（for文でcoutするとカクつく）
         //std::cout << R2_count << std::endl;
         //std::cout << data[5] << ", " << data[6] << std::endl; //吸着できているか確認する用
-        //std::cout << data[9] << ", " << data[10] << ", " << data[11] << ", " << data[12] << ", " << data[13] << std::endl;
+        std::cout << data[9] << ", " << data[10] << ", " << data[11] << ", " << data[12] << ", " << data[13] << std::endl;
         //std::cout << data[1] << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
