@@ -174,6 +174,7 @@ private:
 
         static bool last_share = false; // 前回の状態を保持する static 変数
         static bool share_latch = false;
+        //static bool last_triangle = false;
 
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
@@ -207,11 +208,11 @@ private:
             Action::back();
             data[8]= 1;
             }
-            if (CIRCLE)
+            if (CIRCLE )
             {
                Action::sand();
             }
-            if (TRIANGLE)
+            if (TRIANGLE )
             {
                Action::forward();
                data[8]= 1;
@@ -319,7 +320,7 @@ private:
         // std::cout << data[16] << ", " << data[17] << ", " << data[18] << std::endl;
         //std::cout << "MANUALMODE = " << data[7] << std::endl;
         //std::cout << "MANUALMODE = " << data[8] << std::endl;
-        std::cout << data[1] << ", " << data[2] << ", " << data[8] << std::endl;
+        std::cout << " MANUALMODE =" << data[7] << std::endl;
 
         publish_data();
         std::this_thread::sleep_for(std::chrono::milliseconds(20));

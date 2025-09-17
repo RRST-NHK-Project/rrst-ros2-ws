@@ -41,23 +41,19 @@ public:
 
 private:   
     void angle_listener_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
-        int sw1 = msg->data[0]; // ボタンの状態を取得
-        int angle1 = msg->data[8]; // 現在の角度を取得
-       
-         // スイッチが 0→1 になった瞬間にゼロリセット
-        if (sw1 == 1 && last_sw_1 == 0) {
-            zero_offset_1 = angle1;
-            zero_set_1 = true;
-            RCLCPP_INFO(this->get_logger(), "Zero set at angle=%d", angle1);
-        }
-        last_sw_1 = sw1;
+        bool sw1 = -msg->data[4]+1; // ボタンの状態を取得
+        bool sw2 = -msg->data[5]+1; // ボタンの状態を取得
+        bool sw3 = -msg->data[6]+1; // ボタンの状態を取得
+       // bool angle3 = msg->data[10]; // ボタンの状態を取得
+        //bool last_sw_3 = false;
 
-        int corrected_angle1 = angle1;
-        if (zero_set_1) {
-            corrected_angle1 = angle1 - zero_offset_1;
-        }
-        
-       out_data[1] = corrected_angle1; // サーボ1の角度指令
+
+        // if (last_sw_3 != sw3 && sw3 == true) {
+        //     angle3 = 0;
+        // }
+       out_data[1] = sw1; 
+         out_data[2] = sw2;
+            out_data[3] = sw3;
         publish_data();
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
 
