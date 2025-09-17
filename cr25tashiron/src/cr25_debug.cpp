@@ -1,7 +1,6 @@
 /*
 RRST-NHK-Project 2025
-PS4コントローラーの入力を取得するサンプルプログラム
-esp32マイコンにアクチュエータ指令を送るサンプルプログラム
+キャチロボ2025デバッグ用ノード
 */
 
 // 標準
@@ -16,40 +15,15 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 #include "std_msgs/msg/int32_multi_array.hpp"
 #include <vector>
 
-// 計算
-// #include <cmath>
-
-/*メッセージの定義
-# 共通
-int32 actuator_id          # アクチュエータの種別ごと（例：MD1とSERVO1は共存可能）
-int32 actuator_type        # アクチュエータ種別 (0:デバッグ, 1:モタドラ, 2:サーボ, 3:ソレノイド, 4:ロボマス)
-string actuator_type_name  # "MD", "SERVO", "SV", "ROBOMAS"
-bool enable                # 有効・無効
-
-# --- モタドラ用 ---
-int32 motor_duty           # [%]
-int32 motor_target_rpm     # [RPM]
-int32 motor_target_pos     #
-int32 motor_target_torque  #
-
-# --- サーボ用 ---
-int32 servo_angle_degree   # [deg]
-int32 servo_speed          #
-
-# --- ソレノイドバルブ用 ---
-bool solenoid_state        # [True/False]
-
-# --- ロボマス用 ---
-int32 robomas_target_angle # [degree]
 */
-#define MC_PRINTF 0      // マイコン側のprintfを無効化・有効化(0 or 1)
+// #define MC_PRINTF 0      // マイコン側のprintfを無効化・有効化(0 or 1)
 #define front_speed 360  // 前後の角度変化
 #define updown_speed 150 // 上下の角度変化
 #define speed 200        // 移動の速度
 #define turn_speed 20    // 回転の角度変化
 #define deg 2.22
 
-bool MANUALMODE = false;
+    bool MANUALMODE = true;
 
 std::vector<int16_t> data(25, 0); // マイコンに送信される配列"data"
 
