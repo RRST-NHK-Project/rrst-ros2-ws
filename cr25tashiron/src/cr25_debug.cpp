@@ -15,14 +15,14 @@ RRST-NHK-Project 2025
 #include "std_msgs/msg/int32_multi_array.hpp"
 #include <vector>
 
-#define MC_PRINTF 0      // マイコン側のprintfを無効化・有効化(0 or 1)
+#define DEG_VEL 1        // 0:角度/1:速度
 #define front_speed 360  // 前後の角度変化
 #define updown_speed 150 // 上下の角度変化
 #define speed 200        // 移動の速度
 #define turn_speed 20    // 回転の角度変化
 #define deg 2.22
 
-#define theta_step_deg 1
+#define theta_step_deg 30
 
 bool MANUALMODE = true;
 
@@ -83,7 +83,7 @@ private:
         static bool share_latch = false;
         // static bool last_triangle = false;
 
-        data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
+        data[0] = DEG_VEL; // マイコン側のprintfを無効化・有効化(0 or 1)
 
         if (SHARE && !last_share) {
             share_latch = !share_latch;
@@ -94,11 +94,19 @@ private:
 
         // L1押下で増加、R1押下で減少
         if (L1) {
-            data[3] += theta_step_deg;
-        }
-        if (R1) {
             data[3] -= theta_step_deg;
         }
+        if (R1) {
+            data[3] += theta_step_deg;
+        }
+
+        // if (R1) {
+        //     data[3] = -10; // 押している間だけ上方向
+        // } else if (L1) {
+        //     data[3] = 10; // 押している間だけ下方向
+        // } else {
+        //     data[3] = 0; // どちらも押していなければ停止
+        // }
 
         publish_data();
         // std::this_thread::sleep_for(std::chrono::milliseconds(10));
