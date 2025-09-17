@@ -44,11 +44,12 @@ bool solenoid_state        # [True/False]
 # --- ロボマス用 ---
 int32 robomas_target_angle # [degree]
 */
-
 #define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
-#define front_speed 50 //前後の角度変化
-#define updown_speed 50 //上下の角度変化
-#define turn_speed 10 //回転の角度変化
+#define front_speed 360 //前後の角度変化
+#define updown_speed 150 //上下の角度変化
+#define speed 200 //移動の速度
+#define turn_speed 20 //回転の角度変化
+#define deg 2.22
 
 bool MANUALMODE = false;
 
@@ -58,15 +59,19 @@ std::vector<int16_t> data(25, 0); // マイコンに送信される配列"data"
 //各機構シーケンスを格納するクラス
 class Action{
 public:
+    static void tokei(){
+        data[3] = -turn_speed*deg;
+    }
+    static void hantokei(){
+        data[3] = turn_speed*deg;
+    }
     static void first_position(){
-        data[3] = -turn_speed;
+        data[3] = -90*deg;
     }
     static void second_position(){
-        data[3] = 0;
+        data[3] = 90*deg;
     }
-    static void third_position(){
-        data[3] = turn_speed;
-    }
+    
     static void shoot(){
         data[3] = -90;
     }
@@ -99,20 +104,20 @@ public:
         data[6] = 100;
     }
     static void forward_m(){
-        data[4] = 100;
-        data[5] = -100;
+        data[4] = speed;
+        data[5] = -speed;
     }
     static void back_m(){
-        data[4] = -100;
-        data[5] = 100;
+        data[4] = -speed;
+        data[5] = speed;
     }
     static void up_m(){
-        data[4] = 100;
-        data[5] = 100;
+        data[4] = speed;
+        data[5] = speed;
     }
     static void down_m(){
-        data[4] = -100;
-        data[5] = -100;
+        data[4] = -speed;
+        data[5] = -speed;
     }
     
 
@@ -200,12 +205,12 @@ private:
             data[8]= 0; 
             if(L2)
             {
-            Action::forward();
+            Action::first_position();
             data[8]= 1;
             }
             if(R2)
             {
-            Action::back();
+            Action::second_position();
             data[8]= 1;
             }
             if (CIRCLE )
@@ -214,12 +219,12 @@ private:
             }
             if (TRIANGLE )
             {
-               Action::forward();
+               Action::up();
                data[8]= 1;
             }
             else if (CROSS)
             {
-               Action::back();
+               Action::down();
                data[8]= 1;
             }
             else if (SQUARE)
@@ -228,22 +233,22 @@ private:
             }
             else if (UP)
             {                   // 後退
-                Action::up();
+                Action::forward();
                 data[8]= 1;
             }
             else if (DOWN)
             {                   // 前進
-               Action::down();
+               Action::back();
                data[8]= 1;
             }
             else if (L1)
             {
-               Action::first_position(); // CIRCLEボタンが押されていない場合は0に設定
+               Action::tokei(); // CIRCLEボタンが押されていない場合は0に設定
                data[8]= 1;
             }
             else if (R1)
             {
-                Action::third_position(); // CIRCLEボタンが押されていない場合は0に設定
+                Action::hantokei(); // CIRCLEボタンが押されていない場合は0に設定
                 data[8]= 1;
             }
         }
@@ -270,11 +275,11 @@ private:
             }
             if (TRIANGLE)
             {
-               Action::forward_m();
+               Action::up_m();
             }
             else if (CROSS)
             {
-               Action::back_m();
+               Action::down_m();
             }
             else if (SQUARE)
             {
@@ -282,11 +287,11 @@ private:
             }
             else if (UP)
             {                   // 後退
-                Action::up_m();
+                Action::forward_m();
             }
             else if (DOWN)
             {                   // 前進
-               Action::down_m();
+               Action::back_m();
             }
             else if (L1)
             {
@@ -323,7 +328,7 @@ private:
         std::cout << " MANUALMODE =" << data[7] << std::endl;
 
         publish_data();
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
     void publish_data()

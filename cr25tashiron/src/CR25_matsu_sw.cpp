@@ -41,7 +41,7 @@ public:
 
 private:   
     void angle_listener_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
-        bool sw1 = -msg->data[4]+1; // ボタンの状態を取得
+        bool sw1 = -msg->data[4]+1; // ボタンの状態を取得//from_esp32_1では初期値1で押されたら0になる
         bool sw2 = -msg->data[5]+1; // ボタンの状態を取得
         bool sw3 = -msg->data[6]+1; // ボタンの状態を取得
        // bool angle3 = msg->data[10]; // ボタンの状態を取得
@@ -55,7 +55,7 @@ private:
          out_data[2] = sw2;
             out_data[3] = sw3;
         publish_data();
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     }
     void publish_data() {
