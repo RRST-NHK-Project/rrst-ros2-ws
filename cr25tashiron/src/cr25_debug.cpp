@@ -22,6 +22,8 @@ RRST-NHK-Project 2025
 #define turn_speed 20    // 回転の角度変化
 #define deg 2.22
 
+#define theta_step_deg 1
+
 bool MANUALMODE = true;
 
 std::vector<int16_t> data(25, 0); // マイコンに送信される配列"data"
@@ -92,14 +94,14 @@ private:
 
         // L1押下で増加、R1押下で減少
         if (L1) {
-            data[3] = 30;
+            data[3] += theta_step_deg;
         }
         if (R1) {
-            data[3] = -30;
+            data[3] -= theta_step_deg;
         }
 
         publish_data();
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        // std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
     void publish_data() {
