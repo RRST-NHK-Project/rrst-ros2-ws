@@ -307,7 +307,7 @@ private:
         // デバッグ用（for文でcoutするとカクつく）
         //std::cout << R2_count << std::endl;
         //std::cout << data[5] << ", " << data[6] << std::endl; //吸着できているか確認する用
-        std::cout << data[9] << ", " << data[10] << ", " << data[11] << ", " << data[12] << ", " << data[13] << std::endl;
+        //std::cout << data[9] << ", " << data[10] << ", " << data[11] << ", " << data[12] << ", " << data[13] << std::endl;
         //std::cout << data[1] << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 

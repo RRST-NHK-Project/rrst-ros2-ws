@@ -49,6 +49,8 @@ bool prev_UP = false;       //前回のUPの状態
 bool prev_DOWN = false;     //前回のDOWNの状態
 bool prev_SQUARE = false;   //前回のSQUAREの状態
 bool prev_CIRCLE = false;   //前回のCIRCLEの状態
+bool prev_TRIANGLE = false; //前回のTRIANGLEの状態
+bool prev_CROSS = false;   //前回のTCIRCLEの状態
 
 //サーボ
 int SERVO1_angle = 70;      //サーボ1
@@ -57,12 +59,7 @@ int SERVO3_angle = 70;      //サーボ3
 int SERVO4_angle = 0;      //サーボ4
 int SERVO5_angle = 5;      //サーボ5
 
-// サーボの組み付け時のズレを補正（度数法）
-int SERVO1_CAL = 0;
-int SERVO2_CAL = 0;
-int SERVO3_CAL = 0;
-int SERVO4_CAL = 0;
-int SERVO5_CAL = 0;
+
 
 // マイコンに送信されるデータ配列
 // [θ1, θ2, θ3, θ4, θ5, グリッパー] の指令値を格納
@@ -155,7 +152,7 @@ private:
         // 各ボタンの状態を分かりやすい変数に格納
         bool SQUARE   = msg->buttons[3];
         bool CIRCLE   = msg->buttons[1];
-        //bool TRIANGLE = msg->buttons[2];
+        bool TRIANGLE = msg->buttons[2];
         bool CROSS    = msg->buttons[0];
 
         bool L1 = msg->buttons[4];
@@ -172,7 +169,7 @@ private:
 
         // L2/R2トリガー (-1.0 ~ 1.0 の値を 0.0 ~ 1.0 に変換)
         float L2 = (msg->axes[2] + 1.0) / 2.0;
-        float R2 = (msg->axes[5] + 1.0) / 2.0;
+        //float R2 = (msg->axes[5] + 1.0) / 2.0;
 
 
         // デッドゾーン以下のトリガー入力を無視
@@ -180,10 +177,10 @@ private:
             //RCLCPP_DEBUG(this->get_logger(), "L2トリガーがデッドゾーン以下: %f", L2);
             L2 = 0.0;
         }
-        if (R2 <= TRIGGER_DEADZONE) {
-            //RCLCPP_DEBUG(this->get_logger(), "R2トリガーがデッドゾーン以下: %f", R2);
-            R2 = 0.0;
-        }
+        // if (R2 <= TRIGGER_DEADZONE) {
+        //     //RCLCPP_DEBUG(this->get_logger(), "R2トリガーがデッドゾーン以下: %f", R2);
+        //     R2 = 0.0;
+        // }
 
         // --- 2. PSボタンによる起動/非常停止 (トグル) ---
         if (PS && !last_ps_state_) {
@@ -197,18 +194,14 @@ private:
         RCLCPP_DEBUG(this->get_logger(), "PSボタン状態: %d -> %d", last_ps_state_, PS);
         last_ps_state_ = PS;
 
-        //サーボ1の制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        if(R2 > 0){   //ゼロイチ判断
-            R2 = 1;
-        }else{
-            R2 = 0;
-        }
-        // 0 → 1 に変化したときだけサーボ1が10ずつ加算されていく
-        if (R2 && !prev_R2) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
+       
+        //&&&サーボ1の制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        // 0 → 1 に変化したときだけサーボ1が10ずつが加算されていく
+        if (LEFT && !prev_LEFT) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             SERVO1_angle = SERVO1_angle +5;
         }
         // 0 → 1 に変化したときだけサーボ1が10ずつ減算されていく
-        else if (R1 && !prev_R1) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
+        else if (RIGHT && !prev_RIGHT) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             SERVO1_angle = SERVO1_angle -5;
         }
         if (SERVO1_angle > 270){
@@ -217,20 +210,17 @@ private:
             SERVO1_angle = 0;
         }
         //サーボ1に指令
-        data[7] = SERVO1_angle + SERVO1_CAL;
+        data[7] = SERVO1_angle ;
 
-        //サーボ2の制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        if(L2 > 0){   //ゼロイチ判断
-            L2 = 1;
-        }else{
-            L2 = 0;
-        }
+        
+
+        //&&&サーボ2の制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         // 0 → 1 に変化したときだけサーボ2が10ずつが加算されていく
-        if (L2 && !prev_L2) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
+        if (UP && !prev_UP) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             SERVO2_angle = SERVO2_angle +5;
         }
-        // 0 → 1 に変化したときだけサーボ2が10ずつ減算されていく
-        else if (L1 && !prev_L1) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
+        // 0 → 1 に変化したときだけサーボ4が10ずつ減算されていく
+        else if (DOWN && !prev_DOWN) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             SERVO2_angle = SERVO2_angle -5;
         }
         if (SERVO2_angle > 70){
@@ -239,15 +229,22 @@ private:
             SERVO2_angle = 0;
         }
         //サーボ2に指令
-        data[8] = SERVO2_angle + SERVO2_CAL;
+        data[8] = SERVO2_angle ;
 
-        //サーボ3の制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        
+
+        //&&&サーボ3の制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        if(L2 > 0){   //ゼロイチ判断
+            L2 = 1;
+        }else{
+            L2 = 0;
+        }
         // 0 → 1 に変化したときだけサーボ3が10ずつが加算されていく
-        if (LEFT && !prev_LEFT) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
+        if (L2 && !prev_L2) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             SERVO3_angle = SERVO3_angle +5;
         }
         // 0 → 1 に変化したときだけサーボ3が10ずつ減算されていく
-        else if (RIGHT && !prev_RIGHT) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
+        else if (L1 && !prev_L1) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             SERVO3_angle = SERVO3_angle -5;
         }
         if (SERVO3_angle > 70){
@@ -255,16 +252,16 @@ private:
         }else if(SERVO3_angle < 0){
             SERVO3_angle = 0;
         }
-        //サーボ3に指令
-        data[9] = SERVO3_angle + SERVO3_CAL;
+        //サーボ2に指令
+        data[9] = SERVO3_angle ;
 
-        //サーボ4の制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        //&&&サーボ4の制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         // 0 → 1 に変化したときだけサーボ4が10ずつが加算されていく
-        if (UP && !prev_UP) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
+        if (SQUARE && !prev_SQUARE) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             SERVO4_angle = SERVO4_angle +5;
         }
-        // 0 → 1 に変化したときだけサーボ4が10ずつ減算されていく
-        else if (DOWN && !prev_DOWN) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
+        // 0 → 1 に変化したときだけサーボ5が10ずつ減算されていく
+        else if (CIRCLE && !prev_CIRCLE) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             SERVO4_angle = SERVO4_angle -5;
         }
         if (SERVO4_angle > 65){
@@ -273,15 +270,15 @@ private:
             SERVO4_angle = 0;
         }
         //サーボ4に指令
-        data[10] = SERVO4_angle + SERVO4_CAL;
+        data[10] = SERVO4_angle ;
 
-        //サーボ5の制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        //&&&サーボ5の制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         // 0 → 1 に変化したときだけサーボ5が10ずつが加算されていく
-        if (SQUARE && !prev_SQUARE) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
+        if (TRIANGLE && !prev_TRIANGLE) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             SERVO5_angle = SERVO5_angle +5;
         }
         // 0 → 1 に変化したときだけサーボ5が10ずつ減算されていく
-        else if (CIRCLE && !prev_CIRCLE) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
+        else if (CROSS && !prev_CROSS) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             SERVO5_angle = SERVO5_angle -5;
         }
         if (SERVO5_angle > 90){
@@ -290,10 +287,10 @@ private:
             SERVO5_angle = 0;
         }
         //サーボ5に指令
-        data[11] = SERVO5_angle + SERVO5_CAL;
+        data[11] = SERVO5_angle ;
 
         //エアシリンダの制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        if(CROSS){
+        if(R1){
             data[12] = 1;
         }else{
             data[12] = 0;
@@ -350,7 +347,6 @@ private:
 
         // 状態を更新
         prev_R1 = R1; 
-        prev_R2 = R2;
         prev_L1 = L1;
         prev_L2 = L2;
         prev_LEFT = LEFT;
@@ -359,9 +355,11 @@ private:
         prev_DOWN = DOWN;
         prev_SQUARE = SQUARE;
         prev_CIRCLE = CIRCLE;
+        prev_CROSS = CROSS;
+        prev_TRIANGLE = TRIANGLE;
 
         //std::cout << data[11] << std::endl;
-        //std::cout << data[7] << ", " << data[8] << ", " << data[9] <<", "<< data[10] << ", " << data[11] << ", " << data[12]<< std::endl;
+        std::cout << data[7] << ", " << data[8] << ", " << data[9] <<", "<< data[10] << ", " << data[11] << ", " << data[12]<< std::endl;
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
