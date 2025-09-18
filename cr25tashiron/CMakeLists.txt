@@ -31,6 +31,8 @@ ament_target_dependencies(actuator_msg_bridge rclcpp actuator_msg)
 add_executable(cr25_matsu_sw src/CR25_matsu_sw.cpp)
 ament_target_dependencies(cr25_matsu_sw rclcpp actuator_msg std_msgs sensor_msgs geometry_msgs)
 
+add_executable(cr25_debug src/cr25_debug.cpp)
+ament_target_dependencies(cr25_debug rclcpp std_msgs sensor_msgs geometry_msgs)
 
 install(TARGETS
   cr25_matsu
@@ -38,6 +40,7 @@ install(TARGETS
   actuator_msg_publisher
   actuator_msg_subscriber
   actuator_msg_bridge
+  cr25_debug
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
