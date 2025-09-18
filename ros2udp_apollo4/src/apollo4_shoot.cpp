@@ -155,8 +155,8 @@ private:
         // 各ボタンの状態を分かりやすい変数に格納
         bool SQUARE   = msg->buttons[3];
         bool CIRCLE   = msg->buttons[1];
-        bool TRIANGLE = msg->buttons[2];
-        //bool CROSS    = msg->buttons[0];
+        //bool TRIANGLE = msg->buttons[2];
+        bool CROSS    = msg->buttons[0];
 
         bool L1 = msg->buttons[4];
         bool R1 = msg->buttons[5];
@@ -293,7 +293,7 @@ private:
         data[11] = SERVO5_angle + SERVO5_CAL;
 
         //エアシリンダの制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        if(TRIANGLE){
+        if(CROSS){
             data[12] = 1;
         }else{
             data[12] = 0;
