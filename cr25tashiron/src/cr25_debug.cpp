@@ -22,7 +22,9 @@ RRST-NHK-Project 2025
 #define turn_speed 20    // 回転の角度変化
 #define deg 2.22
 
-#define theta_step_deg 30
+#define theta_step_deg 10
+#define z_step_deg 10
+#define r_step_deg 10
 
 bool MANUALMODE = true;
 
@@ -100,6 +102,29 @@ private:
             data[3] += theta_step_deg;
         }
 
+        if (UP) {
+            data[1] += z_step_deg;
+            data[2] += z_step_deg;
+        }
+        if (DOWN) {
+            data[1] -= z_step_deg;
+            data[2] -= z_step_deg;
+        }
+
+        if (TRIANGLE) {
+            data[1] -= r_step_deg;
+            data[2] += r_step_deg;
+        }
+        if (CROSS) {
+            data[1] += r_step_deg;
+            data[2] -= r_step_deg;
+        }
+
+        int theta_robomas = data[3];
+        int theta1_actual = theta_robomas * 15 / 142;
+        int servo_deg = theta1_actual;
+
+        data[9] = servo_deg; // サーボ1
         // if (R1) {
         //     data[3] = -10; // 押している間だけ上方向
         // } else if (L1) {
@@ -109,7 +134,7 @@ private:
         // }
 
         publish_data();
-        // std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
     void publish_data() {
