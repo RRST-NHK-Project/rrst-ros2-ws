@@ -155,9 +155,9 @@ private:
         // RθZの操作!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         // R軸の操作
         if (UP) {       // 正転
-            data[1] = wheelspeed;
+            data[1] = 75;
         }else if (DOWN) {     // 逆転
-            data[1] = -wheelspeed;
+            data[1] = -75;
         }else{
             data[1] = 0;
         }
@@ -185,12 +185,12 @@ private:
         }else{
             R2 = 0;
         }
-        // 0 → 1 に変化したときだけカウントしR2_countが加算されていく
+        // 0 → 1 に変化したときだけカウントしR_countが加算されていく
         if (R2 && !prev_R2) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             R_count++;
         }
         //R1逆方向
-        // 0 → 1 に変化したときだけカウントしR1_countが加算されていく
+        // 0 → 1 に変化したときだけカウントしR_countが加算されていく
         else if (R1 && !prev_R1) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             R_count = R_count + 5;
         }
@@ -273,8 +273,8 @@ private:
             data[8] = 0;
         }
         else if(TRIANGLE_count %3 == 1) {  // 全ON(Aモード)
-            //data[5] = absorbspeed;          //上data5,6                
-            //data[6] = absorbspeed;
+            data[5] = absorbspeed;          //上data5,6                
+            data[6] = absorbspeed;
             data[7] = absorbspeed;          //下data7,8
             data[8] = absorbspeed;
         }
@@ -306,7 +306,7 @@ private:
 
         // デバッグ用（for文でcoutするとカクつく）
         //std::cout << R2_count << std::endl;
-        //std::cout << data[5] << ", " << data[6] << std::endl; //吸着できているか確認する用
+        std::cout << data[5] << ", " << data[6] << ", " << data[7] << ", " << data[8]<< std::endl; //吸着できているか確認する用
         //std::cout << data[9] << ", " << data[10] << ", " << data[11] << ", " << data[12] << ", " << data[13] << std::endl;
         //std::cout << data[1] << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
