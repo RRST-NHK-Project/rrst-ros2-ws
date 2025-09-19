@@ -99,7 +99,7 @@ private:
         last_share = SHARE;
         MANUALMODE = share_latch;
 
-        if (MANUALMODE) {
+        if (MANUALMODE == 0) {
 
             // L1押下で増加、R1押下で減少
             if (L1) {
