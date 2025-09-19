@@ -21,6 +21,7 @@ RRST-NHK-Project 2025
 #define r_step_deg 10
 
 bool AUTOMATIC = 0; // 0:手動モード 1:自動モード
+bool LERP = 1;      // 線形補間の有効化
 
 int m1 = 0;
 int m2 = 0;
@@ -46,6 +47,11 @@ public:
     }
 
 private:
+    // 線形補間
+    inline int smooth_step(int current, int target, float alpha = 0.1f) {
+        return static_cast<int>(current + alpha * (target - current));
+    }
+
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
 
         // コントローラーの入力を取得、使わない入力はコメントアウト推奨
@@ -105,6 +111,7 @@ private:
             if (L2) {
                 data[3] -= theta_step_deg_large;
             }
+
             if (R2) {
                 data[3] += theta_step_deg_large;
             }
@@ -113,6 +120,7 @@ private:
                 data[1] += z_step_deg;
                 data[2] += z_step_deg;
             }
+
             if (DOWN) {
                 data[1] -= z_step_deg;
                 data[2] -= z_step_deg;
@@ -122,15 +130,38 @@ private:
                 data[1] -= r_step_deg;
                 data[2] += r_step_deg;
             }
+
             if (CROSS) {
                 data[1] += r_step_deg;
                 data[2] -= r_step_deg;
             }
+
+            if (PS) {
+                data[1] = 0;
+                data[2] = 0;
+                data[3] = 0;
+            }
         }
 
         if (AUTOMATIC == 1) {
+            ;
         }
 
+        if (LERP) {
+            // 線形補間(LERP)
+            static int smooth_m1 = 0, smooth_m2 = 0, smooth_m3 = 0;
+
+            smooth_m1 = smooth_step(smooth_m1, data[1], 0.2f);
+            smooth_m2 = smooth_step(smooth_m2, data[2], 0.2f);
+            smooth_m3 = smooth_step(smooth_m3, data[3], 0.2f);
+
+            data[1] = smooth_m1;
+            data[2] = smooth_m2;
+            data[3] = smooth_m3;
+            // 線形補間ここまで
+        }
+
+        // ハンド自動旋回
         int theta_robomas = data[3];
         int theta1_actual = theta_robomas * 15 / 142;
         int servo_deg = theta1_actual;
