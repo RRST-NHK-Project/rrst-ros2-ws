@@ -15,7 +15,6 @@ RRST-NHK-Project 2025
 #include "std_msgs/msg/int32_multi_array.hpp"
 #include <vector>
 
-#define DEG_VEL 1        // 0:角度/1:速度
 #define front_speed 360  // 前後の角度変化
 #define updown_speed 150 // 上下の角度変化
 #define speed 200        // 移動の速度
