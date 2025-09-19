@@ -12,6 +12,7 @@ RRST-NHK-Project 2025
 // ROS
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
+#include "std_msgs/msg/int32.hpp"
 #include "std_msgs/msg/int32_multi_array.hpp"
 #include <vector>
 
@@ -27,6 +28,8 @@ int m1 = 0;
 int m2 = 0;
 int m3 = 0;
 int m4 = 0;
+
+int target_point = 0; // 目標地点
 
 std::vector<int32_t> data(25, 0); // マイコンに送信される配列"data"
 
@@ -222,14 +225,37 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
 };
 
+class TargetPointListener : public rclcpp::Node {
+public:
+    TargetPointListener() : Node("target_point_listener") {
+        subscription_ = this->create_subscription<std_msgs::msg::Int32>(
+            "target_point", 10,
+            std::bind(&TargetPointListener::target_point_listener_callback, this,
+                      std::placeholders::_1));
+        RCLCPP_INFO(this->get_logger(),
+                    "CR25 Target Point Listener initialized");
+    }
+
+private:
+    void target_point_listener_callback(
+        const std_msgs::msg::Int32::SharedPtr msg) {
+        target_point = msg->data;
+        std::cout << "Target Point: " << target_point << std::endl;
+    }
+
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr subscription_;
+};
+
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
     rclcpp::executors::SingleThreadedExecutor exec;
     auto ps4_listener = std::make_shared<PS4_Listener>();
     auto motor_angles_listener = std::make_shared<MotorAnglesListener>();
+    auto target_point_listener = std::make_shared<TargetPointListener>();
     exec.add_node(motor_angles_listener);
     exec.add_node(ps4_listener);
+    exec.add_node(target_point_listener);
     exec.spin();
 
     rclcpp::shutdown();
