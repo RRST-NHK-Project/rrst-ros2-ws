@@ -29,7 +29,13 @@ int m2 = 0;
 int m3 = 0;
 int m4 = 0;
 
+static int last_ps4_m1 = 0;
+static int last_ps4_m2 = 0;
+static int last_ps4_m3 = 0;
+
 int target_point = 0; // 目標地点
+
+bool ps4_active = false;
 
 std::vector<int32_t> data(25, 0); // マイコンに送信される配列"data"
 
@@ -96,13 +102,20 @@ private:
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
 
-        static bool last_share = false; // 前回の状態を保持する static 変数
+        static bool last_share = false;
         static bool share_latch = false;
         static bool last_circle = false;
         static bool circle_latch = false;
         // static bool last_triangle = false;
 
         // data[0] = DEG_VEL; // マイコン側のprintfを無効化・有効化(0 or 1)
+        if (L1 || R1 || L2 || R2 || UP || DOWN || TRIANGLE || CROSS || PS) {
+            // データを更新
+            last_ps4_m1 = data[1];
+            last_ps4_m2 = data[2];
+            last_ps4_m3 = data[3];
+            ps4_active = true; // ラッチフラグとして立てる
+        }
 
         if (SHARE && !last_share) {
             share_latch = !share_latch;
@@ -189,7 +202,7 @@ private:
         data[9] = servo_deg;
 
         publish_data();
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        // std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
     void publish_data() {
@@ -220,19 +233,26 @@ public:
 private:
     void motor_angles_listener_callback(
         const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
-        m1 = msg->data[0];
-        m2 = msg->data[1];
-        m3 = msg->data[2];
-        m4 = msg->data[3];
 
-        // std::cout << m1;
-        // std::cout << m2;
-        // std::cout << m3;
-        // std::cout << m4 << std::endl;
+        if (!ps4_active) {
+            m1 = msg->data[0];
+            m2 = msg->data[1];
+            m3 = msg->data[2];
+            m4 = msg->data[3];
 
-        data[1] = m1;
-        data[2] = m2;
-        data[3] = m3;
+            // std::cout << m1;
+            // std::cout << m2;
+            // std::cout << m3;
+            // std::cout << m4 << std::endl;
+
+            data[1] = m1;
+            data[2] = m2;
+            data[3] = m3;
+        } else {
+            data[1] = last_ps4_m1;
+            data[2] = last_ps4_m2;
+            data[3] = last_ps4_m3;
+        }
     }
 
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
@@ -247,24 +267,29 @@ public:
                       std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(),
                     "CR25 Target Point Listener initialized");
+        motor_angle_sets.push_back({0, 0, 0, 0});
+        motor_angle_sets.push_back({100, 200, 300, 0});
+        motor_angle_sets.push_back({-100, -200, -300, 0});
     }
 
 private:
     void target_point_listener_callback(
         const std_msgs::msg::Int32::SharedPtr msg) {
 
-        motor_angle_sets.push_back({0, 0, 0, 0});
-        motor_angle_sets.push_back({100, 200, 300, 0});
-        motor_angle_sets.push_back({-100, -200, -300, 0});
+        if (!ps4_active) {
+            target_point = msg->data;
+            // std::cout << "Target Point: " << target_point << std::endl;
 
-        target_point = msg->data;
-        // std::cout << "Target Point: " << target_point << std::endl;
+            std::array<int, 4> &angles = motor_angle_sets[target_point];
 
-        std::array<int, 4> &angles = motor_angle_sets[target_point];
-
-        data[1] = angles[0];
-        data[2] = angles[1];
-        data[3] = angles[2];
+            data[1] = angles[0];
+            data[2] = angles[1];
+            data[3] = angles[2];
+        } else {
+            data[1] = last_ps4_m1;
+            data[2] = last_ps4_m2;
+            data[3] = last_ps4_m3;
+        }
     }
 
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr subscription_;
