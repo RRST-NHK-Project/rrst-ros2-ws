@@ -26,7 +26,7 @@ RRST-NHK-Project 2025
 #define z_step_deg 10
 #define r_step_deg 10
 
-bool MANUALMODE = true;
+bool MANUALMODE = false;
 
 int m1 = 0;
 int m2 = 0;
@@ -99,45 +99,44 @@ private:
         last_share = SHARE;
         MANUALMODE = share_latch;
 
-        data[1] = m1;
-        data[2] = m2;
-        data[3] = m3;
+        if (MANUALMODE) {
 
-        // L1押下で増加、R1押下で減少
-        if (L1) {
-            data[3] -= theta_step_deg;
-        }
-        if (R1) {
-            data[3] += theta_step_deg;
-        }
+            // L1押下で増加、R1押下で減少
+            if (L1) {
+                data[3] -= theta_step_deg;
+            }
+            if (R1) {
+                data[3] += theta_step_deg;
+            }
 
-        if (UP) {
-            data[1] += z_step_deg;
-            data[2] += z_step_deg;
-        }
-        if (DOWN) {
-            data[1] -= z_step_deg;
-            data[2] -= z_step_deg;
-        }
+            if (UP) {
+                data[1] += z_step_deg;
+                data[2] += z_step_deg;
+            }
+            if (DOWN) {
+                data[1] -= z_step_deg;
+                data[2] -= z_step_deg;
+            }
 
-        if (TRIANGLE) {
-            data[1] -= r_step_deg;
-            data[2] += r_step_deg;
-        }
-        if (CROSS) {
-            data[1] += r_step_deg;
-            data[2] -= r_step_deg;
-        }
+            if (TRIANGLE) {
+                data[1] -= r_step_deg;
+                data[2] += r_step_deg;
+            }
+            if (CROSS) {
+                data[1] += r_step_deg;
+                data[2] -= r_step_deg;
+            }
 
-        if (PS) {
-            //
+            if (PS) {
+                //
+            }
         }
 
         int theta_robomas = data[3];
         int theta1_actual = theta_robomas * 15 / 142;
         int servo_deg = theta1_actual;
 
-        data[9] = servo_deg; // サーボ1
+        data[9] = servo_deg;
         // if (R1) {
         //     data[3] = -10; // 押している間だけ上方向
         // } else if (L1) {
@@ -146,7 +145,7 @@ private:
         //     data[3] = 0; // どちらも押していなければ停止
         // }
 
-        std::cout << MANUALMODE << std::endl;
+        // std::cout << MANUALMODE << std::endl;
 
         publish_data();
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -184,10 +183,15 @@ private:
         m2 = msg->data[1];
         m3 = msg->data[2];
         m4 = msg->data[3];
+
         std::cout << m1;
         std::cout << m2;
         std::cout << m3;
         std::cout << m4 << std::endl;
+
+        data[1] = m1;
+        data[2] = m2;
+        data[3] = m3;
     }
 
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
