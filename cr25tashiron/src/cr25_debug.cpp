@@ -139,15 +139,6 @@ private:
         int servo_deg = theta1_actual;
 
         data[9] = servo_deg;
-        // if (R1) {
-        //     data[3] = -10; // 押している間だけ上方向
-        // } else if (L1) {
-        //     data[3] = 10; // 押している間だけ下方向
-        // } else {
-        //     data[3] = 0; // どちらも押していなければ停止
-        // }
-
-        // std::cout << MANUALMODE << std::endl;
 
         publish_data();
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
