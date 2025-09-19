@@ -23,6 +23,7 @@ RRST-NHK-Project 2025
 #define deg 2.22
 
 #define theta_step_deg 10
+#define theta_step_deg_large 30
 #define z_step_deg 10
 #define r_step_deg 10
 
@@ -107,6 +108,14 @@ private:
             }
             if (R1) {
                 data[3] += theta_step_deg;
+            }
+
+            // L2押下で増加、R2押下で減少
+            if (L2) {
+                data[3] -= theta_step_deg_large;
+            }
+            if (R2) {
+                data[3] += theta_step_deg_large;
             }
 
             if (UP) {
