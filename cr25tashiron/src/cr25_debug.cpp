@@ -22,7 +22,9 @@ RRST-NHK-Project 2025
 #define r_step_deg 10
 
 bool AUTOMATIC = 0; // 0:手動モード 1:自動モード
-bool LERP = 1;      // 線形補間の有効化
+bool LERP = false;  // 線形補間の有効化
+
+bool field = 0; //(0:赤,1:青)
 
 int m1 = 0;
 int m2 = 0;
@@ -168,9 +170,17 @@ private:
             }
 
             if (PS) {
-                data[1] = 0;
-                data[2] = 0;
-                data[3] = 0;
+                // シューティング位置決定
+                if (field == 0) {
+                    data[1] = 0;
+                    data[2] = 0;
+                    data[3] = 0;
+                } else {
+                    data[1] = 0;
+                    data[2] = 0;
+                    data[3] = 0;
+                }
+                ps4_active = false;
             }
 
             data[17] = circle_latch;
