@@ -28,6 +28,11 @@ RRST-NHK-Project 2025
 
 bool MANUALMODE = true;
 
+int m1 = 0;
+int m2 = 0;
+int m3 = 0;
+int m4 = 0;
+
 std::vector<int16_t> data(25, 0); // マイコンに送信される配列"data"
 
 class PS4_Listener : public rclcpp::Node {
@@ -94,6 +99,10 @@ private:
         last_share = SHARE;
         MANUALMODE = share_latch;
 
+        data[1] = m1;
+        data[2] = m2;
+        data[3] = m3;
+
         // L1押下で増加、R1押下で減少
         if (L1) {
             data[3] -= theta_step_deg;
@@ -118,6 +127,10 @@ private:
         if (CROSS) {
             data[1] += r_step_deg;
             data[2] -= r_step_deg;
+        }
+
+        if (PS) {
+            //
         }
 
         int theta_robomas = data[3];
@@ -150,11 +163,41 @@ private:
     rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr publisher_;
 };
 
+class Params_Listener : public rclcpp::Node {
+public:
+    Params_Listener() : Node("deg_listener") {
+        subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
+            "motor_angles", 10,
+            std::bind(&Params_Listener::params_listener_callback, this,
+                      std::placeholders::_1));
+        RCLCPP_INFO(this->get_logger(),
+
+                    "CR25 DEG Listener initialized");
+    }
+
+private:
+    void params_listener_callback(
+        const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        m1 = msg->data[0];
+        m2 = msg->data[1];
+        m3 = msg->data[2];
+        m4 = msg->data[3];
+        std::cout << m1;
+        std::cout << m2;
+        std::cout << m3;
+        std::cout << m4 << std::endl;
+    }
+
+    rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
+};
+
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
     rclcpp::executors::SingleThreadedExecutor exec;
     auto ps4_listener = std::make_shared<PS4_Listener>();
+    auto params_listener = std::make_shared<Params_Listener>();
+    exec.add_node(params_listener);
     exec.add_node(ps4_listener);
     exec.spin();
 
