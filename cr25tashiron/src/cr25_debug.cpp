@@ -28,7 +28,7 @@ int m2 = 0;
 int m3 = 0;
 int m4 = 0;
 
-std::vector<int16_t> data(25, 0); // マイコンに送信される配列"data"
+std::vector<int32_t> data(25, 0); // マイコンに送信される配列"data"
 
 class PS4_Listener : public rclcpp::Node {
 public:
@@ -48,8 +48,12 @@ public:
 
 private:
     // 線形補間
-    inline int smooth_step(int current, int target, float alpha = 0.1f) {
-        return static_cast<int>(current + alpha * (target - current));
+    inline int smooth_step(int current, int target, float alpha = 0.1f, int threshold = 5) {
+        int next = static_cast<int>(current + alpha * (target - current));
+        if (std::abs(target - next) <= threshold) {
+            return target; // 無理やり収束させる
+        }
+        return next;
     }
 
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
@@ -185,12 +189,12 @@ private:
     rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr publisher_;
 };
 
-class Params_Listener : public rclcpp::Node {
+class MotorAnglesListener : public rclcpp::Node {
 public:
-    Params_Listener() : Node("deg_listener") {
+    MotorAnglesListener() : Node("deg_listener") {
         subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
             "motor_angles", 10,
-            std::bind(&Params_Listener::params_listener_callback, this,
+            std::bind(&MotorAnglesListener::motor_angles_listener_callback, this,
                       std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(),
 
@@ -198,7 +202,7 @@ public:
     }
 
 private:
-    void params_listener_callback(
+    void motor_angles_listener_callback(
         const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
         m1 = msg->data[0];
         m2 = msg->data[1];
@@ -223,8 +227,8 @@ int main(int argc, char *argv[]) {
 
     rclcpp::executors::SingleThreadedExecutor exec;
     auto ps4_listener = std::make_shared<PS4_Listener>();
-    auto params_listener = std::make_shared<Params_Listener>();
-    exec.add_node(params_listener);
+    auto motor_angles_listener = std::make_shared<MotorAnglesListener>();
+    exec.add_node(motor_angles_listener);
     exec.add_node(ps4_listener);
     exec.spin();
 

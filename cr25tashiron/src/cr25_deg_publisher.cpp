@@ -75,11 +75,11 @@ private:
             } else {
                 int motor_id, angle;
                 if (sscanf(line.c_str(), "%d %d", &motor_id, &angle) == 2 &&
-                    motor_id >= 1 && motor_id <= 4 && angle >= -135 && angle <= 135) {
+                    motor_id >= 1 && motor_id <= 4 && angle >= -3600000 && angle <= 3600000) {
                     motor_angles_[motor_id - 1] = angle;
                     std::cout << "Motor " << motor_id << " set to " << angle << "°\n";
                 } else {
-                    std::cout << "Invalid input. Format: <motor_number> <angle> (1-4, -135~135) or 'show'\n";
+                    std::cout << "Invalid input. Format: <motor_number> <angle> (1-4, -3600000~3600000) or 'show'\n";
                 }
             }
         }
