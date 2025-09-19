@@ -91,7 +91,7 @@ private:
         static bool share_latch = false;
         // static bool last_triangle = false;
 
-        data[0] = DEG_VEL; // マイコン側のprintfを無効化・有効化(0 or 1)
+        // data[0] = DEG_VEL; // マイコン側のprintfを無効化・有効化(0 or 1)
 
         if (SHARE && !last_share) {
             share_latch = !share_latch;
