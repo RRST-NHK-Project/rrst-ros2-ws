@@ -20,7 +20,7 @@ RRST-NHK-Project 2025
 #define z_step_deg 10
 #define r_step_deg 10
 
-bool MODE = 0; // 0:手動モード 1:自動モード
+bool AUTOMATIC = 0; // 0:手動モード 1:自動モード
 
 int m1 = 0;
 int m2 = 0;
@@ -91,11 +91,10 @@ private:
         }
 
         last_share = SHARE;
-        MANUALMODE = share_latch;
+        AUTOMATIC = share_latch;
 
-        if (MODE == 0) {
+        if (AUTOMATIC == 0) {
 
-            // L1押下で増加、R1押下で減少
             if (L1) {
                 data[3] -= theta_step_deg;
             }
@@ -103,7 +102,6 @@ private:
                 data[3] += theta_step_deg;
             }
 
-            // L2押下で増加、R2押下で減少
             if (L2) {
                 data[3] -= theta_step_deg_large;
             }
@@ -128,14 +126,10 @@ private:
                 data[1] += r_step_deg;
                 data[2] -= r_step_deg;
             }
-
-            if (PS) {
-                //
-            }
         }
 
-        if (MODE == 1) {
-                }
+        if (AUTOMATIC == 1) {
+        }
 
         int theta_robomas = data[3];
         int theta1_actual = theta_robomas * 15 / 142;
@@ -180,10 +174,10 @@ private:
         m3 = msg->data[2];
         m4 = msg->data[3];
 
-        std::cout << m1;
-        std::cout << m2;
-        std::cout << m3;
-        std::cout << m4 << std::endl;
+        // std::cout << m1;
+        // std::cout << m2;
+        // std::cout << m3;
+        // std::cout << m4 << std::endl;
 
         data[1] = m1;
         data[2] = m2;
