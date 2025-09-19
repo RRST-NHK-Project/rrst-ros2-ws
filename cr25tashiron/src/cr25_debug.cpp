@@ -73,7 +73,7 @@ private:
         bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
         bool TRIANGLE = msg->buttons[2];
-        bool SQUARE = msg->buttons[3];
+        // bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
         // bool RIGHT = msg->axes[6] == -1.0;
@@ -98,6 +98,8 @@ private:
 
         static bool last_share = false; // 前回の状態を保持する static 変数
         static bool share_latch = false;
+        static bool last_circle = false;
+        static bool circle_latch = false;
         // static bool last_triangle = false;
 
         // data[0] = DEG_VEL; // マイコン側のprintfを無効化・有効化(0 or 1)
@@ -106,7 +108,13 @@ private:
             share_latch = !share_latch;
         }
 
+        if (CIRCLE && !last_circle) {
+            circle_latch = !circle_latch;
+        }
+
         last_share = SHARE;
+        last_circle = CIRCLE;
+
         AUTOMATIC = share_latch;
 
         if (AUTOMATIC == 0) {
@@ -151,6 +159,8 @@ private:
                 data[2] = 0;
                 data[3] = 0;
             }
+
+            data[17] = circle_latch;
         }
 
         if (AUTOMATIC == 1) {
