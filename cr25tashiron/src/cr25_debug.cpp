@@ -20,7 +20,7 @@ RRST-NHK-Project 2025
 #define z_step_deg 10
 #define r_step_deg 10
 
-bool MANUALMODE = false;
+bool MODE = 0; // 0:手動モード 1:自動モード
 
 int m1 = 0;
 int m2 = 0;
@@ -93,7 +93,7 @@ private:
         last_share = SHARE;
         MANUALMODE = share_latch;
 
-        if (MANUALMODE == 0) {
+        if (MODE == 0) {
 
             // L1押下で増加、R1押下で減少
             if (L1) {
@@ -133,6 +133,9 @@ private:
                 //
             }
         }
+
+        if (MODE == 1) {
+                }
 
         int theta_robomas = data[3];
         int theta1_actual = theta_robomas * 15 / 142;
