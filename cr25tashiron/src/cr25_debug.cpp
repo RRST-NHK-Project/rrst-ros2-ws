@@ -146,6 +146,8 @@ private:
         //     data[3] = 0; // どちらも押していなければ停止
         // }
 
+        std::cout << MANUALMODE << std::endl;
+
         publish_data();
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
