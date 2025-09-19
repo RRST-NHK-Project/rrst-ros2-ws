@@ -33,6 +33,9 @@ int target_point = 0; // 目標地点
 
 std::vector<int32_t> data(25, 0); // マイコンに送信される配列"data"
 
+// 自動化用に各モーターの角度を格納
+std::vector<std::array<int, 4>> motor_angle_sets;
+
 class PS4_Listener : public rclcpp::Node {
 public:
     PS4_Listener()
@@ -239,8 +242,19 @@ public:
 private:
     void target_point_listener_callback(
         const std_msgs::msg::Int32::SharedPtr msg) {
+
+        motor_angle_sets.push_back({0, 0, 0, 0});
+        motor_angle_sets.push_back({100, 200, 300, 0});
+        motor_angle_sets.push_back({-100, -200, -300, 0});
+
         target_point = msg->data;
-        std::cout << "Target Point: " << target_point << std::endl;
+        // std::cout << "Target Point: " << target_point << std::endl;
+
+        std::array<int, 4> &angles = motor_angle_sets[target_point];
+
+        data[1] = angles[0];
+        data[2] = angles[1];
+        data[3] = angles[2];
     }
 
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr subscription_;
