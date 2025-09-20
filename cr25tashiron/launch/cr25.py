@@ -9,8 +9,6 @@ def generate_launch_description():
                 package="joy",
                 executable="joy_node",
                 output="screen",
-                parameters=[{"device_id": 0}],  # ここで device_id を指定
-                remappings=[("/joy", "/joy0")],
             ),
             Node(
                 package="cr25tashiron",
@@ -19,7 +17,7 @@ def generate_launch_description():
             ),
             ExecuteProcess(
             cmd=[
-                "sudo", "docker", "run", "--rm",
+                "sudo", "docker", "run", "-it",
                 "-v", "/dev:/dev",
                 "--privileged",
                 "--net=host",
