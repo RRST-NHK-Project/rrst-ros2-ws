@@ -50,7 +50,7 @@ int32 robomas_target_angle # [degree]
 #define speed 200 //移動の速度
 #define turn_speed 30 //回転の角度変化
 
-#define turn_speed_v 5 //回転の角度変化
+#define turn_speed_v 3 //回転の角度変化
 #define front_speed_v 200//前後の角度変化
 #define updown_speed_v 200//上下の角度変化
 #define deg 1
@@ -98,12 +98,12 @@ public:
         data[2] = front_speed;
     }
     static void forward_v(){
-        data[1] = front_speed;
-        data[2] = -front_speed;
+        data[1] = front_speed_v;
+        data[2] = -front_speed_v;
     }
     static void back_v(){
-        data[1] = -front_speed;
-        data[2] = front_speed;
+        data[1] = -front_speed_v;
+        data[2] = front_speed_v;
     
     }
     static void up(){
@@ -312,6 +312,7 @@ private:
             data[2] = 0;
             
             data[7] = 1;
+            data[8] = 0;
            // data[4] = 0;
            // data[5] = 0;
             //data[6] = 0;
