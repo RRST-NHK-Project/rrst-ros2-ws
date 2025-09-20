@@ -52,7 +52,7 @@ int32 robomas_target_angle # [degree]
 
 #define turn_speed_v 3 //回転の角度変化
 #define front_speed_v 200//前後の角度変化
-#define updown_speed_v 200//上下の角度変化
+#define updown_speed_v 100//上下の角度変化
 
 #define first_th 60 //最初の角度
 #define first_r 720 //
