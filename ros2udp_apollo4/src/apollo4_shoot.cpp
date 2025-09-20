@@ -62,11 +62,11 @@ bool CHANGEMODE = false;
 bool PtoPMODE = false;
 
 //サーボ
-int SERVO1_angle = 70;      //サーボ1
+int SERVO1_angle = 0;      //サーボ1
 int SERVO2_angle = 70;      //サーボ2
 int SERVO3_angle = 70;      //サーボ3
 int SERVO4_angle = 0;      //サーボ4
-int SERVO5_angle = 5;      //サーボ5
+int SERVO5_angle = 90;      //サーボ5
 
 
 
@@ -140,11 +140,11 @@ public:
     // case1_blue
     static void case1_blue_action(UDP &udp) {
         std::cout << "<case1_blueシーケンス開始>" << std::endl;
-        SERVO1_angle = 1;
-        SERVO2_angle = 1;
-        SERVO3_angle = 1;
-        SERVO4_angle = 1;
-        SERVO5_angle = 1;
+        SERVO1_angle = 0;
+        SERVO2_angle = 70;
+        SERVO3_angle = 70;
+        SERVO4_angle = 0;
+        SERVO5_angle = 0;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -154,11 +154,11 @@ public:
         udp.send(data);
         std::cout << data[7] << data[8] << data[9] << data[10] << data[11] << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        SERVO1_angle = 1;
-        SERVO2_angle = 1;
-        SERVO3_angle = 1;
-        SERVO4_angle = 1;
-        SERVO5_angle = 1;
+        SERVO1_angle = 10;
+        SERVO2_angle = 70;
+        SERVO3_angle = 70;
+        SERVO4_angle = 0;
+        SERVO5_angle = 0;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -171,11 +171,11 @@ public:
     // case2_blue
     static void case2_blue_action(UDP &udp) {
         std::cout << "<case2_blueシーケンス開始>" << std::endl;
-        SERVO1_angle = 2;
-        SERVO2_angle = 2;
-        SERVO3_angle = 2;
-        SERVO4_angle = 2;
-        SERVO5_angle = 2;
+        SERVO1_angle = 0;
+        SERVO2_angle = 70;
+        SERVO3_angle = 70;
+        SERVO4_angle = 0;
+        SERVO5_angle = 0;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -185,11 +185,11 @@ public:
         udp.send(data);
         std::cout << data[7] << data[8] << data[9] << data[10] << data[11] << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        SERVO1_angle = 2;
-        SERVO2_angle = 2;
-        SERVO3_angle = 2;
-        SERVO4_angle = 2;
-        SERVO5_angle = 2;
+        SERVO1_angle = 0;
+        SERVO2_angle = 60;
+        SERVO3_angle = 70;
+        SERVO4_angle = 0;
+        SERVO5_angle = 0;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -202,11 +202,11 @@ public:
     // case3_blue
     static void case3_blue_action(UDP &udp) {
         std::cout << "<case3_blueシーケンス開始>" << std::endl;
-        SERVO1_angle = 3;
-        SERVO2_angle = 3;
-        SERVO3_angle = 3;
-        SERVO4_angle = 3;
-        SERVO5_angle = 3;
+        SERVO1_angle = 0;
+        SERVO2_angle = 70;
+        SERVO3_angle = 70;
+        SERVO4_angle = 0;
+        SERVO5_angle = 0;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -216,11 +216,11 @@ public:
         udp.send(data);
         std::cout << data[7] << data[8] << data[9] << data[10] << data[11] << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        SERVO1_angle = 3;
-        SERVO2_angle = 3;
-        SERVO3_angle = 3;
-        SERVO4_angle = 3;
-        SERVO5_angle = 3;
+        SERVO1_angle = 0;
+        SERVO2_angle = 70;
+        SERVO3_angle = 60;
+        SERVO4_angle = 0;
+        SERVO5_angle = 0;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -233,11 +233,11 @@ public:
     // case4_blue
     static void case4_blue_action(UDP &udp) {
         std::cout << "<case4_blueシーケンス開始>" << std::endl;
-        SERVO1_angle = 4;
-        SERVO2_angle = 4;
-        SERVO3_angle = 4;
-        SERVO4_angle = 4;
-        SERVO5_angle = 4;
+        SERVO1_angle = 0;
+        SERVO2_angle = 70;
+        SERVO3_angle = 70;
+        SERVO4_angle = 0;
+        SERVO5_angle = 0;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -247,11 +247,11 @@ public:
         udp.send(data);
         std::cout << data[7] << data[8] << data[9] << data[10] << data[11] << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        SERVO1_angle = 4;
-        SERVO2_angle = 4;
-        SERVO3_angle = 4;
-        SERVO4_angle = 4;
-        SERVO5_angle = 4;
+        SERVO1_angle = 0;
+        SERVO2_angle = 70;
+        SERVO3_angle = 70;
+        SERVO4_angle = 10;
+        SERVO5_angle = 0;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -264,25 +264,25 @@ public:
     // case5_blue
     static void case5_blue_action(UDP &udp) {
         std::cout << "<case5_blueシーケンス開始>" << std::endl;
-        SERVO1_angle = 5;
-        SERVO2_angle = 5;
-        SERVO3_angle = 5;
-        SERVO4_angle = 5;
-        SERVO5_angle = 5;
+        SERVO1_angle = 0;
+        SERVO2_angle = 70;
+        SERVO3_angle = 70;
+        SERVO4_angle = 0;
+        SERVO5_angle = 0;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
-        data[9] = SERVO3_angle;
+        data[9] = SERVO1_angle;
         data[10] = SERVO4_angle;
         data[11] = SERVO5_angle;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         udp.send(data);
         std::cout << data[7] << data[8] << data[9] << data[10] << data[11] << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        SERVO1_angle = 5;
-        SERVO2_angle = 5;
-        SERVO3_angle = 5;
-        SERVO4_angle = 5;
-        SERVO5_angle = 5;
+        SERVO1_angle = 0;
+        SERVO2_angle = 70;
+        SERVO3_angle = 70;
+        SERVO4_angle = 0;
+        SERVO5_angle = 10;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -295,11 +295,11 @@ public:
     // case6_blue
     static void case6_blue_action(UDP &udp) {
         std::cout << "<case6_blueシーケンス開始>" << std::endl;
-        SERVO1_angle = 6;
-        SERVO2_angle = 6;
-        SERVO3_angle = 6;
-        SERVO4_angle = 6;
-        SERVO5_angle = 6;
+        SERVO1_angle = 0;
+        SERVO2_angle = 70;
+        SERVO3_angle = 70;
+        SERVO4_angle = 0;
+        SERVO5_angle = 0;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -309,11 +309,11 @@ public:
         udp.send(data);
         std::cout << data[7] << data[8] << data[9] << data[10] << data[11] << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        SERVO1_angle = 6;
-        SERVO2_angle = 6;
-        SERVO3_angle = 6;
-        SERVO4_angle = 6;
-        SERVO5_angle = 6;
+        SERVO1_angle = 50;
+        SERVO2_angle = 70;
+        SERVO3_angle = 70;
+        SERVO4_angle = 0;
+        SERVO5_angle = 0;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -326,11 +326,11 @@ public:
     // case7_blue
     static void case7_blue_action(UDP &udp) {
         std::cout << "<case7_blueシーケンス開始>" << std::endl;
-        SERVO1_angle = 7;
-        SERVO2_angle = 7;
-        SERVO3_angle = 7;
-        SERVO4_angle = 7;
-        SERVO5_angle = 7;
+        SERVO1_angle = 0;
+        SERVO2_angle = 70;
+        SERVO3_angle = 70;
+        SERVO4_angle = 0;
+        SERVO5_angle = 0;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -340,11 +340,11 @@ public:
         udp.send(data);
         std::cout << data[7] << data[8] << data[9] << data[10] << data[11] << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        SERVO1_angle = 7;
-        SERVO2_angle = 7;
-        SERVO3_angle = 7;
-        SERVO4_angle = 7;
-        SERVO5_angle = 7;
+        SERVO1_angle = 10;
+        SERVO2_angle = 50;
+        SERVO3_angle = 70;
+        SERVO4_angle = 0;
+        SERVO5_angle = 0;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -357,11 +357,11 @@ public:
     // case1_red
     static void case1_red_action(UDP &udp) {
         std::cout << "<case1_redシーケンス開始>" << std::endl;
-        SERVO1_angle = 1;
-        SERVO2_angle = 1;
-        SERVO3_angle = 1;
-        SERVO4_angle = 1;
-        SERVO5_angle = 1;
+        SERVO1_angle = 0;
+        SERVO2_angle = 70;
+        SERVO3_angle = 70;
+        SERVO4_angle = 0;
+        SERVO5_angle = 90;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -371,11 +371,11 @@ public:
         udp.send(data);
         std::cout << data[7] << data[8] << data[9] << data[10] << data[11] << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        SERVO1_angle = 1;
-        SERVO2_angle = 1;
-        SERVO3_angle = 1;
-        SERVO4_angle = 1;
-        SERVO5_angle = 1;
+        SERVO1_angle = 10;
+        SERVO2_angle = 70;
+        SERVO3_angle = 70;
+        SERVO4_angle = 0;
+        SERVO5_angle = 90;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -388,11 +388,23 @@ public:
     // case2_red
     static void case2_red_action(UDP &udp) {
         std::cout << "<case2_redシーケンス開始>" << std::endl;
-        SERVO1_angle = 2;
-        SERVO2_angle = 2;
-        SERVO3_angle = 2;
-        SERVO4_angle = 2;
-        SERVO5_angle = 2;
+        SERVO1_angle = 170;
+        SERVO2_angle = 79;
+        SERVO3_angle = 60;
+        SERVO4_angle = 80;
+        SERVO5_angle = 105;
+        data[7] = SERVO1_angle;
+        data[8] = SERVO2_angle;
+        data[9] = SERVO3_angle;
+        data[10] = SERVO4_angle;
+        data[11] = SERVO5_angle;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        udp.send(data);
+        SERVO1_angle = 110;
+        SERVO2_angle = 89;
+        SERVO3_angle = 40;
+        SERVO4_angle = 40;
+        SERVO5_angle = 105;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -402,11 +414,11 @@ public:
         udp.send(data);
         std::cout << data[7] << data[8] << data[9] << data[10] << data[11] << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        SERVO1_angle = 2;
-        SERVO2_angle = 2;
-        SERVO3_angle = 2;
-        SERVO4_angle = 2;
-        SERVO5_angle = 2;
+        SERVO1_angle = 105;
+        SERVO2_angle = 76;
+        SERVO3_angle = 40;
+        SERVO4_angle = 20;
+        SERVO5_angle = 125;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -419,11 +431,23 @@ public:
     // case3_red
     static void case3_red_action(UDP &udp) {
         std::cout << "<case3_redシーケンス開始>" << std::endl;
-        SERVO1_angle = 3;
-        SERVO2_angle = 3;
-        SERVO3_angle = 3;
-        SERVO4_angle = 3;
-        SERVO5_angle = 3;
+        SERVO1_angle = 170;
+        SERVO2_angle = 79;
+        SERVO3_angle = 60;
+        SERVO4_angle = 80;
+        SERVO5_angle = 105;
+        data[7] = SERVO1_angle;
+        data[8] = SERVO2_angle;
+        data[9] = SERVO3_angle;
+        data[10] = SERVO4_angle;
+        data[11] = SERVO5_angle;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        udp.send(data);
+        SERVO1_angle = 105;
+        SERVO2_angle = 64;
+        SERVO3_angle = 65;
+        SERVO4_angle = 20;
+        SERVO5_angle = 90;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -433,11 +457,11 @@ public:
         udp.send(data);
         std::cout << data[7] << data[8] << data[9] << data[10] << data[11] << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        SERVO1_angle = 3;
-        SERVO2_angle = 3;
-        SERVO3_angle = 3;
-        SERVO4_angle = 3;
-        SERVO5_angle = 3;
+        SERVO1_angle = 105;
+        SERVO2_angle = 57;
+        SERVO3_angle = 65;
+        SERVO4_angle = 25;
+        SERVO5_angle = 100;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -450,11 +474,23 @@ public:
     // case4_red
     static void case4_red_action(UDP &udp) {
         std::cout << "<case4_redシーケンス開始>" << std::endl;
-        SERVO1_angle = 4;
-        SERVO2_angle = 4;
-        SERVO3_angle = 4;
-        SERVO4_angle = 4;
-        SERVO5_angle = 4;
+        SERVO1_angle = 170;
+        SERVO2_angle = 79;
+        SERVO3_angle = 60;
+        SERVO4_angle = 80;
+        SERVO5_angle = 105;
+        data[7] = SERVO1_angle;
+        data[8] = SERVO2_angle;
+        data[9] = SERVO3_angle;
+        data[10] = SERVO4_angle;
+        data[11] = SERVO5_angle;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        udp.send(data);
+        SERVO1_angle = 135;
+        SERVO2_angle = 69;
+        SERVO3_angle = 65;
+        SERVO4_angle = 45;
+        SERVO5_angle = 75;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -464,11 +500,11 @@ public:
         udp.send(data);
         std::cout << data[7] << data[8] << data[9] << data[10] << data[11] << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        SERVO1_angle = 4;
-        SERVO2_angle = 4;
-        SERVO3_angle = 4;
-        SERVO4_angle = 4;
-        SERVO5_angle = 4;
+        SERVO1_angle = 145;
+        SERVO2_angle = 69;
+        SERVO3_angle = 50;
+        SERVO4_angle = 60;
+        SERVO5_angle = 90;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -481,11 +517,23 @@ public:
     // case5_red
     static void case5_red_action(UDP &udp) {
         std::cout << "<case5_redシーケンス開始>" << std::endl;
-        SERVO1_angle = 5;
-        SERVO2_angle = 5;
-        SERVO3_angle = 5;
-        SERVO4_angle = 5;
-        SERVO5_angle = 5;
+        SERVO1_angle = 170;
+        SERVO2_angle = 79;
+        SERVO3_angle = 60;
+        SERVO4_angle = 80;
+        SERVO5_angle = 105;
+        data[7] = SERVO1_angle;
+        data[8] = SERVO2_angle;
+        data[9] = SERVO3_angle;
+        data[10] = SERVO4_angle;
+        data[11] = SERVO5_angle;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        udp.send(data);
+        SERVO1_angle = 145;
+        SERVO2_angle = 59;
+        SERVO3_angle = 70;
+        SERVO4_angle = 60;
+        SERVO5_angle = 90;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -495,11 +543,11 @@ public:
         udp.send(data);
         std::cout << data[7] << data[8] << data[9] << data[10] << data[11] << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        SERVO1_angle = 5;
-        SERVO2_angle = 5;
-        SERVO3_angle = 5;
-        SERVO4_angle = 5;
-        SERVO5_angle = 5;
+        SERVO1_angle = 145;
+        SERVO2_angle = 54;
+        SERVO3_angle = 70;
+        SERVO4_angle = 60;
+        SERVO5_angle = 90;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -512,11 +560,23 @@ public:
     // case6_red
     static void case6_red_action(UDP &udp) {
         std::cout << "<case6_redシーケンス開始>" << std::endl;
-        SERVO1_angle = 6;
-        SERVO2_angle = 6;
-        SERVO3_angle = 6;
-        SERVO4_angle = 6;
-        SERVO5_angle = 6;
+        SERVO1_angle = 170;
+        SERVO2_angle = 79;
+        SERVO3_angle = 60;
+        SERVO4_angle = 80;
+        SERVO5_angle = 105;
+        data[7] = SERVO1_angle;
+        data[8] = SERVO2_angle;
+        data[9] = SERVO3_angle;
+        data[10] = SERVO4_angle;
+        data[11] = SERVO5_angle;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        udp.send(data);
+        SERVO1_angle = 175;
+        SERVO2_angle = 64;
+        SERVO3_angle = 60;
+        SERVO4_angle = 80;
+        SERVO5_angle = 90;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -526,11 +586,11 @@ public:
         udp.send(data);
         std::cout << data[7] << data[8] << data[9] << data[10] << data[11] << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        SERVO1_angle = 6;
-        SERVO2_angle = 6;
-        SERVO3_angle = 6;
-        SERVO4_angle = 6;
-        SERVO5_angle = 6;
+        SERVO1_angle = 170;
+        SERVO2_angle = 69;
+        SERVO3_angle = 35;
+        SERVO4_angle = 80;
+        SERVO5_angle = 130;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -543,11 +603,23 @@ public:
     // case7_red
     static void case7_red_action(UDP &udp) {
         std::cout << "<case7_redシーケンス開始>" << std::endl;
-        SERVO1_angle = 7;
-        SERVO2_angle = 7;
-        SERVO3_angle = 7;
-        SERVO4_angle = 7;
-        SERVO5_angle = 7;
+        SERVO1_angle = 170;
+        SERVO2_angle = 79;
+        SERVO3_angle = 60;
+        SERVO4_angle = 80;
+        SERVO5_angle = 105;
+        data[7] = SERVO1_angle;
+        data[8] = SERVO2_angle;
+        data[9] = SERVO3_angle;
+        data[10] = SERVO4_angle;
+        data[11] = SERVO5_angle;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        udp.send(data);
+        SERVO1_angle = 170;
+        SERVO2_angle = 64;
+        SERVO3_angle = 50;
+        SERVO4_angle = 75;
+        SERVO5_angle = 110;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -557,11 +629,11 @@ public:
         udp.send(data);
         std::cout << data[7] << data[8] << data[9] << data[10] << data[11] << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        SERVO1_angle = 7;
-        SERVO2_angle = 7;
-        SERVO3_angle = 7;
-        SERVO4_angle = 7;
-        SERVO5_angle = 7;
+        SERVO1_angle = 170;
+        SERVO2_angle = 49;
+        SERVO3_angle = 60;
+        SERVO4_angle = 80;
+        SERVO5_angle = 105;
         data[7] = SERVO1_angle;
         data[8] = SERVO2_angle;
         data[9] = SERVO3_angle;
@@ -674,14 +746,14 @@ private:
         //&&&サーボ2の制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         // 0 → 1 に変化したときだけサーボ2が10ずつが加算されていく
         if (UP && !prev_UP) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
-            SERVO2_angle = SERVO2_angle +5;
+            SERVO2_angle = SERVO2_angle -5;
         }
         // 0 → 1 に変化したときだけサーボ4が10ずつ減算されていく
         else if (DOWN && !prev_DOWN) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
-            SERVO2_angle = SERVO2_angle -5;
+            SERVO2_angle = SERVO2_angle +5;
         }
-        if (SERVO2_angle > 70){
-            SERVO2_angle = 70;
+        if (SERVO2_angle > 270){
+            SERVO2_angle = 270;
         }else if(SERVO2_angle < 0){
             SERVO2_angle = 0;
         }
@@ -700,8 +772,8 @@ private:
         else if (L1 && !prev_L1) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             SERVO3_angle = SERVO3_angle -5;
         }
-        if (SERVO3_angle > 70){
-            SERVO3_angle = 70;
+        if (SERVO3_angle > 270){
+            SERVO3_angle = 270;
         }else if(SERVO3_angle < 0){
             SERVO3_angle = 0;
         }
@@ -710,34 +782,29 @@ private:
         //&&&サーボ4の制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         // 0 → 1 に変化したときだけサーボ4が10ずつが加算されていく
         if (SQUARE && !prev_SQUARE) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
-            SERVO4_angle = SERVO4_angle +5;
+            SERVO4_angle = SERVO4_angle -5;
         }
         // 0 → 1 に変化したときだけサーボ5が10ずつ減算されていく
         else if (CIRCLE && !prev_CIRCLE) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
-            SERVO4_angle = SERVO4_angle -5;
+            SERVO4_angle = SERVO4_angle +5;
         }
-        if (SERVO4_angle > 65){
-            SERVO4_angle = 65;
+        if (SERVO4_angle > 270){
+            SERVO4_angle = 270;
         }else if(SERVO4_angle < 0){
             SERVO4_angle = 0;
         }
 
         //&&&サーボ5の制御!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        if(R2 > 0){   //ゼロイチ判断
-            R2 = 1;
-        }else{
-            R2 = 0;
-        }
         // 0 → 1 に変化したときだけサーボ5が10ずつが加算されていく
-        if (R1 && !prev_R1) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
-            SERVO5_angle = SERVO5_angle +5;
-        }
-        // 0 → 1 に変化したときだけサーボ5が10ずつ減算されていく
-        else if (R2 && !prev_R2) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
+        if (TRIANGLE && !prev_TRIANGLE) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
             SERVO5_angle = SERVO5_angle -5;
         }
-        if (SERVO5_angle > 90){
-            SERVO5_angle = 90;
+        // 0 → 1 に変化したときだけサーボ5が10ずつ減算されていく
+        else if (CROSS && !prev_CROSS) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
+            SERVO5_angle = SERVO5_angle +5;
+        }
+        if (SERVO5_angle > 270){
+            SERVO5_angle = 270;
         }else if(SERVO5_angle < 0){
             SERVO5_angle = 0;
         }
@@ -751,7 +818,7 @@ private:
         }
 
         // SHAREによるモード切替
-        if(CHANGEMODE == 0){            //blueモード
+        if(CHANGEMODE == 1){            //blueモード
 
         // 0 → 1 に変化したときだけカウントしR_countが加算されていく
         if (L3 && !prev_L3) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
@@ -786,7 +853,7 @@ private:
         }
         
         // SHAREによるモード切替
-        if(CHANGEMODE == 1){            //redモード
+        if(CHANGEMODE == 0){            //redモード
 
         // 0 → 1 に変化したときだけカウントしR_countが加算されていく
         if (L3 && !prev_L3) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
@@ -819,7 +886,11 @@ private:
             Action::case7_red_action(udp_);
         }
         }
-        
+
+        if (R1 && !prev_R1) {   // 論理積(AND演算子よりtrue&&trueのときのみtrueとなりそれ以外はfalse)
+            Action::case1_red_action(udp_);
+            R_count = 0;
+        }
 
         data[7] = SERVO1_angle ;    //サーボ1に指令
         data[8] = SERVO2_angle ;    //サーボ2に指令
@@ -844,7 +915,7 @@ private:
         prev_TRIANGLE = TRIANGLE;
 
         //std::cout << data[11] << std::endl;
-        std::cout << data[7] << ", " << data[8] << ", " << data[9] <<", "<< data[10] << ", " << data[11] << ", " << data[12]<< std::endl;
+        //std::cout << data[7] << ", " << data[8] << ", " << data[9] <<", "<< data[10] << ", " << data[11] << ", " << data[12]<< std::endl;
         //std::cout << CHANGEMODE << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
