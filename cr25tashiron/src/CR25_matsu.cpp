@@ -45,12 +45,18 @@ bool solenoid_state        # [True/False]
 int32 robomas_target_angle # [degree]
 */
 #define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
-#define front_speed 360 //前後の角度変化
-#define updown_speed 150 //上下の角度変化
+#define front_speed 720 //前後の角度変化
+#define updown_speed 360 //上下の角度変化
 #define speed 200 //移動の速度
-#define turn_speed 20 //回転の角度変化
-#define deg 2.22
+#define turn_speed 30 //回転の角度変化
 
+#define turn_speed_v 5 //回転の角度変化
+#define front_speed_v 200//前後の角度変化
+#define updown_speed_v 200//上下の角度変化
+#define deg 1
+#define th 20
+#define count 1
+#define field 190
 bool MANUALMODE = false;
 
 std::vector<int16_t> data(25, 0); // マイコンに送信される配列"data"
@@ -60,10 +66,16 @@ std::vector<int16_t> data(25, 0); // マイコンに送信される配列"data"
 class Action{
 public:
     static void tokei(){
-        data[3] = -turn_speed*deg;
+        data[3] -= turn_speed*deg;
     }
     static void hantokei(){
-        data[3] = turn_speed*deg;
+        data[3] += turn_speed*deg;
+    }
+    static void tokei_v(){
+        data[3] -= turn_speed_v;
+    }
+    static void hantokei_v(){
+        data[3] += turn_speed_v;
     }
     static void first_position(){
         data[3] = -90*deg;
@@ -75,6 +87,8 @@ public:
     static void shoot(){
         data[3] = -90;
     }
+
+
     static void forward(){
         data[1] = front_speed;
         data[2] = -front_speed;
@@ -82,6 +96,15 @@ public:
     static void back(){
         data[1] = -front_speed;
         data[2] = front_speed;
+    }
+    static void forward_v(){
+        data[1] = front_speed;
+        data[2] = -front_speed;
+    }
+    static void back_v(){
+        data[1] = -front_speed;
+        data[2] = front_speed;
+    
     }
     static void up(){
         data[1] = updown_speed;
@@ -91,6 +114,16 @@ public:
         data[1] = -updown_speed;
         data[2] = -updown_speed;
     }
+
+     static void up_v(){
+        data[1] = updown_speed_v;
+        data[2] = updown_speed_v;
+    }
+    static void down_v(){
+        data[1] = -updown_speed_v;
+        data[2] = -updown_speed_v;
+    }
+
     static void sand(){
         data[17] = 1;
     }
@@ -98,10 +131,10 @@ public:
         data[17] = 0;
     }
     static void left(){
-        data[6] = -100;
+        data[6] = -th;
     }
     static void right(){
-        data[6] = 100;
+        data[6] = th;
     }
     static void forward_m(){
         data[4] = speed;
@@ -179,6 +212,9 @@ private:
 
         static bool last_share = false; // 前回の状態を保持する static 変数
         static bool share_latch = false;
+
+        static bool last_R1 =false;
+         static bool last_L1 =false;
         //static bool last_triangle = false;
 
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
@@ -191,7 +227,14 @@ private:
         last_share = SHARE;
         MANUALMODE = share_latch;
 
-        
+        if(L2){
+            data[9] -= count;
+        }
+        if(R2){
+            data[9] += count;
+        }
+
+
 
         //自動モード
         if (MANUALMODE == false)
@@ -200,19 +243,19 @@ private:
 
             data[1] = 0;
             data[2] = 0;
-            data[3] = 0;
-            data[7] = 0;
+            //data[3] = 0;
+             data[7] = 0;
             data[8]= 0; 
-            if(L2)
-            {
-            Action::first_position();
-            data[8]= 1;
-            }
-            if(R2)
-            {
-            Action::second_position();
-            data[8]= 1;
-            }
+            // if(L2)
+            // {
+            // Action::first_position();
+            // data[8]= 1;
+            // }
+            // if(R2)
+            // {
+            // Action::second_position();
+            // data[8]= 1;
+            // }
             if (CIRCLE )
             {
                Action::sand();
@@ -241,45 +284,53 @@ private:
                Action::back();
                data[8]= 1;
             }
-            else if (L1)
+            else if (L1  && !last_L1 )
             {
                Action::tokei(); // CIRCLEボタンが押されていない場合は0に設定
                data[8]= 1;
             }
-            else if (R1)
+            else if (R1  && !last_R1)
             {
                 Action::hantokei(); // CIRCLEボタンが押されていない場合は0に設定
                 data[8]= 1;
             }
+            else if (PS)
+            {
+                
+                data[3]= field;
+            }
+            last_R1 = R1;
+            last_L1 = L1;
+
         }
         //手動モード
         else if (MANUALMODE == true)
         {
             //std::cout << "手動モード" << std::endl;
         
-            // data[1] = 0;
-            // data[2] = 0;
-            // data[3] = 0;
+            data[1] = 0;
+            data[2] = 0;
+            
             data[7] = 1;
-            data[4] = 0;
-            data[5] = 0;
-            data[6] = 0;
+           // data[4] = 0;
+           // data[5] = 0;
+            //data[6] = 0;
              //永井清流逆運動学
             //arctan2(Y, X)でラジアン、atan2(Y, X)*180/M_PIで度
             //atan2(LS_X, LS_Y)*180/M_PI = data[3]
-            
-            
-            if (CIRCLE)
+             if (CIRCLE )
             {
                Action::sand();
             }
-            if (TRIANGLE)
+            if (TRIANGLE )
             {
-               Action::up_m();
+               Action::up_v();
+               data[8]= 1;
             }
             else if (CROSS)
             {
-               Action::down_m();
+               Action::down_v();
+               data[8]= 1;
             }
             else if (SQUARE)
             {
@@ -287,36 +338,81 @@ private:
             }
             else if (UP)
             {                   // 後退
-                Action::forward_m();
+                Action::forward_v();
+                data[8]= 1;
             }
             else if (DOWN)
             {                   // 前進
-               Action::back_m();
+               Action::back_v();
+               data[8]= 1;
             }
-            else if (L1)
+            else if (L1  && !last_L1 )
             {
-               Action::left(); // CIRCLEボタンが押されていない場合は0に設定
+               Action::tokei_v(); // CIRCLEボタンが押されていない場合は0に設定
+               data[8]= 1;
             }
-            else if (R1)
+            else if (R1  && !last_R1)
             {
-                Action::right(); // CIRCLEボタンが押されていない場合は0に設定
+                Action::hantokei_v(); // CIRCLEボタンが押されていない場合は0に設定
+                data[8]= 1;
             }
-            // data[4] = 0;
+            else if (PS)
+            {
+                
+                data[3]= field;
+            }
+            last_R1 = R1;
+            last_L1 = L1;
+
+            
+            // if (CIRCLE)
+            // {
+            //    Action::sand();
+            // }
+            // if (TRIANGLE)
+            // {
+            //    Action::up_m();
+            // }
+            // else if (CROSS)
+            // {
+            //    Action::down_m();
+            // }
+            // else if (SQUARE)
+            // {
+            //    Action::drop();
+            // }
+            // else if (UP)
+            // {                   // 後退
+            //     Action::forward_m();
+            // }
+            // else if (DOWN)
+            // {                   // 前進
+            //    Action::back_m();
+            // }
+            // else if (L1)
+            // {
+            //    Action::left(); // CIRCLEボタンが押されていない場合は0に設定
+            // }
+            // else if (R1)
+            // {
+            //     Action::right(); // CIRCLEボタンが押されていない場合は0に設定
+            // }
+            // // data[4] = 0;
             // data[5] = 0;
             // data[6] = 0;
         }
 
        
 
-        if (PS == true){
+        // if (PS == true){
             
-            data[1] = 0;
-            data[2] = 0;
-            data[3] = 0;
-            data[4] = 0;
-            data[5] = 0;
-            data[6] = 0;
-        }
+        //     data[1] = 0;
+        //     data[2] = 0;
+        //     data[3] = 0;
+        //     data[4] = 0;
+        //     data[5] = 0;
+        //     data[6] = 0;
+        // }
         // デバッグ用（for文でcoutするとカクつく）
         // std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", ";
         // std::cout << data[4] << ", " << data[5] << ", " << data[6] << ", " << data[7] << ", ";

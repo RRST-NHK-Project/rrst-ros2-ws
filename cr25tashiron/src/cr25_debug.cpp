@@ -277,9 +277,17 @@ public:
                       std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(),
                     "CR25 Target Point Listener initialized");
-        motor_angle_sets.push_back({0, 0, 0, 0});
-        motor_angle_sets.push_back({100, 200, 300, 0});
-        motor_angle_sets.push_back({-100, -200, -300, 0});
+        motor_angle_sets.push_back({0, 0, 0, 0});//0
+        motor_angle_sets.push_back({200, -200, 300, 0});//1
+        motor_angle_sets.push_back({-200, 200, -300, 0});//2
+        motor_angle_sets.push_back({100, 200, 600, 0});//3
+        motor_angle_sets.push_back({100, 200, 900, 0});//4
+        motor_angle_sets.push_back({100, 200, 1200, 0});//5
+        motor_angle_sets.push_back({100, 200, 1500, 0});//6
+        motor_angle_sets.push_back({100, 200, 1800, 0});//7
+        
+        
+
     }
 
 private:
