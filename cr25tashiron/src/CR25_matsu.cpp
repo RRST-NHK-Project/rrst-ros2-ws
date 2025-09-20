@@ -53,6 +53,11 @@ int32 robomas_target_angle # [degree]
 #define turn_speed_v 3 //回転の角度変化
 #define front_speed_v 200//前後の角度変化
 #define updown_speed_v 200//上下の角度変化
+
+#define first_th 60 //最初の角度
+#define first_r 720 //
+#define first_z 360 //
+
 #define deg 1
 #define th 20
 #define count 1
@@ -78,7 +83,9 @@ public:
         data[3] += turn_speed_v;
     }
     static void first_position(){
-        data[3] = -90*deg;
+        data[1] = first_r;
+        data[2] = -first_r;
+        data[3] = first_th;
     }
     static void second_position(){
         data[3] = 90*deg;
@@ -189,7 +196,7 @@ private:
         bool TRIANGLE = msg->buttons[2];
         bool SQUARE = msg->buttons[3];
 
-        // bool LEFT = msg->axes[6] == 1.0;
+        bool LEFT = msg->axes[6] == 1.0;
         // bool RIGHT = msg->axes[6] == -1.0;
         bool UP = msg->axes[7] == 1.0;
         bool DOWN = msg->axes[7] == -1.0;
@@ -256,11 +263,15 @@ private:
             // Action::second_position();
             // data[8]= 1;
             // }
-            if (CIRCLE )
+            if(LEFT){
+                Action::first_position();
+                data[8]= 1;
+            }
+            else if (CIRCLE )
             {
                Action::sand();
             }
-            if (TRIANGLE )
+            else if (TRIANGLE )
             {
                Action::up();
                data[8]= 1;
@@ -319,11 +330,15 @@ private:
              //永井清流逆運動学
             //arctan2(Y, X)でラジアン、atan2(Y, X)*180/M_PIで度
             //atan2(LS_X, LS_Y)*180/M_PI = data[3]
-             if (CIRCLE )
+            if(LEFT){
+                Action::first_position();
+                data[8]= 1;
+            }
+            else if (CIRCLE )
             {
                Action::sand();
             }
-            if (TRIANGLE )
+            else if (TRIANGLE )
             {
                Action::up_v();
                data[8]= 1;
