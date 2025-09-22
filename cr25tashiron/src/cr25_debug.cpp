@@ -12,21 +12,37 @@ RRST-NHK-Project 2025
 // ROS
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
+#include "std_msgs/msg/int32.hpp"
 #include "std_msgs/msg/int32_multi_array.hpp"
 #include <vector>
 
-#define DEG_VEL 1        // 0:角度/1:速度
-#define front_speed 360  // 前後の角度変化
-#define updown_speed 150 // 上下の角度変化
-#define speed 200        // 移動の速度
-#define turn_speed 20    // 回転の角度変化
-#define deg 2.22
+#define theta_step_deg 10
+#define theta_step_deg_large 30
+#define z_step_deg 10
+#define r_step_deg 10
 
-#define theta_step_deg 30
+bool AUTOMATIC = 0; // 0:手動モード 1:自動モード
+bool LERP = false;  // 線形補間の有効化
 
-bool MANUALMODE = true;
+bool field = 0; //(0:赤,1:青)
 
-std::vector<int16_t> data(25, 0); // マイコンに送信される配列"data"
+int m1 = 0;
+int m2 = 0;
+int m3 = 0;
+int m4 = 0;
+
+static int last_ps4_m1 = 0;
+static int last_ps4_m2 = 0;
+static int last_ps4_m3 = 0;
+
+int target_point = 0; // 目標地点
+
+bool ps4_active = false;
+
+std::vector<int32_t> data(25, 0); // マイコンに送信される配列"data"
+
+// 自動化用に各モーターの角度を格納
+std::vector<std::array<int, 4>> motor_angle_sets;
 
 class PS4_Listener : public rclcpp::Node {
 public:
@@ -45,6 +61,15 @@ public:
     }
 
 private:
+    // 線形補間
+    inline int smooth_step(int current, int target, float alpha = 0.1f, int threshold = 5) {
+        int next = static_cast<int>(current + alpha * (target - current));
+        if (std::abs(target - next) <= threshold) {
+            return target; // 無理やり収束させる
+        }
+        return next;
+    }
+
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
 
         // コントローラーの入力を取得、使わない入力はコメントアウト推奨
@@ -56,7 +81,7 @@ private:
         bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
         bool TRIANGLE = msg->buttons[2];
-        bool SQUARE = msg->buttons[3];
+        // bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
         // bool RIGHT = msg->axes[6] == -1.0;
@@ -79,37 +104,115 @@ private:
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
 
-        static bool last_share = false; // 前回の状態を保持する static 変数
+        static bool last_share = false;
         static bool share_latch = false;
+        static bool last_circle = false;
+        static bool circle_latch = false;
         // static bool last_triangle = false;
 
-        data[0] = DEG_VEL; // マイコン側のprintfを無効化・有効化(0 or 1)
+        // data[0] = DEG_VEL; // マイコン側のprintfを無効化・有効化(0 or 1)
+        if (L1 || R1 || L2 || R2 || UP || DOWN || TRIANGLE || CROSS || PS) {
+            // データを更新
+            last_ps4_m1 = data[1];
+            last_ps4_m2 = data[2];
+            last_ps4_m3 = data[3];
+            ps4_active = true; // ラッチフラグとして立てる
+        }
 
         if (SHARE && !last_share) {
             share_latch = !share_latch;
         }
 
+        if (CIRCLE && !last_circle) {
+            circle_latch = !circle_latch;
+        }
+
         last_share = SHARE;
-        MANUALMODE = share_latch;
+        last_circle = CIRCLE;
 
-        // L1押下で増加、R1押下で減少
-        if (L1) {
-            data[3] -= theta_step_deg;
-        }
-        if (R1) {
-            data[3] += theta_step_deg;
+        AUTOMATIC = share_latch;
+
+        if (AUTOMATIC == 0) {
+
+            if (L1) {
+                data[3] -= theta_step_deg;
+            }
+            if (R1) {
+                data[3] += theta_step_deg;
+            }
+
+            if (L2) {
+                data[3] -= theta_step_deg_large;
+            }
+
+            if (R2) {
+                data[3] += theta_step_deg_large;
+            }
+
+            if (UP) {
+                data[1] += z_step_deg;
+                data[2] += z_step_deg;
+            }
+
+            if (DOWN) {
+                data[1] -= z_step_deg;
+                data[2] -= z_step_deg;
+            }
+
+            if (TRIANGLE) {
+                data[1] -= r_step_deg;
+                data[2] += r_step_deg;
+            }
+
+            if (CROSS) {
+                data[1] += r_step_deg;
+                data[2] -= r_step_deg;
+            }
+
+            if (PS) {
+                // シューティング位置決定
+                if (field == 0) {
+                    data[1] = 0;
+                    data[2] = 0;
+                    data[3] = 0;
+                } else {
+                    data[1] = 0;
+                    data[2] = 0;
+                    data[3] = 0;
+                }
+                ps4_active = false;
+            }
+
+            data[17] = circle_latch;
         }
 
-        // if (R1) {
-        //     data[3] = -10; // 押している間だけ上方向
-        // } else if (L1) {
-        //     data[3] = 10; // 押している間だけ下方向
-        // } else {
-        //     data[3] = 0; // どちらも押していなければ停止
-        // }
+        if (AUTOMATIC == 1) {
+            ;
+        }
+
+        if (LERP) {
+            // 線形補間(LERP)
+            static int smooth_m1 = 0, smooth_m2 = 0, smooth_m3 = 0;
+
+            smooth_m1 = smooth_step(smooth_m1, data[1], 0.2f);
+            smooth_m2 = smooth_step(smooth_m2, data[2], 0.2f);
+            smooth_m3 = smooth_step(smooth_m3, data[3], 0.2f);
+
+            data[1] = smooth_m1;
+            data[2] = smooth_m2;
+            data[3] = smooth_m3;
+            // 線形補間ここまで
+        }
+
+        // ハンド自動旋回
+        int theta_robomas = data[3];
+        int theta1_actual = theta_robomas * 15 / 142;
+        int servo_deg = theta1_actual;
+
+        data[9] = servo_deg;
 
         publish_data();
-        // std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        // std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
     void publish_data() {
@@ -125,12 +228,101 @@ private:
     rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr publisher_;
 };
 
+class MotorAnglesListener : public rclcpp::Node {
+public:
+    MotorAnglesListener() : Node("deg_listener") {
+        subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
+            "motor_angles", 10,
+            std::bind(&MotorAnglesListener::motor_angles_listener_callback, this,
+                      std::placeholders::_1));
+        RCLCPP_INFO(this->get_logger(),
+
+                    "CR25 DEG Listener initialized");
+    }
+
+private:
+    void motor_angles_listener_callback(
+        const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+
+        if (!ps4_active) {
+            m1 = msg->data[0];
+            m2 = msg->data[1];
+            m3 = msg->data[2];
+            m4 = msg->data[3];
+
+            // std::cout << m1;
+            // std::cout << m2;
+            // std::cout << m3;
+            // std::cout << m4 << std::endl;
+
+            data[1] = m1;
+            data[2] = m2;
+            data[3] = m3;
+        } else {
+            data[1] = last_ps4_m1;
+            data[2] = last_ps4_m2;
+            data[3] = last_ps4_m3;
+        }
+    }
+
+    rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
+};
+
+class TargetPointListener : public rclcpp::Node {
+public:
+    TargetPointListener() : Node("target_point_listener") {
+        subscription_ = this->create_subscription<std_msgs::msg::Int32>(
+            "target_point", 10,
+            std::bind(&TargetPointListener::target_point_listener_callback, this,
+                      std::placeholders::_1));
+        RCLCPP_INFO(this->get_logger(),
+                    "CR25 Target Point Listener initialized");
+        motor_angle_sets.push_back({0, 0, 0, 0});//0
+        motor_angle_sets.push_back({200, -200, 300, 0});//1
+        motor_angle_sets.push_back({-200, 200, -300, 0});//2
+        motor_angle_sets.push_back({100, 200, 600, 0});//3
+        motor_angle_sets.push_back({100, 200, 900, 0});//4
+        motor_angle_sets.push_back({100, 200, 1200, 0});//5
+        motor_angle_sets.push_back({100, 200, 1500, 0});//6
+        motor_angle_sets.push_back({100, 200, 1800, 0});//7
+        
+        
+
+    }
+
+private:
+    void target_point_listener_callback(
+        const std_msgs::msg::Int32::SharedPtr msg) {
+
+        if (!ps4_active) {
+            target_point = msg->data;
+            // std::cout << "Target Point: " << target_point << std::endl;
+
+            std::array<int, 4> &angles = motor_angle_sets[target_point];
+
+            data[1] = angles[0];
+            data[2] = angles[1];
+            data[3] = angles[2];
+        } else {
+            data[1] = last_ps4_m1;
+            data[2] = last_ps4_m2;
+            data[3] = last_ps4_m3;
+        }
+    }
+
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr subscription_;
+};
+
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
     rclcpp::executors::SingleThreadedExecutor exec;
     auto ps4_listener = std::make_shared<PS4_Listener>();
+    auto motor_angles_listener = std::make_shared<MotorAnglesListener>();
+    auto target_point_listener = std::make_shared<TargetPointListener>();
+    exec.add_node(motor_angles_listener);
     exec.add_node(ps4_listener);
+    exec.add_node(target_point_listener);
     exec.spin();
 
     rclcpp::shutdown();

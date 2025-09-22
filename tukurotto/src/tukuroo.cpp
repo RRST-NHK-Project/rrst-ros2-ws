@@ -7,7 +7,6 @@
 #include <cstdlib>
 #include <iostream>
 #include <thread>
-
 // ROS
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
@@ -16,7 +15,7 @@
 #include "include/IP.hpp"
 #include "include/UDP.hpp"
 
-#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
+#define MC_PRINTF 1 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 // L2,R2のデッドゾーン
 //#define DEADZONE_L2 0.3
@@ -30,6 +29,11 @@ static bool last_SQUARE = false;
 
 // 速度
 int wheelspeed = 30;
+
+//サーボ
+int servo_angle = 74;        // 現在の角度（初期は74度,真っ直ぐになるように調整）
+int servo_step1 = 2;          // 1回の更新で動く角度(l1,R1)
+int servo_step2 = 5;          // 1回の更新で動く角度(l2,R2)
 
 std::vector<int16_t> data(22, 0); // マイコンに送信される配列"data" std~は型　int16は16bit（通信量）
 /*
@@ -81,17 +85,19 @@ private:
 
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
-        //float L2 = (-1 * msg->axes[2] + 1) / 2;
-        float R2 = (-1 * msg->axes[5] + 1) / 2;
-        data[3] = 50 * R2;
+        float L2 = (-1 * msg->axes[2] + 1) / 2 ;
+        float R2 = (-1 * msg->axes[5] + 1) / 2 ;
+
+        int L2OR = int(L2) ;
+        int R2OR = int(R2) ;
         //float LS_X = -1 * msg->axes[0];
         
         //bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
         //bool TRIANGLE = msg->buttons[2];
         bool SQUARE = msg->buttons[3];
-        //bool L1 = msg->buttons[4];
-        //bool R1 = msg->buttons[5];
+        bool L1 = msg->buttons[4];
+        bool R1 = msg->buttons[5];
         //bool SHARE = msg->buttons[8];
         //bool OPTIONS = msg->buttons[9];
         //bool PS = msg->buttons[10];
@@ -103,20 +109,20 @@ private:
         bool DOWN = msg->axes[7] == -1.0;
         
         //θ軸の操作
-        if (LEFT) {     // 正転
-            data[1] = wheelspeed;
-        }else if (RIGHT) {    // 逆転
-            data[1] = -wheelspeed;
+        if (RIGHT) {     // 正転
+            data[2] = (wheelspeed-10);
+        }else if (LEFT) {    // 逆転
+            data[2] = (-wheelspeed+10);
         }else{
-            data[1] = 0;
+            data[2] = 0;
         }
         // R軸の操作
         if (UP) {       // 正転
-            data[2] = wheelspeed;
+            data[1] = (wheelspeed+30);
         }else if (DOWN) {     // 逆転
-            data[2] = -wheelspeed;
+            data[1] = (-wheelspeed-30);
         }else{
-            data[2] = 0;
+            data[1] = 0;
         }
 
         //if (CROSS) {
@@ -133,12 +139,12 @@ private:
         last_CIRCLE = CIRCLE;
         last_SQUARE = SQUARE;       
         
-        if (CIRCLE && !last_CIRCLE) {
-            CIRCLE_count++;
-        }
-        if (SQUARE && !last_SQUARE) {
-            SQUARE_count++;
-        }
+        // if (CIRCLE && !last_CIRCLE) {
+        //     CIRCLE_count++;
+        // }
+        // if (SQUARE && !last_SQUARE) {
+        //     SQUARE_count++;
+        // }
         
         //ハンド掴むエアシリンダー
         if (CIRCLE_count == 0) {
@@ -155,6 +161,41 @@ private:
         else if(SQUARE_count == 1){
             data[16] = 1;
         }
+
+        // サーボの手先角度3作!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        // ボタン入力に応じて角度を変化
+        // DS3218proなので270度までいけます
+        if (R1 && !L1){
+        // 徐々に正転
+        servo_angle += servo_step1;
+        if (servo_angle > 270) {// 上限で止める
+            servo_angle = 270;
+            }
+        } else if (L1 && !R1){
+        // 徐々に逆転
+        servo_angle -= servo_step1;
+        if (servo_angle < 0) {// 下限で止める
+            servo_angle = 0;
+            }
+        }
+
+        if (R2OR && !L2OR){
+        // 徐々に正転
+        servo_angle += servo_step2;
+        if (servo_angle > 270) {// 上限で止める
+            servo_angle = 270;
+            }
+        } else if (L2OR && !R2OR){
+        // 徐々に逆転
+        servo_angle -= servo_step2;
+        if (servo_angle < 0) {// 下限で止める
+            servo_angle = 0;
+            }
+        }
+
+        // サーボ指令
+        data[11] = servo_angle ;
+
         //if (L1) {
             //std::cout << "L1" << std::endl;
         //}
@@ -174,7 +215,7 @@ private:
         udp_.send(data);   // データ送信
 
     }
-
+   
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
     UDP udp_;
 };

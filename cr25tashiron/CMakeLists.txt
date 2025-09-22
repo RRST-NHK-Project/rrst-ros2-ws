@@ -34,6 +34,12 @@ ament_target_dependencies(cr25_matsu_sw rclcpp actuator_msg std_msgs sensor_msgs
 add_executable(cr25_debug src/cr25_debug.cpp)
 ament_target_dependencies(cr25_debug rclcpp std_msgs sensor_msgs geometry_msgs)
 
+add_executable(cr25_deg_pub src/cr25_deg_publisher.cpp)
+ament_target_dependencies(cr25_deg_pub rclcpp std_msgs sensor_msgs geometry_msgs)
+
+add_executable(cr25_num_pub src/cr25_num_publisher.cpp)
+ament_target_dependencies(cr25_num_pub rclcpp std_msgs)
+
 install(TARGETS
   cr25_matsu
   cr25_matsu_sw
@@ -41,6 +47,8 @@ install(TARGETS
   actuator_msg_subscriber
   actuator_msg_bridge
   cr25_debug
+  cr25_deg_pub
+  cr25_num_pub
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
@@ -54,5 +62,9 @@ if(BUILD_TESTING)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
+
+install(DIRECTORY launch/
+  DESTINATION share/${PROJECT_NAME}/launch)
+
 
 ament_package()
