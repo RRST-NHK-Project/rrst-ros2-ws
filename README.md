@@ -14,7 +14,7 @@
 [![Docker Build](https://github.com/RRST-NHK-Project/rrst-ros2-ws/actions/workflows/docker-publish.yml/badge.svg?branch=develop)](https://github.com/RRST-NHK-Project/rrst-ros2-ws/actions/workflows/docker-publish.yml)
 
 ## 1. 🚀 概要
-RRST, NHKプロジェクトのROS 2 ワークスペースです。現在使用中の各種パッケージ、回路データ、マイコン側プログラムを格納しています。不要になったものは別リポジトリに移動しアーカイブしてください。
+立命館大学ロボット技術研究会, NHKプロジェクトのROS 2 ワークスペースです。現在使用中の各種パッケージ、回路データ、マイコン側プログラムを格納しています。
 
 
 ## 2. ⚙️ 動作環境
@@ -25,7 +25,7 @@ RRST, NHKプロジェクトのROS 2 ワークスペースです。現在使用�
 | ROS | ROS 2 Jazzy |
 | RAM | 16GB以上推奨 |
 
-> 💡 **注意**: ビルド中にフリーズする場合は、RAMが足りていない可能性があります。スワップ領域を追加すると解決します。
+> 💡 **注意**: ビルド中にフリーズする場合は、RAMが足りていない可能性があります。スワップ領域を追加するかビルド時のスレッド数を指定してください。
 
 ---
 
@@ -64,6 +64,12 @@ cd ~/ros2_ws
 colcon build
 ```
 
+※スレッド数を指定してビルドする場合は以下
+```bash
+cd ~/ros2_ws
+colcon build --parallel-workers 4
+```
+
 ---
 
 ## 4. 📁 ディレクトリ構成
@@ -71,10 +77,10 @@ colcon build
 | パス | 説明 |
 |:---|:---|
 | `/example` | 講習関連 |
-| `/ros2udp` | ros2udpパッケージ、詳細はパッケージ内のReadmeを参照 |
+| `/ros2udp` | ros2udpパッケージ、学ロボ25で使用 |
 | `/ros2udp_core` | ros2udpパッケージの最小構成 |
 | `/ros2esp` | ros2espパッケージ、詳細はパッケージ内のReadmeを参照 |
-| `/microcontrollerーws` | マイコン用プログラム |
+| `/microcontroller-ws` | マイコン用プログラム |
 | `/kicad-ws` | メイン基板のKiCadデータ |
 ---
 
