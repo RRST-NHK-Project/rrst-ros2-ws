@@ -1,7 +1,7 @@
 
 
 # **rrst-ros2-workspace**
-ソフト班はdevelopブランチを使用すること。
+ソフト班はdevelopブランチを使用してください。
 ### main（安定版/stable）
 
 [![ROS 2 Jazzy Build](https://github.com/RRST-NHK-Project/rrst-ros2-ws/actions/workflows/main_jazzy_build_and_test.yml/badge.svg?branch=main)](https://github.com/RRST-NHK-Project/rrst-ros2-ws/actions/workflows/main_jazzy_build_and_test.yml)
