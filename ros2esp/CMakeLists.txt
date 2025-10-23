@@ -34,11 +34,16 @@ ament_target_dependencies(actuator_msg_subscriber rclcpp actuator_msg)
 add_executable(actuator_msg_bridge src/ActuatorMsgBridge.cpp)
 ament_target_dependencies(actuator_msg_bridge rclcpp actuator_msg)
 
+add_executable(nr26_omni src/NR26_omni.cpp)
+ament_target_dependencies(nr26_omni rclcpp std_msgs sensor_msgs geometry_msgs)
+
+
 # インストール設定
 install(TARGETS
   mros_wip
   mb_tester
   nr25_mr_sd
+  nr26_omni
   actuator_msg_publisher
   actuator_msg_subscriber
   actuator_msg_bridge
