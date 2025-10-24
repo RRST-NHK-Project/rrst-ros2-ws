@@ -14,7 +14,6 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
-find_package(actuator_msg REQUIRED)
 
 add_executable(mros_wip src/mROS_WIP.cpp)
 ament_target_dependencies(mros_wip rclcpp std_msgs sensor_msgs)
@@ -30,9 +29,6 @@ ament_target_dependencies(actuator_msg_publisher rclcpp actuator_msg)
 
 add_executable(actuator_msg_subscriber src/ActuatorMsgSubscriber.cpp)
 ament_target_dependencies(actuator_msg_subscriber rclcpp actuator_msg)
-
-add_executable(actuator_msg_bridge src/ActuatorMsgBridge.cpp)
-ament_target_dependencies(actuator_msg_bridge rclcpp actuator_msg)
 
 add_executable(nr26_omni src/NR26_omni.cpp)
 ament_target_dependencies(nr26_omni rclcpp std_msgs sensor_msgs geometry_msgs)
