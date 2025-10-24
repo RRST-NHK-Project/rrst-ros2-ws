@@ -24,12 +24,6 @@ ament_target_dependencies(mb_tester rclcpp std_msgs sensor_msgs)
 add_executable(nr25_mr_sd src/NR25_MR_SwerveDrive.cpp)
 ament_target_dependencies(nr25_mr_sd rclcpp std_msgs sensor_msgs geometry_msgs)
 
-add_executable(actuator_msg_publisher src/ActuatorMsgPublisher.cpp)
-ament_target_dependencies(actuator_msg_publisher rclcpp actuator_msg)
-
-add_executable(actuator_msg_subscriber src/ActuatorMsgSubscriber.cpp)
-ament_target_dependencies(actuator_msg_subscriber rclcpp actuator_msg)
-
 add_executable(nr26_omni src/NR26_omni.cpp)
 ament_target_dependencies(nr26_omni rclcpp std_msgs sensor_msgs geometry_msgs)
 
@@ -40,9 +34,6 @@ install(TARGETS
   mb_tester
   nr25_mr_sd
   nr26_omni
-  actuator_msg_publisher
-  actuator_msg_subscriber
-  actuator_msg_bridge
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
