@@ -25,6 +25,7 @@ jobs:
           apt-get install -y python3-colcon-common-extensions
 
       - name: Create ROS 2 workspace
+        shell: bash
         run: |
           mkdir -p ros2_ws/src
           shopt -s extglob
