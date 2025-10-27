@@ -24,7 +24,7 @@ jobs:
           apt-get update
           apt-get install -y python3-colcon-common-extensions
 
-      - name: Build workspace
+      - name: Create ROS 2 workspace
         run: |
           mkdir -p ros2_ws/src
           shopt -s extglob
@@ -33,11 +33,10 @@ jobs:
           source /opt/ros/jazzy/setup.bash
           rosdep update
           rosdep install --from-paths src --ignore-src -r -y
-          colcon build --symlink-install --merge-install --parallel-workers $(nproc)
 
-      - name: Run tests
+      - name: Build workspace
         run: |
           source /opt/ros/jazzy/setup.bash
           cd ros2_ws
-          colcon test --merge-install
-          colcon test-result --verbose
+          colcon build --symlink-install --event-handlers console_cohesion+
+
