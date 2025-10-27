@@ -78,10 +78,8 @@ colcon build --parallel-workers 4
 |:---|:---|
 | `/example` | 講習関連 |
 | `/ros2udp` | ros2udpパッケージ、学ロボ25で使用 |
-| `/ros2udp_core` | ros2udpパッケージの最小構成 |
-| `/ros2esp` | ros2espパッケージ、詳細はパッケージ内のReadmeを参照 |
+| `/ros2esp` | ros2espパッケージ、学ロボ26で使用予定 |
 | `/microcontroller-ws` | マイコン用プログラム |
-| `/kicad-ws` | メイン基板のKiCadデータ |
 ---
 
 ## 5. 🌟 Powered by
