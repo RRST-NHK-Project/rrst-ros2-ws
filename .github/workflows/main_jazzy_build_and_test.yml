@@ -67,9 +67,8 @@ jobs:
         shell: bash
         run: |
           apt-get update
-          apt-get install -y python3-colcon-common-extensions python3-pip
-          pip install --upgrade pip
-
+          apt-get install -y python3-colcon-common-extensions
+          
       # ------------------------------------------------------------
       # ⑤ ワークスペース作成＋依存解決
       # ------------------------------------------------------------
