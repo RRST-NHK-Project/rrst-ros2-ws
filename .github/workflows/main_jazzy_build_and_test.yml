@@ -36,6 +36,7 @@ jobs:
           rosdep install --from-paths src --ignore-src -r -y
 
       - name: Build workspace
+        shell: bash
         run: |
           source /opt/ros/jazzy/setup.bash
           cd ros2_ws
