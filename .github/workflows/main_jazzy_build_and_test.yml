@@ -5,74 +5,26 @@ name: ROS 2 Jazzy Build
 on:
   push:
     branches: [main, develop]
-    paths-ignore: ['README.md']
   pull_request:
     branches: [main]
-    paths-ignore: ['README.md']
 
 jobs:
-  jazzy-build:
+  jazzy-build-and-test:
     runs-on: ubuntu-24.04
-
     container:
-      image: ros:jazzy  # 公式ROSイメージで高速化
-      options: --user root
-
+      image: ros:jazzy  # ← 公式ROSイメージを使用
     steps:
       - name: Checkout repository (with submodules)
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      # ------------------------------------------------------------
-      # ① APTキャッシュ：依存関係のダウンロードをスキップ
-      # ------------------------------------------------------------
-      - name: Cache APT packages
-        uses: actions/cache@v4
-        with:
-          path: /var/cache/apt
-          key: ${{ runner.os }}-apt-${{ hashFiles('**/package.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-apt-
-
-      # ------------------------------------------------------------
-      # ② rosdepキャッシュ：依存解決をスキップ
-      # ------------------------------------------------------------
-      - name: Cache rosdep
-        uses: actions/cache@v4
-        with:
-          path: /root/.ros/rosdep
-          key: ${{ runner.os }}-rosdep-${{ hashFiles('**/package.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-rosdep-
-
-      # ------------------------------------------------------------
-      # ③ colconビルドキャッシュ：再ビルドをスキップ
-      # ------------------------------------------------------------
-      - name: Cache colcon build
-        uses: actions/cache@v4
-        with:
-          path: |
-            ros2_ws/build
-            ros2_ws/install
-            ros2_ws/log
-          key: colcon-${{ hashFiles('**/CMakeLists.txt', '**/package.xml') }}
-          restore-keys: |
-            colcon-
-
-      # ------------------------------------------------------------
-      # ④ 依存関係インストール
-      # ------------------------------------------------------------
       - name: Install dependencies
-        shell: bash
         run: |
           apt-get update
           apt-get install -y python3-colcon-common-extensions
-          
-      # ------------------------------------------------------------
-      # ⑤ ワークスペース作成＋依存解決
-      # ------------------------------------------------------------
-      - name: Prepare workspace
+
+      - name: Create ROS 2 workspace
         shell: bash
         run: |
           mkdir -p ros2_ws/src
@@ -83,12 +35,10 @@ jobs:
           rosdep update
           rosdep install --from-paths src --ignore-src -r -y
 
-      # ------------------------------------------------------------
-      # ⑥ ビルド（高速・静かな出力）
-      # ------------------------------------------------------------
       - name: Build workspace
         shell: bash
         run: |
           source /opt/ros/jazzy/setup.bash
           cd ros2_ws
           colcon build --symlink-install --event-handlers console_cohesion+
+
