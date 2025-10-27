@@ -1,47 +1,31 @@
 # Github上でのCI/CDを使用して、ROS 2 Jazzyのビルドを行うためのGitHub Actionsワークフロー
+# 2025/10/28:高速化のため、公式ROSイメージを使用するように変更
 name: ROS 2 Jazzy Build
 
 on:
   push:
-    branches:
-      - main
-      - develop
-    paths-ignore:
-      - 'README.md'
+    branches: [main, develop]
   pull_request:
-    branches:
-      - main
-    paths-ignore:
-      - 'README.md'
+    branches: [main]
 
 jobs:
   jazzy-build-and-test:
     runs-on: ubuntu-24.04
+    container:
+      image: ros:jazzy  # ← 公式ROSイメージを使用
     steps:
-#      - name: Checkout repository
-#        uses: actions/checkout@v4
-
       - name: Checkout repository (with submodules)
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Setup ROS 2
-        uses: ros-tooling/setup-ros@v0.7
-        with:
-          required-ros-distributions: jazzy
-
       - name: Install dependencies
         run: |
-          sudo apt update
-          sudo apt install -y python3-colcon-common-extensions
-
-      - name: Install pytest dependencies
-        run: |
-          pip install --upgrade pip
-          pip install --force-reinstall pytest pytest-repeat
+          apt-get update
+          apt-get install -y python3-colcon-common-extensions
 
       - name: Create ROS 2 workspace
+        shell: bash
         run: |
           mkdir -p ros2_ws/src
           shopt -s extglob
@@ -51,21 +35,10 @@ jobs:
           rosdep update
           rosdep install --from-paths src --ignore-src -r -y
 
-#      - name: Run setup script
-#       run: |
-#        cd ros2_ws/src/setup
-#       sudo chmod +x setup.sh
-#      ./setup.sh
-
       - name: Build workspace
+        shell: bash
         run: |
           source /opt/ros/jazzy/setup.bash
           cd ros2_ws
           colcon build --symlink-install --event-handlers console_cohesion+
 
-#      - name: Run tests
-#        run: |
-#          source /opt/ros/jazzy/setup.bash
-#          cd ros2_ws
-#          colcon test
-#          colcon test-result --verbose
