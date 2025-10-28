@@ -75,10 +75,15 @@ private:
         count[2] = msg->data[2];
         count[3] = msg->data[3];
 
-        std::cout << count[0] << ", ";
-        std::cout << count[1] << ", ";
-        std::cout << count[2] << ", ";
-        std::cout << count[3] << std::endl;
+        deg[0] = (float)count[0] / 4096 * 360.0;
+        deg[1] = (float)count[1] / 4096 * 360.0;
+        deg[2] = (float)count[2] / 4096 * 360.0;
+        deg[3] = (float)count[3] / 4096 * 360.0;
+
+        // std::cout << count[0] << ", ";
+        // std::cout << count[1] << ", ";
+        // std::cout << count[2] << ", ";
+        // std::cout << count[3] << std::endl;
     }
 
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
