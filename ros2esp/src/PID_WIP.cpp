@@ -21,7 +21,7 @@ PID on ROS 2, Work In Progress
 
 #define MAX_OUTPUT 30.0 // PIDの出力上限
 
-std::vector<int16_t> data(19, 0); // マイコンに送信される配列"data"
+std::vector<int16_t> data(18, 0); // マイコンに送信される配列"data"
 std::vector<int16_t> count(4, 0);
 std::vector<float_t> deg(4, 0.0);
 std::vector<float_t> target(4, 0.0);
@@ -148,19 +148,19 @@ private:
 
             last_Error[i] = Error[i];
             output[i] = ((Kp * Error[i]) + (Ki * Integral[i]) +
-                         (Kd * Differential[i]));             // PID
-            output[i] = std::clamp(output[i], -50.0f, 50.0f); //-50 ~ 50に収める
+                         (Kd * Differential[i]));               // PID
+            output[i] = std::clamp(output[i], -255.0f, 255.0f); //-50 ~ 50に収める
             data[i + 1] = (int)output[i];
         }
-        std::cout << output[0] << ", ";
-        std::cout << output[1] << ", ";
-        std::cout << output[2] << ", ";
-        std::cout << output[3] << std::endl;
+        // std::cout << output[0] << ", ";
+        // std::cout << output[1] << ", ";
+        // std::cout << output[2] << ", ";
+        // std::cout << output[3] << std::endl;
 
-        // std::cout << data[1] << ", ";
-        // std::cout << data[2] << ", ";
-        // std::cout << data[3] << ", ";
-        // std::cout << data[4] << std::endl;
+        std::cout << data[1] << ", ";
+        std::cout << data[2] << ", ";
+        std::cout << data[3] << ", ";
+        std::cout << data[4] << std::endl;
         publish_data();
 
         // std::cout << Differential[3] << std::endl;
