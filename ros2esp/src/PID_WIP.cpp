@@ -22,9 +22,9 @@ PID on ROS 2, Work In Progress
 #define MAX_OUTPUT 30.0 // PIDの出力上限
 
 std::vector<int16_t> data(19, 0); // マイコンに送信される配列"data"
-std::vector<float_t> deg(4, 0.0); // マイコンに送信される配列"data"
-
-std::vector<float_t> target(4, 0.0); // マイコンに送信される配列"data"
+std::vector<int16_t> count(4, 0);
+std::vector<float_t> deg(4, 0.0);
+std::vector<float_t> target(4, 0.0);
 
 float Kp = 0.01;
 float Ki = 0.0;
@@ -59,8 +59,8 @@ class ENC_Listener : public rclcpp::Node {
 public:
     ENC_Listener()
         : Node("enc_listener") {
-        subscription_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
-            "enc", 10,
+        subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
+            "from_esp32_0", 10,
             std::bind(&ENC_Listener::enc_listener_callback, this,
                       std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(),
@@ -69,18 +69,20 @@ public:
 
 private:
     void enc_listener_callback(
-        const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
-        deg[0] = msg->data[0];
-        deg[1] = msg->data[1];
-        deg[2] = msg->data[2];
-        deg[3] = msg->data[3];
-        // std::cout << deg[0] << ", ";
-        // std::cout << deg[1] << ", ";
-        // std::cout << deg[2] << ", ";
-        // std::cout << deg[3] << std::endl;
+        const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        count[0] = msg->data[0];
+        count[1] = msg->data[1];
+        count[2] = msg->data[2];
+        count[3] = msg->data[3];
+
+        std::cout << count[0] << ", ";
+        std::cout << count[1] << ", ";
+        std::cout << count[2] << ", ";
+        std::cout << count[3] << std::endl;
     }
 
-    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr subscription_;
+    rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
+    rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr publisher_;
 };
 
 class PID_Params_Listener : public rclcpp::Node {
@@ -91,7 +93,6 @@ public:
             std::bind(&PID_Params_Listener::pid_params_listener_callback, this,
                       std::placeholders::_1));
         RCLCPP_INFO(this->get_logger(),
-
                     "PID Parameter Listener initialized");
     }
 
@@ -109,16 +110,18 @@ private:
     }
 
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr subscription_;
+    rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr publisher_;
 };
 
 class PID : public rclcpp::Node {
 public:
-    PID(const std::string &ip, int port)
-        : Node("pid"), udp_(ip, port) {
+    PID()
+        : Node("pid") {
         // タイマーの作成：50msごとにPID制御を実行
         timer_ = this->create_wall_timer(
             std::chrono::milliseconds(50),
             std::bind(&PID::timer_callback, this));
+        publisher_ = this->create_publisher<std_msgs::msg::Int32MultiArray>("to_esp32_1", 10);
     }
 
 private:
@@ -153,13 +156,23 @@ private:
         // std::cout << data[2] << ", ";
         // std::cout << data[3] << ", ";
         // std::cout << data[4] << std::endl;
-        udp_.send(data);
+        publish_data();
 
         // std::cout << Differential[3] << std::endl;
         //---------------------------PID---------------------------//
+        rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr publisher_;
+    }
+
+    void publish_data() {
+        auto msg = std_msgs::msg::Int32MultiArray();
+        msg.data.reserve(data.size());
+        for (auto &v : data) {
+            msg.data.push_back(static_cast<int32_t>(v));
+        }
+        publisher_->publish(msg);
     }
     rclcpp::TimerBase::SharedPtr timer_; // タイマーのポインタ
-    UDP udp_;
+    rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr publisher_;
 };
 
 int main(int argc, char *argv[]) {
@@ -167,7 +180,7 @@ int main(int argc, char *argv[]) {
 
     rclcpp::executors::MultiThreadedExecutor exec;
     auto enc_listener = std::make_shared<ENC_Listener>();
-    auto pid = std::make_shared<PID>(IP_DR_SD, PORT_DR_SD);
+    auto pid = std::make_shared<PID>();
     auto pid_params_listener = std::make_shared<PID_Params_Listener>();
     exec.add_node(enc_listener);
     exec.add_node(pid);
