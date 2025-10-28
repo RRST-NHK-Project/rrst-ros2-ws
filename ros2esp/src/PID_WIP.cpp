@@ -108,10 +108,10 @@ private:
         Ki = msg->data[1];
         Kd = msg->data[2];
         target[2] = msg->data[3];
-        std::cout << Kp << ", ";
-        std::cout << Ki << ", ";
-        std::cout << Kd << ", ";
-        std::cout << target[2] << std::endl;
+        // std::cout << Kp << ", ";
+        // std::cout << Ki << ", ";
+        // std::cout << Kd << ", ";
+        // std::cout << target[2] << std::endl;
     }
 
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr subscription_;
@@ -152,10 +152,10 @@ private:
             output[i] = std::clamp(output[i], -50.0f, 50.0f); //-50 ~ 50に収める
             data[i + 1] = (int)output[i];
         }
-        // std::cout << output[0] << ", ";
-        // std::cout << output[1] << ", ";
-        // std::cout << output[2] << ", ";
-        // std::cout << output[3] << std::endl;
+        std::cout << output[0] << ", ";
+        std::cout << output[1] << ", ";
+        std::cout << output[2] << ", ";
+        std::cout << output[3] << std::endl;
 
         // std::cout << data[1] << ", ";
         // std::cout << data[2] << ", ";
