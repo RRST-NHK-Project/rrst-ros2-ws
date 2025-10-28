@@ -75,10 +75,10 @@ private:
         count[2] = msg->data[2];
         count[3] = msg->data[3];
 
-        deg[0] = (float)count[0] / 4096 * 360.0;
-        deg[1] = (float)count[1] / 4096 * 360.0;
-        deg[2] = (float)count[2] / 4096 * 360.0;
-        deg[3] = (float)count[3] / 4096 * 360.0;
+        deg[0] = (float)count[0] / 2048 * 360.0;
+        deg[1] = (float)count[1] / 2048 * 360.0;
+        deg[2] = (float)count[2] / 2048 * 360.0;
+        deg[3] = (float)count[3] / 2048 * 360.0;
 
         // std::cout << count[0] << ", ";
         // std::cout << count[1] << ", ";
@@ -107,7 +107,7 @@ private:
         Kp = msg->data[0];
         Ki = msg->data[1];
         Kd = msg->data[2];
-        target[2] = msg->data[3];
+        target[1] = msg->data[3];
         // std::cout << Kp << ", ";
         // std::cout << Ki << ", ";
         // std::cout << Kd << ", ";
