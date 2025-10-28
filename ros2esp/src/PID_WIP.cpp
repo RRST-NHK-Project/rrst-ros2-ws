@@ -107,7 +107,7 @@ private:
         Kp = msg->data[0];
         Ki = msg->data[1];
         Kd = msg->data[2];
-        target[1] = msg->data[3];
+        target[0] = msg->data[3];
         // std::cout << Kp << ", ";
         // std::cout << Ki << ", ";
         // std::cout << Kd << ", ";
