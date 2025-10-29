@@ -13,6 +13,7 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 // ROS
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
+#include <std_msgs/msg/float32_multi_array.hpp>
 #include "std_msgs/msg/int32_multi_array.hpp"
 //#include "actuator_msg/msg/actuator_msg.hpp"
 #include <vector>
