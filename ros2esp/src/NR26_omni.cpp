@@ -169,7 +169,7 @@ private:
         data[4] = int(v4 * duty_max);
 
         // デバッグ用（for文でcoutするとカクつく）
-        std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", "<< data[4] <<std::endl;//", ";
+        std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", "<<std::endl;//", ";
         // std::cout << data[4] << ", " << data[5] << ", " << data[6] << ", " << data[7] << ", ";
         // std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
         // std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
