@@ -24,9 +24,12 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 float duty_max = 500;
 float sp_yaw = 0.5;
 
+float speed = 100;
+
 float deadzone = 0.3; // adjust DS4 deadzone
 
 float v1, v2, v3, v4; // 各オムニホイールの速度指令値
+//v1:第一象限, v2:第二象限, v3:第三象限, v4:第四象限
 
 /*
 マイコンに送信される配列"data"
@@ -56,41 +59,37 @@ debug: マイコンのprintfを有効化, MD: モータードライバー, TR: �
 
 std::vector<int16_t> data(18, 0); // マイコンに送信される配列"data"
 
-// 各機構シーケンスを格納するクラス
+// オムニ直進用関数群
 class Action
 {
 public:
-    static void tokei()
-    {
-           //data[3] -= turn_speed*deg;
-    }
     static void forward()
     {
-        data[1] = 100;
-        data[2] = 100;
-        data[3] = 100;
-        data[4] = 100;
+        data[1] = speed;
+        data[2] = speed;
+        data[3] = speed;
+        data[4] = speed;
     }
     static void back()
     {
-        data[1] = -100;
-        data[2] = -100;
-        data[3] = -100;
-        data[4] = -100;
+        data[1] = -speed;
+        data[2] = -speed;
+        data[3] = -speed;
+        data[4] = -speed;
     }
     static void left()
     {
-        data[1] = 100;
-        data[2] = -100;
-        data[3] = 100;
-        data[4] = -100;
+        data[1] = speed;
+        data[2] = -speed;
+        data[3] = speed;
+        data[4] = -speed;
     }
     static void right()
     {
-        data[1] = -100;
-        data[2] = 100;
-        data[3] = -100;
-        data[4] = 100;
+        data[1] = -speed;
+        data[2] = speed;
+        data[3] = -speed;
+        data[4] = speed;
     }
 };
 
@@ -126,10 +125,10 @@ private:
         // bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
 
-        // bool LEFT = msg->axes[6] == 1.0;
-        // bool RIGHT = msg->axes[6] == -1.0;
-        // bool UP = msg->axes[7] == 1.0;
-        // bool DOWN = msg->axes[7] == -1.0;
+        bool LEFT = msg->axes[6] == 1.0;
+        bool RIGHT = msg->axes[6] == -1.0;
+        bool UP = msg->axes[7] == 1.0;
+        bool DOWN = msg->axes[7] == -1.0;
 
         bool L1 = msg->buttons[4];
         bool R1 = msg->buttons[5];
@@ -191,10 +190,29 @@ private:
         }
 
         // printf("\t\n%d,%d,%d,%d\n",v1, v2, v3, v4);
-        data[1] = int(v1 * duty_max);
-        data[2] = int(v2 * duty_max);
-        data[3] = int(v3 * duty_max);
-        data[4] = int(v4 * duty_max);
+        // data[1] = int(v1 * duty_max);
+        // data[2] = int(v2 * duty_max);
+        // data[3] = int(v3 * duty_max);
+        // data[4] = int(v4 * duty_max);
+
+        if(UP){
+            Action::forward();
+        }
+        else if(DOWN){
+            Action::back();
+        }
+        else if(LEFT){
+            Action::left();
+        }
+        else if(RIGHT){
+            Action::right();
+        }
+        else{
+            data[1] = 0;
+            data[2] = 0;
+            data[3] = 0;
+            data[4] = 0;
+        }
 
         // デバッグ用（for文でcoutするとカクつく）
         std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", "<<std::endl;//", ";
