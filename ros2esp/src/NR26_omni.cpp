@@ -62,7 +62,35 @@ class Action
 public:
     static void tokei()
     {
-        //    data[3] -= turn_speed*deg;
+           //data[3] -= turn_speed*deg;
+    }
+    static void forward()
+    {
+        data[1] = 100;
+        data[2] = 100;
+        data[3] = 100;
+        data[4] = 100;
+    }
+    static void back()
+    {
+        data[1] = -100;
+        data[2] = -100;
+        data[3] = -100;
+        data[4] = -100;
+    }
+    static void left()
+    {
+        data[1] = 100;
+        data[2] = -100;
+        data[3] = 100;
+        data[4] = -100;
+    }
+    static void right()
+    {
+        data[1] = -100;
+        data[2] = 100;
+        data[3] = -100;
+        data[4] = 100;
     }
 };
 
