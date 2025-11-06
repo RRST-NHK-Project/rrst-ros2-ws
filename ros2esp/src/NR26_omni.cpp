@@ -190,29 +190,29 @@ private:
         }
 
         // printf("\t\n%d,%d,%d,%d\n",v1, v2, v3, v4);
-        // data[1] = int(v1 * duty_max);
-        // data[2] = int(v2 * duty_max);
-        // data[3] = int(v3 * duty_max);
-        // data[4] = int(v4 * duty_max);
+        data[1] = int(v1 * duty_max);
+        data[2] = int(v2 * duty_max);
+        data[3] = int(v3 * duty_max);
+        data[4] = int(v4 * duty_max);
 
-        if(UP){
-            Action::forward();
-        }
-        else if(DOWN){
-            Action::back();
-        }
-        else if(LEFT){
-            Action::left();
-        }
-        else if(RIGHT){
-            Action::right();
-        }
-        else{
-            data[1] = 0;
-            data[2] = 0;
-            data[3] = 0;
-            data[4] = 0;
-        }
+        // if(UP){
+        //     Action::forward();
+        // }
+        // else if(DOWN){
+        //     Action::back();
+        // }
+        // else if(LEFT){
+        //     Action::left();
+        // }
+        // else if(RIGHT){
+        //     Action::right();
+        // }
+        // else{
+        //     data[1] = 0;
+        //     data[2] = 0;
+        //     data[3] = 0;
+        //     data[4] = 0;
+        // }
 
         // デバッグ用（for文でcoutするとカクつく）
         std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", "<<std::endl;//", ";
