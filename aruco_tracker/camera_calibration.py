@@ -1,3 +1,5 @@
+# GPT製注意
+
 import cv2
 import numpy as np
 import glob
