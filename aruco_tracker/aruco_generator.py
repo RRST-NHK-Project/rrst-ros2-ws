@@ -1,51 +1,29 @@
-#!/usr/bin/env python3
-# coding: utf-8
 import cv2
-import numpy as np
+import cv2.aruco as aruco
+import os
 
-aruco = cv2.aruco
+# このスクリプト(.py)と同じディレクトリを取得
+script_dir = os.path.dirname(os.path.abspath(__file__))
 
-dictionary = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
-pixel = 150
-offset = 10
-cnt = 9
+# 使用する辞書を選択
+aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
 
+# マーカー設定
+marker_id = 0
+marker_size = 200  # ピクセル単位
 
-def generateArMarker():
-    img = np.zeros((pixel + offset, pixel + offset), dtype=np.uint8)
-    img += 255
+# マーカー生成
+marker_image = aruco.generateImageMarker(aruco_dict, marker_id, marker_size)
 
-    x_offset = y_offset = int(offset) // 2
+# 保存パスを作成
+filename = f"aruco_marker_{marker_id}.png"
+save_path = os.path.join(script_dir, filename)
 
-    for i in range(cnt):
-        # OpenCV 5.x の場合、次のようにアクセスする
-        try:
-            ar_image = aruco.drawMarker(dictionary, i, pixel, 3)
-        except AttributeError:
-            # drawMarker が移動している場合
-            ar_image = aruco.utils.drawMarker(dictionary, i, pixel)
+# 画像を保存
+cv2.imwrite(save_path, marker_image)
+print(f"Saved: {save_path}")
 
-        filename = f"ar{i}.png"
-        img[
-            y_offset : y_offset + ar_image.shape[0],
-            x_offset : x_offset + ar_image.shape[1],
-        ] = ar_image
-
-        rgb_img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-
-        if i % 3 == 0:
-            hconcat_img = rgb_img
-        elif i % 3 <= 2:
-            hconcat_img = cv2.hconcat([hconcat_img, rgb_img])
-            if i % 3 == 2 and i // 3 == 0:
-                vconcat_img = hconcat_img
-            elif i % 3 == 2 and i // 3 > 0:
-                vconcat_img = cv2.vconcat([vconcat_img, hconcat_img])
-
-        cv2.imwrite(filename, rgb_img)
-
-    cv2.imwrite(f"ar{cnt}.png", vconcat_img)
-
-
-if __name__ == "__main__":
-    generateArMarker()
+# 表示（任意）
+cv2.imshow("ArUco Marker", marker_image)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
