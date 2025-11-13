@@ -43,6 +43,9 @@ add_executable(pid_tuner src/PID_Tuner.cpp)
 ament_target_dependencies(pid_tuner rclcpp std_msgs sensor_msgs geometry_msgs)
 target_include_directories(pid_tuner PRIVATE ${nlohmann_json_SOURCE_DIR}/single_include)
 
+add_executable(cr25_fes src/CR25_FES.cpp)
+ament_target_dependencies(cr25_fes rclcpp std_msgs sensor_msgs geometry_msgs)
+
 
 
 # インストール設定
@@ -51,6 +54,7 @@ install(TARGETS
   mb_tester
   nr25_mr_sd
   nr26_omni
+  cr25_fes
   pid_wip
   pid_tuner
   DESTINATION lib/${PROJECT_NAME})
