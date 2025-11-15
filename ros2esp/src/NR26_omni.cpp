@@ -21,7 +21,7 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 #define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 // 定数・変数
-float duty_max = 500;
+float duty_max = 100;
 float sp_yaw = 0.5;
 
 float speed = 100;
@@ -215,7 +215,7 @@ private:
         // }
 
         // デバッグ用（for文でcoutするとカクつく）
-        std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", "<<std::endl;//", ";
+        //std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", "<<std::endl;//", ";
         // std::cout << data[4] << ", " << data[5] << ", " << data[6] << ", " << data[7] << ", ";
         // std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
         // std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
