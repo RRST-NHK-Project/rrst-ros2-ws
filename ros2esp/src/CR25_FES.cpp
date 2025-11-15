@@ -21,17 +21,9 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 #define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 #define front_speed 60 //前後の角度変化
 #define updown_speed 50 //上下の角度変化
-#define speed 40 //移動の速度
+//#define speed 40 //移動の速度
 #define turn_speed 30 //回転の角度変化
-
-#define turn_speed_v 5 //回転の角度変化
-#define front_speed_v 5//前後の角度変化
-#define updown_speed_v 100//上下の角度変化
-
-#define deg 1
-#define th 20
-#define count 1
-#define field 190
+#define count 1 //カウント数
 
 std::vector<int32_t> data(18, 0); // マイコンに送信される配列"data"
 
@@ -58,12 +50,12 @@ public:
         data[2] = front_speed;
     }
     static void up(){
-        data[1] = speed;
-        data[2] = speed;
+        data[1] = updown_speed;
+        data[2] = updown_speed;
     }
     static void down(){
-        data[1] = -speed;
-        data[2] = -speed;
+        data[1] = -updown_speed;
+        data[2] = -updown_speed;
     }
 
 };
@@ -178,7 +170,7 @@ private:
             else if (PS)
             {
                 
-                data[3]= field;
+                //data[3]= field;
             }
             // last_R1 = R1;
             // last_L1 = L1;
