@@ -19,13 +19,13 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 
 // 定数・変数
 #define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
-#define front_speed 3 //前後の角度変化
-#define updown_speed 3 //上下の角度変化
-#define speed 3 //移動の速度
-#define turn_speed 3 //回転の角度変化
+#define front_speed 60 //前後の角度変化
+#define updown_speed 50 //上下の角度変化
+#define speed 40 //移動の速度
+#define turn_speed 30 //回転の角度変化
 
-#define turn_speed_v 3 //回転の角度変化
-#define front_speed_v 3//前後の角度変化
+#define turn_speed_v 5 //回転の角度変化
+#define front_speed_v 5//前後の角度変化
 #define updown_speed_v 100//上下の角度変化
 
 #define deg 1
@@ -33,7 +33,7 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 #define count 1
 #define field 190
 
-std::vector<int16_t> data(25, 0); // マイコンに送信される配列"data"
+std::vector<int32_t> data(18, 0); // マイコンに送信される配列"data"
 
 
 //各機構シーケンスを格納するクラス
@@ -42,10 +42,10 @@ public:
 
     //回転
     static void tokei(){
-        data[3] = turn_speed;
+        data[3] += -turn_speed;
     }
     static void hantokei(){
-        data[3] = turn_speed;
+        data[3] += turn_speed;
     }
     
     //前後
@@ -80,7 +80,7 @@ public:
             std::bind(&PS4_Listener::ps4_listener_callback, this,
                       std::placeholders::_1));
 
-        publisher_ = this->create_publisher<std_msgs::msg::Int32MultiArray>("to_esp32_0", 10);
+        publisher_ = this->create_publisher<std_msgs::msg::Int32MultiArray>("to_esp32_1", 10);
 
         RCLCPP_INFO(this->get_logger(),
                     "PS4 Listener initialized");
@@ -99,9 +99,9 @@ private:
         bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
         bool TRIANGLE = msg->buttons[2];
-        bool SQUARE = msg->buttons[3];
+        //bool SQUARE = msg->buttons[3];
 
-        bool LEFT = msg->axes[6] == 1.0;
+        //bool LEFT = msg->axes[6] == 1.0;
         // bool RIGHT = msg->axes[6] == -1.0;
         bool UP = msg->axes[7] == 1.0;
         bool DOWN = msg->axes[7] == -1.0;
@@ -199,7 +199,7 @@ private:
         std::cout << data[4] << ", " << data[5] << ", " << data[6] << ", " << data[7] << ", ";
         std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
         std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
-        std::cout << data[16] << ", " << data[17] << ", " << data[18] << std::endl;
+        std::cout << data[16] << ", " << data[17] << std::endl;
 
         publish_data();
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
