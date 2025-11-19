@@ -22,8 +22,11 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 #define front_speed 60 //前後の角度変化
 #define updown_speed 50 //上下の角度変化
 //#define speed 40 //移動の速度
-#define turn_speed 30 //回転の角度変化
+#define turn_speed 40 //回転の角度変化
 #define count 1 //カウント数
+#define servo_max 90
+
+
 
 std::vector<int32_t> data(18, 0); // マイコンに送信される配列"data"
 
@@ -37,7 +40,7 @@ public:
         data[3] += -turn_speed;
     }
     static void hantokei(){
-        data[3] += turn_speed;
+        data[3] += turn_speed*1.1;
     }
     
     //前後
@@ -47,11 +50,11 @@ public:
     }
     static void back(){
         data[1] = -front_speed;
-        data[2] = front_speed;
+        data[2] = front_speed*1.2;
     }
     static void up(){
-        data[1] = updown_speed;
-        data[2] = updown_speed;
+        data[1] = updown_speed*1.4;
+        data[2] = updown_speed*1.4;
     }
     static void down(){
         data[1] = -updown_speed;
@@ -93,13 +96,13 @@ private:
         bool TRIANGLE = msg->buttons[2];
         //bool SQUARE = msg->buttons[3];
 
-        //bool LEFT = msg->axes[6] == 1.0;
-        // bool RIGHT = msg->axes[6] == -1.0;
+        bool LEFT = msg->axes[6] == 1.0;
+        bool RIGHT = msg->axes[6] == -1.0;
         bool UP = msg->axes[7] == 1.0;
         bool DOWN = msg->axes[7] == -1.0;
 
-        bool L1 = msg->buttons[4];
-        bool R1 = msg->buttons[5];
+        //bool L1 = msg->buttons[4];
+        //bool R1 = msg->buttons[5];
 
         // float L2_DIGITAL = (-1 * msg->axes[2] + 1) / 2;
         // float R2_DIGITAL = (-1 * msg->axes[5] + 1) / 2;
@@ -131,9 +134,15 @@ private:
 
         if(L2){
             data[9] -= count;
+            if(data[9] < -servo_max){
+                data[9] = -servo_max;
+            }
         }
         if(R2){
             data[9] += count;
+            if(data[9] > servo_max){
+                data[9] = servo_max;
+            }
         }
 
 
@@ -159,11 +168,11 @@ private:
             {                   // 前進
                Action::back();
             }
-            else if (L1)
+            else if (LEFT)
             {
                Action::tokei(); // CIRCLEボタンが押されていない場合は0に設定
             }
-            else if (R1)
+            else if (RIGHT)
             {
                 Action::hantokei(); // CIRCLEボタンが押されていない場合は0に設定
             }
