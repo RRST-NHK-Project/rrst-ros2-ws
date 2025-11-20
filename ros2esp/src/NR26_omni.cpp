@@ -1,7 +1,10 @@
 /*
-RRST-NHK-Project 2025
+RRST-NHK-Project 2026
 PS4コントローラーの入力を取得するサンプルプログラム
 esp32マイコンにアクチュエータ指令を送るサンプルプログラム
+
+2025/11/20
+初期化してもどこかが暴走する問題発生
 */
 
 // 標準
@@ -21,7 +24,7 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 #define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 // 定数・変数
-float duty_max = 500;
+float duty_max = 100;
 float sp_yaw = 0.5;
 
 float speed = 100;
@@ -91,6 +94,55 @@ public:
         data[3] = -speed;
         data[4] = speed;
     }
+
+};
+
+class Omni_para :public rclcpp::Node{
+    public:
+
+    Omni_para() : Node("omni_tuner") {
+
+    
+    sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+        "omni_param",  
+        10,
+        std::bind(&Omni_para::param_callback, this, std::placeholders::_1)
+    );
+
+    RCLCPP_INFO(this->get_logger(), "OMNI Node Started.");
+}
+
+private:
+
+rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_;
+std::vector<float> params = {0,0,0,0};   // 受信したパラメータを保持
+
+void param_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
+
+    if (msg->data.size() < 4) {
+        RCLCPP_WARN(this->get_logger(), "param message too short");
+        return;
+    }
+
+    // 受信した params をコピー
+    v1 = msg->data[0];
+    v2 = msg->data[1];
+    v3 = msg->data[2];
+    v4 = msg->data[3];
+
+    //  data[0] = params[0]; // v1
+    //  data[1] = params[1]; // v2
+    //  data[2] = params[2]; // v3
+    //  data[3] = params[3]; // v4
+
+    // // ここでモータ制御に送ったり何でもできる
+    // std::cout << "Received params:" << std::endl;
+    // std::cout << " v1=" << params[0]
+    //           << " v2=" << params[1]
+    //           << " v3=" << params[2]
+    //           << " v4=" << params[3]
+    //           << std::endl;
+}
 };
 
 class PS4_Listener : public rclcpp::Node
@@ -115,26 +167,26 @@ private:
     {
 
         // コントローラーの入力を取得、使わない入力はコメントアウト推奨
-        float LS_X = -1 * msg->axes[0];
-        float LS_Y = msg->axes[1];
-        float RS_X = -1 * msg->axes[3];
-        float RS_Y = msg->axes[4];
+        // float LS_X = -1 * msg->axes[0];
+        // float LS_Y = msg->axes[1];
+        // float RS_X = -1 * msg->axes[3];
+        // float RS_Y = msg->axes[4];
 
         // bool CROSS = msg->buttons[0];
         // bool CIRCLE = msg->buttons[1];
         // bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
 
-        bool LEFT = msg->axes[6] == 1.0;
-        bool RIGHT = msg->axes[6] == -1.0;
-        bool UP = msg->axes[7] == 1.0;
-        bool DOWN = msg->axes[7] == -1.0;
+        // bool LEFT = msg->axes[6] == 1.0;
+        // bool RIGHT = msg->axes[6] == -1.0;
+        // bool UP = msg->axes[7] == 1.0;
+        // bool DOWN = msg->axes[7] == -1.0;
 
-        bool L1 = msg->buttons[4];
-        bool R1 = msg->buttons[5];
+        // bool L1 = msg->buttons[4];
+        // bool R1 = msg->buttons[5];
 
         // float L2_DIGITAL = (-1 * msg->axes[2] + 1) / 2;
-        float R2_DIGITAL = (-1 * msg->axes[5] + 1) / 2;
+        //float R2_DIGITAL = (-1 * msg->axes[5] + 1) / 2;
 
         // bool L2 = msg->buttons[6];
         // bool R2 = msg->buttons[7];
@@ -155,45 +207,45 @@ private:
 
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
-        float rad = atan2(LS_Y, LS_X);
-        if (R2_DIGITAL >= 0.3)
-        {
-            v1 = sin(rad - 3 * M_PI / 4) * R2_DIGITAL;
-            v2 = sin(rad - 5 * M_PI / 4) * R2_DIGITAL;
-            v3 = sin(rad - 7 * M_PI / 4) * R2_DIGITAL;
-            v4 = sin(rad - 9 * M_PI / 4) * R2_DIGITAL;
-        }
+        // float rad = atan2(LS_Y, LS_X);
+        // if (R2_DIGITAL >= 0.3)
+        // {
+        //     v1 = sin(rad - 3 * M_PI / 4) * R2_DIGITAL;
+        //     v2 = sin(rad - 5 * M_PI / 4) * R2_DIGITAL;
+        //     v3 = sin(rad - 7 * M_PI / 4) * R2_DIGITAL;
+        //     v4 = sin(rad - 9 * M_PI / 4) * R2_DIGITAL;
+        // }
 
-        else if (RS_X >= deadzone || R1 == 1)
-        {
-            v1 = -1.0 * sp_yaw;
-            v2 = -1.0 * sp_yaw;
-            v3 = -1.0 * sp_yaw;
-            v4 = -1.0 * sp_yaw;
-        }
+        // else if (RS_X >= deadzone || R1 == 1)
+        // {
+        //     v1 = -1.0 * sp_yaw;
+        //     v2 = -1.0 * sp_yaw;
+        //     v3 = -1.0 * sp_yaw;
+        //     v4 = -1.0 * sp_yaw;
+        // }
 
-        else if (RS_X <= -1 * deadzone || L1 == 1)
-        {
-            v1 = 1.0 * sp_yaw;
-            v2 = 1.0 * sp_yaw;
-            v3 = 1.0 * sp_yaw;
-            v4 = 1.0 * sp_yaw;
-        }
+        // else if (RS_X <= -1 * deadzone || L1 == 1)
+        // {
+        //     v1 = 1.0 * sp_yaw;
+        //     v2 = 1.0 * sp_yaw;
+        //     v3 = 1.0 * sp_yaw;
+        //     v4 = 1.0 * sp_yaw;
+        // }
 
-        else if (
-            (fabsf(LS_X) <= deadzone) && (fabsf(LS_Y) <= deadzone) && (fabsf(RS_X) <= deadzone) && (fabsf(RS_Y) <= deadzone) && (R1 == 0) && (L1 == 0))
-        {
-            v1 = 0.0;
-            v2 = 0.0;
-            v3 = 0.0;
-            v4 = 0.0;
-        }
+        // else if (
+        //     (fabsf(LS_X) <= deadzone) && (fabsf(LS_Y) <= deadzone) && (fabsf(RS_X) <= deadzone) && (fabsf(RS_Y) <= deadzone) && (R1 == 0) && (L1 == 0))
+        // {
+        //     v1 = 0.0;
+        //     v2 = 0.0;
+        //     v3 = 0.0;
+        //     v4 = 0.0;
+        // }
 
         // printf("\t\n%d,%d,%d,%d\n",v1, v2, v3, v4);
-        data[1] = int(v1 * duty_max);
-        data[2] = int(v2 * duty_max);
-        data[3] = int(v3 * duty_max);
-        data[4] = int(v4 * duty_max);
+        // data[1] = int(v1 * duty_max);
+        // data[2] = int(v2 * duty_max);
+        // data[3] = int(v3 * duty_max);
+        // data[4] = int(v4 * duty_max);
 
         // if(UP){
         //     Action::forward();
@@ -214,8 +266,18 @@ private:
         //     data[4] = 0;
         // }
 
+
+        data[1] = v1;
+        data[2] = v2;
+        data[3] = v3;
+        data[4] = v4;
+       
+
+       std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4] << ", "<<std::endl;//", ";
+             
+
         // デバッグ用（for文でcoutするとカクつく）
-        std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", "<<std::endl;//", ";
+        //std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", "<<std::endl;//", ";
         // std::cout << data[4] << ", " << data[5] << ", " << data[6] << ", " << data[7] << ", ";
         // std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
         // std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
@@ -246,7 +308,9 @@ int main(int argc, char *argv[])
 
     rclcpp::executors::SingleThreadedExecutor exec;
     auto ps4_listener = std::make_shared<PS4_Listener>();
+    auto omni_param = std::make_shared<Omni_para>();
     exec.add_node(ps4_listener);
+    exec.add_node(omni_param);
     exec.spin();
 
     rclcpp::shutdown();
