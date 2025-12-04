@@ -50,7 +50,8 @@ target_include_directories(pid_tuner PRIVATE ${nlohmann_json_SOURCE_DIR}/single_
 add_executable(cr25_fes src/CR25_FES.cpp)
 ament_target_dependencies(cr25_fes rclcpp std_msgs sensor_msgs geometry_msgs)
 
-
+add_executable(dokusute src/dokusute.cpp)
+ament_target_dependencies(dokusute rclcpp std_msgs sensor_msgs geometry_msgs)
 
 # インストール設定
 install(TARGETS
@@ -62,6 +63,7 @@ install(TARGETS
   cr25_fes
   pid_wip
   pid_tuner
+  dokusute
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
