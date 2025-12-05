@@ -11,17 +11,17 @@ ESP32-IO-Boardのテストノード
 #include <thread>
 
 #include "rclcpp/rclcpp.hpp"
-#include <std_msgs/msg/int32_multi_array.hpp>
+#include <std_msgs/msg/int16_multi_array.hpp>
 
 #define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
-std::vector<int16_t> data(25, 0);
+std::vector<int16_t> data(18, 0);
 
 class KeyboardInputHandler {
 public:
     KeyboardInputHandler(rclcpp::Node::SharedPtr node)
         : node_(node), running_(true) {
-        publisher_ = node_->create_publisher<std_msgs::msg::Int32MultiArray>("to_esp32_0", 10);
+        publisher_ = node_->create_publisher<std_msgs::msg::Int16MultiArray>("to_esp32_0", 10);
         input_thread_ = std::thread(&KeyboardInputHandler::keyboard_input_loop, this);
     }
 
@@ -36,7 +36,7 @@ private:
     void keyboard_input_loop() {
         while (running_) {
             int index, value;
-            std::cout << "Enter index (0-24) and value: ";
+            std::cout << "Enter index (0-17) and value: ";
 
             if (!(std::cin >> index >> value)) {
                 std::cerr << "Invalid input! Please enter two integers." << std::endl;
@@ -45,8 +45,8 @@ private:
                 continue;
             }
 
-            if (index < 0 || index >= 24) {
-                std::cerr << "Invalid index! Enter a value between 0 and 24." << std::endl;
+            if (index < 0 || index >= 17) {
+                std::cerr << "Invalid index! Enter a value between 0 and 17." << std::endl;
                 continue;
             }
 
@@ -66,10 +66,10 @@ private:
             print_data();
 
             // メッセージ作成・送信
-            auto msg = std_msgs::msg::Int32MultiArray();
+            auto msg = std_msgs::msg::Int16MultiArray();
             msg.data.clear();
             for (auto &v : data) {
-                msg.data.push_back(static_cast<int32_t>(v));
+                msg.data.push_back(static_cast<int16_t>(v));
             }
             publisher_->publish(msg);
         }
@@ -86,7 +86,7 @@ private:
     }
 
     rclcpp::Node::SharedPtr node_;
-    rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr publisher_;
+    rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
     std::thread input_thread_;
     std::atomic<bool> running_;
 };
