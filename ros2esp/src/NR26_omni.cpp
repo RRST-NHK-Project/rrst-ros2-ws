@@ -17,7 +17,7 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include <std_msgs/msg/float32_multi_array.hpp>
-#include "std_msgs/msg/int32_multi_array.hpp"
+#include "std_msgs/msg/int16_multi_array.hpp"
 // #include "actuator_msg/msg/actuator_msg.hpp"
 #include <vector>
 
@@ -124,10 +124,10 @@ private:
         }
 
         // 受信した params をコピー
-        v1 = msg->data[0];
-        v2 = msg->data[1];
-        v3 = msg->data[2];
-        v4 = msg->data[3];
+        duty_max = msg->data[0];
+        // v2 = msg->data[1];
+        // v3 = msg->data[2];
+        // v4 = msg->data[3];
 
         //  data[0] = params[0]; // v1
         //  data[1] = params[1]; // v2
@@ -155,7 +155,7 @@ public:
             std::bind(&PS4_Listener::ps4_listener_callback, this,
                       std::placeholders::_1));
 
-        publisher_ = this->create_publisher<std_msgs::msg::Int32MultiArray>("to_esp32_1", 10);
+        publisher_ = this->create_publisher<std_msgs::msg::Int16MultiArray>("to_esp32_0", 10);
 
         RCLCPP_INFO(this->get_logger(),
                     "PS4 Listener initialized");
@@ -266,17 +266,17 @@ private:
 
     void publish_data()
     {
-        auto msg = std_msgs::msg::Int32MultiArray();
+        auto msg = std_msgs::msg::Int16MultiArray();
         msg.data.reserve(data.size());
         for (auto &v : data)
         {
-            msg.data.push_back(static_cast<int32_t>(v));
+            msg.data.push_back(static_cast<int16_t>(v));
         }
         publisher_->publish(msg);
     }
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
-    rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr publisher_;
+    rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
 };
 
 int main(int argc, char *argv[])

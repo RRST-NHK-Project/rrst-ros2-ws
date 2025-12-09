@@ -39,9 +39,11 @@ const std::string BASE_DIR = SOURCE_DIR + "/config";
 const std::string PARAM_FILE = BASE_DIR + "/omni_parameter.json";
 const std::string CSV_FILE = BASE_DIR + "/omni_parameter.csv";
 
-class ParameterNode : public rclcpp::Node {
+class ParameterNode : public rclcpp::Node
+{
 public:
-    ParameterNode() : Node("omni_tuner") {
+    ParameterNode() : Node("omni_tuner")
+    {
         show_usage(); // 起動時に使い方を表示
 
         // パラメータファイル読み込み
@@ -54,7 +56,8 @@ public:
         input_thread = std::thread(&ParameterNode::handle_user_input, this);
     }
 
-    ~ParameterNode() {
+    ~ParameterNode()
+    {
         // セーブ
         save_parameters();
         save_logs();
@@ -74,7 +77,8 @@ private:
     std::thread input_thread;
 
     // 使い方を表示する関数
-    void show_usage() {
+    void show_usage()
+    {
         std::cout << "\n=== MR Parameter Tuner ===\n";
         std::cout << "オムニの調整\n";
         std::cout << "使用方法:\n";
@@ -87,8 +91,10 @@ private:
         std::cout << "=====================================\n";
     }
 
-    void publish_parameters() {
-        while (running) {
+    void publish_parameters()
+    {
+        while (running)
+        {
             {
                 std::lock_guard<std::mutex> lock(
                     param_mutex); // shoot_state と dribble_state も含めてロック
@@ -104,48 +110,62 @@ private:
         }
     }
 
-    void save_parameters() {
+    void save_parameters()
+    {
         json json;
         json["params"] = params;
         std::ofstream file(PARAM_FILE);
-        if (file.is_open()) {
+        if (file.is_open())
+        {
             file << json.dump(4);
             std::cout << "パラメータを保存しました。\n";
-        } else {
+        }
+        else
+        {
 
             std::cout << "パラメータを保存に失敗しました。\n";
         }
     }
 
-    void load_parameters() {
+    void load_parameters()
+    {
         std::ifstream file(PARAM_FILE);
-        if (file.is_open()) {
+        if (file.is_open())
+        {
             json json;
             file >> json;
             params = json.value("params", std::vector<float>{0.0, 0.0, 0.0, 0.0});
             std::cout << "パラメータファイルのロードに成功。\n";
-        } else {
+        }
+        else
+        {
             params = {0.0, 0.0, 0.0, 0.0};
             std::cout
                 << "パラメータファイルのロードに失敗。デフォルト値を適用します。\n";
         }
     }
 
-    void save_logs() {
+    void save_logs()
+    {
         std::ofstream file(CSV_FILE, std::ios::app);
-        if (file.is_open()) {
+        if (file.is_open())
+        {
             auto now = std::chrono::system_clock::now();
             auto time_t_now = std::chrono::system_clock::to_time_t(now);
             file << std::ctime(&time_t_now) << params[0] << "," << params[1] << ","
                  << params[2] << "," << params[3] << "\n";
             file.close();
             std::cout << "ログを保存しました\n";
-        } else {
+        }
+        else
+        {
             std::cout << "ログの保存に失敗。\n";
         }
     }
-    void handle_user_input() {
-        while (running) {
+    void handle_user_input()
+    {
+        while (running)
+        {
             std::string input;
             std::getline(std::cin, input);
             if (input.empty())
@@ -153,16 +173,22 @@ private:
 
             std::lock_guard<std::mutex> lock(param_mutex);
 
-            if (input == "show") {
+            if (input == "show")
+            {
                 show_parameters();
-            } else {
+            }
+            else
+            {
                 int idx;
                 float value;
                 if (sscanf(input.c_str(), "%d %f", &idx, &value) == 2 && idx >= 0 &&
-                    idx < 4) {
+                    idx < 4)
+                {
                     params[idx] = value;
                     show_parameters();
-                } else {
+                }
+                else
+                {
                     std::cout << "Invalid input. Use: <index> <value> (0-3, 0-100), 's' "
                                  "(shoot), 'd' (dribble), or 'show'\n";
                 }
@@ -170,9 +196,10 @@ private:
         }
     }
 
-    void show_parameters() {
+    void show_parameters()
+    {
         std::cout << "\n=== Current Parameters ===\n";
-        std::cout << "0: v1 = " << params[0] << "\n";
+        std::cout << "0: speed = " << params[0] << "\n";
         std::cout << "1: v2 = " << params[1] << "\n";
         std::cout << "2: v3 = " << params[2] << "\n";
         std::cout << "3: v4  = " << params[3] << "\n";
@@ -180,7 +207,8 @@ private:
     }
 };
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     rclcpp::init(argc, argv);
     auto node = std::make_shared<ParameterNode>();
     rclcpp::spin(node);
