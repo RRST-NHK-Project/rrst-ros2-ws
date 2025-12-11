@@ -1,3 +1,8 @@
+#camera確認用
+#仮想環境を有効にする（venv を使っている場合）
+#source venv/bin/activate
+#cd ros2_ws/src/aruco_tracker/
+#実行コードpython camera.py
 import cv2
 
 # 0 はデフォルトのカメラ（USBカメラや内蔵カメラ）
