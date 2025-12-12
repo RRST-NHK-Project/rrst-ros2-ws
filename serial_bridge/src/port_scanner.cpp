@@ -1,7 +1,9 @@
 #include "serial_bridge/port_scanner.hpp"
 
+#include <cstring>
 #include <dirent.h>
 #include <fcntl.h>
+#include <glob.h>
 #include <iostream>
 #include <map>
 #include <string>
@@ -13,23 +15,31 @@
 // /dev/ttyACMx または /dev/ttyUSBx を列挙する
 //
 static std::vector<std::string> list_serial_ports() {
-    std::vector<std::string> result;
+    std::vector<std::string> ports;
 
-    const char *dev_dir = "/dev";
-    DIR *dir = opendir(dev_dir);
-    if (!dir)
-        return result;
+    std::vector<std::string> patterns = {
+        "/dev/ttyUSB*",
+        "/dev/ttyACM*"};
 
-    struct dirent *entry;
-    while ((entry = readdir(dir)) != nullptr) {
-        std::string name(entry->d_name);
+    for (const auto &pattern : patterns) {
+        std::cout << "[SCAN] pattern: " << pattern << std::endl;
 
-        if (name.rfind("ttyACM", 0) == 0 || name.rfind("ttyUSB", 0) == 0) {
-            result.push_back("/dev/" + name);
+        glob_t g;
+        memset(&g, 0, sizeof(g));
+
+        int ret = glob(pattern.c_str(), 0, NULL, &g);
+        if (ret == 0) {
+            for (size_t i = 0; i < g.gl_pathc; ++i) {
+                std::cout << "[SCAN] found: " << g.gl_pathv[i] << std::endl;
+                ports.emplace_back(g.gl_pathv[i]);
+            }
+        } else {
+            std::cout << "[SCAN] none matched for pattern " << pattern << std::endl;
         }
+        globfree(&g);
     }
-    closedir(dir);
-    return result;
+
+    return ports;
 }
 
 //
@@ -38,9 +48,15 @@ static std::vector<std::string> list_serial_ports() {
 // 失敗 → -1
 //
 static int read_device_id(const std::string &port) {
+    std::cout << "[OPEN] Trying port: " << port << std::endl;
+
     int fd = open(port.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
-    if (fd < 0)
+    if (fd < 0) {
+        std::cout << "[OPEN] Failed to open " << port << std::endl;
         return -1;
+    }
+
+    std::cout << "[OPEN] Success opening " << port << " (fd=" << fd << ")" << std::endl;
 
     // シリアル設定
     termios tty{};
@@ -54,16 +70,30 @@ static int read_device_id(const std::string &port) {
     tty.c_cflag |= CS8;
 
     tcsetattr(fd, TCSANOW, &tty);
+    std::cout << "[CONFIG] Serial configured for " << port << std::endl;
 
-    usleep(200000); // 200ms 待つ（マイコン初回送信を待つ）
+    // USB CDC リセット考慮
+    std::cout << "[WAIT] Waiting 1000ms for device reset..." << std::endl;
+    usleep(1000000);
 
+    // ID 読み取り
     unsigned char buf[1];
-    int n = read(fd, buf, 1);
-    close(fd);
+    std::cout << "[READ] Waiting up to 2s for ID on " << port << std::endl;
 
-    if (n == 1) {
-        return buf[0]; // 0x00〜
+    for (int i = 0; i < 20; i++) {
+        int n = read(fd, buf, 1);
+        if (n == 1) {
+            std::cout << "[READ] Got ID=0x" << std::hex << (int)buf[0]
+                      << " (" << std::dec << (int)buf[0] << ")" << std::endl;
+            close(fd);
+            return buf[0];
+        }
+        usleep(100000); // 100ms
     }
+
+    std::cout << "[READ] Timeout: No ID received from " << port << std::endl;
+
+    close(fd);
     return -1;
 }
 
@@ -74,12 +104,26 @@ std::map<uint8_t, std::string> detect_serial_devices() {
     std::map<uint8_t, std::string> result;
 
     auto ports = list_serial_ports();
+
+    std::cout << "[SCAN] Total ports found: " << ports.size() << std::endl;
+
     for (auto &p : ports) {
+        std::cout << "[CHECK] Checking port: " << p << std::endl;
+
         int id = read_device_id(p);
         if (id >= 0) {
             result[(uint8_t)id] = p;
-            std::cout << "Detected ID=" << id << " on " << p << std::endl;
+            std::cout << "[OK] Detected ID=" << id << " on " << p << std::endl;
+        } else {
+            std::cout << "[NG] No valid ID from " << p << std::endl;
         }
     }
+
+    if (result.empty()) {
+        std::cout << "[RESULT] No serial devices detected." << std::endl;
+    } else {
+        std::cout << "[RESULT] Total detected devices: " << result.size() << std::endl;
+    }
+
     return result;
 }
