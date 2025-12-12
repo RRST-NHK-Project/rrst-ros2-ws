@@ -50,7 +50,8 @@ static std::vector<std::string> list_serial_ports() {
 static int read_device_id(const std::string &port) {
     std::cout << "[OPEN] Trying port: " << port << std::endl;
 
-    int fd = open(port.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
+    // ★ NONBLOCK を削除：USB CDC は非同期 read が不安定になる
+    int fd = open(port.c_str(), O_RDWR | O_NOCTTY);
     if (fd < 0) {
         std::cout << "[OPEN] Failed to open " << port << std::endl;
         return -1;
@@ -62,12 +63,17 @@ static int read_device_id(const std::string &port) {
     termios tty{};
     tcgetattr(fd, &tty);
 
+    // ★ RAWモード：ICANON/ECHOなどすべてオフになる
+    cfmakeraw(&tty);
+
     cfsetispeed(&tty, B115200);
     cfsetospeed(&tty, B115200);
 
     tty.c_cflag |= (CLOCAL | CREAD);
-    tty.c_cflag &= ~CSIZE;
-    tty.c_cflag |= CS8;
+
+    // ★ read が 1 バイト来たら返るように
+    tty.c_cc[VMIN] = 1;
+    tty.c_cc[VTIME] = 5; // 0.5秒
 
     tcsetattr(fd, TCSANOW, &tty);
     std::cout << "[CONFIG] Serial configured for " << port << std::endl;
