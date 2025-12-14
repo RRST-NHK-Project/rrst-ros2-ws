@@ -1,3 +1,8 @@
+/*====================================================================
+シリアルポートを走査しマイコンから送信されているIDを取得する。これにより接続順に関わらず各マイコンを識別できる。
+Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
+====================================================================*/
+
 #include "serial_bridge/port_scanner.hpp"
 
 #include <cstring>
@@ -12,19 +17,25 @@
 #include <vector>
 
 //
-// /dev/ttyACMx または /dev/ttyUSBx を列挙する
+// /dev/ttyACMx(Arduino, STM32) または /dev/ttyUSBx(ESP32) を列挙する
 //
 static std::vector<std::string> list_serial_ports() {
     std::vector<std::string> ports;
 
+    // 探索パターンの定義
     std::vector<std::string> patterns = {
         "/dev/ttyUSB*",
         "/dev/ttyACM*"};
 
+    // 各パターンで glob を実行
+    // globってなに？？ >> ワイルドカード付きのパス検索を行う。コマンドで行うls /dev/ttyUSB*みたいなやつ。
     for (const auto &pattern : patterns) {
         std::cout << "[SCAN] pattern: " << pattern << std::endl;
 
+        // 検索結果を格納する構造体
         glob_t g;
+
+        // 初期化
         memset(&g, 0, sizeof(g));
 
         int ret = glob(pattern.c_str(), 0, NULL, &g);
@@ -44,13 +55,13 @@ static std::vector<std::string> list_serial_ports() {
 
 //
 // 指定ポートを開き、マイコンから ID を読む
-// 成功 → ID
-// 失敗 → -1
+// 成功 -> ID
+// 失敗 -> -1
 //
 static int read_device_id(const std::string &port) {
     std::cout << "[OPEN] Trying port: " << port << std::endl;
 
-    // ★ NONBLOCK を削除：USB CDC は非同期 read が不安定になる
+    // ポートを開く、ノンブロッキングにしないのがポイント
     int fd = open(port.c_str(), O_RDWR | O_NOCTTY);
     if (fd < 0) {
         std::cout << "[OPEN] Failed to open " << port << std::endl;
@@ -62,27 +73,30 @@ static int read_device_id(const std::string &port) {
     // シリアル設定
     termios tty{};
     tcgetattr(fd, &tty);
-
-    // ★ RAWモード：ICANON/ECHOなどすべてオフになる
+    // RAWモード、届いたバイトをそのまま読む
     cfmakeraw(&tty);
 
+    // 入出力のボーレートの設定（115200bps）
     cfsetispeed(&tty, B115200);
     cfsetospeed(&tty, B115200);
 
+    // ローカル制御＆受信有効（ほんとに必要なのかこれ？）
     tty.c_cflag |= (CLOCAL | CREAD);
 
-    // ★ read が 1 バイト来たら返るように
-    tty.c_cc[VMIN] = 1;
+    // readのブロッキング条件
+    tty.c_cc[VMIN] = 1;  // 1バイト来るまで待つ
     tty.c_cc[VTIME] = 5; // 0.5秒
 
+    // 設定の即時反映
     tcsetattr(fd, TCSANOW, &tty);
     std::cout << "[CONFIG] Serial configured for " << port << std::endl;
 
-    // USB CDC リセット考慮
+    // USB CDC リセット待ち
     std::cout << "[WAIT] Waiting 1000ms for device reset..." << std::endl;
-    usleep(1000000);
+    usleep(1000000); // 1000ms
 
     // ID 読み取り
+    // 複数回のreadを試みる（試行回数は減らす予定）
     unsigned char buf[1];
     std::cout << "[READ] Waiting up to 2s for ID on " << port << std::endl;
 
