@@ -106,6 +106,21 @@ static int read_device_id(const std::string &port) {
             std::cout << "[READ] Got ID=0x" << std::hex << (int)buf[0]
                       << " (" << std::dec << (int)buf[0] << ")" << std::endl;
 
+            // フィルタ：0x01～0x1F以外は無視
+            if (buf[0] >= 0x01 && buf[0] <= 0x1F) {
+                // ACK送信（通信が確率したことをマイコンに知らせる）
+                uint8_t ack = 0x20;
+                write(fd, &ack, 1);
+
+                std::cout << "[WRITE] Sent ACK to " << port << std::endl;
+                close(fd);
+                return buf[0];
+            } else {
+                std::cout << "[IGNORE] ID 0x" << std::hex << (int)buf[0] << " out of range, ignoring." << std::endl;
+                close(fd);
+                return -1;
+            }
+
             // ACK送信（通信が確率したことをマイコンに知らせる）
             uint8_t ack = 0x20;
             write(fd, &ack, 1);
