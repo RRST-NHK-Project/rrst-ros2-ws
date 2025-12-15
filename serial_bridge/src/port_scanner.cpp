@@ -100,11 +100,17 @@ static int read_device_id(const std::string &port) {
     unsigned char buf[1];
     std::cout << "[READ] Waiting up to 2s for ID on " << port << std::endl;
 
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < 5; i++) {
         int n = read(fd, buf, 1);
         if (n == 1) {
             std::cout << "[READ] Got ID=0x" << std::hex << (int)buf[0]
                       << " (" << std::dec << (int)buf[0] << ")" << std::endl;
+
+            // ACK送信（通信が確率したことをマイコンに知らせる）
+            uint8_t ack = 0x20;
+            write(fd, &ack, 1);
+
+            std::cout << "[WRITE] Sent ACK to " << port << std::endl;
             close(fd);
             return buf[0];
         }
