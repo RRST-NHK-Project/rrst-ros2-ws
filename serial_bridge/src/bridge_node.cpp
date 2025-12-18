@@ -11,6 +11,8 @@
 
 constexpr size_t TX16NUM = 8;
 
+// コメントそのうち整備します
+
 /*
 フレーム構造
 [0] START   = 0xAA
