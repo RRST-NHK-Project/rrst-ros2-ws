@@ -13,7 +13,7 @@ private:
     uint8_t device_id_;
     rclcpp::TimerBase::SharedPtr timer_;
 
-    // ★ 追加
+    // pub,sub
     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr rx_pub_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr tx_sub_;
 };
