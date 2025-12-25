@@ -65,7 +65,7 @@ private:
         }
     }
 
-    /* ★ 周期 publish */
+    /* 周期 publish */
     void timer_callback() {
         std_msgs::msg::Int16MultiArray msg;
 
