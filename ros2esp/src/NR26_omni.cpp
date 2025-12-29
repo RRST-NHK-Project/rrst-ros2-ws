@@ -27,7 +27,7 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 float duty_max = 100;
 float sp_yaw = 0.5;
 
-float speed = 100;
+float speed = 30;
 
 float deadzone = 0.3; // adjust DS4 deadzone
 
@@ -66,33 +66,39 @@ std::vector<int16_t> data(18, 0); // マイコンに送信される配列"data"
 class Action
 {
 public:
-    static void forward()
-    {
-        data[1] = speed;
-        data[2] = speed;
-        data[3] = speed;
-        data[4] = speed;
-    }
-    static void back()
+    static void all_up()
     {
         data[1] = -speed;
         data[2] = -speed;
-        data[3] = -speed;
-        data[4] = -speed;
+        data[3] = -speed * 1.5;
+        data[4] = -speed * 1.5;
     }
-    static void left()
+    static void all_down()
     {
         data[1] = speed;
-        data[2] = -speed;
-        data[3] = speed;
+        data[2] = speed;
+        data[3] = speed * 1.5;
+        data[4] = speed * 1.5;
+    }
+    static void for_up()
+    {
+        data[3] = -speed;
         data[4] = -speed;
     }
-    static void right()
+    static void for_down()
+    {
+        data[3] = speed;
+        data[4] = speed;
+    }
+    static void back_up()
     {
         data[1] = -speed;
+        data[2] = -speed;
+    }
+    static void back_down()
+    {
+        data[1] = speed;
         data[2] = speed;
-        data[3] = -speed;
-        data[4] = speed;
     }
 };
 
@@ -171,15 +177,15 @@ private:
         float RS_X = -1 * msg->axes[3];
         float RS_Y = msg->axes[4];
 
-        // bool CROSS = msg->buttons[0];
-        // bool CIRCLE = msg->buttons[1];
-        // bool TRIANGLE = msg->buttons[2];
-        // bool SQUARE = msg->buttons[3];
+        bool CROSS = msg->buttons[0];
+        bool CIRCLE = msg->buttons[1];
+        bool TRIANGLE = msg->buttons[2];
+        bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
         // bool RIGHT = msg->axes[6] == -1.0;
-        // bool UP = msg->axes[7] == 1.0;
-        // bool DOWN = msg->axes[7] == -1.0;
+        bool UP = msg->axes[7] == 1.0;
+        bool DOWN = msg->axes[7] == -1.0;
 
         bool L1 = msg->buttons[4];
         bool R1 = msg->buttons[5];
@@ -239,19 +245,49 @@ private:
             v3 = 0.0;
             v4 = 0.0;
         }
+        data[1] = 0;
+        data[2] = 0;
+        data[3] = 0;
+        data[4] = 0;
+        data[5] = 0;
+        data[6] = 0;
+        if (TRIANGLE)
+        {
+            Action::all_up();
+        }
+        if (CIRCLE)
+        {
+            Action::for_up();
+        }
+        if (CROSS)
+        {
+            Action::all_down();
+        }
+        if (SQUARE)
+        {
+            Action::for_down();
+        }
+        if (UP)
+        {
+            Action::back_up();
+        }
+        if (DOWN)
+        {
+            Action::back_down();
+        }
 
         // printf("\t\n%d,%d,%d,%d\n", v1, v2, v3, v4);
-        data[1] = int(v1 * duty_max);
-        data[2] = int(v2 * duty_max);
-        data[3] = int(v3 * duty_max);
-        data[4] = int(v4 * duty_max);
+        data[7] = int(v1 * duty_max);
+        data[8] = int(v2 * duty_max);
+        data[9] = int(v3 * duty_max);
+        data[10] = int(v4 * duty_max);
 
         // data[1] = v1;
         // data[2] = v2;
         // data[3] = v3;
         // data[4] = v4;
 
-        std::cout << data[1] << ", " << data[2] << ", " << data[3] << ", " << data[4] << ", " << std::endl; //", ";
+        std::cout << data[7] << ", " << data[8] << ", " << data[9] << ", " << data[10] << ", " << std::endl; //", ";
 
         // デバッグ用（for文でcoutするとカクつく）
         // std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", "<<std::endl;//", ";
