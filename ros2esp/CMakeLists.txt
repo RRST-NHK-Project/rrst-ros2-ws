@@ -56,6 +56,9 @@ ament_target_dependencies(cr25_fes rclcpp std_msgs sensor_msgs geometry_msgs)
 add_executable(dokusute src/dokusute.cpp)
 ament_target_dependencies(dokusute rclcpp std_msgs sensor_msgs geometry_msgs)
 
+add_executable(sb_tester src/Serial_Bridge_Tester.cpp)
+ament_target_dependencies(sb_tester rclcpp std_msgs sensor_msgs geometry_msgs)
+
 # インストール設定
 install(TARGETS
   mros_wip
@@ -68,6 +71,7 @@ install(TARGETS
   pid_wip
   pid_tuner
   dokusute
+  sb_tester
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)

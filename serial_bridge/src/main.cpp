@@ -5,22 +5,23 @@
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
-    // 全マイコンの (ID → ポート) を検出
+    auto debug_node = std::make_shared<rclcpp::Node>("serial_bridge_status");
+
+    rclcpp::executors::MultiThreadedExecutor executor;
+    executor.add_node(debug_node);
+
     auto devices = detect_serial_devices();
 
     if (devices.empty()) {
-        std::cerr << "No serial devices found\n";
-        return 1;
+        RCLCPP_WARN(debug_node->get_logger(), "No serial devices found");
+        executor.spin(); // ← debug_node は生き続ける
+        rclcpp::shutdown();
+        return 0;
     }
 
-    rclcpp::executors::MultiThreadedExecutor executor;
     std::vector<std::shared_ptr<SerialBridgeNode>> nodes;
-
     for (auto &item : devices) {
-        uint8_t id = item.first;
-        const std::string &port = item.second;
-
-        auto node = std::make_shared<SerialBridgeNode>(id, port);
+        auto node = std::make_shared<SerialBridgeNode>(item.first, item.second);
         nodes.push_back(node);
         executor.add_node(node);
     }

@@ -4,6 +4,7 @@ project(serial_bridge)
 set(CMAKE_CXX_STANDARD 17)
 
 find_package(rclcpp REQUIRED)
+find_package(std_msgs REQUIRED)
 
 include_directories(
   include
@@ -17,6 +18,7 @@ add_executable(serial_bridge_node
 
 ament_target_dependencies(serial_bridge_node
   rclcpp
+  std_msgs
 )
 
 install(TARGETS
