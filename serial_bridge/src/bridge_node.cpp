@@ -9,7 +9,8 @@
 #include <termios.h>
 #include <unistd.h>
 
-constexpr size_t TX16NUM = 8;
+constexpr size_t TX16NUM = 24;
+constexpr size_t RX16NUM = 17;
 
 // コメントそのうち整備します
 
@@ -114,7 +115,7 @@ void SerialBridgeNode::update() {
         }
 
         // 16bit data decode
-        int16_t values[TX16NUM] = {0};
+        int16_t values[RX16NUM] = {0};
         size_t data16_count = std::min((size_t)(length / 2), TX16NUM);
 
         for (size_t i = 0; i < data16_count; i++) {
@@ -124,15 +125,15 @@ void SerialBridgeNode::update() {
 
         // publish
         std_msgs::msg::Int16MultiArray msg;
-        msg.data.assign(values, values + TX16NUM);
+        msg.data.assign(values, values + RX16NUM);
         rx_pub_->publish(msg);
 
         // debug log
         std::ostringstream oss;
         oss << "[";
-        for (size_t i = 0; i < TX16NUM; i++) {
+        for (size_t i = 0; i < RX16NUM; i++) {
             oss << values[i];
-            if (i + 1 < TX16NUM)
+            if (i + 1 < RX16NUM)
                 oss << ", ";
         }
         oss << "]";

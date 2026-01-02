@@ -10,7 +10,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include <std_msgs/msg/int16_multi_array.hpp>
 
-constexpr size_t TX16NUM = 8;
+constexpr size_t TX16NUM = 24;
 
 class KeyboardInputHandler {
 public:
@@ -42,7 +42,7 @@ private:
     void keyboard_input_loop() {
         while (running_) {
             int index, value;
-            std::cout << "Enter index (0-7) and value: ";
+            std::cout << "Enter index (0-23) and value: ";
 
             if (!(std::cin >> index >> value)) {
                 std::cerr << "Invalid input!" << std::endl;
