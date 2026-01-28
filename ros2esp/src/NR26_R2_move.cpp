@@ -27,6 +27,8 @@ constexpr size_t TX16NUM = 24;
 
 // 定数・変数
 float duty_max = 100;
+float for_speed = 30;
+float back_speed = 30;
 float sp_yaw = 0.5;
 float deadzone = 0.3; // adjust DS4 deadzone
 
@@ -62,8 +64,8 @@ private:
 
         // 受信した params をコピー
         duty_max = msg->data[0];
-        // v2 = msg->data[1];
-        // v3 = msg->data[2];
+        for_speed = msg->data[1];
+        back_speed = msg->data[2];
         // v4 = msg->data[3];
 
         //  data[0] = params[0]; // v1
