@@ -35,6 +35,53 @@ float deadzone = 0.3; // adjust DS4 deadzone
 float v1, v2, v3, v4; // 各オムニホイールの速度指令値
 // v1:第一象限, v2:第二象限, v3:第三象限, v4:第四象限
 
+class Action
+{
+public:
+    static void all_up(std::vector<int16_t> &data)
+    {
+        data[1] = for_speed;
+        data[2] = for_speed;
+        data[3] = back_speed;
+        data[4] = back_speed;
+    }
+    static void all_down(std::vector<int16_t> &data)
+    {
+        data[1] = for_speed;
+        data[2] = for_speed;
+        data[3] = back_speed;
+        data[4] = back_speed;
+    }
+    static void for_up(std::vector<int16_t> &data)
+    {
+        data[1] = for_speed;
+        data[2] = for_speed;
+        data[3] = back_speed;
+        data[4] = back_speed;
+    }
+    static void for_down(std::vector<int16_t> &data)
+    {
+        data[1] = for_speed;
+        data[2] = for_speed;
+        data[3] = back_speed;
+        data[4] = back_speed;
+    }
+    static void back_up(std::vector<int16_t> &data)
+    {
+        data[1] = for_speed;
+        data[2] = for_speed;
+        data[3] = back_speed;
+        data[4] = back_speed;
+    }
+    static void back_down(std::vector<int16_t> &data)
+    {
+        data[1] = for_speed;
+        data[2] = for_speed;
+        data[3] = back_speed;
+        data[4] = back_speed;
+    }
+};
+
 class Omni_para : public rclcpp::Node
 {
 public:
@@ -117,15 +164,15 @@ private:
         float RS_X = -1 * msg->axes[3];
         float RS_Y = msg->axes[4];
 
-        // bool CROSS = msg->buttons[0];
-        // bool CIRCLE = msg->buttons[1];
-        // bool TRIANGLE = msg->buttons[2];
+        bool CROSS = msg->buttons[0];
+        bool CIRCLE = msg->buttons[1];
+        bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
-        // bool RIGHT = msg->axes[6] == -1.0;
-        // bool UP = msg->axes[7] == 1.0;
-        // bool DOWN = msg->axes[7] == -1.0;
+        bool RIGHT = msg->axes[6] == -1.0;
+        bool UP = msg->axes[7] == 1.0;
+        bool DOWN = msg->axes[7] == -1.0;
 
         bool L1 = msg->buttons[4];
         bool R1 = msg->buttons[5];
@@ -151,6 +198,7 @@ private:
         // static bool last_triangle = false;
 
         float rad = atan2(LS_Y, LS_X);
+
         if (R2_DIGITAL >= 0.3)
         {
             v1 = sin(rad - 3 * M_PI / 4) * R2_DIGITAL;
@@ -184,6 +232,35 @@ private:
             v4 = 0.0;
         }
 
+        data_[1] = 0;
+        data_[2] = 0;
+        data_[3] = 0;
+        data_[4] = 0;
+
+        if (UP)
+        {
+            Action::for_up(data_);
+        }
+        if (DOWN)
+        {
+            Action::back_up(data_);
+        }
+        if (RIGHT)
+        {
+            Action::all_up(data_);
+        }
+        if (CIRCLE)
+        {
+            Action::all_down(data_);
+        }
+        if (TRIANGLE)
+        {
+            Action::for_down(data_);
+        }
+        if (CROSS)
+        {
+            Action::back_down(data_);
+        }
         // printf("\t\n%d,%d,%d,%d\n", v1, v2, v3, v4);
         std::lock_guard<std::mutex> lock(data_mutex_);
         data_[7] = static_cast<int16_t>(v1 * duty_max);
