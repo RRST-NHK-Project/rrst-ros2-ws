@@ -60,7 +60,7 @@ SerialBridgeNode::SerialBridgeNode(uint8_t device_id, const std::string &port)
 
     // ---------- timer ----------
     timer_ = this->create_wall_timer(
-        std::chrono::milliseconds(20),
+        std::chrono::milliseconds(20), //短くしすぎるとマイコンの処理が追いつかなくなるので注意
         std::bind(&SerialBridgeNode::update, this));
 }
 
