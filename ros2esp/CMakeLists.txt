@@ -43,6 +43,9 @@ add_executable(nr26_tuner src/NR26_R2_Tuner.cpp)
 ament_target_dependencies(nr26_tuner rclcpp std_msgs sensor_msgs geometry_msgs)
 target_include_directories(nr26_tuner PRIVATE ${nlohmann_json_SOURCE_DIR}/single_include)
 
+add_executable(nr26_r2_move src/NR26_R2_move.cpp)
+ament_target_dependencies(nr26_r2_move rclcpp std_msgs sensor_msgs geometry_msgs)
+
 add_executable(pid_wip src/PID_WIP.cpp)
 ament_target_dependencies(pid_wip rclcpp std_msgs sensor_msgs geometry_msgs)
 
@@ -72,6 +75,7 @@ install(TARGETS
   pid_tuner
   dokusute
   sb_tester
+  nr26_r2_move
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
