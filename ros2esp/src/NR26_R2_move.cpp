@@ -27,10 +27,14 @@ constexpr size_t TX16NUM = 24;
 
 // 定数・変数
 float duty_max = 100;
-float for_speed = 30;
-float back_speed = 30;
+float for_speed = 50;
+float back_speed = 50;
 float sp_yaw = 0.5;
 float deadzone = 0.3; // adjust DS4 deadzone
+float m1 = 80;
+float m2 = 80;
+float m3 = 80;
+float m4 = 80; // 各馬渕モーター出力値
 
 float v1, v2, v3, v4; // 各オムニホイールの速度指令値
 // v1:第一象限, v2:第二象限, v3:第三象限, v4:第四象限
@@ -40,45 +44,45 @@ class Action
 public:
     static void all_up(std::vector<int16_t> &data)
     {
-        data[1] = for_speed;
-        data[2] = for_speed;
-        data[3] = back_speed;
-        data[4] = back_speed;
+        data[1] = m1;
+        data[2] = m2;
+        data[3] = m3;
+        data[4] = m4;
     }
     static void all_down(std::vector<int16_t> &data)
     {
-        data[1] = for_speed;
-        data[2] = for_speed;
-        data[3] = back_speed;
-        data[4] = back_speed;
+        data[1] = -m1;
+        data[2] = -m2;
+        data[3] = -m3;
+        data[4] = -m4;
     }
     static void for_up(std::vector<int16_t> &data)
     {
-        data[1] = for_speed;
-        data[2] = for_speed;
-        data[3] = back_speed;
-        data[4] = back_speed;
+        data[1] = m1;
+        data[2] = m2;
+        data[3] = m3;
+        data[4] = -m4;
     }
     static void for_down(std::vector<int16_t> &data)
     {
-        data[1] = for_speed;
-        data[2] = for_speed;
-        data[3] = back_speed;
-        data[4] = back_speed;
+        data[1] = m1;
+        data[2] = m2;
+        data[3] = m3;
+        data[4] = -m4;
     }
     static void back_up(std::vector<int16_t> &data)
     {
-        data[1] = for_speed;
-        data[2] = for_speed;
-        data[3] = back_speed;
-        data[4] = back_speed;
+        data[1] = m1;
+        data[2] = m2;
+        data[3] = m3;
+        data[4] = -m4;
     }
     static void back_down(std::vector<int16_t> &data)
     {
-        data[1] = for_speed;
-        data[2] = for_speed;
-        data[3] = back_speed;
-        data[4] = back_speed;
+        data[1] = m1;
+        data[2] = m2;
+        data[3] = m3;
+        data[4] = -m4;
     }
 };
 
@@ -147,7 +151,7 @@ public:
             "serial_tx_" + std::to_string(device_id_), 10);
 
         timer_ = create_wall_timer(
-            std::chrono::milliseconds(50), // 20Hz
+            std::chrono::milliseconds(100), // 20Hz
             std::bind(&PS4_Listener::timer_callback, this));
 
         RCLCPP_INFO(get_logger(),
@@ -158,6 +162,7 @@ private:
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg)
     {
 
+        std::lock_guard<std::mutex> lock(data_mutex_);
         // コントローラーの入力を取得、使わない入力はコメントアウト推奨
         float LS_X = -1 * msg->axes[0];
         float LS_Y = msg->axes[1];
@@ -169,7 +174,7 @@ private:
         bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
 
-        // bool LEFT = msg->axes[6] == 1.0;
+        bool LEFT = msg->axes[6] == 1.0;
         bool RIGHT = msg->axes[6] == -1.0;
         bool UP = msg->axes[7] == 1.0;
         bool DOWN = msg->axes[7] == -1.0;
@@ -232,37 +237,43 @@ private:
             v4 = 0.0;
         }
 
-        data_[1] = 0;
-        data_[2] = 0;
-        data_[3] = 0;
-        data_[4] = 0;
-
         if (UP)
         {
             Action::for_up(data_);
         }
-        if (DOWN)
+        else if (DOWN)
         {
             Action::back_up(data_);
         }
-        if (RIGHT)
+        else if (RIGHT)
         {
+
             Action::all_up(data_);
         }
-        if (CIRCLE)
+        else if (CIRCLE)
         {
+
             Action::all_down(data_);
         }
-        if (TRIANGLE)
+        else if (TRIANGLE)
         {
+
             Action::for_down(data_);
         }
-        if (CROSS)
+        else if (CROSS)
         {
             Action::back_down(data_);
         }
+        else if (LEFT)
+        {
+            data_[1] = 0;
+            data_[2] = 0;
+            data_[3] = 0;
+            data_[4] = 0;
+        }
+
         // printf("\t\n%d,%d,%d,%d\n", v1, v2, v3, v4);
-        std::lock_guard<std::mutex> lock(data_mutex_);
+        // std::lock_guard<std::mutex> lock(data_mutex_);
         data_[7] = static_cast<int16_t>(v1 * duty_max);
         data_[8] = static_cast<int16_t>(v2 * duty_max);
         data_[9] = static_cast<int16_t>(v3 * duty_max);
