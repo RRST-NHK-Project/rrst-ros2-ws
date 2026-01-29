@@ -13,7 +13,7 @@
 // 定数・変数
 #define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
-constexpr size_t TX16NUM = 18;
+constexpr size_t TX16NUM = 24;
 
 // スティックのデッドゾーン
 #define DEADZONE_L 0.3
@@ -52,7 +52,7 @@ double speed_Output = 0.0;
 const double dt = 0.05; // 50ms
 
 // 速度
-int wheelspeed = 50;
+int wheelspeed = 128;
 int yawspeed = 10;
 int previous_speed = 0;
 int desired_speed = 30;
@@ -69,8 +69,6 @@ int SERVO4_CAL = 20;
 // 最近傍点距離の格納
 float min_distance = 0;
 bool front_cleared = false;
-
-// std::vector<int16_t> data(18, 0); // マイコンに送信される配列"data"
 
 
 class PS4_Listener : public rclcpp::Node
@@ -104,8 +102,8 @@ private:
 
         // コントローラーの入力を取得、使わない入力はコメントアウト推奨
         
-        // ここから先は data_ を mutex で守りながら更新する 
-        std::lock_guard<std::mutex> lock(data_mutex_);
+        // ここから先は data を mutex で守りながら更新する 
+        std::lock_guard<std::mutex> lock(datamutex_);
 
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
@@ -157,7 +155,7 @@ private:
         LATERALMOTIONMODE = R3_latch;
 
         if (AGRESSIVEMODE == 0) {
-            wheelspeed = 75;
+            wheelspeed = 128;
             data[11] = 1; // LED光らない
         }
         if (AGRESSIVEMODE == 1) {
@@ -335,11 +333,12 @@ void timer_callback()
 {
     std_msgs::msg::Int16MultiArray msg;
     {
-        std::lock_guard<std::mutex> lock(data_mutex_);
+        std::lock_guard<std::mutex> lock(datamutex_);
         msg.data = data;
     }
     publisher_->publish(msg);
 }
+
 
     void print_data()
     {
@@ -360,7 +359,7 @@ void timer_callback()
     rclcpp::TimerBase::SharedPtr timer_;
 
     std::vector<int16_t> data;
-    std::mutex data_mutex_;
+    std::mutex datamutex_;
 };
 
 int main(int argc, char *argv[])
@@ -377,30 +376,3 @@ int main(int argc, char *argv[])
     rclcpp::shutdown();
     return 0;
 }
-//     void publish_data()
-//     {
-//         auto msg = std_msgs::msg::Int16MultiArray();
-//         msg.data.reserve(data.size());
-//         for (auto &v : data)
-//         {
-//             msg.data.push_back(static_cast<int16_t>(v));
-//         }
-//         publisher_->publish(msg);
-//     }
-
-//     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
-//     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
-// };
-
-// int main(int argc, char *argv[])
-// {
-//     rclcpp::init(argc, argv);
-
-//     rclcpp::executors::SingleThreadedExecutor exec;
-//     auto ps4_listener = std::make_shared<PS4_Listener>();
-//     exec.add_node(ps4_listener);
-//     exec.spin();
-
-//     rclcpp::shutdown();
-//     return 0;
-// }
