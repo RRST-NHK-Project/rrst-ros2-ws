@@ -14,7 +14,7 @@
 #define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 
-// スティックのデッドゾーン
+// スティックのデッドゾーン 
 #define DEADZONE_L 0.3
 #define DEADZONE_R 0.3
 
