@@ -13,8 +13,9 @@
 // 定数・変数
 #define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
+constexpr size_t TX16NUM = 18;
 
-// スティックのデッドゾーン 
+// スティックのデッドゾーン
 #define DEADZONE_L 0.3
 #define DEADZONE_R 0.3
 
@@ -69,25 +70,32 @@ int SERVO4_CAL = 20;
 float min_distance = 0;
 bool front_cleared = false;
 
-std::vector<int16_t> data(18, 0); // マイコンに送信される配列"data"
+// std::vector<int16_t> data(18, 0); // マイコンに送信される配列"data"
 
 
 class PS4_Listener : public rclcpp::Node
 {
 public:
-    PS4_Listener()
-        : Node("ps4_listener")
+    PS4_Listener(uint8_t device_id)
+        : Node("ps4_listener"),
+          device_id_(device_id)
     {
+        data.assign(TX16NUM,0);
+    joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
+    "joy",
+    rclcpp::SensorDataQoS(),
+    std::bind(&PS4_Listener::ps4_listener_callback, this, std::placeholders::_1)
+);
 
-        subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
-            "joy", 10,
-            std::bind(&PS4_Listener::ps4_listener_callback, this,
-                      std::placeholders::_1));
+        publisher_ = this->create_publisher<std_msgs::msg::Int16MultiArray>(
+            "serial_tx_" + std::to_string(device_id_), 10);
 
-        publisher_ = this->create_publisher<std_msgs::msg::Int16MultiArray>("to_esp32_1", 10);
+        timer_ = create_wall_timer(
+            std::chrono::milliseconds(50), // 20Hz
+            std::bind(&PS4_Listener::timer_callback, this));
 
-        RCLCPP_INFO(this->get_logger(),
-                    "PS4 Listener initialized");
+        RCLCPP_INFO(get_logger(),
+                    "PS4 → serial_tx_%d started (timer publish)", device_id_);
     }
 
 private:
@@ -96,6 +104,9 @@ private:
 
         // コントローラーの入力を取得、使わない入力はコメントアウト推奨
         
+        // ここから先は data_ を mutex で守りながら更新する 
+        std::lock_guard<std::mutex> lock(data_mutex_);
+
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
 
         float LS_X = -1 * msg->axes[0];
@@ -311,41 +322,85 @@ private:
             data[4] = -yawspeed;
         }
 
-        // デバッグ用（for文でcoutするとカクつく）
+    //    デバッグ用（for文でcoutするとカクつく）
         std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", ";
         std::cout << data[4] << ", " << data[5] << ", " << data[6] << ", " << data[7] << ", ";
         std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
         std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
         std::cout << data[16] << ", " << data[17] << std::endl;
 
-        publish_data();
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
-    void publish_data()
+void timer_callback()
+{
+    std_msgs::msg::Int16MultiArray msg;
     {
-        auto msg = std_msgs::msg::Int16MultiArray();
-        msg.data.reserve(data.size());
-        for (auto &v : data)
-        {
-            msg.data.push_back(static_cast<int16_t>(v));
-        }
-        publisher_->publish(msg);
+        std::lock_guard<std::mutex> lock(data_mutex_);
+        msg.data = data;
     }
+    publisher_->publish(msg);
+}
 
-    rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
+    void print_data()
+    {
+    //     std::lock_guard<std::mutex> lock(data_mutex_);
+    //     std::cout << "TX DATA: [";
+    //     for (size_t i = 0; i < data_.size(); ++i)
+    //     {
+    //         std::cout << data_[i];
+    //         if (i + 1 < data_.size())
+    //             std::cout << ", ";
+    //     }
+    //     std::cout << "]" << std::endl;
+    }
+    uint8_t device_id_;
+
+    rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
+    rclcpp::TimerBase::SharedPtr timer_;
+
+    std::vector<int16_t> data;
+    std::mutex data_mutex_;
 };
 
 int main(int argc, char *argv[])
 {
     rclcpp::init(argc, argv);
 
-    rclcpp::executors::SingleThreadedExecutor exec;
-    auto ps4_listener = std::make_shared<PS4_Listener>();
+    rclcpp::executors::MultiThreadedExecutor exec;
+
+    uint8_t device_id = 2; // serial_bridge_node と一致
+    auto ps4_listener = std::make_shared<PS4_Listener>(device_id);
     exec.add_node(ps4_listener);
     exec.spin();
 
     rclcpp::shutdown();
     return 0;
 }
+//     void publish_data()
+//     {
+//         auto msg = std_msgs::msg::Int16MultiArray();
+//         msg.data.reserve(data.size());
+//         for (auto &v : data)
+//         {
+//             msg.data.push_back(static_cast<int16_t>(v));
+//         }
+//         publisher_->publish(msg);
+//     }
+
+//     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
+//     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
+// };
+
+// int main(int argc, char *argv[])
+// {
+//     rclcpp::init(argc, argv);
+
+//     rclcpp::executors::SingleThreadedExecutor exec;
+//     auto ps4_listener = std::make_shared<PS4_Listener>();
+//     exec.add_node(ps4_listener);
+//     exec.spin();
+
+//     rclcpp::shutdown();
+//     return 0;
+// }
