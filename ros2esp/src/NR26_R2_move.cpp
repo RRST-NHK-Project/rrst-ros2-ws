@@ -31,12 +31,10 @@ float for_speed = 50;
 float back_speed = 50;
 float sp_yaw = 0.5;
 float deadzone = 0.3; // adjust DS4 deadzone
-float m1 = 80;
-float m2 = 80;
-float m3 = 80;
-float m4 = 80; // 各馬渕モーター出力値
+float m1 = 3;
+float m2 = 3;
 
-float v1, v2, v3, v4; // 各オムニホイールの速度指令値
+float v1, v2, v3, v4; // 各メカナムホイールの速度指令値
 // v1:第一象限, v2:第二象限, v3:第三象限, v4:第四象限
 
 class Action
@@ -44,45 +42,13 @@ class Action
 public:
     static void all_up(std::vector<int16_t> &data)
     {
-        data[1] = m1;
-        data[2] = m2;
-        data[3] = m3;
-        data[4] = m4;
+        data[1] += m1;
+        data[2] -= m2;
     }
     static void all_down(std::vector<int16_t> &data)
     {
-        data[1] = -m1;
-        data[2] = -m2;
-        data[3] = -m3;
-        data[4] = -m4;
-    }
-    static void for_up(std::vector<int16_t> &data)
-    {
-        data[1] = m1;
-        data[2] = m2;
-        data[3] = m3;
-        data[4] = -m4;
-    }
-    static void for_down(std::vector<int16_t> &data)
-    {
-        data[1] = m1;
-        data[2] = m2;
-        data[3] = m3;
-        data[4] = -m4;
-    }
-    static void back_up(std::vector<int16_t> &data)
-    {
-        data[1] = m1;
-        data[2] = m2;
-        data[3] = m3;
-        data[4] = -m4;
-    }
-    static void back_down(std::vector<int16_t> &data)
-    {
-        data[1] = m1;
-        data[2] = m2;
-        data[3] = m3;
-        data[4] = -m4;
+        data[1] -= m1;
+        data[2] += m2;
     }
 };
 
@@ -169,13 +135,13 @@ private:
         float RS_X = -1 * msg->axes[3];
         float RS_Y = msg->axes[4];
 
-        bool CROSS = msg->buttons[0];
+        // bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
-        bool TRIANGLE = msg->buttons[2];
+        // bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
 
-        bool LEFT = msg->axes[6] == 1.0;
-        bool RIGHT = msg->axes[6] == -1.0;
+        // bool LEFT = msg->axes[6] == 1.0;
+        // bool RIGHT = msg->axes[6] == -1.0;
         bool UP = msg->axes[7] == 1.0;
         bool DOWN = msg->axes[7] == -1.0;
 
@@ -204,28 +170,33 @@ private:
 
         float rad = atan2(LS_Y, LS_X);
 
+        // float X = LS_X;
+        // float Y = LS_Y;
+        // float W = RS_X;
+
         if (R2_DIGITAL >= 0.3)
         {
-            v1 = sin(rad - 3 * M_PI / 4) * R2_DIGITAL;
-            v2 = sin(rad - 5 * M_PI / 4) * R2_DIGITAL;
-            v3 = sin(rad - 7 * M_PI / 4) * R2_DIGITAL;
-            v4 = sin(rad - 9 * M_PI / 4) * R2_DIGITAL;
-        }
+            float vx = cos(rad) * R2_DIGITAL;
+            float vy = sin(rad) * R2_DIGITAL;
 
+            v1 = vy - vx; // 前右
+            v2 = vy + vx; // 前左
+            v3 = vy - vx; // 後左
+            v4 = vy + vx; // 後右
+        }
         else if (RS_X >= deadzone || R1 == 1)
         {
-            v1 = -1.0 * sp_yaw;
-            v2 = -1.0 * sp_yaw;
-            v3 = -1.0 * sp_yaw;
-            v4 = -1.0 * sp_yaw;
+            v1 = sp_yaw;
+            v2 = -sp_yaw;
+            v3 = sp_yaw;
+            v4 = -sp_yaw;
         }
-
-        else if (RS_X <= -1 * deadzone || L1 == 1)
+        else if (RS_X <= -deadzone || L1 == 1)
         {
-            v1 = 1.0 * sp_yaw;
-            v2 = 1.0 * sp_yaw;
-            v3 = 1.0 * sp_yaw;
-            v4 = 1.0 * sp_yaw;
+            v1 = -sp_yaw;
+            v2 = sp_yaw;
+            v3 = -sp_yaw;
+            v4 = sp_yaw;
         }
 
         else if (
@@ -237,40 +208,61 @@ private:
             v4 = 0.0;
         }
 
+        // 正規化(これで全方向安定した速度出せる)
+        float max_v = std::max({fabsf(v1), fabsf(v2), fabsf(v3), fabsf(v4), 1.0f});
+
+        v1 /= max_v;
+        v2 /= max_v;
+        v3 /= max_v;
+        v4 /= max_v;
+
         if (UP)
         {
-            Action::for_up(data_);
+            Action::all_up(data_);
         }
         else if (DOWN)
         {
-            Action::back_up(data_);
-        }
-        else if (RIGHT)
-        {
-
-            Action::all_up(data_);
-        }
-        else if (CIRCLE)
-        {
-
             Action::all_down(data_);
         }
-        else if (TRIANGLE)
-        {
 
-            Action::for_down(data_);
-        }
-        else if (CROSS)
-        {
-            Action::back_down(data_);
-        }
-        else if (LEFT)
+        if (CIRCLE)
         {
             data_[1] = 0;
             data_[2] = 0;
-            data_[3] = 0;
-            data_[4] = 0;
         }
+
+        // if (R2_DIGITAL >= 0.3)
+        // {
+        //     v1 = sin(rad - 3 * M_PI / 4) * R2_DIGITAL;
+        //     v2 = sin(rad - 5 * M_PI / 4) * R2_DIGITAL;
+        //     v3 = sin(rad - 7 * M_PI / 4) * R2_DIGITAL;
+        //     v4 = sin(rad - 9 * M_PI / 4) * R2_DIGITAL;
+        // }
+
+        // else if (RS_X >= deadzone || R1 == 1)
+        // {
+        //     v1 = -1.0 * sp_yaw;
+        //     v2 = -1.0 * sp_yaw;
+        //     v3 = -1.0 * sp_yaw;
+        //     v4 = -1.0 * sp_yaw;
+        // }
+
+        // else if (RS_X <= -1 * deadzone || L1 == 1)
+        // {
+        //     v1 = 1.0 * sp_yaw;
+        //     v2 = 1.0 * sp_yaw;
+        //     v3 = 1.0 * sp_yaw;
+        //     v4 = 1.0 * sp_yaw;
+        // }
+
+        // else if (
+        //     (fabsf(LS_X) <= deadzone) && (fabsf(LS_Y) <= deadzone) && (fabsf(RS_X) <= deadzone) && (fabsf(RS_Y) <= deadzone) && (R1 == 0) && (L1 == 0))
+        // {
+        //     v1 = 0.0;
+        //     v2 = 0.0;
+        //     v3 = 0.0;
+        //     v4 = 0.0;
+        // }
 
         // printf("\t\n%d,%d,%d,%d\n", v1, v2, v3, v4);
         // std::lock_guard<std::mutex> lock(data_mutex_);
@@ -278,6 +270,9 @@ private:
         data_[8] = static_cast<int16_t>(v2 * duty_max);
         data_[9] = static_cast<int16_t>(v3 * duty_max);
         data_[10] = static_cast<int16_t>(v4 * duty_max);
+
+        // std::cout << "\n"
+        //           << data_[1] << "," << data_[2] << "," << data_[7] << "," << data_[8] << "," << data_[9] << "," << data_[10] << std::endl;
 
         // デバッグ用（for文でcoutするとカクつく）
         // std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", "<<std::endl;//", ";
