@@ -137,6 +137,7 @@ private:
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
+    rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sensor_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     std::vector<int16_t> data_;
