@@ -9,17 +9,20 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include "std_msgs/msg/int16_multi_array.hpp"
 #include <std_msgs/msg/float32_multi_array.hpp>
 
-#define TARGET_DEVICE_ID 2
-#define TX16NUM 24
-#define PUBLISH_RATE_MS 20
+// 以下マイコンに合わせて設定
+#define TARGET_DEVICE_ID 2 // 宛先マイコンのID
+#define TX16NUM 24         // 送信データ数
+#define RX8NUM 17          // 受信データ数
+
+#define PUBLISH_RATE_MS 20 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
 
 class PS4_Listener : public rclcpp::Node {
 public:
     PS4_Listener(uint8_t device_id)
-        : Node("ps4_listener"),
+        : Node("ps4_listener_" + std::to_string(device_id)),
           device_id_(device_id) {
 
-        // 配列を０で初期化
+        // 配列を0で初期化
         data_.assign(TX16NUM, 0);
 
         // joyノードのSubscribe
@@ -97,7 +100,7 @@ private:
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
-    rclcpp::executors::SingleThreadedExecutor exec;
+    rclcpp::executors::MultiThreadedExecutor exec;
 
     auto ps4_listener = std::make_shared<PS4_Listener>(TARGET_DEVICE_ID);
     exec.add_node(ps4_listener);
