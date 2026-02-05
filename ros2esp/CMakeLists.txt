@@ -56,11 +56,18 @@ target_include_directories(pid_tuner PRIVATE ${nlohmann_json_SOURCE_DIR}/single_
 add_executable(cr25_fes src/CR25_FES.cpp)
 ament_target_dependencies(cr25_fes rclcpp std_msgs sensor_msgs geometry_msgs)
 
-add_executable(dokusute src/dokusute.cpp)
-ament_target_dependencies(dokusute rclcpp std_msgs sensor_msgs geometry_msgs)
+add_executable(dokusute_move src/dokusute_move.cpp)
+ament_target_dependencies(dokusute_move rclcpp std_msgs sensor_msgs geometry_msgs)
+
+add_executable(dokusute_tuner src/dokusute_tuner.cpp)
+ament_target_dependencies(dokusute_tuner rclcpp std_msgs sensor_msgs geometry_msgs )
+target_include_directories(dokusute_tuner PRIVATE ${nlohmann_json_SOURCE_DIR}/single_include)
 
 add_executable(sb_tester src/Serial_Bridge_Tester.cpp)
 ament_target_dependencies(sb_tester rclcpp std_msgs sensor_msgs geometry_msgs)
+
+add_executable(sb_host src/Serial_Bridge_Host.cpp)
+ament_target_dependencies(sb_host rclcpp std_msgs sensor_msgs geometry_msgs)
 
 # インストール設定
 install(TARGETS
@@ -73,9 +80,11 @@ install(TARGETS
   cr25_fes
   pid_wip
   pid_tuner
-  dokusute
+  dokusute_move
+  dokusute_tuner
   sb_tester
   nr26_r2_move
+  sb_host
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)

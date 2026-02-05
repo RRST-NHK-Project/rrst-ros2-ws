@@ -7,6 +7,8 @@
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/int16_multi_array.hpp"
+#include <std_msgs/msg/float32_multi_array.hpp>
+#include <mutex>
 //#include "actuator_msg/msg/actuator_msg.hpp"
 #include <vector>
 
@@ -70,10 +72,58 @@ int SERVO4_CAL = 20;
 float min_distance = 0;
 bool front_cleared = false;
 
+class dokusute_para : public rclcpp::Node
+{
+public:
+    dokusute_para() : Node("dokusute_param_receiver")
+    {
+
+        sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+            "dokusute_param",
+            10,
+            std::bind(&dokusute_para::param_callback, this, std::placeholders::_1));
+
+        RCLCPP_INFO(this->get_logger(), "DOKUSUTE Node Started.");
+    }
+
+private:
+    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_;
+    std::vector<float> params = {0, 0, 0, 0}; // 受信したパラメータを保持
+
+    void param_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
+    {
+
+        if (msg->data.size() < 4)
+        {
+            RCLCPP_WARN(this->get_logger(), "param message too short");
+            return;
+        }
+
+        // 受信した params をコピー
+        wheelspeed = msg->data[0];
+        yawspeed = msg->data[1];
+        desired_speed = msg->data[2];
+        LATERALMOTION_speed = msg->data[3];
+
+        //  data[0] = params[0]; // v1
+        //  data[1] = params[1]; // v2
+        //  data[2] = params[2]; // v3
+        //  data[3] = params[3]; // v4
+
+        // // ここでモータ制御に送ったり何でもできる
+        // std::cout << "Received params:" << std::endl;
+        // std::cout << " v1=" << params[0]
+        //           << " v2=" << params[1]
+        //           << " v3=" << params[2]
+        //           << " v4=" << params[3]
+        //           << std::endl;
+    }
+};
 
 class PS4_Listener : public rclcpp::Node
 {
 public:
+    
     PS4_Listener(uint8_t device_id)
         : Node("ps4_listener"),
           device_id_(device_id)
@@ -83,20 +133,44 @@ public:
     "joy",
     rclcpp::SensorDataQoS(),
     std::bind(&PS4_Listener::ps4_listener_callback, this, std::placeholders::_1)
-);
+    );
+
+    param_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+    "dokusute_param",
+    10,
+    std::bind(&PS4_Listener::param_callback, this, std::placeholders::_1)
+    );
 
         publisher_ = this->create_publisher<std_msgs::msg::Int16MultiArray>(
             "serial_tx_" + std::to_string(device_id_), 10);
 
         timer_ = create_wall_timer(
             std::chrono::milliseconds(50), // 20Hz
-            std::bind(&PS4_Listener::timer_callback, this));
+            std::bind(&PS4_Listener::timer_callback, this)
+        );
 
         RCLCPP_INFO(get_logger(),
                     "PS4 → serial_tx_%d started (timer publish)", device_id_);
     }
 
 private:
+
+rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr param_sub_;
+
+    void param_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
+    {
+        if (msg->data.size() < 4) return;
+
+        wheelspeed = msg->data[0];
+        yawspeed = msg->data[1];
+        desired_speed = msg->data[2];
+        LATERALMOTION_speed = msg->data[3];
+
+        // RCLCPP_INFO(this->get_logger(),
+        //     "Param updated: wheel=%d yaw=%d desired=%d lateral=%d",
+        //     wheelspeed, yawspeed, desired_speed, LATERALMOTION_speed);
+    }
+
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg)
     {
 
@@ -154,14 +228,14 @@ private:
         last_R3 = R3;
         LATERALMOTIONMODE = R3_latch;
 
-        if (AGRESSIVEMODE == 0) {
-            wheelspeed = 128;
-            data[11] = 1; // LED光らない
-        }
-        if (AGRESSIVEMODE == 1) {
-            wheelspeed = 50;
-            data[11] = 0; // LED光る
-        }
+        // if (AGRESSIVEMODE == 0) {
+        //     wheelspeed = 128;
+        //     data[11] = 1; // LED光らない
+        // }
+        // if (AGRESSIVEMODE == 1) {
+        //     wheelspeed = 50;
+        //     data[11] = 0; // LED光る
+        // }
 
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
@@ -332,10 +406,7 @@ private:
 void timer_callback()
 {
     std_msgs::msg::Int16MultiArray msg;
-    {
-        std::lock_guard<std::mutex> lock(datamutex_);
-        msg.data = data;
-    }
+    msg.data = data;
     publisher_->publish(msg);
 }
 
@@ -371,6 +442,7 @@ int main(int argc, char *argv[])
     uint8_t device_id = 2; // serial_bridge_node と一致
     auto ps4_listener = std::make_shared<PS4_Listener>(device_id);
     exec.add_node(ps4_listener);
+    exec.add_node(std::make_shared<dokusute_para>());
     exec.spin();
 
     rclcpp::shutdown();
