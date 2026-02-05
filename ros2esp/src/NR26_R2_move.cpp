@@ -21,9 +21,16 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 
 #include <mutex>
 
+// 以下マイコンに合わせて設定
+#define TARGET_DEVICE_ID 2 // 宛先マイコンのID
+#define TX16NUM 24         // 送信データ数
+#define RX16NUM 17         // 受信データ数
+
 #define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
-constexpr size_t TX16NUM = 24;
+#define PUBLISH_RATE_MS 20 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
+
+// constexpr size_t TX16NUM = 24;
 
 // 定数・変数
 float duty_max = 100;
@@ -84,51 +91,49 @@ private:
         for_speed = msg->data[1];
         back_speed = msg->data[2];
         // v4 = msg->data[3];
-
-        //  data[0] = params[0]; // v1
-        //  data[1] = params[1]; // v2
-        //  data[2] = params[2]; // v3
-        //  data[3] = params[3]; // v4
-
-        // // ここでモータ制御に送ったり何でもできる
-        // std::cout << "Received params:" << std::endl;
-        // std::cout << " v1=" << params[0]
-        //           << " v2=" << params[1]
-        //           << " v3=" << params[2]
-        //           << " v4=" << params[3]
-        //           << std::endl;
     }
 };
 
-class PS4_Listener : public rclcpp::Node
+class DriverInterface : public rclcpp::Node
 {
 public:
-    PS4_Listener(uint8_t device_id)
-        : Node("ps4_listener"),
+    DriverInterface(uint8_t device_id)
+        : Node("driver_interface_" + std::to_string(device_id)),
           device_id_(device_id)
     {
+
+        // 配列を0で初期化
         data_.assign(TX16NUM, 0);
+
+        // joyノードのSubscribe
         joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
             "joy", 10,
-            std::bind(&PS4_Listener::ps4_listener_callback, this,
-                      std::placeholders::_1));
+            std::bind(&DriverInterface::ps4_listener_callback, this, std::placeholders::_1));
 
+        // seial_bridgeへpublish
         publisher_ = this->create_publisher<std_msgs::msg::Int16MultiArray>(
             "serial_tx_" + std::to_string(device_id_), 10);
 
+        // timer_callbackを呼び出すタイマーを作成
         timer_ = create_wall_timer(
-            std::chrono::milliseconds(100), // 20Hz
-            std::bind(&PS4_Listener::timer_callback, this));
+            std::chrono::milliseconds(PUBLISH_RATE_MS),
+            std::bind(&DriverInterface::publisher_timer_callback, this));
+
+        sensor_sub_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
+            "serial_rx_" + std::to_string(device_id_),
+            10,
+            std::bind(&DriverInterface::sensor_callback,
+                      this,
+                      std::placeholders::_1));
 
         RCLCPP_INFO(get_logger(),
-                    "PS4 → serial_tx_%d started (timer publish)", device_id_);
+                    "serial_tx_%d started.", device_id_);
     }
 
 private:
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg)
     {
 
-        std::lock_guard<std::mutex> lock(data_mutex_);
         // コントローラーの入力を取得、使わない入力はコメントアウト推奨
         float LS_X = -1 * msg->axes[0];
         float LS_Y = msg->axes[1];
@@ -138,7 +143,7 @@ private:
         // bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
         // bool TRIANGLE = msg->buttons[2];
-        // bool SQUARE = msg->buttons[3];
+        //  bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
         // bool RIGHT = msg->axes[6] == -1.0;
@@ -161,13 +166,7 @@ private:
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
 
-        // static bool last_share = false; // 前回の状態を保持する static 変数
-        // static bool share_latch = false;
-
-        // static bool last_R1 =false;
-        //  static bool last_L1 =false;
-        // static bool last_triangle = false;
-
+        // 以降、配列data_を操作する
         float rad = atan2(LS_Y, LS_X);
 
         // float X = LS_X;
@@ -231,65 +230,19 @@ private:
             data_[2] = 0;
         }
 
-        // if (R2_DIGITAL >= 0.3)
-        // {
-        //     v1 = sin(rad - 3 * M_PI / 4) * R2_DIGITAL;
-        //     v2 = sin(rad - 5 * M_PI / 4) * R2_DIGITAL;
-        //     v3 = sin(rad - 7 * M_PI / 4) * R2_DIGITAL;
-        //     v4 = sin(rad - 9 * M_PI / 4) * R2_DIGITAL;
-        // }
-
-        // else if (RS_X >= deadzone || R1 == 1)
-        // {
-        //     v1 = -1.0 * sp_yaw;
-        //     v2 = -1.0 * sp_yaw;
-        //     v3 = -1.0 * sp_yaw;
-        //     v4 = -1.0 * sp_yaw;
-        // }
-
-        // else if (RS_X <= -1 * deadzone || L1 == 1)
-        // {
-        //     v1 = 1.0 * sp_yaw;
-        //     v2 = 1.0 * sp_yaw;
-        //     v3 = 1.0 * sp_yaw;
-        //     v4 = 1.0 * sp_yaw;
-        // }
-
-        // else if (
-        //     (fabsf(LS_X) <= deadzone) && (fabsf(LS_Y) <= deadzone) && (fabsf(RS_X) <= deadzone) && (fabsf(RS_Y) <= deadzone) && (R1 == 0) && (L1 == 0))
-        // {
-        //     v1 = 0.0;
-        //     v2 = 0.0;
-        //     v3 = 0.0;
-        //     v4 = 0.0;
-        // }
-
-        // printf("\t\n%d,%d,%d,%d\n", v1, v2, v3, v4);
-        // std::lock_guard<std::mutex> lock(data_mutex_);
         data_[7] = static_cast<int16_t>(v1 * duty_max);
         data_[8] = static_cast<int16_t>(v2 * duty_max);
         data_[9] = static_cast<int16_t>(v3 * duty_max);
         data_[10] = static_cast<int16_t>(v4 * duty_max);
-
-        // std::cout << "\n"
-        //           << data_[1] << "," << data_[2] << "," << data_[7] << "," << data_[8] << "," << data_[9] << "," << data_[10] << std::endl;
-
-        // デバッグ用（for文でcoutするとカクつく）
-        // std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", "<<std::endl;//", ";
-        // std::cout << data[4] << ", " << data[5] << ", " << data[6] << ", " << data[7] << ", ";
-        // std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
-        // std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
-        // std::cout << data[16] << ", " << data[17] << ", " << data[18] << std::endl;
+        // 配列操作ここまで
     }
 
-    /* ---------- 周期 publish ---------- */
-    void timer_callback()
+    void publisher_timer_callback()
     {
         std_msgs::msg::Int16MultiArray msg;
-        {
-            std::lock_guard<std::mutex> lock(data_mutex_);
-            msg.data = data_;
-        }
+
+        msg.data = data_;
+
         publisher_->publish(msg);
         print_data();
     }
@@ -306,10 +259,48 @@ private:
         }
         std::cout << "]" << std::endl;
     }
+
+    void
+    sensor_callback(
+        const std_msgs::msg::Int16MultiArray::SharedPtr msg)
+    {
+        // 最低限：サイズチェック
+        if (msg->data.size() < RX16NUM)
+        {
+            RCLCPP_WARN(this->get_logger(),
+                        "serial_rx_%d: data too short (%zu)",
+                        device_id_, msg->data.size());
+            return;
+        }
+
+        // int16_t ENC1 = msg->data[1];
+        // int16_t ENC2 = msg->data[2];
+        // int16_t ENC3 = msg->data[3];
+        // int16_t ENC4 = msg->data[4];
+        // int16_t ENC5 = msg->data[5];
+        // int16_t ENC6 = msg->data[6];
+        // int16_t ENC7 = msg->data[7];
+        // int16_t ENC8 = msg->data[8];
+
+        // int16_t SW1 = msg->data[9];
+        // int16_t SW2 = msg->data[10];
+        // int16_t SW3 = msg->data[11];
+        // int16_t SW4 = msg->data[12];
+        // int16_t SW5 = msg->data[13];
+        // int16_t SW6 = msg->data[14];
+        // int16_t SW7 = msg->data[15];
+        // int16_t SW8 = msg->data[16];
+
+        // 以降、受信データを使った処理を記述
+
+        // 受信データ処理ここまで
+    }
+
     uint8_t device_id_;
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
+    rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sensor_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     std::vector<int16_t> data_;
@@ -320,12 +311,11 @@ int main(int argc, char *argv[])
 {
     rclcpp::init(argc, argv);
 
-    rclcpp::executors::SingleThreadedExecutor exec;
+    rclcpp::executors::MultiThreadedExecutor exec;
 
-    uint8_t device_id = 2; // serial_bridge_node と一致
-    auto ps4_listener = std::make_shared<PS4_Listener>(device_id);
+    auto driver_interface = std::make_shared<DriverInterface>(TARGET_DEVICE_ID);
     auto omni_param = std::make_shared<Omni_para>();
-    exec.add_node(ps4_listener);
+    exec.add_node(driver_interface);
     exec.add_node(omni_param);
     exec.spin();
 
