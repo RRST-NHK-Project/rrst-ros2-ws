@@ -38,8 +38,8 @@ float for_speed = 50;
 float back_speed = 50;
 float sp_yaw = 0.5;
 float deadzone = 0.3; // adjust DS4 deadzone
-float m1 = 3;
-float m2 = 3;
+float m1 = 30;
+float m2 = 30;
 
 float v1, v2, v3, v4; // 各メカナムホイールの速度指令値
 // v1:第一象限, v2:第二象限, v3:第三象限, v4:第四象限
@@ -166,6 +166,22 @@ private:
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
 
+        static bool last_up = false;
+        static bool up_latch = false;
+        static bool last_down = false;
+        static bool down_latch = false;
+
+        //  if (UP && !last_up) {
+        //     up_latch = !up_latch;
+        // }
+
+        // if (CIRCLE && !last_circle) {
+        //     down_latch = !down_latch;
+        // }
+
+        // last_share = SHARE;
+        // last_circle = CIRCLE;
+
         // 以降、配列data_を操作する
         float rad = atan2(LS_Y, LS_X);
 
@@ -215,15 +231,16 @@ private:
         v3 /= max_v;
         v4 /= max_v;
 
-        if (UP)
+        if (UP != last_up && UP == true)
         {
             Action::all_up(data_);
         }
-        else if (DOWN)
+        else if (DOWN != last_down && DOWN == true)
         {
             Action::all_down(data_);
         }
-
+        last_up = UP;
+        last_down = DOWN;
         if (CIRCLE)
         {
             data_[1] = 0;
@@ -292,6 +309,24 @@ private:
         // int16_t SW8 = msg->data[16];
 
         // 以降、受信データを使った処理を記述
+        // static uint8_t sw1_prev = 1;
+        // static uint8_t sw2_prev = 1;
+
+        // if (sw1_prev == 1 && SW1 == 0)
+        // {
+        //     // リセット処理
+        //     // total_cnt0 = 0;
+        //     ENC1 = 0;
+        // }
+        // if (sw2_prev == 1 && SW2 == 0)
+        // {
+        //     // リセット処理
+        //     // total_cnt1 = 0;
+        //     ENC2 = 0;
+        // }
+
+        // sw1_prev = SW1;
+        // sw2_prev = SW2;
 
         // 受信データ処理ここまで
     }
