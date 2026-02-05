@@ -59,8 +59,14 @@ ament_target_dependencies(cr25_fes rclcpp std_msgs sensor_msgs geometry_msgs)
 add_executable(dokusute_move src/dokusute_move.cpp)
 ament_target_dependencies(dokusute_move rclcpp std_msgs sensor_msgs geometry_msgs)
 
+add_executable(dokusute_tuner src/dokusute_tuner.cpp)
+ament_target_dependencies(dokusute_tuner rclcpp std_msgs sensor_msgs geometry_msgs)
+
 add_executable(sb_tester src/Serial_Bridge_Tester.cpp)
 ament_target_dependencies(sb_tester rclcpp std_msgs sensor_msgs geometry_msgs)
+
+add_executable(sb_host src/Serial_Bridge_Host.cpp)
+ament_target_dependencies(sb_host rclcpp std_msgs sensor_msgs geometry_msgs)
 
 # インストール設定
 install(TARGETS
