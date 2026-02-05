@@ -178,24 +178,24 @@ private:
             float vx = cos(rad) * R2_DIGITAL;
             float vy = sin(rad) * R2_DIGITAL;
 
-            v1 = vy - vx; // 前右
-            v2 = vy + vx; // 前左
-            v3 = vy - vx; // 後左
-            v4 = vy + vx; // 後右
+            v2 = -vy + vx; // 前右
+            v4 = vy + vx;  // vy + vx; // 前左
+            v1 = vy - vx;  // vy - vx; // 後左
+            v3 = -vy - vx; // vy + vx; // 後右
         }
         else if (RS_X >= deadzone || R1 == 1)
         {
-            v1 = sp_yaw;
-            v2 = -sp_yaw;
-            v3 = sp_yaw;
+            v2 = sp_yaw;
             v4 = -sp_yaw;
+            v1 = sp_yaw;
+            v3 = -sp_yaw;
         }
         else if (RS_X <= -deadzone || L1 == 1)
         {
-            v1 = -sp_yaw;
-            v2 = sp_yaw;
-            v3 = -sp_yaw;
+            v2 = -sp_yaw;
             v4 = sp_yaw;
+            v1 = -sp_yaw;
+            v3 = sp_yaw;
         }
 
         else if (
