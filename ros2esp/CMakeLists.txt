@@ -60,7 +60,8 @@ add_executable(dokusute_move src/dokusute_move.cpp)
 ament_target_dependencies(dokusute_move rclcpp std_msgs sensor_msgs geometry_msgs)
 
 add_executable(dokusute_tuner src/dokusute_tuner.cpp)
-ament_target_dependencies(dokusute_tuner rclcpp std_msgs sensor_msgs geometry_msgs)
+ament_target_dependencies(dokusute_tuner rclcpp std_msgs sensor_msgs geometry_msgs )
+target_include_directories(dokusute_tuner PRIVATE ${nlohmann_json_SOURCE_DIR}/single_include)
 
 add_executable(sb_tester src/Serial_Bridge_Tester.cpp)
 ament_target_dependencies(sb_tester rclcpp std_msgs sensor_msgs geometry_msgs)
