@@ -12,14 +12,19 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 // ROS
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
-#include "std_msgs/msg/int16.hpp"
 #include <std_msgs/msg/int16_multi_array.hpp>
+#include <std_msgs/msg/int32_multi_array.hpp>
+
 // 以下マイコンに合わせて設定
 #define TARGET_DEVICE_ID 2 // 宛先マイコンのID
 #define TX16NUM 24         // 送信データ数
 #define RX16NUM 17         // 受信データ数
 
 #define PUBLISH_RATE_MS 20 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
+
+// スティックのデッドゾーン
+#define DEADZONE_L 0.3
+#define DEADZONE_R 0.3
 
 class HardWareControl : public rclcpp::Node {
 public:
@@ -30,7 +35,7 @@ public:
         // 配列を0で初期化
         data_.assign(TX16NUM, 0);
         /*
-        マイコンに送信される配列"data"
+        マイコンに送信される配列"data_"
         debug: 機能未割り当て, MD: モータードライバー, TR: トランジスタ
         | data[n] | 詳細 | 範囲 |
         | ---- | ---- | ---- |
@@ -90,38 +95,51 @@ private:
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
 
         // コントローラーの入力を取得、使わない入力はコメントアウト推奨
-        float LS_X = -1 * msg->axes[0];
-        float LS_Y = msg->axes[1];
-        float RS_X = -1 * msg->axes[3];
-        float RS_Y = msg->axes[4];
+        // float LS_X = -1 * msg->axes[0];
+        // float LS_Y = msg->axes[1];
+        // float RS_X = -1 * msg->axes[3];
+        // float RS_Y = msg->axes[4];
 
-        bool CROSS = msg->buttons[0];
-        bool CIRCLE = msg->buttons[1];
-        bool TRIANGLE = msg->buttons[2];
-        bool SQUARE = msg->buttons[3];
+        // bool CROSS = msg->buttons[0];
+        // bool CIRCLE = msg->buttons[1];
+        // bool TRIANGLE = msg->buttons[2];
+        // bool SQUARE = msg->buttons[3];
 
-        bool LEFT = msg->axes[6] == 1.0;
-        bool RIGHT = msg->axes[6] == -1.0;
-        bool UP = msg->axes[7] == 1.0;
-        bool DOWN = msg->axes[7] == -1.0;
+        // bool LEFT = msg->axes[6] == 1.0;
+        // bool RIGHT = msg->axes[6] == -1.0;
+        // bool UP = msg->axes[7] == 1.0;
+        // bool DOWN = msg->axes[7] == -1.0;
 
-        bool L1 = msg->buttons[4];
-        bool R1 = msg->buttons[5];
+        // bool L1 = msg->buttons[4];
+        // bool R1 = msg->buttons[5];
 
-        float L2_DIGITAL = (-1 * msg->axes[2] + 1) / 2;
-        float R2_DIGITAL = (-1 * msg->axes[5] + 1) / 2;
+        // float L2_DIGITAL = (-1 * msg->axes[2] + 1) / 2;
+        // float R2_DIGITAL = (-1 * msg->axes[5] + 1) / 2;
 
-        bool L2 = msg->buttons[6];
-        bool R2 = msg->buttons[7];
+        // bool L2 = msg->buttons[6];
+        // bool R2 = msg->buttons[7];
 
-        bool SHARE = msg->buttons[8];
-        bool OPTION = msg->buttons[9];
-        bool PS = msg->buttons[10];
+        // bool SHARE = msg->buttons[8];
+        // bool OPTION = msg->buttons[9];
+        // bool PS = msg->buttons[10];
 
-        bool L3 = msg->buttons[11];
-        bool R3 = msg->buttons[12];
+        // bool L3 = msg->buttons[11];
+        // bool R3 = msg->buttons[12];
+
+        // static bool last_option = false;
+        // static bool option_latch = false;
+
+        // static bool last_share = false;
+        // static bool share_latch = false;
 
         // 以降、配列data_を操作する
+
+        // デバッグ用
+        // RCLCPP_INFO(
+        //     get_logger(),
+        //     "data_[1-4]=[%d,%d,%d,%d], data_[9-12]=[%d,%d,%d,%d]",
+        //     data_[1], data_[2], data_[3], data_[4],
+        //     data_[9], data_[10], data_[11], data_[12]);
 
         // 配列操作ここまで
     }
@@ -146,23 +164,23 @@ private:
             return;
         }
 
-        int16_t ENC1 = msg->data[1];
-        int16_t ENC2 = msg->data[2];
-        int16_t ENC3 = msg->data[3];
-        int16_t ENC4 = msg->data[4];
-        int16_t ENC5 = msg->data[5];
-        int16_t ENC6 = msg->data[6];
-        int16_t ENC7 = msg->data[7];
-        int16_t ENC8 = msg->data[8];
+        // int16_t ENC1 = msg->data[1];
+        // int16_t ENC2 = msg->data[2];
+        // int16_t ENC3 = msg->data[3];
+        // int16_t ENC4 = msg->data[4];
+        // int16_t ENC5 = msg->data[5];
+        // int16_t ENC6 = msg->data[6];
+        // int16_t ENC7 = msg->data[7];
+        // int16_t ENC8 = msg->data[8];
 
-        int16_t SW1 = msg->data[9];
-        int16_t SW2 = msg->data[10];
-        int16_t SW3 = msg->data[11];
-        int16_t SW4 = msg->data[12];
-        int16_t SW5 = msg->data[13];
-        int16_t SW6 = msg->data[14];
-        int16_t SW7 = msg->data[15];
-        int16_t SW8 = msg->data[16];
+        // int16_t SW1 = msg->data[9];
+        // int16_t SW2 = msg->data[10];
+        // int16_t SW3 = msg->data[11];
+        // int16_t SW4 = msg->data[12];
+        // int16_t SW5 = msg->data[13];
+        // int16_t SW6 = msg->data[14];
+        // int16_t SW7 = msg->data[15];
+        // int16_t SW8 = msg->data[16];
 
         // 以降、受信データを使った処理を記述
 
@@ -182,10 +200,23 @@ private:
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
+    // figletでノード名を表示
+    std::string figletout = "figlet Serial Bridge Host";
+    int result = std::system(figletout.c_str());
+    if (result != 0) {
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                  << std::endl;
+        std::cerr << "Please install 'figlet' with the following command:"
+                  << std::endl;
+        std::cerr << "sudo apt install figlet" << std::endl;
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                  << std::endl;
+    }
+
     rclcpp::executors::MultiThreadedExecutor exec;
 
-    auto driver_interface = std::make_shared<HardWareControl>(TARGET_DEVICE_ID);
-    exec.add_node(driver_interface);
+    auto hardware_control = std::make_shared<HardWareControl>(TARGET_DEVICE_ID);
+    exec.add_node(hardware_control);
     exec.spin();
 
     rclcpp::shutdown();

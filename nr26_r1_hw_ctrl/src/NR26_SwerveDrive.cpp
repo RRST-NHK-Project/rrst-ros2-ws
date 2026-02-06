@@ -142,15 +142,11 @@ private:
         // bool L3 = msg->buttons[11];
         bool R3 = msg->buttons[12];
 
-        static bool last_option = false; // 前回の状態を保持する static 変数
-        static bool last_share = false;
-
-        // OPTION のラッチ状態を保持する static 変数（初期状態は OFF とする）
+        static bool last_option = false;
         static bool option_latch = false;
-        static bool share_latch = false;
 
-        static bool last_R3 = false;
-        static bool R3_latch = false;
+        static bool last_share = false;
+        static bool share_latch = false;
 
         // 以降、配列data_を操作する
 
