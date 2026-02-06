@@ -3,12 +3,17 @@ Serial_Bridgeノードのホスト側プログラム
 Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 */
 
+#include <chrono>
+#include <cmath>
+#include <iostream>
+#include <thread>
+#include <vector>
+
 // ROS
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
-#include "std_msgs/msg/int16_multi_array.hpp"
-#include <std_msgs/msg/float32_multi_array.hpp>
-
+#include "std_msgs/msg/int16.hpp"
+#include <std_msgs/msg/int16_multi_array.hpp>
 // 以下マイコンに合わせて設定
 #define TARGET_DEVICE_ID 2 // 宛先マイコンのID
 #define TX16NUM 24         // 送信データ数
@@ -16,19 +21,50 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 
 #define PUBLISH_RATE_MS 20 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
 
-class DriverInterface : public rclcpp::Node {
+class HardWareControl : public rclcpp::Node {
 public:
-    DriverInterface(uint8_t device_id)
-        : Node("driver_interface_" + std::to_string(device_id)),
+    HardWareControl(uint8_t device_id)
+        : Node("hardware_control_" + std::to_string(device_id)),
           device_id_(device_id) {
 
         // 配列を0で初期化
         data_.assign(TX16NUM, 0);
+        /*
+        マイコンに送信される配列"data"
+        debug: 機能未割り当て, MD: モータードライバー, TR: トランジスタ
+        | data[n] | 詳細 | 範囲 |
+        | ---- | ---- | ---- |
+        | data[0] | debug | 0 or 1 |
+        | data[1] | MD1 | -100 ~ 100 |
+        | data[2] | MD2 | -100 ~ 100 |
+        | data[3] | MD3 | -100 ~ 100 |
+        | data[4] | MD4 | -100 ~ 100 |
+        | data[5] | MD5 | -100 ~ 100 |
+        | data[6] | MD6 | -100 ~ 100 |
+        | data[7] | MD7 | -100 ~ 100 |
+        | data[8] | MD8 | -100 ~ 100 |
+        | data[9] | Servo1 | 0 ~ 270 |
+        | data[10] | Servo2 | 0 ~ 270 |
+        | data[11] | Servo3 | 0 ~ 270 |
+        | data[12] | Servo4 | 0 ~ 270 |
+        | data[13] | Servo5 | 0 ~ 270 |
+        | data[14] | Servo6 | 0 ~ 270 |
+        | data[15] | Servo7 | 0 ~ 270 |
+        | data[16] | Servo8 | 0 ~ 270 |
+        | data[17] | TR1 | 0 or 1|
+        | data[18] | TR2 | 0 or 1|
+        | data[19] | TR3 | 0 or 1|
+        | data[20] | TR4 | 0 or 1|
+        | data[21] | TR5 | 0 or 1|
+        | data[22] | TR6 | 0 or 1|
+        | data[23] | TR7 | 0 or 1|
+        | data[24] | TR8 | 0 or 1|
+        */
 
         // joyノードのSubscribe
         joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
             "joy", 10,
-            std::bind(&DriverInterface::ps4_listener_callback, this, std::placeholders::_1));
+            std::bind(&HardWareControl::ps4_listener_callback, this, std::placeholders::_1));
 
         // seial_bridgeへpublish
         publisher_ = this->create_publisher<std_msgs::msg::Int16MultiArray>(
@@ -37,12 +73,12 @@ public:
         // timer_callbackを呼び出すタイマーを作成
         timer_ = create_wall_timer(
             std::chrono::milliseconds(PUBLISH_RATE_MS),
-            std::bind(&DriverInterface::publisher_timer_callback, this));
+            std::bind(&HardWareControl::publisher_timer_callback, this));
 
         sensor_sub_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
             "serial_rx_" + std::to_string(device_id_),
             10,
-            std::bind(&DriverInterface::sensor_callback,
+            std::bind(&HardWareControl::sensor_callback,
                       this,
                       std::placeholders::_1));
 
@@ -62,7 +98,7 @@ private:
         bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
         bool TRIANGLE = msg->buttons[2];
-        // bool SQUARE = msg->buttons[3];
+        bool SQUARE = msg->buttons[3];
 
         bool LEFT = msg->axes[6] == 1.0;
         bool RIGHT = msg->axes[6] == -1.0;
@@ -148,7 +184,7 @@ int main(int argc, char *argv[]) {
 
     rclcpp::executors::MultiThreadedExecutor exec;
 
-    auto driver_interface = std::make_shared<DriverInterface>(TARGET_DEVICE_ID);
+    auto driver_interface = std::make_shared<HardWareControl>(TARGET_DEVICE_ID);
     exec.add_node(driver_interface);
     exec.spin();
 
