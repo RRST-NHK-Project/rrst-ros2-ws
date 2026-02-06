@@ -325,15 +325,15 @@ private:
 
         // int16_t ENC1 = msg->data[1];
         // int16_t ENC2 = msg->data[2];
-        // int16_t ENC3 = msg->data[3];
-        // int16_t ENC4 = msg->data[4];
-        // int16_t ENC5 = msg->data[5];
-        // int16_t ENC6 = msg->data[6];
-        // int16_t ENC7 = msg->data[7];
-        // int16_t ENC8 = msg->data[8];
+        //  int16_t ENC3 = msg->data[3];
+        //  int16_t ENC4 = msg->data[4];
+        //  int16_t ENC5 = msg->data[5];
+        //  int16_t ENC6 = msg->data[6];
+        //  int16_t ENC7 = msg->data[7];
+        //  int16_t ENC8 = msg->data[8];
 
-        // int16_t SW1 = msg->data[9];
-        // int16_t SW2 = msg->data[10];
+        int16_t SW1 = msg->data[9];
+        int16_t SW2 = msg->data[10];
         // int16_t SW3 = msg->data[11];
         // int16_t SW4 = msg->data[12];
         // int16_t SW5 = msg->data[13];
@@ -342,25 +342,47 @@ private:
         // int16_t SW8 = msg->data[16];
 
         // 以降、受信データを使った処理を記述
-        // static uint8_t sw1_prev = 1;
-        // static uint8_t sw2_prev = 1;
+        static uint8_t sw1_prev = 0;
+        static uint8_t sw2_prev = 0;
 
-        // if (sw1_prev == 1 && SW1 == 0)
+        if (sw1_prev == 0 && SW1 == 1)
+        {
+            data_[5] = 1;
+        }
+        else if (sw2_prev == 0 && SW2 == 1)
+        {
+            data_[6] = 1;
+        }
+        else
+        {
+            data_[5] = 0;
+            data_[6] = 0;
+        }
+        sw1_prev = SW1;
+        sw2_prev = SW2;
+
+        // if (ENC1 > -15 && output1 > 0)
         // {
-        //     // リセット処理
-        //     // total_cnt0 = 0;
-        //     ENC1 = 0;
+        //     data_[3] = 30;
         // }
-        // if (sw2_prev == 1 && SW2 == 0)
+        // else if (ENC1 > -15 && output1 < 0)
         // {
-        //     // リセット処理
-        //     // total_cnt1 = 0;
-        //     ENC2 = 0;
+        //     data_[3] = 50;
         // }
 
-        // sw1_prev = SW1;
-        // sw2_prev = SW2;
-
+        // else if (ENC2 > -15 && output2 > 0)
+        // {
+        //     data_[4] = 30;
+        // }
+        // else if (ENC2 > -15 && output2 < 0)
+        // {
+        //     data_[4] = 50;
+        // }
+        // else
+        // {
+        //     data_[3] = output1;
+        //     data_[4] = output2;
+        // }
         // 受信データ処理ここまで
     }
 
