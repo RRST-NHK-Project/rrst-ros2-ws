@@ -30,6 +30,8 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 
 #define PUBLISH_RATE_MS 20 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
 
+#define MAX_DEG 300
+
 // constexpr size_t TX16NUM = 24;
 
 // 定数・変数
@@ -38,8 +40,10 @@ float for_speed = 50;
 float back_speed = 50;
 float sp_yaw = 0.5;
 float deadzone = 0.3; // adjust DS4 deadzone
-float m1 = 30;
-float m2 = 30;
+float m1 = 90;
+float m2 = 90;
+
+float deg = 3;
 
 float v1, v2, v3, v4; // 各メカナムホイールの速度指令値
 // v1:第一象限, v2:第二象限, v3:第三象限, v4:第四象限
@@ -50,12 +54,12 @@ public:
     static void all_up(std::vector<int16_t> &data)
     {
         data[1] += m1;
-        data[2] -= m2;
+        data[2] += m2;
     }
     static void all_down(std::vector<int16_t> &data)
     {
         data[1] -= m1;
-        data[2] += m2;
+        data[2] -= m2;
     }
 };
 
@@ -140,9 +144,9 @@ private:
         float RS_X = -1 * msg->axes[3];
         float RS_Y = msg->axes[4];
 
-        // bool CROSS = msg->buttons[0];
+        bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
-        // bool TRIANGLE = msg->buttons[2];
+        bool TRIANGLE = msg->buttons[2];
         //  bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
@@ -167,9 +171,9 @@ private:
         // bool R3 = msg->buttons[12];
 
         static bool last_up = false;
-        static bool up_latch = false;
+        // static bool up_latch = false;
         static bool last_down = false;
-        static bool down_latch = false;
+        // static bool down_latch = false;
 
         //  if (UP && !last_up) {
         //     up_latch = !up_latch;
@@ -245,6 +249,35 @@ private:
         {
             data_[1] = 0;
             data_[2] = 0;
+        }
+
+        if (CROSS)
+        {
+            data_[1] -= deg;
+            data_[2] -= deg;
+        }
+        else if (TRIANGLE)
+        {
+            data_[1] += deg;
+            data_[2] += deg;
+        }
+
+        if (data_[1] > MAX_DEG)
+        {
+            data_[1] = MAX_DEG;
+        }
+        else if (data_[1] < -MAX_DEG)
+        {
+            data_[1] = -MAX_DEG;
+        }
+
+        if (data_[2] > MAX_DEG)
+        {
+            data_[2] = MAX_DEG;
+        }
+        else if (data_[2] < -MAX_DEG)
+        {
+            data_[2] = -MAX_DEG;
         }
 
         data_[7] = static_cast<int16_t>(v1 * duty_max);
