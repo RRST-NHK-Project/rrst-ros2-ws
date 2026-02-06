@@ -13,6 +13,7 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include <std_msgs/msg/int16_multi_array.hpp>
+#include <std_msgs/msg/int32_multi_array.hpp>
 
 // 以下マイコンに合わせて設定
 #define TARGET_DEVICE_ID 2 // 宛先マイコンのID
@@ -498,13 +499,50 @@ private:
     std::vector<int16_t> data_;
 };
 
+class Params_Listener : public rclcpp::Node {
+public:
+    Params_Listener() : Node("nr25_r1_servo_cal_listener") {
+        subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
+            "r1_servo_cal", 10,
+            std::bind(&Params_Listener::params_listener_callback, this,
+                      std::placeholders::_1));
+        RCLCPP_INFO(this->get_logger(), "R1 Servo Calibrator Listener");
+    }
+
+private:
+    void params_listener_callback(
+        const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        SERVO1_CAL = msg->data[0];
+        SERVO2_CAL = msg->data[1];
+        SERVO3_CAL = msg->data[2];
+        SERVO4_CAL = msg->data[3];
+    }
+
+    rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
+};
+
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
+    // figletでノード名を表示
+    std::string figletout = "figlet R1 SwerveDrive";
+    int result = std::system(figletout.c_str());
+    if (result != 0) {
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                  << std::endl;
+        std::cerr << "Please install 'figlet' with the following command:"
+                  << std::endl;
+        std::cerr << "sudo apt install figlet" << std::endl;
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                  << std::endl;
+    }
+
     rclcpp::executors::MultiThreadedExecutor exec;
 
-    auto driver_interface = std::make_shared<HardWareControl>(TARGET_DEVICE_ID);
-    exec.add_node(driver_interface);
+    auto hardware_control = std::make_shared<HardWareControl>(TARGET_DEVICE_ID);
+    auto params_listener = std::make_shared<Params_Listener>();
+    exec.add_node(hardware_control);
+    exec.add_node(params_listener);
     exec.spin();
 
     rclcpp::shutdown();
