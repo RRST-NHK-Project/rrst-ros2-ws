@@ -30,6 +30,8 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 
 #define PUBLISH_RATE_MS 20 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
 
+#define MAX_DEG 300
+
 // constexpr size_t TX16NUM = 24;
 
 // 定数・変数
@@ -38,8 +40,10 @@ float for_speed = 50;
 float back_speed = 50;
 float sp_yaw = 0.5;
 float deadzone = 0.3; // adjust DS4 deadzone
-float m1 = 3;
-float m2 = 3;
+float m1 = 90;
+float m2 = 90;
+
+float deg = 3;
 
 float v1, v2, v3, v4; // 各メカナムホイールの速度指令値
 // v1:第一象限, v2:第二象限, v3:第三象限, v4:第四象限
@@ -50,12 +54,12 @@ public:
     static void all_up(std::vector<int16_t> &data)
     {
         data[1] += m1;
-        data[2] -= m2;
+        data[2] += m2;
     }
     static void all_down(std::vector<int16_t> &data)
     {
         data[1] -= m1;
-        data[2] += m2;
+        data[2] -= m2;
     }
 };
 
@@ -140,9 +144,9 @@ private:
         float RS_X = -1 * msg->axes[3];
         float RS_Y = msg->axes[4];
 
-        // bool CROSS = msg->buttons[0];
+        bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
-        // bool TRIANGLE = msg->buttons[2];
+        bool TRIANGLE = msg->buttons[2];
         //  bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
@@ -165,6 +169,22 @@ private:
 
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
+
+        static bool last_up = false;
+        // static bool up_latch = false;
+        static bool last_down = false;
+        // static bool down_latch = false;
+
+        //  if (UP && !last_up) {
+        //     up_latch = !up_latch;
+        // }
+
+        // if (CIRCLE && !last_circle) {
+        //     down_latch = !down_latch;
+        // }
+
+        // last_share = SHARE;
+        // last_circle = CIRCLE;
 
         // 以降、配列data_を操作する
         float rad = atan2(LS_Y, LS_X);
@@ -215,19 +235,49 @@ private:
         v3 /= max_v;
         v4 /= max_v;
 
-        if (UP)
+        if (UP != last_up && UP == true)
         {
             Action::all_up(data_);
         }
-        else if (DOWN)
+        else if (DOWN != last_down && DOWN == true)
         {
             Action::all_down(data_);
         }
-
+        last_up = UP;
+        last_down = DOWN;
         if (CIRCLE)
         {
             data_[1] = 0;
             data_[2] = 0;
+        }
+
+        if (CROSS)
+        {
+            data_[1] -= deg;
+            data_[2] -= deg;
+        }
+        else if (TRIANGLE)
+        {
+            data_[1] += deg;
+            data_[2] += deg;
+        }
+
+        if (data_[1] > MAX_DEG)
+        {
+            data_[1] = MAX_DEG;
+        }
+        else if (data_[1] < -MAX_DEG)
+        {
+            data_[1] = -MAX_DEG;
+        }
+
+        if (data_[2] > MAX_DEG)
+        {
+            data_[2] = MAX_DEG;
+        }
+        else if (data_[2] < -MAX_DEG)
+        {
+            data_[2] = -MAX_DEG;
         }
 
         data_[7] = static_cast<int16_t>(v1 * duty_max);
@@ -275,15 +325,15 @@ private:
 
         // int16_t ENC1 = msg->data[1];
         // int16_t ENC2 = msg->data[2];
-        // int16_t ENC3 = msg->data[3];
-        // int16_t ENC4 = msg->data[4];
-        // int16_t ENC5 = msg->data[5];
-        // int16_t ENC6 = msg->data[6];
-        // int16_t ENC7 = msg->data[7];
-        // int16_t ENC8 = msg->data[8];
+        //  int16_t ENC3 = msg->data[3];
+        //  int16_t ENC4 = msg->data[4];
+        //  int16_t ENC5 = msg->data[5];
+        //  int16_t ENC6 = msg->data[6];
+        //  int16_t ENC7 = msg->data[7];
+        //  int16_t ENC8 = msg->data[8];
 
-        // int16_t SW1 = msg->data[9];
-        // int16_t SW2 = msg->data[10];
+        int16_t SW1 = msg->data[9];
+        int16_t SW2 = msg->data[10];
         // int16_t SW3 = msg->data[11];
         // int16_t SW4 = msg->data[12];
         // int16_t SW5 = msg->data[13];
@@ -292,7 +342,47 @@ private:
         // int16_t SW8 = msg->data[16];
 
         // 以降、受信データを使った処理を記述
+        static uint8_t sw1_prev = 0;
+        static uint8_t sw2_prev = 0;
 
+        if (sw1_prev == 0 && SW1 == 1)
+        {
+            data_[5] = 1;
+        }
+        else if (sw2_prev == 0 && SW2 == 1)
+        {
+            data_[6] = 1;
+        }
+        else
+        {
+            data_[5] = 0;
+            data_[6] = 0;
+        }
+        sw1_prev = SW1;
+        sw2_prev = SW2;
+
+        // if (ENC1 > -15 && output1 > 0)
+        // {
+        //     data_[3] = 30;
+        // }
+        // else if (ENC1 > -15 && output1 < 0)
+        // {
+        //     data_[3] = 50;
+        // }
+
+        // else if (ENC2 > -15 && output2 > 0)
+        // {
+        //     data_[4] = 30;
+        // }
+        // else if (ENC2 > -15 && output2 < 0)
+        // {
+        //     data_[4] = 50;
+        // }
+        // else
+        // {
+        //     data_[3] = output1;
+        //     data_[4] = output2;
+        // }
         // 受信データ処理ここまで
     }
 

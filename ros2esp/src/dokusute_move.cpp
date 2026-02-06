@@ -7,9 +7,9 @@
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/int16_multi_array.hpp"
-#include <std_msgs/msg/float32_multi_array.hpp>
 #include <mutex>
-//#include "actuator_msg/msg/actuator_msg.hpp"
+#include <std_msgs/msg/float32_multi_array.hpp>
+// #include "actuator_msg/msg/actuator_msg.hpp"
 #include <vector>
 
 // 定数・変数
@@ -31,7 +31,7 @@ constexpr size_t TX16NUM = 24;
 
 #define speed_limit 30
 #define deg_limit 360
-#define DPAD_SPEED 30  
+#define DPAD_SPEED 30
 
 bool AGRESSIVEMODE = false; // 暴走モードの初期値0
 bool LATERALMOTIONMODE = false;
@@ -63,20 +63,18 @@ int LATERALMOTION_speed = 15;
 // static double current_motor_command = 0.0;
 
 // サーボの組み付け時のズレを補正（度数法）
-int SERVO1_CAL = 28;
-int SERVO2_CAL = -16;
-int SERVO3_CAL = 10;
-int SERVO4_CAL = 20;
+int SERVO1_CAL = 0;
+int SERVO2_CAL = 0;
+int SERVO3_CAL = 0;
+int SERVO4_CAL = 0;
 
 // 最近傍点距離の格納
 float min_distance = 0;
 bool front_cleared = false;
 
-class dokusute_para : public rclcpp::Node
-{
+class dokusute_para : public rclcpp::Node {
 public:
-    dokusute_para() : Node("dokusute_param_receiver")
-    {
+    dokusute_para() : Node("dokusute_param_receiver") {
 
         sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
             "dokusute_param",
@@ -90,11 +88,9 @@ private:
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_;
     std::vector<float> params = {0, 0, 0, 0}; // 受信したパラメータを保持
 
-    void param_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
-    {
+    void param_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
 
-        if (msg->data.size() < 4)
-        {
+        if (msg->data.size() < 4) {
             RCLCPP_WARN(this->get_logger(), "param message too short");
             return;
         }
@@ -120,46 +116,39 @@ private:
     }
 };
 
-class PS4_Listener : public rclcpp::Node
-{
+class PS4_Listener : public rclcpp::Node {
 public:
-    
     PS4_Listener(uint8_t device_id)
         : Node("ps4_listener"),
-          device_id_(device_id)
-    {
-        data.assign(TX16NUM,0);
-    joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
-    "joy",
-    rclcpp::SensorDataQoS(),
-    std::bind(&PS4_Listener::ps4_listener_callback, this, std::placeholders::_1)
-    );
+          device_id_(device_id) {
+        data.assign(TX16NUM, 0);
+        joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
+            "joy",
+            rclcpp::SensorDataQoS(),
+            std::bind(&PS4_Listener::ps4_listener_callback, this, std::placeholders::_1));
 
-    param_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
-    "dokusute_param",
-    10,
-    std::bind(&PS4_Listener::param_callback, this, std::placeholders::_1)
-    );
+        param_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+            "dokusute_param",
+            10,
+            std::bind(&PS4_Listener::param_callback, this, std::placeholders::_1));
 
         publisher_ = this->create_publisher<std_msgs::msg::Int16MultiArray>(
             "serial_tx_" + std::to_string(device_id_), 10);
 
         timer_ = create_wall_timer(
             std::chrono::milliseconds(50), // 20Hz
-            std::bind(&PS4_Listener::timer_callback, this)
-        );
+            std::bind(&PS4_Listener::timer_callback, this));
 
         RCLCPP_INFO(get_logger(),
                     "PS4 → serial_tx_%d started (timer publish)", device_id_);
     }
 
 private:
+    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr param_sub_;
 
-rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr param_sub_;
-
-    void param_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
-    {
-        if (msg->data.size() < 4) return;
+    void param_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
+        if (msg->data.size() < 4)
+            return;
 
         wheelspeed = msg->data[0];
         yawspeed = msg->data[1];
@@ -171,12 +160,11 @@ rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr param_sub_;
         //     wheelspeed, yawspeed, desired_speed, LATERALMOTION_speed);
     }
 
-    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg)
-    {
+    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
 
         // コントローラーの入力を取得、使わない入力はコメントアウト推奨
-        
-        // ここから先は data を mutex で守りながら更新する 
+
+        // ここから先は data を mutex で守りながら更新する
         std::lock_guard<std::mutex> lock(datamutex_);
 
         data[0] = MC_PRINTF; // マイコン側のprintfを無効化・有効化(0 or 1)
@@ -288,20 +276,20 @@ rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr param_sub_;
             data[2] = 0;
             data[3] = 0;
             data[4] = 0;
-            data[5] = deg + SERVO1_CAL;
-            data[8] = deg + SERVO2_CAL;
-            data[9] = deg + SERVO3_CAL;
-            data[10] = deg + SERVO4_CAL;
+            data[9] = deg + SERVO1_CAL;
+            data[10] = deg + SERVO2_CAL;
+            data[11] = deg + SERVO3_CAL;
+            data[12] = deg + SERVO4_CAL;
         }
 
         data[1] = -wheelspeed * R2;
         data[2] = -wheelspeed * R2;
         data[3] = -wheelspeed * R2;
         data[4] = -wheelspeed * R2;
-        data[5] = deg + SERVO1_CAL;
-        data[8] = deg + SERVO2_CAL;
-        data[9] = deg + SERVO3_CAL;
-        data[10] = deg + SERVO4_CAL;
+        data[9] = deg + SERVO1_CAL;
+        data[10] = deg + SERVO2_CAL;
+        data[11] = deg + SERVO3_CAL;
+        data[12] = deg + SERVO4_CAL;
 
         if (LEFT) {
             deg = 45;
@@ -339,44 +327,44 @@ rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr param_sub_;
             data[2] = wheelspeed * R2;
             data[3] = wheelspeed * R2;
             data[4] = wheelspeed * R2;
-            data[5] = deg + SERVO1_CAL;
-            data[8] = deg + SERVO2_CAL;
-            data[9] = deg + SERVO3_CAL;
-            data[10] = deg + SERVO4_CAL;
+            data[9] = deg + SERVO1_CAL;
+            data[10] = deg + SERVO2_CAL;
+            data[11] = deg + SERVO3_CAL;
+            data[12] = deg + SERVO4_CAL;
         }
 
         // 角度だけ横移動
         if (R3_latch == 0) {
-                data[5] = deg + SERVO1_CAL;
-                data[8] = deg + SERVO2_CAL;
-                data[9] = deg + SERVO3_CAL;
-                data[10] = deg + SERVO4_CAL;
+            data[9] = deg + SERVO1_CAL;
+            data[10] = deg + SERVO2_CAL;
+            data[11] = deg + SERVO3_CAL;
+            data[12] = deg + SERVO4_CAL;
         }
         if (R3_latch == 1) {
-                data[5] = 45 + SERVO1_CAL;
-                data[8] = 45 + SERVO2_CAL;
-                data[9] = 45 + SERVO3_CAL;
-                data[10] = 45 + SERVO4_CAL;
+            data[9] = 45 + SERVO1_CAL;
+            data[10] = 45 + SERVO2_CAL;
+            data[11] = 45 + SERVO3_CAL;
+            data[12] = 45 + SERVO4_CAL;
             if (LEFT) {
                 data[1] = -LATERALMOTION_speed;
-                data[2] = -LATERALMOTION_speed ;
-                data[3] = -LATERALMOTION_speed ;
-                data[4] = -LATERALMOTION_speed ;
+                data[2] = -LATERALMOTION_speed;
+                data[3] = -LATERALMOTION_speed;
+                data[4] = -LATERALMOTION_speed;
             }
             if (RIGHT) {
-                data[1] = LATERALMOTION_speed ;
-                data[2] = LATERALMOTION_speed ;
-                data[3] = LATERALMOTION_speed ;
-                data[4] = LATERALMOTION_speed ;
+                data[1] = LATERALMOTION_speed;
+                data[2] = LATERALMOTION_speed;
+                data[3] = LATERALMOTION_speed;
+                data[4] = LATERALMOTION_speed;
             }
         }
 
         // 時計回りYAW回転
         if (RS_X > 0 && fabs(RS_X) >= DEADZONE_R) {
-            data[5] = 180 + SERVO1_CAL;
-            data[8] = 90 + SERVO2_CAL;
-            data[9] = 90 + SERVO3_CAL;
-            data[10] = 180 + SERVO4_CAL;
+            data[9] = 180 + SERVO1_CAL;
+            data[10] = 90 + SERVO2_CAL;
+            data[11] = 90 + SERVO3_CAL;
+            data[12] = 180 + SERVO4_CAL;
             data[1] = -yawspeed;
             data[2] = yawspeed;
             data[3] = -yawspeed;
@@ -384,44 +372,40 @@ rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr param_sub_;
         }
         // 半時計回りYAW回転
         if (0 > RS_X && fabs(RS_X) >= DEADZONE_R) {
-            data[5] = 180 + SERVO1_CAL;
-            data[8] = 90 + SERVO2_CAL;
-            data[9] = 90 + SERVO3_CAL;
-            data[10] = 180 + SERVO4_CAL;
+            data[9] = 180 + SERVO1_CAL;
+            data[10] = 90 + SERVO2_CAL;
+            data[11] = 90 + SERVO3_CAL;
+            data[12] = 180 + SERVO4_CAL;
             data[1] = yawspeed;
             data[2] = -yawspeed;
             data[3] = yawspeed;
             data[4] = -yawspeed;
         }
 
-    //    デバッグ用（for文でcoutするとカクつく）
+        //    デバッグ用（for文でcoutするとカクつく）
         std::cout << data[0] << ", " << data[1] << ", " << data[2] << ", " << data[3] << ", ";
         std::cout << data[4] << ", " << data[5] << ", " << data[6] << ", " << data[7] << ", ";
         std::cout << data[8] << ", " << data[9] << ", " << data[10] << ", " << data[11] << ", ";
         std::cout << data[12] << ", " << data[13] << ", " << data[14] << ", " << data[15] << ", ";
         std::cout << data[16] << ", " << data[17] << std::endl;
-
     }
 
-void timer_callback()
-{
-    std_msgs::msg::Int16MultiArray msg;
-    msg.data = data;
-    publisher_->publish(msg);
-}
+    void timer_callback() {
+        std_msgs::msg::Int16MultiArray msg;
+        msg.data = data;
+        publisher_->publish(msg);
+    }
 
-
-    void print_data()
-    {
-    //     std::lock_guard<std::mutex> lock(data_mutex_);
-    //     std::cout << "TX DATA: [";
-    //     for (size_t i = 0; i < data_.size(); ++i)
-    //     {
-    //         std::cout << data_[i];
-    //         if (i + 1 < data_.size())
-    //             std::cout << ", ";
-    //     }
-    //     std::cout << "]" << std::endl;
+    void print_data() {
+        //     std::lock_guard<std::mutex> lock(data_mutex_);
+        //     std::cout << "TX DATA: [";
+        //     for (size_t i = 0; i < data_.size(); ++i)
+        //     {
+        //         std::cout << data_[i];
+        //         if (i + 1 < data_.size())
+        //             std::cout << ", ";
+        //     }
+        //     std::cout << "]" << std::endl;
     }
     uint8_t device_id_;
 
@@ -433,8 +417,7 @@ void timer_callback()
     std::mutex datamutex_;
 };
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
     rclcpp::executors::MultiThreadedExecutor exec;
