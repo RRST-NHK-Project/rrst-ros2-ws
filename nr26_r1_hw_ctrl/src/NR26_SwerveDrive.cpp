@@ -39,10 +39,10 @@ int wheelspeed = 64;
 int yawspeed = 32;
 
 // サーボの組み付け時のズレを補正（度数法）
-int SERVO1_CAL = 0;
-int SERVO2_CAL = 0;
-int SERVO3_CAL = 0;
-int SERVO4_CAL = 0;
+int SERVO1_CAL = 4;
+int SERVO2_CAL = 7;
+int SERVO3_CAL = 2;
+int SERVO4_CAL = -5;
 
 class HardWareControl : public rclcpp::Node {
 public:
@@ -147,6 +147,9 @@ private:
 
         static bool last_share = false;
         static bool share_latch = false;
+
+        static bool last_R3 = false;
+        static bool R3_latch = false;
 
         // 以降、配列data_を操作する
 
@@ -276,8 +279,8 @@ private:
                 data_[10] = 90 + SERVO2_CAL;
                 data_[11] = 90 + SERVO3_CAL;
                 data_[12] = 180 + SERVO4_CAL;
-                data_[1] = -yawspeed;
-                data_[2] = yawspeed;
+                data_[1] = yawspeed;
+                data_[2] = -yawspeed;
                 data_[3] = -yawspeed;
                 data_[4] = yawspeed;
             }
@@ -287,8 +290,8 @@ private:
                 data_[10] = 90 + SERVO2_CAL;
                 data_[11] = 90 + SERVO3_CAL;
                 data_[12] = 180 + SERVO4_CAL;
-                data_[1] = yawspeed;
-                data_[2] = -yawspeed;
+                data_[1] = -yawspeed;
+                data_[2] = yawspeed;
                 data_[3] = yawspeed;
                 data_[4] = -yawspeed;
             }
