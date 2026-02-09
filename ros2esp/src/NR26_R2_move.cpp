@@ -68,7 +68,7 @@ public:
         static float angle = 120;
         float end_angle = 300;
 
-        const int duration_ms = 1000;
+        const int duration_ms = 5000;
         const int step_ms = PUBLISH_RATE_MS;
         const int steps = duration_ms / step_ms;
         const float angle_step = (300.0f - 120.0f) / steps;
@@ -304,23 +304,23 @@ private:
             data_[2] += deg;
         }
 
-        // if (data_[1] > MAX_DEG)
-        // {
-        //     data_[1] = MAX_DEG;
-        // }
-        // else if (data_[1] < -MAX_DEG)
-        // {
-        //     data_[1] = -MAX_DEG;
-        // }
+        if (data_[1] > MAX_DEG)
+        {
+            data_[1] = data_[1] - 360;
+        }
+        else if (data_[1] < -MAX_DEG)
+        {
+            data_[1] = -MAX_DEG;
+        }
 
-        // if (data_[2] > MAX_DEG)
-        // {
-        //     data_[2] = MAX_DEG;
-        // }
-        // else if (data_[2] < -MAX_DEG)
-        // {
-        //     data_[2] = -MAX_DEG;
-        // }
+        if (data_[2] > MAX_DEG)
+        {
+            data_[2] = data_[2] - 360;
+        }
+        else if (data_[2] < -MAX_DEG)
+        {
+            data_[2] = -MAX_DEG;
+        }
         bool sequense = data_[0];
         if (SQUARE == 0)
         {
