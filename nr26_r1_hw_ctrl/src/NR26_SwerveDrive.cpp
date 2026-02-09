@@ -35,8 +35,8 @@ int deg = 0;
 int truedeg = 0;
 
 // 速度
-int wheelspeed = 64;
-int yawspeed = 32;
+int wheelspeed = 80; // 64;
+int yawspeed = 60;   // 32;
 
 // サーボの組み付け時のズレを補正（度数法）
 int SERVO1_CAL = 4;
@@ -44,11 +44,13 @@ int SERVO2_CAL = 7;
 int SERVO3_CAL = 2;
 int SERVO4_CAL = -5;
 
-class HardWareControl : public rclcpp::Node {
+class HardWareControl : public rclcpp::Node
+{
 public:
     HardWareControl(uint8_t device_id)
         : Node("hardware_control_" + std::to_string(device_id)),
-          device_id_(device_id) {
+          device_id_(device_id)
+    {
 
         // 配列を0で初期化
         data_.assign(TX16NUM, 0);
@@ -110,7 +112,8 @@ public:
     }
 
 private:
-    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
+    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg)
+    {
 
         // コントローラーの入力を取得、使わない入力はコメントアウト推奨
 
@@ -155,14 +158,17 @@ private:
 
         float rad = atan2(LS_Y, LS_X);
         deg = rad * 180 / M_PI;
-        if (OPTION && !last_option) {
+        if (OPTION && !last_option)
+        {
             option_latch = !option_latch;
         }
-        if (SHARE && !last_share) {
+        if (SHARE && !last_share)
+        {
             share_latch = !share_latch;
             // Automation::auto_turn(udp_);
         }
-        if (R3 && !last_R3) {
+        if (R3 && !last_R3)
+        {
             R3_latch = !R3_latch;
         }
 
@@ -179,26 +185,33 @@ private:
 
         // XY座標での正しい角度truedeg
 
-        if (REVERSEMODE == 0) {
+        if (REVERSEMODE == 0)
+        {
             truedeg = deg;
-            if ((0 <= truedeg) && (truedeg <= 180)) {
+            if ((0 <= truedeg) && (truedeg <= 180))
+            {
                 truedeg = truedeg;
             }
-            if ((-180 <= truedeg) && (truedeg <= 0)) {
+            if ((-180 <= truedeg) && (truedeg <= 0))
+            {
                 truedeg = -truedeg + 360;
             }
 
             // ！！！！！最重要！！！！！
             //  XY座標での９０度の位置に１３５度を変換して計算
-            if ((-180 <= deg) && (deg <= -135)) {
+            if ((-180 <= deg) && (deg <= -135))
+            {
                 deg = -deg - 135;
-            } else {
+            }
+            else
+            {
                 deg = 225 - deg;
             }
 
             // deadzone追加
             if ((fabs(LS_X) <= DEADZONE_R) && (fabs(LS_Y) <= DEADZONE_R) &&
-                (fabs(RS_X) <= DEADZONE_L)) {
+                (fabs(RS_X) <= DEADZONE_L))
+            {
                 deg = 135;
                 data_[1] = 0;
                 data_[2] = 0;
@@ -219,28 +232,32 @@ private:
             data_[11] = deg + SERVO3_CAL;
             data_[12] = deg + SERVO4_CAL;
 
-            if (LEFT) {
+            if (LEFT)
+            {
                 deg = 45;
                 data_[1] = -wheelspeed * R2;
                 data_[2] = -wheelspeed * R2;
                 data_[3] = -wheelspeed * R2;
                 data_[4] = -wheelspeed * R2;
             }
-            if (RIGHT) {
+            if (RIGHT)
+            {
                 deg = 45;
                 data_[1] = wheelspeed * R2;
                 data_[2] = wheelspeed * R2;
                 data_[3] = wheelspeed * R2;
                 data_[4] = wheelspeed * R2;
             }
-            if (UP) {
+            if (UP)
+            {
                 deg = 135;
                 data_[1] = -wheelspeed * R2;
                 data_[2] = -wheelspeed * R2;
                 data_[3] = -wheelspeed * R2;
                 data_[4] = -wheelspeed * R2;
             }
-            if (DOWN) {
+            if (DOWN)
+            {
                 deg = 135;
                 data_[1] = wheelspeed * R2;
                 data_[2] = wheelspeed * R2;
@@ -249,7 +266,8 @@ private:
             }
 
             // 独ステが扱えない範囲の変換
-            if ((270 < deg) && (deg < 360)) {
+            if ((270 < deg) && (deg < 360))
+            {
                 deg = deg - 180;
                 data_[1] = wheelspeed * R2;
                 data_[2] = wheelspeed * R2;
@@ -261,20 +279,23 @@ private:
                 data_[12] = deg + SERVO4_CAL;
             }
             // 角度だけYAW
-            if (R3_latch == 0) {
+            if (R3_latch == 0)
+            {
                 data_[9] = deg + SERVO1_CAL;
                 data_[10] = deg + SERVO2_CAL;
                 data_[11] = deg + SERVO3_CAL;
                 data_[12] = deg + SERVO4_CAL;
             }
-            if (R3_latch == 1) {
+            if (R3_latch == 1)
+            {
                 data_[9] = 180 + SERVO1_CAL;
                 data_[10] = 90 + SERVO2_CAL;
                 data_[11] = 90 + SERVO3_CAL;
                 data_[12] = 180 + SERVO4_CAL;
             }
             // 時計回りYAW回転
-            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R) {
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R)
+            {
                 data_[9] = 180 + SERVO1_CAL;
                 data_[10] = 90 + SERVO2_CAL;
                 data_[11] = 90 + SERVO3_CAL;
@@ -285,7 +306,8 @@ private:
                 data_[4] = yawspeed;
             }
             // 半時計回りYAW回転
-            if (0 < RS_X && fabs(RS_X) >= DEADZONE_R) {
+            if (0 < RS_X && fabs(RS_X) >= DEADZONE_R)
+            {
                 data_[9] = 180 + SERVO1_CAL;
                 data_[10] = 90 + SERVO2_CAL;
                 data_[11] = 90 + SERVO3_CAL;
@@ -298,26 +320,33 @@ private:
         }
         // 反転モード
         //
-        if (REVERSEMODE == 1) {
+        if (REVERSEMODE == 1)
+        {
             truedeg = deg;
-            if ((0 <= truedeg) && (truedeg <= 180)) {
+            if ((0 <= truedeg) && (truedeg <= 180))
+            {
                 truedeg = truedeg;
             }
-            if ((-180 <= truedeg) && (truedeg <= 0)) {
+            if ((-180 <= truedeg) && (truedeg <= 0))
+            {
                 truedeg = -truedeg + 360;
             }
 
             // ！！！！！最重要！！！！！
             //  XY座標での９０度の位置に１３５度を変換して計算
-            if ((-180 <= deg) && (deg <= -135)) {
+            if ((-180 <= deg) && (deg <= -135))
+            {
                 deg = -deg - 135;
-            } else {
+            }
+            else
+            {
                 deg = 225 - deg;
             }
 
             // deadzone追加
             if ((fabs(LS_X) <= DEADZONE_R) && (fabs(LS_Y) <= DEADZONE_R) &&
-                (fabs(RS_X) <= DEADZONE_L)) {
+                (fabs(RS_X) <= DEADZONE_L))
+            {
                 deg = 135;
                 data_[1] = 0;
                 data_[2] = 0;
@@ -338,28 +367,32 @@ private:
             data_[11] = deg + SERVO3_CAL;
             data_[12] = deg + SERVO4_CAL;
 
-            if (LEFT) {
+            if (LEFT)
+            {
                 deg = 45;
                 data_[1] = wheelspeed * R2;
                 data_[2] = wheelspeed * R2;
                 data_[3] = wheelspeed * R2;
                 data_[4] = wheelspeed * R2;
             }
-            if (RIGHT) {
+            if (RIGHT)
+            {
                 deg = 45;
                 data_[1] = -wheelspeed * R2;
                 data_[2] = -wheelspeed * R2;
                 data_[3] = -wheelspeed * R2;
                 data_[4] = -wheelspeed * R2;
             }
-            if (UP) {
+            if (UP)
+            {
                 deg = 135;
                 data_[1] = wheelspeed * R2;
                 data_[2] = wheelspeed * R2;
                 data_[3] = wheelspeed * R2;
                 data_[4] = wheelspeed * R2;
             }
-            if (DOWN) {
+            if (DOWN)
+            {
                 deg = 135;
                 data_[1] = -wheelspeed * R2;
                 data_[2] = -wheelspeed * R2;
@@ -368,7 +401,8 @@ private:
             }
 
             // 射出直前にサーボを直角に向けストップ
-            if (CROSS) {
+            if (CROSS)
+            {
                 data_[1] = 0;
                 data_[2] = 0;
                 data_[3] = 0;
@@ -382,7 +416,8 @@ private:
             }
 
             // 独ステが扱えない範囲の変換
-            if ((270 < deg) && (deg < 360)) {
+            if ((270 < deg) && (deg < 360))
+            {
                 deg = deg - 180;
                 data_[1] = -wheelspeed * R2;
                 data_[2] = -wheelspeed * R2;
@@ -394,20 +429,23 @@ private:
                 data_[12] = deg + SERVO4_CAL;
             }
             // 角度だけYAW
-            if (R3_latch == 0) {
+            if (R3_latch == 0)
+            {
                 data_[9] = deg + SERVO1_CAL;
                 data_[10] = deg + SERVO2_CAL;
                 data_[11] = deg + SERVO3_CAL;
                 data_[12] = deg + SERVO4_CAL;
             }
-            if (R3_latch == 1) {
+            if (R3_latch == 1)
+            {
                 data_[9] = 180 + SERVO1_CAL;
                 data_[10] = 90 + SERVO2_CAL;
                 data_[11] = 90 + SERVO3_CAL;
                 data_[12] = 180 + SERVO4_CAL;
             }
             // 時計回りYAW回転
-            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R) {
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R)
+            {
                 data_[9] = 180 + SERVO1_CAL;
                 data_[10] = 90 + SERVO2_CAL;
                 data_[11] = 90 + SERVO3_CAL;
@@ -418,7 +456,8 @@ private:
                 data_[4] = yawspeed;
             }
             // 半時計回りYAW回転
-            if (0 < RS_X && fabs(RS_X) >= DEADZONE_R) {
+            if (0 < RS_X && fabs(RS_X) >= DEADZONE_R)
+            {
                 data_[9] = 180 + SERVO1_CAL;
                 data_[10] = 90 + SERVO2_CAL;
                 data_[11] = 90 + SERVO3_CAL;
@@ -430,7 +469,8 @@ private:
             }
         }
 
-        if (SHARE) {
+        if (SHARE)
+        {
             // Automation::auto_turn(udp_);
         }
         // std::cout << REVERSEMODE << std::endl;
@@ -446,7 +486,8 @@ private:
     }
 
     // publish
-    void publisher_timer_callback() {
+    void publisher_timer_callback()
+    {
         std_msgs::msg::Int16MultiArray msg;
 
         msg.data = data_;
@@ -456,9 +497,11 @@ private:
 
     void
     sensor_callback(
-        const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
+        const std_msgs::msg::Int16MultiArray::SharedPtr msg)
+    {
         // 最低限：サイズチェック
-        if (msg->data.size() < RX16NUM) {
+        if (msg->data.size() < RX16NUM)
+        {
             RCLCPP_WARN(this->get_logger(),
                         "serial_rx_%d: data too short (%zu)",
                         device_id_, msg->data.size());
@@ -498,9 +541,11 @@ private:
     std::vector<int16_t> data_;
 };
 
-class Params_Listener : public rclcpp::Node {
+class Params_Listener : public rclcpp::Node
+{
 public:
-    Params_Listener() : Node("nr25_r1_servo_cal_listener") {
+    Params_Listener() : Node("nr25_r1_servo_cal_listener")
+    {
         subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
             "r1_servo_cal", 10,
             std::bind(&Params_Listener::params_listener_callback, this,
@@ -510,7 +555,8 @@ public:
 
 private:
     void params_listener_callback(
-        const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        const std_msgs::msg::Int32MultiArray::SharedPtr msg)
+    {
         SERVO1_CAL = msg->data[0];
         SERVO2_CAL = msg->data[1];
         SERVO3_CAL = msg->data[2];
@@ -520,13 +566,15 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
 };
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     rclcpp::init(argc, argv);
 
     // figletでノード名を表示
     std::string figletout = "figlet R1 SwerveDrive";
     int result = std::system(figletout.c_str());
-    if (result != 0) {
+    if (result != 0)
+    {
         std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
                   << std::endl;
         std::cerr << "Please install 'figlet' with the following command:"

@@ -40,8 +40,9 @@ float for_speed = 50;
 float back_speed = 50;
 float sp_yaw = 0.5;
 float deadzone = 0.3; // adjust DS4 deadzone
-float m1 = 90;
-float m2 = 90;
+float m1 = 120;
+float m2 = 120;
+float s = 200;
 
 float deg = 3;
 
@@ -60,6 +61,47 @@ public:
     {
         data[1] -= m1;
         data[2] -= m2;
+    }
+    static void climb_up(std::vector<int16_t> &data)
+    {
+        static int step = 0;
+        static float angle = 120;
+        float end_angle = 300;
+
+        const int duration_ms = 1000;
+        const int step_ms = PUBLISH_RATE_MS;
+        const int steps = duration_ms / step_ms;
+        const float angle_step = (300.0f - 120.0f) / steps;
+
+        if (step == 0)
+        {
+            data[1] = 120;
+            data[2] = 120;
+            data[7] = s;
+            data[8] = -s;
+            data[9] = -s;
+            data[10] = s;
+        }
+
+        if (step < steps)
+        {
+            data[7] = s;
+            data[8] = -s;
+            data[9] = -s;
+            data[10] = s;
+            angle += angle_step;
+            data[1] = static_cast<int16_t>(angle);
+            data[2] = static_cast<int16_t>(angle);
+            step++;
+        }
+        else
+        {
+            data[1] = end_angle;
+            data[2] = end_angle;
+            data[0] = 0; // シーケンス終了
+            step = 0;
+            angle = 120;
+        }
     }
 };
 
@@ -147,7 +189,7 @@ private:
         bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
         bool TRIANGLE = msg->buttons[2];
-        //  bool SQUARE = msg->buttons[3];
+        bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
         // bool RIGHT = msg->axes[6] == -1.0;
@@ -262,29 +304,40 @@ private:
             data_[2] += deg;
         }
 
-        if (data_[1] > MAX_DEG)
-        {
-            data_[1] = MAX_DEG;
-        }
-        else if (data_[1] < -MAX_DEG)
-        {
-            data_[1] = -MAX_DEG;
-        }
+        // if (data_[1] > MAX_DEG)
+        // {
+        //     data_[1] = MAX_DEG;
+        // }
+        // else if (data_[1] < -MAX_DEG)
+        // {
+        //     data_[1] = -MAX_DEG;
+        // }
 
-        if (data_[2] > MAX_DEG)
+        // if (data_[2] > MAX_DEG)
+        // {
+        //     data_[2] = MAX_DEG;
+        // }
+        // else if (data_[2] < -MAX_DEG)
+        // {
+        //     data_[2] = -MAX_DEG;
+        // }
+        bool sequense = data_[0];
+        if (SQUARE == 0)
         {
-            data_[2] = MAX_DEG;
+            data_[7] = static_cast<int16_t>(v1 * duty_max);
+            data_[8] = static_cast<int16_t>(v2 * duty_max);
+            data_[9] = static_cast<int16_t>(v3 * duty_max);
+            data_[10] = static_cast<int16_t>(v4 * duty_max);
         }
-        else if (data_[2] < -MAX_DEG)
+        else if (SQUARE == 1)
         {
-            data_[2] = -MAX_DEG;
-        }
+            data_[0] = 1; // シーケンス開始
+        } // 配列操作ここまで
 
-        data_[7] = static_cast<int16_t>(v1 * duty_max);
-        data_[8] = static_cast<int16_t>(v2 * duty_max);
-        data_[9] = static_cast<int16_t>(v3 * duty_max);
-        data_[10] = static_cast<int16_t>(v4 * duty_max);
-        // 配列操作ここまで
+        if (data_[0] == 1)
+        {
+            Action::climb_up(data_);
+        }
     }
 
     void publisher_timer_callback()
