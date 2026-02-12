@@ -144,7 +144,7 @@ private:
         static int CROSS_PUSH_MAX = 4;
 
         if (CROSS == 1 && cross_pre == 0){
-            s = ( s + 1 ) % PUSH_MAX;  
+            s = ( s + 1 ) % CROSS_PUSH_MAX;  
         }
         if (s == 0){
             data_[9] = MAG_SERVO_ANGLE[0];
@@ -172,7 +172,7 @@ private:
         static int CIRCLE_PUSH_MAX = 2;
 
         if (CIRCLE == 1 && circle_pre == 0){
-            t = ( t + 1 ) % CIRCLE_PUSH_MAX
+            t = ( t + 1 ) % CIRCLE_PUSH_MAX;
         }
         if (t == 0){
             data_[10] = BAR_RELE_ANGLE;
