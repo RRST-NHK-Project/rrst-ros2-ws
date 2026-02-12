@@ -100,15 +100,15 @@ private:
         // float RS_X = -1 * msg->axes[3];
         // float RS_Y = msg->axes[4];
 
-        // bool CROSS = msg->buttons[0];
-        // bool CIRCLE = msg->buttons[1];
+        bool CROSS = msg->buttons[0];
+        bool CIRCLE = msg->buttons[1];
         // bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
         // bool RIGHT = msg->axes[6] == -1.0;
-        // bool UP = msg->axes[7] == 1.0;
-        // bool DOWN = msg->axes[7] == -1.0;
+        bool UP = msg->axes[7] == 1.0;
+        bool DOWN = msg->axes[7] == -1.0;
 
         // bool L1 = msg->buttons[4];
         // bool R1 = msg->buttons[5];
@@ -133,13 +133,81 @@ private:
         // static bool share_latch = false;
 
         // 以降、配列data_を操作する
+        // =================================================================
+        // CROSS:「マガジン回転」
+        // ボタンを一回押すごとにサーボモーターを45°づつ回転する
+        // =================================================================
+        data_[1] = CROSS;
+        static int MAG_SERVO_ANGLE[] = {0, 45, 90, 135};
+        static int cross_pre = 0;
+        static int s = 0;
+        static int CROSS_PUSH_MAX = 4;
+
+        if (CROSS == 1 && cross_pre == 0){
+            s = ( s + 1 ) % PUSH_MAX;  
+        }
+        if (s == 0){
+            data_[9] = MAG_SERVO_ANGLE[0];
+        }
+        if (s == 1){
+            data_[9] = MAG_SERVO_ANGLE[1];
+        }
+        if (s == 2){
+            data_[9] = MAG_SERVO_ANGLE[2];
+        }
+        if (s == 3){
+            data_[9] = MAG_SERVO_ANGLE[3];
+        }
+        cross_pre = CROSS;
+
+        // =================================================================
+        // CIRCLE:「棒ホールド機構」
+        // ボタンを一回押すごとに2つのサーボモーターの角度状態を同時に変化させる
+        // =================================================================
+        data_[2] = CIRCLE;
+        static int BAR_HOLD_ANGLE = 45;
+        static int BAR_RELE_ANGLE = 225;
+        static int circle_pre = 0;
+        static int t = 0;
+        static int CIRCLE_PUSH_MAX = 2;
+
+        if (CIRCLE == 1 && circle_pre == 0){
+            t = ( t + 1 ) % CIRCLE_PUSH_MAX
+        }
+        if (t == 0){
+            data_[10] = BAR_RELE_ANGLE;
+            data_[11] = BAR_RELE_ANGLE;
+        }
+        if (t == 1){
+            data_[10] = BAR_HOLD_ANGLE;
+            data_[11] = BAR_HOLD_ANGLE;
+        }
+
+        // =================================================================
+        // UP:「槍押上機構」
+        // ボタンを押し続けると槍を押し上げるモーターが回転し続ける
+        // =================================================================
+        data_[3] = UP;
+        if (UP){
+            data_[1] = 50
+        }
+
+        // =================================================================
+        // DOWN:「槍押上機構」
+        // ボタンを押し続けると槍を下げるモーターが回転し続ける
+        // =================================================================
+        data_[3] = DOWN;
+        if (DOWN){
+            data_[1] = -50
+        }
+
 
         // デバッグ用
-        // RCLCPP_INFO(
-        //     get_logger(),
-        //     "data_[1-4]=[%d,%d,%d,%d], data_[9-12]=[%d,%d,%d,%d]",
-        //     data_[1], data_[2], data_[3], data_[4],
-        //     data_[9], data_[10], data_[11], data_[12]);
+        RCLCPP_INFO(
+            get_logger(),
+            "data_[1-4]=[%d,%d,%d,%d], data_[9-12]=[%d,%d,%d,%d]",
+            data_[1], data_[2], data_[3], data_[4],
+            data_[9], data_[10], data_[11], data_[12]);
 
         // 配列操作ここまで
     }
