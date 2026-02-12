@@ -138,37 +138,59 @@ private:
         // ボタンを一回押すごとにサーボモーターを45°づつ回転する
         // =================================================================
 
-        // data_[1] = CROSS;
-        // static int MAG_SERVO_ANGLE[] = {270, 225, 190, 135, 0};
-        // static int cross_pre = 0;
-        // static int s = 0;
-        // static int CROSS_PUSH_MAX = 5;
+        static int MAG_SERVO_ANGLE[] = {270, 228, 186, 141, 95, 53, 8, 141, 95, 50, 53, 5, 8};
+        static int cross_pre = 0;
+        static int s = 0;
+        static int CROSS_PUSH_MAX = 13;
 
-        // if (CROSS == 1 && cross_pre == 0) {
-        //     s = (s + 1) % CROSS_PUSH_MAX;
-        // }
-        // if (s == 0) {
-        //     data_[9] = MAG_SERVO_ANGLE[0];
-        // }
-        // if (s == 1) {
-        //     data_[9] = MAG_SERVO_ANGLE[1];
-        // }
-        // if (s == 2) {
-        //     data_[9] = MAG_SERVO_ANGLE[2];
-        // }
-        // if (s == 3) {
-        //     data_[9] = MAG_SERVO_ANGLE[3];
-        // }
-        // if (s == 4) {
-        //     data_[9] = MAG_SERVO_ANGLE[4];
-        // }
-        // cross_pre = CROSS;
+        if (CROSS == 1 && cross_pre == 0) {
+            s = (s + 1) % CROSS_PUSH_MAX;
+        }
+        if (s == 0) {
+            data_[9] = MAG_SERVO_ANGLE[0];
+        }
+        if (s == 1) {
+            data_[9] = MAG_SERVO_ANGLE[1];
+        }
+        if (s == 2) {
+            data_[9] = MAG_SERVO_ANGLE[2];
+        }
+        if (s == 3) {
+            data_[9] = MAG_SERVO_ANGLE[3];
+        }
+        if (s == 4) {
+            data_[9] = MAG_SERVO_ANGLE[4];
+        }
+        if (s == 5) {
+            data_[9] = MAG_SERVO_ANGLE[5];
+        }
+        if (s == 6) {
+            data_[9] = MAG_SERVO_ANGLE[6];
+        }
+        if (s == 7) {
+            data_[9] = MAG_SERVO_ANGLE[7];
+        }
+        if (s == 8) {
+            data_[9] = MAG_SERVO_ANGLE[8];
+        }
+        if (s == 9) {
+            data_[9] = MAG_SERVO_ANGLE[9];
+        }
+        if (s == 10) {
+            data_[9] = MAG_SERVO_ANGLE[10];
+        }
+        if (s == 11) {
+            data_[9] = MAG_SERVO_ANGLE[11];
+        }
+        if (s == 12) {
+            data_[9] = MAG_SERVO_ANGLE[12];
+        }
+        cross_pre = CROSS;
 
         // =================================================================
         // CIRCLE:「棒ホールド機構」
         // ボタンを一回押すごとに2つのサーボモーターの角度状態を同時に変化させる
         // =================================================================
-        // data_[2] = CIRCLE;
         // angle = 10のとき最下部までお仕込み
         // angle = 245のときマガジンに戻してる
 
@@ -241,21 +263,21 @@ private:
         // =================================================================
         // LR
         // マガジン調整用
-        static int MAG_ADJ_STEP = 5;
-        static int left_pre = 0;
-        static int right_pre = 0;
-        static int mag_servo_angle = 270;
+        // static int MAG_ADJ_STEP = 5;
+        // static int left_pre = 0;
+        // static int right_pre = 0;
+        // static int mag_servo_angle = 270;
 
-        if (LEFT == 1 && left_pre == 0) {
-            mag_servo_angle -= MAG_ADJ_STEP;
-            data_[9] = mag_servo_angle;
-        }
-        left_pre = LEFT;
-        if (RIGHT == 1 && right_pre == 0) {
-            mag_servo_angle += MAG_ADJ_STEP;
-            data_[9] = mag_servo_angle;
-        }
-        right_pre = RIGHT;
+        // if (LEFT == 1 && left_pre == 0) {
+        //     mag_servo_angle -= MAG_ADJ_STEP;
+        //     data_[9] = mag_servo_angle;
+        // }
+        // left_pre = LEFT;
+        // if (RIGHT == 1 && right_pre == 0) {
+        //     mag_servo_angle += MAG_ADJ_STEP;
+        //     data_[9] = mag_servo_angle;
+        // }
+        // right_pre = RIGHT;
         // =================================================================
 
         // デバッグ用
