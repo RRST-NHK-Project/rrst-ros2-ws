@@ -26,11 +26,13 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #define DEADZONE_L 0.3
 #define DEADZONE_R 0.3
 
-class HardWareControl : public rclcpp::Node {
+class HardWareControl : public rclcpp::Node
+{
 public:
     HardWareControl(uint8_t device_id)
         : Node("hardware_control_" + std::to_string(device_id)),
-          device_id_(device_id) {
+          device_id_(device_id)
+    {
 
         // 配列を0で初期化
         data_.assign(TX16NUM, 0);
@@ -92,7 +94,8 @@ public:
     }
 
 private:
-    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
+    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg)
+    {
 
         // コントローラーの入力を取得、使わない入力はコメントアウト推奨
         // float LS_X = -1 * msg->axes[0];
@@ -143,19 +146,24 @@ private:
         static int s = 0;
         static int CROSS_PUSH_MAX = 4;
 
-        if (CROSS == 1 && cross_pre == 0){
-            s = ( s + 1 ) % CROSS_PUSH_MAX;  
+        if (CROSS == 1 && cross_pre == 0)
+        {
+            s = (s + 1) % CROSS_PUSH_MAX;
         }
-        if (s == 0){
+        if (s == 0)
+        {
             data_[9] = MAG_SERVO_ANGLE[0];
         }
-        if (s == 1){
+        if (s == 1)
+        {
             data_[9] = MAG_SERVO_ANGLE[1];
         }
-        if (s == 2){
+        if (s == 2)
+        {
             data_[9] = MAG_SERVO_ANGLE[2];
         }
-        if (s == 3){
+        if (s == 3)
+        {
             data_[9] = MAG_SERVO_ANGLE[3];
         }
         cross_pre = CROSS;
@@ -164,20 +172,26 @@ private:
         // CIRCLE:「棒ホールド機構」
         // ボタンを一回押すごとに2つのサーボモーターの角度状態を同時に変化させる
         // =================================================================
-        //data_[2] = CIRCLE;
+        // data_[2] = CIRCLE;
+        // angle = 10のとき最下部までお仕込み
+        // angle = 245のときマガジンに戻してる
+
         static int BAR_HOLD_ANGLE = 45;
         static int BAR_RELE_ANGLE = 225;
         static int circle_pre = 0;
         static int t = 0;
         static int CIRCLE_PUSH_MAX = 2;
 
-        if (CIRCLE == 1 && circle_pre == 0){
-            t = ( t + 1 ) % CIRCLE_PUSH_MAX;
+        if (CIRCLE == 1 && circle_pre == 0)
+        {
+            t = (t + 1) % CIRCLE_PUSH_MAX;
         }
-        if (t == 0){
+        if (t == 0)
+        {
             data_[10] = BAR_RELE_ANGLE;
         }
-        if (t == 1){
+        if (t == 1)
+        {
             data_[10] = BAR_HOLD_ANGLE;
         }
 
@@ -186,24 +200,28 @@ private:
         // UP:「槍押上機構」
         // ボタンを押し続けると槍を押し上げるモーターが回転し続ける
         // =================================================================
-        //data_[3] = UP;
-        if (UP){
+        // data_[3] = UP;
+        if (UP)
+        {
             data_[1] = 50;
-        }else if (DOWN){
+        }
+        else if (DOWN)
+        {
             data_[1] = -50;
-        }else{
+        }
+        else
+        {
             data_[1] = 0;
         }
         // =================================================================
         // DOWN:「槍押上機構」
         // ボタンを押し続けると槍を下げるモーターが回転し続ける
         // =================================================================
-        //data_[4] = DOWN;
-        
+        // data_[4] = DOWN;
+
         // }else if (!DOWN){
         //     data_[1] = 0;
         // }
-
 
         // デバッグ用
         RCLCPP_INFO(
@@ -216,7 +234,8 @@ private:
     }
 
     // publish
-    void publisher_timer_callback() {
+    void publisher_timer_callback()
+    {
         std_msgs::msg::Int16MultiArray msg;
 
         msg.data = data_;
@@ -226,9 +245,11 @@ private:
 
     void
     sensor_callback(
-        const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
+        const std_msgs::msg::Int16MultiArray::SharedPtr msg)
+    {
         // 最低限：サイズチェック
-        if (msg->data.size() < RX16NUM) {
+        if (msg->data.size() < RX16NUM)
+        {
             RCLCPP_WARN(this->get_logger(),
                         "serial_rx_%d: data too short (%zu)",
                         device_id_, msg->data.size());
@@ -268,13 +289,15 @@ private:
     std::vector<int16_t> data_;
 };
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     rclcpp::init(argc, argv);
 
     // figletでノード名を表示
     std::string figletout = "figlet Serial Bridge Host";
     int result = std::system(figletout.c_str());
-    if (result != 0) {
+    if (result != 0)
+    {
         std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
                   << std::endl;
         std::cerr << "Please install 'figlet' with the following command:"
