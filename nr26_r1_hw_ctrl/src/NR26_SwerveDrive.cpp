@@ -16,7 +16,7 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include <std_msgs/msg/int32_multi_array.hpp>
 
 // 以下マイコンに合わせて設定
-#define TARGET_DEVICE_ID 2 // 宛先マイコンのID
+#define TARGET_DEVICE_ID 1 // 宛先マイコンのID
 #define TX16NUM 24         // 送信データ数
 #define RX16NUM 17         // 受信データ数
 
@@ -35,14 +35,14 @@ int deg = 0;
 int truedeg = 0;
 
 // 速度
-int wheelspeed = 64;
-int yawspeed = 32;
+int wheelspeed = 80; // 64;
+int yawspeed = 60;   // 32;
 
 // サーボの組み付け時のズレを補正（度数法）
-int SERVO1_CAL = 0;
-int SERVO2_CAL = 0;
-int SERVO3_CAL = 0;
-int SERVO4_CAL = 0;
+int SERVO1_CAL = 4;
+int SERVO2_CAL = 7;
+int SERVO3_CAL = 2;
+int SERVO4_CAL = -5;
 
 class HardWareControl : public rclcpp::Node {
 public:
@@ -142,11 +142,10 @@ private:
         // bool L3 = msg->buttons[11];
         bool R3 = msg->buttons[12];
 
-        static bool last_option = false; // 前回の状態を保持する static 変数
-        static bool last_share = false;
-
-        // OPTION のラッチ状態を保持する static 変数（初期状態は OFF とする）
+        static bool last_option = false;
         static bool option_latch = false;
+
+        static bool last_share = false;
         static bool share_latch = false;
 
         static bool last_R3 = false;
@@ -280,8 +279,8 @@ private:
                 data_[10] = 90 + SERVO2_CAL;
                 data_[11] = 90 + SERVO3_CAL;
                 data_[12] = 180 + SERVO4_CAL;
-                data_[1] = -yawspeed;
-                data_[2] = yawspeed;
+                data_[1] = yawspeed;
+                data_[2] = -yawspeed;
                 data_[3] = -yawspeed;
                 data_[4] = yawspeed;
             }
@@ -291,8 +290,8 @@ private:
                 data_[10] = 90 + SERVO2_CAL;
                 data_[11] = 90 + SERVO3_CAL;
                 data_[12] = 180 + SERVO4_CAL;
-                data_[1] = yawspeed;
-                data_[2] = -yawspeed;
+                data_[1] = -yawspeed;
+                data_[2] = yawspeed;
                 data_[3] = yawspeed;
                 data_[4] = -yawspeed;
             }

@@ -28,7 +28,6 @@ FetchContent_MakeAvailable(nlohmann_json)
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
@@ -44,6 +43,10 @@ find_package(visualization_msgs REQUIRED)
 add_executable(nr26_sd src/NR26_SwerveDrive.cpp)
 ament_target_dependencies(nr26_sd rclcpp std_msgs sensor_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs visualization_msgs)
 
+add_executable(nr26_pick src/NR26_pick.cpp)
+ament_target_dependencies(nr26_pick rclcpp std_msgs sensor_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs visualization_msgs)
+
+
 add_executable(nr26_r1_servo_cal src/NR26_MR_Servo_Calibrator.cpp)
 ament_target_dependencies(nr26_r1_servo_cal rclcpp std_msgs sensor_msgs geometry_msgs)
 target_include_directories(nr26_r1_servo_cal PRIVATE ${nlohmann_json_SOURCE_DIR}/single_include)
@@ -51,6 +54,7 @@ target_include_directories(nr26_r1_servo_cal PRIVATE ${nlohmann_json_SOURCE_DIR}
 # インストール設定
 install(TARGETS
   nr26_sd
+  nr26_pick
   nr26_r1_servo_cal
   DESTINATION lib/${PROJECT_NAME})
 
