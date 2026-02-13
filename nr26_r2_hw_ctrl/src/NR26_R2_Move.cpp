@@ -23,7 +23,7 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 #include <mutex>
 
 // 以下マイコンに合わせて設定
-#define TARGET_DEVICE_ID 2 // 宛先マイコンのID
+#define TARGET_DEVICE_ID 6 // 宛先マイコンのID
 #define TX16NUM 24         // 送信データ数
 #define RX16NUM 17         // 受信データ数
 
@@ -50,19 +50,19 @@ class Action
 public:
     static void for_up(std::vector<int16_t> &data)
     {
-        data[1] = 1;
+        data[17] = 1;
     }
     static void for_down(std::vector<int16_t> &data)
     {
-        data[1] = 0;
+        data[17] = 0;
     }
     static void back_up(std::vector<int16_t> &data)
     {
-        data[2] = 1;
+        data[18] = 1;
     }
     static void back_down(std::vector<int16_t> &data)
     {
-        data[2] = 0;
+        data[18] = 0;
     }
 };
 
@@ -95,8 +95,6 @@ private:
 
         // 受信した params をコピー
         duty_max = msg->data[0];
-        for_speed = msg->data[1];
-        back_speed = msg->data[2];
         // v4 = msg->data[3];
     }
 };
@@ -193,19 +191,16 @@ private:
         // 以降、配列data_を操作する
         float rad = atan2(LS_Y, LS_X);
 
-        // float X = LS_X;
-        // float Y = LS_Y;
-        // float W = RS_X;
-
         if (R2_DIGITAL >= 0.3)
         {
             float vx = cos(rad) * R2_DIGITAL;
             float vy = sin(rad) * R2_DIGITAL;
 
+            // canのIDごとなのでつけ直して動かすとき注意!!!!!
             v2 = -vy + vx; // 前右
-            v4 = vy + vx;  // vy + vx; // 前左
-            v1 = vy - vx;  // vy - vx; // 後左
-            v3 = -vy - vx; // vy + vx; // 後右
+            v4 = vy + vx;  // 前左
+            v1 = vy - vx;  // 後左
+            v3 = -vy - vx; // 後右
         }
         else if (RS_X >= deadzone || R1 == 1)
         {
@@ -298,8 +293,8 @@ private:
             return;
         }
 
-        // int16_t ENC1 = msg->data[1];
-        // int16_t ENC2 = msg->data[2];
+        //  int16_t ENC1 = msg->data[1];
+        //  int16_t ENC2 = msg->data[2];
         //  int16_t ENC3 = msg->data[3];
         //  int16_t ENC4 = msg->data[4];
         //  int16_t ENC5 = msg->data[5];

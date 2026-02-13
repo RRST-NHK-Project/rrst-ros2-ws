@@ -31,47 +31,17 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 
 #define PUBLISH_RATE_MS 20 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
 
-#define MAX_DEG 300
-
 // constexpr size_t TX16NUM = 24;
 
 // 定数・変数
-float duty_max = 100;
-float for_speed = 50;
-float back_speed = 50;
-float sp_yaw = 0.5;
 float deadzone = 0.3; // adjust DS4 deadzone
 
 float x = 0;
 float y = 0;
-float maxdeg1 = 70;
+float maxdeg1 = 60;
 float mindeg1 = 0;
-float maxdeg2 = 60;
+float maxdeg2 = 70;
 float mindeg2 = 0;
-
-float v1, v2, v3, v4; // 各メカナムホイールの速度指令値
-// v1:第一象限, v2:第二象限, v3:第三象限, v4:第四象限
-
-class Action
-{
-public:
-    static void for_up(std::vector<int16_t> &data)
-    {
-        data[1] = 1;
-    }
-    static void for_down(std::vector<int16_t> &data)
-    {
-        data[1] = 0;
-    }
-    static void back_up(std::vector<int16_t> &data)
-    {
-        data[2] = 1;
-    }
-    static void back_down(std::vector<int16_t> &data)
-    {
-        data[2] = 0;
-    }
-};
 
 class Omni_para : public rclcpp::Node
 {
@@ -101,10 +71,8 @@ private:
         }
 
         // 受信した params をコピー
-        duty_max = msg->data[0];
         x = msg->data[1];
         y = msg->data[2];
-        // v4 = msg->data[3];
     }
 };
 
@@ -258,7 +226,7 @@ private:
 
         th1 = acos(((x * x) + (y * y) - (l2 * l2) + (l1 * l1)) / (2 * l1 * sqrt((x * x) * (y * y))));
 
-        th1 = th1 * 180.0f / M_PI;
+        th1 = th1 * 180.0f / M_PI; // rad → deg
         th2 = th2 * 180.0f / M_PI;
 
         data_[1] = x;
@@ -267,8 +235,8 @@ private:
         data_[5] = th1;
         data_[6] = th2;
 
-        // 第一リンク0~70
-        // 第二リンク60~0
+        // 第一リンク60~0
+        // 第二リンク0~70
         th1 = -th1 + 70;
         if (th1 > maxdeg1)
         {
