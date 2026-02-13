@@ -246,7 +246,7 @@ private:
         float th1 = 0;
         float th2 = 0;
         float l1 = 600;
-        float l2 = 400;
+        float l2 = 450;
 
         float r = sqrt(x * x + y * y);
 
@@ -269,7 +269,7 @@ private:
 
         // 第一リンク0~70
         // 第二リンク60~0
-        th2 = -th2 + 60;
+        th1 = -th1 + 70;
         if (th1 > maxdeg1)
         {
             th1 = maxdeg1;
