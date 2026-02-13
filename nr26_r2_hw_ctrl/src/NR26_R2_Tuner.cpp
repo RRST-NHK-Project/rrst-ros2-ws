@@ -80,10 +80,10 @@ private:
     void show_usage()
     {
         std::cout << "\n=== MR Parameter Tuner ===\n";
-        std::cout << "足回りの調整\n";
+        std::cout << "機構の調整\n";
         std::cout << "使用方法:\n";
         std::cout << "ex)0 100\n";
-        std::cout << "  - 0番のパラメーター(オムニのスピード)を100に設定\n";
+        std::cout << "  - 0番のパラメーター(スピード)を100に設定\n";
         std::cout << "  - <index> <value>: 指定したインデックスのパラメーターを変更 (0-3, 0-100)\n";
         std::cout << "  - show: 現在のパラメータを表示\n";
         std::cout << "=====================================\n";
@@ -198,8 +198,8 @@ private:
     {
         std::cout << "\n=== Current Parameters ===\n";
         std::cout << "0: speed = " << params[0] << "\n";
-        std::cout << "1: 前昇降 = " << params[1] << "\n";
-        std::cout << "2: 後昇降 = " << params[2] << "\n";
+        std::cout << "1: x = " << params[1] << "\n";
+        std::cout << "2: y = " << params[2] << "\n";
         std::cout << "3: v4  = " << params[3] << "\n";
         std::cout << "==========================\n";
     }

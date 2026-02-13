@@ -43,6 +43,9 @@ find_package(visualization_msgs REQUIRED)
 add_executable(nr26_r2_move src/NR26_R2_Move.cpp)
 ament_target_dependencies(nr26_r2_move rclcpp std_msgs sensor_msgs geometry_msgs)
 
+add_executable(nr26_r2_action src/NR26_R2_Action.cpp)
+ament_target_dependencies(nr26_r2_action rclcpp std_msgs sensor_msgs geometry_msgs)
+
 add_executable(nr26_tuner src/NR26_R2_Tuner.cpp)
 ament_target_dependencies(nr26_tuner rclcpp std_msgs sensor_msgs geometry_msgs)
 target_include_directories(nr26_tuner PRIVATE ${nlohmann_json_SOURCE_DIR}/single_include)
@@ -50,6 +53,7 @@ target_include_directories(nr26_tuner PRIVATE ${nlohmann_json_SOURCE_DIR}/single
 # インストール設定
 install(TARGETS
   nr26_r2_move
+  nr26_r2_action
   nr26_tuner
   DESTINATION lib/${PROJECT_NAME})
 
