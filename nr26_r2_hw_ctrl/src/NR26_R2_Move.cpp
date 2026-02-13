@@ -4,15 +4,8 @@ PS4コントローラーの入力を取得するサンプルプログラム
 esp32マイコンにアクチュエータ指令を送るサンプルプログラム
 
 ボタン操作について
- ○ボタン：原点復帰
- △ボタン：押してる間アーム下がる
- ✕ボタン：押してる間アーム上がる
- 上矢印：120度ずつアーム下がる
- 下矢印：120度ずつアーム上がる
- □ボタン：シーケンス動作開始
-
- 登り始めが約120度、登り終わりが300度に設定してあります
-
+ 上矢印：前輪上げ下げ
+ 下矢印：後輪上げ下げ
 */
 
 // 標準
@@ -48,11 +41,6 @@ float for_speed = 50;
 float back_speed = 50;
 float sp_yaw = 0.5;
 float deadzone = 0.3; // adjust DS4 deadzone
-float m1 = 120;
-float m2 = 120;
-float s = 200;
-
-float deg = 3;
 
 float v1, v2, v3, v4; // 各メカナムホイールの速度指令値
 // v1:第一象限, v2:第二象限, v3:第三象限, v4:第四象限
@@ -60,74 +48,21 @@ float v1, v2, v3, v4; // 各メカナムホイールの速度指令値
 class Action
 {
 public:
-    static void all_up(std::vector<int16_t> &data)
+    static void for_up(std::vector<int16_t> &data)
     {
-        data[1] += m1;
-        data[2] += m2;
+        data[1] = 1;
     }
-    static void all_down(std::vector<int16_t> &data)
-    {
-        data[1] -= m1;
-        data[2] -= m2;
-    }
-    static void orizin(std::vector<int16_t> &data)
+    static void for_down(std::vector<int16_t> &data)
     {
         data[1] = 0;
+    }
+    static void back_up(std::vector<int16_t> &data)
+    {
+        data[2] = 1;
+    }
+    static void back_down(std::vector<int16_t> &data)
+    {
         data[2] = 0;
-    }
-    static void gr_up(std::vector<int16_t> &data)
-    {
-        data[1] -= deg;
-        data[2] -= deg;
-    }
-    static void gr_down(std::vector<int16_t> &data)
-    {
-        data[1] += deg;
-        data[2] += deg;
-    }
-
-    ///////ここからシーケンス動作////////
-    // ここの部分をイジる
-    static void climb_up(std::vector<int16_t> &data)
-    {
-        static int step = 0;
-        static float angle = 120;
-        float end_angle = 300;
-
-        const int duration_ms = 5000;
-        const int step_ms = PUBLISH_RATE_MS;
-        const int steps = duration_ms / step_ms;
-        const float angle_step = (300.0f - 120.0f) / steps;
-
-        if (step == 0)
-        {
-            data[1] = 120;
-            data[2] = 120;
-            data[7] = s;
-            data[8] = -s;
-            data[9] = -s;
-            data[10] = s;
-        }
-
-        if (step < steps)
-        {
-            data[7] = s;
-            data[8] = -s;
-            data[9] = -s;
-            data[10] = s;
-            angle += angle_step;
-            data[1] = static_cast<int16_t>(angle);
-            data[2] = static_cast<int16_t>(angle);
-            step++;
-        }
-        else
-        {
-            data[1] = end_angle;
-            data[2] = end_angle;
-            data[0] = 0; // シーケンス終了
-            step = 0;
-            angle = 120;
-        }
     }
 };
 
@@ -212,10 +147,10 @@ private:
         float RS_X = -1 * msg->axes[3];
         float RS_Y = msg->axes[4];
 
-        bool CROSS = msg->buttons[0];
-        bool CIRCLE = msg->buttons[1];
-        bool TRIANGLE = msg->buttons[2];
-        bool SQUARE = msg->buttons[3];
+        // bool CROSS = msg->buttons[0];
+        // bool CIRCLE = msg->buttons[1];
+        // bool TRIANGLE = msg->buttons[2];
+        // bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
         // bool RIGHT = msg->axes[6] == -1.0;
@@ -239,20 +174,21 @@ private:
         // bool R3 = msg->buttons[12];
 
         static bool last_up = false;
-        // static bool up_latch = false;
+        static bool up_latch = false;
         static bool last_down = false;
-        // static bool down_latch = false;
+        static bool down_latch = false;
 
-        //  if (UP && !last_up) {
-        //     up_latch = !up_latch;
-        // }
+        if (UP && !last_up)
+        {
+            up_latch = !up_latch;
+        }
 
-        // if (CIRCLE && !last_circle) {
-        //     down_latch = !down_latch;
-        // }
-
-        // last_share = SHARE;
-        // last_circle = CIRCLE;
+        if (DOWN && !last_down)
+        {
+            down_latch = !down_latch;
+        }
+        last_up = UP;
+        last_down = DOWN;
 
         // 以降、配列data_を操作する
         float rad = atan2(LS_Y, LS_X);
@@ -303,46 +239,27 @@ private:
         v3 /= max_v;
         v4 /= max_v;
 
-        if (UP != last_up && UP == true)
+        if (up_latch == true)
         {
-            Action::all_up(data_);
+            Action::for_up(data_);
         }
-        else if (DOWN != last_down && DOWN == true)
+        else if (up_latch == false)
         {
-            Action::all_down(data_);
+            Action::for_down(data_);
         }
-        last_up = UP;
-        last_down = DOWN;
-        if (CIRCLE)
+        if (down_latch == true)
         {
-            Action::orizin(data_);
+            Action::back_up(data_);
         }
-
-        if (CROSS)
+        else if (down_latch == false)
         {
-            Action::gr_up(data_);
-        }
-        else if (TRIANGLE)
-        {
-            Action::gr_down(data_);
+            Action::back_down(data_);
         }
 
-        if (SQUARE == 0)
-        {
-            data_[7] = static_cast<int16_t>(v1 * duty_max);
-            data_[8] = static_cast<int16_t>(v2 * duty_max);
-            data_[9] = static_cast<int16_t>(v3 * duty_max);
-            data_[10] = static_cast<int16_t>(v4 * duty_max);
-        }
-        else if (SQUARE == 1)
-        {
-            data_[0] = 1; // シーケンス開始
-        } // 配列操作ここまで
-
-        if (data_[0] == 1)
-        {
-            Action::climb_up(data_);
-        }
+        data_[7] = static_cast<int16_t>(v1 * duty_max);
+        data_[8] = static_cast<int16_t>(v2 * duty_max);
+        data_[9] = static_cast<int16_t>(v3 * duty_max);
+        data_[10] = static_cast<int16_t>(v4 * duty_max);
     }
 
     void publisher_timer_callback()
@@ -392,41 +309,14 @@ private:
 
         // int16_t SW1 = msg->data[9];
         // int16_t SW2 = msg->data[10];
-        int16_t SW3 = msg->data[11];
-        int16_t SW4 = msg->data[12];
+        // int16_t SW3 = msg->data[11];
+        // int16_t SW4 = msg->data[12];
         // int16_t SW5 = msg->data[13];
         // int16_t SW6 = msg->data[14];
         // int16_t SW7 = msg->data[15];
         // int16_t SW8 = msg->data[16];
 
         // 以降、受信データを使った処理を記述
-        static uint8_t sw3_prev = 0;
-        static uint8_t sw4_prev = 0;
-
-        if (sw3_prev == 0 && SW3 == 1)
-        {
-            data_[5] = 1;
-        }
-        else if (sw4_prev == 0 && SW4 == 1)
-        {
-            data_[6] = 1;
-        }
-        else
-        {
-            data_[5] = 0;
-            data_[6] = 0;
-        }
-        sw3_prev = SW3;
-        sw4_prev = SW4;
-
-        // if (ENC1 > 300)
-        // {
-        //     data_[1] -= 360;
-        // }
-        // else if (ENC2 > 300)
-        // {
-        //     data_[2] -= 360;
-        // }
 
         // 受信データ処理ここまで
     }
