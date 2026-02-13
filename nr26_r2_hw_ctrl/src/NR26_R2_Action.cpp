@@ -23,7 +23,7 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 #include <mutex>
 
 // 以下マイコンに合わせて設定
-#define TARGET_DEVICE_ID 6 // 宛先マイコンのID //1,2,3 r1で使用中
+#define TARGET_DEVICE_ID 2 // 宛先マイコンのID //1,2,3 r1で使用中
 #define TX16NUM 24         // 送信データ数
 #define RX16NUM 17         // 受信データ数
 
@@ -237,7 +237,8 @@ private:
 
         // 第一リンク60~0
         // 第二リンク0~70
-        th1 = -th1 + 70;
+        th1 = -th1 + 60;
+        th2 = th2 - 27;
         if (th1 > maxdeg1)
         {
             th1 = maxdeg1;
