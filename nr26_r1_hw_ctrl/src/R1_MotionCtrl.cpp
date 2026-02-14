@@ -1,5 +1,5 @@
 /*
-Serial_Bridgeノードのホスト側プログラム
+R1機構制御
 Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 */
 
@@ -105,8 +105,8 @@ private:
         // bool TRIANGLE = msg->buttons[2];
         bool SQUARE = msg->buttons[3];
 
-        bool LEFT = msg->axes[6] == 1.0;
-        bool RIGHT = msg->axes[6] == -1.0;
+        // bool LEFT = msg->axes[6] == 1.0;
+        // bool RIGHT = msg->axes[6] == -1.0;
         bool UP = msg->axes[7] == 1.0;
         bool DOWN = msg->axes[7] == -1.0;
 

@@ -40,22 +40,22 @@ find_package(visualization_msgs REQUIRED)
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-add_executable(nr26_sd src/NR26_SwerveDrive.cpp)
-ament_target_dependencies(nr26_sd rclcpp std_msgs sensor_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs visualization_msgs)
+add_executable(r1_sd src/R1_SwerveDrive.cpp)
+ament_target_dependencies(r1_sd rclcpp std_msgs sensor_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs visualization_msgs)
 
-add_executable(nr26_pick src/NR26_pick.cpp)
-ament_target_dependencies(nr26_pick rclcpp std_msgs sensor_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs visualization_msgs)
+add_executable(r2_mc src/R1_MotionCtrl.cpp)
+ament_target_dependencies(r2_mc rclcpp std_msgs sensor_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs visualization_msgs)
 
 
-add_executable(nr26_r1_servo_cal src/NR26_MR_Servo_Calibrator.cpp)
-ament_target_dependencies(nr26_r1_servo_cal rclcpp std_msgs sensor_msgs geometry_msgs)
-target_include_directories(nr26_r1_servo_cal PRIVATE ${nlohmann_json_SOURCE_DIR}/single_include)
+add_executable(r1_servo_cal src/R1_Servo_Calibrator.cpp)
+ament_target_dependencies(r1_servo_cal rclcpp std_msgs sensor_msgs geometry_msgs)
+target_include_directories(r1_servo_cal PRIVATE ${nlohmann_json_SOURCE_DIR}/single_include)
 
 # インストール設定
 install(TARGETS
-  nr26_sd
-  nr26_pick
-  nr26_r1_servo_cal
+  r1_sd
+  r2_mc
+  r1_servo_cal
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
