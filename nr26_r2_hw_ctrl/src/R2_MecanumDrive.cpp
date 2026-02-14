@@ -51,6 +51,10 @@ public:
     static void back_down(std::vector<int16_t> &data) {
         data[18] = 0;
     }
+    static void all_down(std::vector<int16_t> &data) {
+        data[17] = 0;
+        data[18] = 0;
+    }
 };
 
 class ParamTuner : public rclcpp::Node {
@@ -125,7 +129,7 @@ private:
         float RS_X = -1 * msg->axes[3];
         float RS_Y = msg->axes[4];
 
-        // bool CROSS = msg->buttons[0];
+        bool CROSS = msg->buttons[0];
         // bool CIRCLE = msg->buttons[1];
         // bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
@@ -215,6 +219,10 @@ private:
             Action::back_up(data_);
         } else if (down_latch == false) {
             Action::back_down(data_);
+        }
+
+        if (CROSS) {
+            Action::all_down(data_);
         }
 
         // 2026/02/14, 7,8,9,10を5,6,7,8に変更
