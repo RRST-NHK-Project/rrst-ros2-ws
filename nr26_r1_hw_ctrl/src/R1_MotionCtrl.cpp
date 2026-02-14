@@ -138,7 +138,7 @@ private:
         // ボタンを一回押すごとにサーボモーターを45°づつ回転する
         // =================================================================
 
-        static int MAG_SERVO_ANGLE[] = {270, 228, 186, 141, 95, 53, 8, 141, 95, 50, 53, 5, 8};
+        static int MAG_SERVO_ANGLE[] = {270, 228, 186, 146, 100, 58, 13, 141, 95, 50, 53, 5, 8};
         static int cross_pre = 0;
         static int s = 0;
         static int CROSS_PUSH_MAX = 13;
