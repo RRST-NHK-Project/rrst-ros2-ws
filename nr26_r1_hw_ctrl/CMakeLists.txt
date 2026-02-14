@@ -43,8 +43,8 @@ find_package(visualization_msgs REQUIRED)
 add_executable(r1_sd src/R1_SwerveDrive.cpp)
 ament_target_dependencies(r1_sd rclcpp std_msgs sensor_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs visualization_msgs)
 
-add_executable(r2_mc src/R1_MotionCtrl.cpp)
-ament_target_dependencies(r2_mc rclcpp std_msgs sensor_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs visualization_msgs)
+add_executable(r1_mc src/R1_MotionCtrl.cpp)
+ament_target_dependencies(r1_mc rclcpp std_msgs sensor_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs visualization_msgs)
 
 
 add_executable(r1_servo_cal src/R1_Servo_Calibrator.cpp)
