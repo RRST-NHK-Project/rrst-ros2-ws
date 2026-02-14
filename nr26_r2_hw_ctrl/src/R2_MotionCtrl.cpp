@@ -1,72 +1,30 @@
 /*
-RRST-NHK-Project 2026
-PS4コントローラーの入力を取得するサンプルプログラム
-esp32マイコンにアクチュエータ指令を送るサンプルプログラム
-
-ボタン操作について
- 上矢印：前輪上げ下げ
- 下矢印：後輪上げ下げ
+R2機構制御
+Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 */
 
-// 標準
 #include <chrono>
-#include <cstdlib>
+#include <cmath>
 #include <iostream>
 #include <thread>
+#include <vector>
 
 // ROS
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
-#include "std_msgs/msg/int16_multi_array.hpp"
-#include <std_msgs/msg/float32_multi_array.hpp>
+#include <std_msgs/msg/int16_multi_array.hpp>
+#include <std_msgs/msg/int32_multi_array.hpp>
 
 // 以下マイコンに合わせて設定
-#define TARGET_DEVICE_ID 7 // 宛先マイコンのID //1,2,3 r1で使用中
+#define TARGET_DEVICE_ID 7 // 宛先マイコンのID
 #define TX16NUM 24         // 送信データ数
 #define RX16NUM 17         // 受信データ数
 
 #define PUBLISH_RATE_MS 20 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
 
-// constexpr size_t TX16NUM = 24;
-
-// 定数・変数
-float deadzone = 0.3; // adjust DS4 deadzone
-
-float x = 0;
-float y = 0;
-float maxdeg1 = 60;
-float mindeg1 = 0;
-float maxdeg2 = 70;
-float mindeg2 = 0;
-
-class HandXY : public rclcpp::Node {
-public:
-    HandXY() : Node("hand_xy") {
-
-        sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
-            "r2_hand_xy",
-            10,
-            std::bind(&HandXY::param_callback, this, std::placeholders::_1));
-
-        RCLCPP_INFO(this->get_logger(), "HandXY Node Started.");
-    }
-
-private:
-    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_;
-    std::vector<float> params = {0, 0, 0, 0}; // 受信したパラメータを保持
-
-    void param_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
-
-        if (msg->data.size() < 4) {
-            RCLCPP_WARN(this->get_logger(), "param message too short");
-            return;
-        }
-
-        // 受信した params をコピー
-        x = msg->data[1];
-        y = msg->data[2];
-    }
-};
+// スティックのデッドゾーン
+#define DEADZONE_L 0.3
+#define DEADZONE_R 0.3
 
 class HardWareControl : public rclcpp::Node {
 public:
@@ -76,11 +34,42 @@ public:
 
         // 配列を0で初期化
         data_.assign(TX16NUM, 0);
+        /*
+        マイコンに送信される配列"data_"
+        debug: 機能未割り当て, MD: モータードライバー, TR: トランジスタ
+        | data[n] | 詳細 | 範囲 |
+        | ---- | ---- | ---- |
+        | data[0] | debug | 0 or 1 |
+        | data[1] | MD1 | -100 ~ 100 |
+        | data[2] | MD2 | -100 ~ 100 |
+        | data[3] | MD3 | -100 ~ 100 |
+        | data[4] | MD4 | -100 ~ 100 |
+        | data[5] | MD5 | -100 ~ 100 |
+        | data[6] | MD6 | -100 ~ 100 |
+        | data[7] | MD7 | -100 ~ 100 |
+        | data[8] | MD8 | -100 ~ 100 |
+        | data[9] | Servo1 | 0 ~ 270 |
+        | data[10] | Servo2 | 0 ~ 270 |
+        | data[11] | Servo3 | 0 ~ 270 |
+        | data[12] | Servo4 | 0 ~ 270 |
+        | data[13] | Servo5 | 0 ~ 270 |
+        | data[14] | Servo6 | 0 ~ 270 |
+        | data[15] | Servo7 | 0 ~ 270 |
+        | data[16] | Servo8 | 0 ~ 270 |
+        | data[17] | TR1 | 0 or 1|
+        | data[18] | TR2 | 0 or 1|
+        | data[19] | TR3 | 0 or 1|
+        | data[20] | TR4 | 0 or 1|
+        | data[21] | TR5 | 0 or 1|
+        | data[22] | TR6 | 0 or 1|
+        | data[23] | TR7 | 0 or 1|
+        | data[24] | TR8 | 0 or 1|
+        */
 
         // joyノードのSubscribe
-        // joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
-        //     "joy", 10,
-        //     std::bind(&HardWareControl::IK_cal, this, std::placeholders::_1));
+        joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
+            "joy", 10,
+            std::bind(&HardWareControl::ps4_listener_callback, this, std::placeholders::_1));
 
         // seial_bridgeへpublish
         publisher_ = this->create_publisher<std_msgs::msg::Int16MultiArray>(
@@ -103,61 +92,105 @@ public:
     }
 
 private:
-    // void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg)
-    // {
+    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
 
-    //     // コントローラーの入力を取得、使わない入力はコメントアウト推奨
-    //     // float LS_X = -1 * msg->axes[0];
-    //     // float LS_Y = msg->axes[1];
-    //     // float RS_X = -1 * msg->axes[3];
-    //     // float RS_Y = msg->axes[4];
+        // コントローラーの入力を取得、使わない入力はコメントアウト推奨
+        // float LS_X = -1 * msg->axes[0];
+        // float LS_Y = msg->axes[1];
+        // float RS_X = -1 * msg->axes[3];
+        // float RS_Y = msg->axes[4];
 
-    //     // bool CROSS = msg->buttons[0];
-    //     // bool CIRCLE = msg->buttons[1];
-    //     // bool TRIANGLE = msg->buttons[2];
-    //     // bool SQUARE = msg->buttons[3];
+        bool CROSS = msg->buttons[0];
+        bool CIRCLE = msg->buttons[1];
+        bool TRIANGLE = msg->buttons[2];
+        bool SQUARE = msg->buttons[3];
 
-    //     // bool LEFT = msg->axes[6] == 1.0;
-    //     // bool RIGHT = msg->axes[6] == -1.0;
-    //     // bool UP = msg->axes[7] == 1.0;
-    //     // bool DOWN = msg->axes[7] == -1.0;
+        // bool LEFT = msg->axes[6] == 1.0;
+        // bool RIGHT = msg->axes[6] == -1.0;
+        bool UP = msg->axes[7] == 1.0;
+        bool DOWN = msg->axes[7] == -1.0;
 
-    //     // bool L1 = msg->buttons[4];
-    //     // bool R1 = msg->buttons[5];
+        bool L1 = msg->buttons[4];
+        bool R1 = msg->buttons[5];
 
-    //     // float L2_DIGITAL = (-1 * msg->axes[2] + 1) / 2;
-    //     // float R2_DIGITAL = (-1 * msg->axes[5] + 1) / 2;
+        // float L2_DIGITAL = (-1 * msg->axes[2] + 1) / 2;
+        // float R2_DIGITAL = (-1 * msg->axes[5] + 1) / 2;
 
-    //     // bool L2 = msg->buttons[6];
-    //     // bool R2 = msg->buttons[7];
+        // bool L2 = msg->buttons[6];
+        // bool R2 = msg->buttons[7];
 
-    //     // bool SHARE = msg->buttons[8];
-    //     // bool OPTION = msg->buttons[9];
-    //     // bool PS = msg->buttons[10];
+        // bool SHARE = msg->buttons[8];
+        // bool OPTION = msg->buttons[9];
+        // bool PS = msg->buttons[10];
 
-    //     // bool L3 = msg->buttons[11];
-    //     // bool R3 = msg->buttons[12];
-    // }
+        // bool L3 = msg->buttons[11];
+        // bool R3 = msg->buttons[12];
 
+        // static bool last_option = false;
+        // static bool option_latch = false;
+
+        // static bool last_share = false;
+        // static bool share_latch = false;
+
+        // 以降、配列data_を操作する
+
+        // =================================================================
+        // LR
+        // マガジン調整用
+        // =================================================================
+        static int MAG_ADJ_STEP = 5;
+        static int up_pre = 0;
+        static int down_pre = 0;
+        static int mag_servo_angle = 0;
+
+        if (UP == 1 && up_pre == 0) {
+            mag_servo_angle += MAG_ADJ_STEP;
+            data_[9] = mag_servo_angle;
+        }
+        up_pre = UP;
+        if (DOWN == 1 && down_pre == 0) {
+            mag_servo_angle -= MAG_ADJ_STEP;
+            data_[9] = mag_servo_angle;
+        }
+        down_pre = DOWN;
+
+        // =================================================================
+        // LR
+        // マガジン調整用
+        // =================================================================
+        static int MAG_ADJ_STEP_ = 5;
+        static int triangle_pre = 0;
+        static int cross_pre = 0;
+        static int mag_servo_angle_ = 0;
+
+        if (TRIANGLE == 1 && triangle_pre == 0) {
+            mag_servo_angle_ += MAG_ADJ_STEP;
+            data_[10] = mag_servo_angle_;
+        }
+        triangle_pre = TRIANGLE;
+        if (CROSS == 1 && cross_pre == 0) {
+            mag_servo_angle_ -= MAG_ADJ_STEP;
+            data_[10] = mag_servo_angle_;
+        }
+        cross_pre = CROSS;
+
+        // デバッグ用
+        RCLCPP_INFO(
+            get_logger(),
+            "data_[1-4]=[%d,%d,%d,%d], data_[9-12]=[%d,%d,%d,%d]",
+            data_[1], data_[2], data_[3], data_[4],
+            data_[9], data_[10], data_[11], data_[12]);
+
+        // 配列操作ここまで
+    }
+
+    // publish
     void publisher_timer_callback() {
-
-        IK_cal();
         std_msgs::msg::Int16MultiArray msg;
 
         msg.data = data_;
 
         publisher_->publish(msg);
-        print_data();
-    }
-
-    void print_data() {
-        std::cout << "TX DATA: [";
-        for (size_t i = 0; i < data_.size(); ++i) {
-            std::cout << data_[i];
-            if (i + 1 < data_.size())
-                std::cout << ", ";
-        }
-        std::cout << "]" << std::endl;
     }
 
     void
@@ -173,12 +206,12 @@ private:
 
         // int16_t ENC1 = msg->data[1];
         // int16_t ENC2 = msg->data[2];
-        //  int16_t ENC3 = msg->data[3];
-        //  int16_t ENC4 = msg->data[4];
-        //  int16_t ENC5 = msg->data[5];
-        //  int16_t ENC6 = msg->data[6];
-        //  int16_t ENC7 = msg->data[7];
-        //  int16_t ENC8 = msg->data[8];
+        // int16_t ENC3 = msg->data[3];
+        // int16_t ENC4 = msg->data[4];
+        // int16_t ENC5 = msg->data[5];
+        // int16_t ENC6 = msg->data[6];
+        // int16_t ENC7 = msg->data[7];
+        // int16_t ENC8 = msg->data[8];
 
         // int16_t SW1 = msg->data[9];
         // int16_t SW2 = msg->data[10];
@@ -192,49 +225,6 @@ private:
         // 以降、受信データを使った処理を記述
 
         // 受信データ処理ここまで
-    }
-    void IK_cal() //(const sensor_msgs::msg::Joy::SharedPtr msg)
-    {
-        float th1 = 0;
-        float th2 = 0;
-        float l1 = 600;
-        float l2 = 450;
-
-        float r = sqrt(x * x + y * y);
-
-        if (r > l1 + l2 || r < fabs(l1 - l2)) {
-            data_[0] = -999;
-            return; // 到達不能
-        }
-        th2 = acos(((x * x) + (y * y) - (l2 * l2) - (l1 * l1)) / (2 * l1 * l2));
-
-        th1 = acos(((x * x) + (y * y) - (l2 * l2) + (l1 * l1)) / (2 * l1 * sqrt((x * x) * (y * y))));
-
-        th1 = th1 * 180.0f / M_PI; // rad → deg
-        th2 = th2 * 180.0f / M_PI;
-
-        data_[1] = x;
-        data_[2] = y;
-
-        data_[5] = th1;
-        data_[6] = th2;
-
-        // 第一リンク60~0
-        // 第二リンク0~70
-        th1 = -th1 + 60;
-        th2 = th2 - 27;
-        if (th1 > maxdeg1) {
-            th1 = maxdeg1;
-        } else if (th1 < mindeg1) {
-            th1 = mindeg1;
-        } else if (th2 > maxdeg2) {
-            th2 = maxdeg2;
-        } else if (th1 < mindeg1) {
-            th2 = mindeg2;
-        }
-
-        data_[9] = th1;
-        data_[10] = th2;
     }
 
     uint8_t device_id_;
@@ -250,12 +240,23 @@ private:
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
+    // figletでノード名を表示
+    std::string figletout = "figlet Serial Bridge Host";
+    int result = std::system(figletout.c_str());
+    if (result != 0) {
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                  << std::endl;
+        std::cerr << "Please install 'figlet' with the following command:"
+                  << std::endl;
+        std::cerr << "sudo apt install figlet" << std::endl;
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                  << std::endl;
+    }
+
     rclcpp::executors::MultiThreadedExecutor exec;
 
     auto hardware_control = std::make_shared<HardWareControl>(TARGET_DEVICE_ID);
-    auto hand_xy = std::make_shared<HandXY>();
     exec.add_node(hardware_control);
-    exec.add_node(hand_xy);
     exec.spin();
 
     rclcpp::shutdown();
