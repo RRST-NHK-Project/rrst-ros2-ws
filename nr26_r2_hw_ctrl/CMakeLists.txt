@@ -43,14 +43,26 @@ find_package(visualization_msgs REQUIRED)
 add_executable(nr26_r2_move src/NR26_R2_Move.cpp)
 ament_target_dependencies(nr26_r2_move rclcpp std_msgs sensor_msgs geometry_msgs)
 
-add_executable(nr26_tuner src/NR26_R2_Tuner.cpp)
-ament_target_dependencies(nr26_tuner rclcpp std_msgs sensor_msgs geometry_msgs)
-target_include_directories(nr26_tuner PRIVATE ${nlohmann_json_SOURCE_DIR}/single_include)
+add_executable(nr26_r2_action src/NR26_R2_Action.cpp)
+ament_target_dependencies(nr26_r2_action rclcpp std_msgs sensor_msgs geometry_msgs)
+
+add_executable(r2_md src/R2_MecanumDrive.cpp)
+ament_target_dependencies(r2_md rclcpp std_msgs sensor_msgs geometry_msgs)
+
+add_executable(r2_mc src/R2_MotionCtrl.cpp)
+ament_target_dependencies(r2_mc rclcpp std_msgs sensor_msgs geometry_msgs)
+
+add_executable(r2_tuner src/R2_Tuner.cpp)
+ament_target_dependencies(r2_tuner rclcpp std_msgs sensor_msgs geometry_msgs)
+target_include_directories(r2_tuner PRIVATE ${nlohmann_json_SOURCE_DIR}/single_include)
 
 # インストール設定
 install(TARGETS
   nr26_r2_move
-  nr26_tuner
+  nr26_r2_action
+  r2_md
+  r2_mc
+  r2_tuner
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)

@@ -1,5 +1,5 @@
 /*
-Serial_Bridgeノードのホスト側プログラム
+R1独ステ制御
 Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 */
 

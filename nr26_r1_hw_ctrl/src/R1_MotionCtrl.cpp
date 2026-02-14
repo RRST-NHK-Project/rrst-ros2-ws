@@ -1,5 +1,5 @@
 /*
-Serial_Bridgeノードのホスト側プログラム
+R1機構制御
 Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 */
 
@@ -102,11 +102,11 @@ private:
 
         bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
-        // bool TRIANGLE = msg->buttons[2];
+        bool TRIANGLE = msg->buttons[2];
         bool SQUARE = msg->buttons[3];
 
-        bool LEFT = msg->axes[6] == 1.0;
-        bool RIGHT = msg->axes[6] == -1.0;
+        // bool LEFT = msg->axes[6] == 1.0;
+        // bool RIGHT = msg->axes[6] == -1.0;
         bool UP = msg->axes[7] == 1.0;
         bool DOWN = msg->axes[7] == -1.0;
 
@@ -138,7 +138,7 @@ private:
         // ボタンを一回押すごとにサーボモーターを45°づつ回転する
         // =================================================================
 
-        static int MAG_SERVO_ANGLE[] = {270, 228, 186, 141, 95, 53, 8, 141, 95, 50, 53, 5, 8};
+        static int MAG_SERVO_ANGLE[] = {270, 228, 186, 146, 100, 58, 13, 141, 95, 50, 53, 5, 8};
         static int cross_pre = 0;
         static int s = 0;
         static int CROSS_PUSH_MAX = 13;
@@ -216,6 +216,30 @@ private:
 
         circle_pre = CIRCLE;
 
+       // =================================================================
+        // TRIANGLE:「」
+        // 
+        // =================================================================
+       
+        static int triangle_pre = 0;
+        static int tri_count=0;
+        static int tri_state;
+        static int ang_1=13;
+        static int ang_2=90;
+
+        if(TRIANGLE==1 && triangle_pre==0) tri_count++;
+
+        tri_state = tri_count%2;
+
+        if(tri_state==0) {
+            data_[12]= ang_1;
+        }
+        else if (tri_state==1) {
+            data_[12]= ang_2 ;
+        }
+    
+        triangle_pre = TRIANGLE;
+
         // =================================================================
         // SQUARE:「棒ロック」
         // ボタンを一回押すごとに2つのサーボモーターの角度状態を同時に変化させる
@@ -254,9 +278,9 @@ private:
         // L1,R1:「槍押上機構」
         // フォークリフト上下
         // =================================================================
-        if (L1) {
+        if (L1==1 && data_[18]==0) {
             data_[2] = 127;
-        } else if (R1) {
+        } else if (R1==1 && data_[17]==0) {
             data_[2] = -127;
         } else {
             data_[2] = 0;

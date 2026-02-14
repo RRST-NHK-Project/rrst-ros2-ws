@@ -27,10 +27,6 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 
 #define PUBLISH_RATE_MS 20 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
 
-#define MAX_DEG 300
-
-// constexpr size_t TX16NUM = 24;
-
 // 定数・変数
 float duty_max = 100;
 float for_speed = 50;
@@ -55,18 +51,26 @@ public:
     static void back_down(std::vector<int16_t> &data) {
         data[18] = 0;
     }
+    static void all_down(std::vector<int16_t> &data) {
+        data[17] = 0;
+        data[18] = 0;
+    }
+    static void all_up(std::vector<int16_t> &data) {
+        data[17] = 1;
+        data[18] = 1;
+    }
 };
 
-class Omni_para : public rclcpp::Node {
+class ParamTuner : public rclcpp::Node {
 public:
-    Omni_para() : Node("omni_tuner") {
+    ParamTuner() : Node("param_tuner") {
 
         sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
-            "omni_param",
+            "r2_mecanum_param",
             10,
-            std::bind(&Omni_para::param_callback, this, std::placeholders::_1));
+            std::bind(&ParamTuner::param_callback, this, std::placeholders::_1));
 
-        RCLCPP_INFO(this->get_logger(), "OMNI Node Started.");
+        RCLCPP_INFO(this->get_logger(), "Param Tuner Node Started.");
     }
 
 private:
@@ -129,9 +133,9 @@ private:
         float RS_X = -1 * msg->axes[3];
         float RS_Y = msg->axes[4];
 
-        // bool CROSS = msg->buttons[0];
+        bool CROSS = msg->buttons[0];
         // bool CIRCLE = msg->buttons[1];
-        // bool TRIANGLE = msg->buttons[2];
+        bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
@@ -184,14 +188,14 @@ private:
             v3 = -vy - vx; // 後右
         } else if (RS_X >= deadzone || R1 == 1) {
             v2 = sp_yaw;
-            v4 = -sp_yaw;
+            v4 = sp_yaw;
             v1 = sp_yaw;
-            v3 = -sp_yaw;
+            v3 = sp_yaw;
         } else if (RS_X <= -deadzone || L1 == 1) {
             v2 = -sp_yaw;
-            v4 = sp_yaw;
+            v4 = -sp_yaw;
             v1 = -sp_yaw;
-            v3 = sp_yaw;
+            v3 = -sp_yaw;
         }
 
         else if (
@@ -221,10 +225,23 @@ private:
             Action::back_down(data_);
         }
 
-        data_[7] = static_cast<int16_t>(v1 * duty_max);
-        data_[8] = static_cast<int16_t>(v2 * duty_max);
-        data_[9] = static_cast<int16_t>(v3 * duty_max);
-        data_[10] = static_cast<int16_t>(v4 * duty_max);
+        if (CROSS) {
+            Action::all_down(data_);
+            up_latch = false;
+            down_latch = false;
+        }
+
+        if (TRIANGLE) {
+            Action::all_up(data_);
+            up_latch = true;
+            down_latch = true;
+        }
+
+        // 2026/02/14, 7,8,9,10を5,6,7,8に変更
+        data_[5] = static_cast<int16_t>(v1 * duty_max);
+        data_[6] = static_cast<int16_t>(v2 * duty_max);
+        data_[7] = static_cast<int16_t>(v3 * duty_max);
+        data_[8] = static_cast<int16_t>(v4 * duty_max);
     }
 
     void publisher_timer_callback() {
@@ -296,9 +313,9 @@ int main(int argc, char *argv[]) {
     rclcpp::executors::MultiThreadedExecutor exec;
 
     auto hardware_control = std::make_shared<HardWareControl>(TARGET_DEVICE_ID);
-    auto omni_param = std::make_shared<Omni_para>();
+    auto param_tuner = std::make_shared<ParamTuner>();
     exec.add_node(hardware_control);
-    exec.add_node(omni_param);
+    exec.add_node(param_tuner);
     exec.spin();
 
     rclcpp::shutdown();
