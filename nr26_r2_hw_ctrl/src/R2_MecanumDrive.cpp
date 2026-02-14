@@ -55,6 +55,10 @@ public:
         data[17] = 0;
         data[18] = 0;
     }
+    static void all_up(std::vector<int16_t> &data) {
+        data[17] = 1;
+        data[18] = 1;
+    }
 };
 
 class ParamTuner : public rclcpp::Node {
@@ -131,7 +135,7 @@ private:
 
         bool CROSS = msg->buttons[0];
         // bool CIRCLE = msg->buttons[1];
-        // bool TRIANGLE = msg->buttons[2];
+        bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
@@ -184,14 +188,14 @@ private:
             v3 = -vy - vx; // 後右
         } else if (RS_X >= deadzone || R1 == 1) {
             v2 = sp_yaw;
-            v4 = -sp_yaw;
+            v4 = sp_yaw;
             v1 = sp_yaw;
-            v3 = -sp_yaw;
+            v3 = sp_yaw;
         } else if (RS_X <= -deadzone || L1 == 1) {
             v2 = -sp_yaw;
-            v4 = sp_yaw;
+            v4 = -sp_yaw;
             v1 = -sp_yaw;
-            v3 = sp_yaw;
+            v3 = -sp_yaw;
         }
 
         else if (
@@ -225,6 +229,12 @@ private:
             Action::all_down(data_);
             up_latch = false;
             down_latch = false;
+        }
+
+        if (TRIANGLE) {
+            Action::all_up(data_);
+            up_latch = true;
+            down_latch = true;
         }
 
         // 2026/02/14, 7,8,9,10を5,6,7,8に変更
