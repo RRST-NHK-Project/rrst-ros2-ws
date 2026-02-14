@@ -39,16 +39,16 @@ float mindeg1 = 0;
 float maxdeg2 = 70;
 float mindeg2 = 0;
 
-class Omni_para : public rclcpp::Node {
+class HandXY : public rclcpp::Node {
 public:
-    Omni_para() : Node("omni_tuner") {
+    HandXY() : Node("hand_xy") {
 
         sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
-            "omni_param",
+            "r2_hand_xy",
             10,
-            std::bind(&Omni_para::param_callback, this, std::placeholders::_1));
+            std::bind(&HandXY::param_callback, this, std::placeholders::_1));
 
-        RCLCPP_INFO(this->get_logger(), "OMNI Node Started.");
+        RCLCPP_INFO(this->get_logger(), "HandXY Node Started.");
     }
 
 private:
@@ -203,6 +203,7 @@ private:
         float r = sqrt(x * x + y * y);
 
         if (r > l1 + l2 || r < fabs(l1 - l2)) {
+            data_[0] = -999;
             return; // 到達不能
         }
         th2 = acos(((x * x) + (y * y) - (l2 * l2) - (l1 * l1)) / (2 * l1 * l2));
@@ -252,9 +253,9 @@ int main(int argc, char *argv[]) {
     rclcpp::executors::MultiThreadedExecutor exec;
 
     auto hardware_control = std::make_shared<HardWareControl>(TARGET_DEVICE_ID);
-    auto omni_param = std::make_shared<Omni_para>();
+    auto hand_xy = std::make_shared<HandXY>();
     exec.add_node(hardware_control);
-    exec.add_node(omni_param);
+    exec.add_node(hand_xy);
     exec.spin();
 
     rclcpp::shutdown();
