@@ -27,10 +27,6 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 
 #define PUBLISH_RATE_MS 20 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
 
-#define MAX_DEG 300
-
-// constexpr size_t TX16NUM = 24;
-
 // 定数・変数
 float duty_max = 100;
 float for_speed = 50;
