@@ -17,17 +17,13 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 // ROS
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
-#include <std_msgs/msg/float32_multi_array.hpp>
 #include "std_msgs/msg/int16_multi_array.hpp"
-
-#include <mutex>
+#include <std_msgs/msg/float32_multi_array.hpp>
 
 // 以下マイコンに合わせて設定
 #define TARGET_DEVICE_ID 2 // 宛先マイコンのID //1,2,3 r1で使用中
 #define TX16NUM 24         // 送信データ数
 #define RX16NUM 17         // 受信データ数
-
-#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 #define PUBLISH_RATE_MS 20 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
 
@@ -43,11 +39,9 @@ float mindeg1 = 0;
 float maxdeg2 = 70;
 float mindeg2 = 0;
 
-class Omni_para : public rclcpp::Node
-{
+class Omni_para : public rclcpp::Node {
 public:
-    Omni_para() : Node("omni_tuner")
-    {
+    Omni_para() : Node("omni_tuner") {
 
         sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
             "omni_param",
@@ -61,11 +55,9 @@ private:
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_;
     std::vector<float> params = {0, 0, 0, 0}; // 受信したパラメータを保持
 
-    void param_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
-    {
+    void param_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
 
-        if (msg->data.size() < 4)
-        {
+        if (msg->data.size() < 4) {
             RCLCPP_WARN(this->get_logger(), "param message too short");
             return;
         }
@@ -76,13 +68,11 @@ private:
     }
 };
 
-class DriverInterface : public rclcpp::Node
-{
+class HardWareControl : public rclcpp::Node {
 public:
-    DriverInterface(uint8_t device_id)
-        : Node("driver_interface_" + std::to_string(device_id)),
-          device_id_(device_id)
-    {
+    HardWareControl(uint8_t device_id)
+        : Node("hardware_control_" + std::to_string(device_id)),
+          device_id_(device_id) {
 
         // 配列を0で初期化
         data_.assign(TX16NUM, 0);
@@ -90,7 +80,7 @@ public:
         // joyノードのSubscribe
         // joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
         //     "joy", 10,
-        //     std::bind(&DriverInterface::IK_cal, this, std::placeholders::_1));
+        //     std::bind(&HardWareControl::IK_cal, this, std::placeholders::_1));
 
         // seial_bridgeへpublish
         publisher_ = this->create_publisher<std_msgs::msg::Int16MultiArray>(
@@ -99,12 +89,12 @@ public:
         // timer_callbackを呼び出すタイマーを作成
         timer_ = create_wall_timer(
             std::chrono::milliseconds(PUBLISH_RATE_MS),
-            std::bind(&DriverInterface::publisher_timer_callback, this));
+            std::bind(&HardWareControl::publisher_timer_callback, this));
 
         sensor_sub_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
             "serial_rx_" + std::to_string(device_id_),
             10,
-            std::bind(&DriverInterface::sensor_callback,
+            std::bind(&HardWareControl::sensor_callback,
                       this,
                       std::placeholders::_1));
 
@@ -149,8 +139,7 @@ private:
     //     // bool R3 = msg->buttons[12];
     // }
 
-    void publisher_timer_callback()
-    {
+    void publisher_timer_callback() {
 
         IK_cal();
         std_msgs::msg::Int16MultiArray msg;
@@ -161,12 +150,9 @@ private:
         print_data();
     }
 
-    void print_data()
-    {
-        std::lock_guard<std::mutex> lock(data_mutex_);
+    void print_data() {
         std::cout << "TX DATA: [";
-        for (size_t i = 0; i < data_.size(); ++i)
-        {
+        for (size_t i = 0; i < data_.size(); ++i) {
             std::cout << data_[i];
             if (i + 1 < data_.size())
                 std::cout << ", ";
@@ -176,11 +162,9 @@ private:
 
     void
     sensor_callback(
-        const std_msgs::msg::Int16MultiArray::SharedPtr msg)
-    {
+        const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
         // 最低限：サイズチェック
-        if (msg->data.size() < RX16NUM)
-        {
+        if (msg->data.size() < RX16NUM) {
             RCLCPP_WARN(this->get_logger(),
                         "serial_rx_%d: data too short (%zu)",
                         device_id_, msg->data.size());
@@ -218,8 +202,7 @@ private:
 
         float r = sqrt(x * x + y * y);
 
-        if (r > l1 + l2 || r < fabs(l1 - l2))
-        {
+        if (r > l1 + l2 || r < fabs(l1 - l2)) {
             return; // 到達不能
         }
         th2 = acos(((x * x) + (y * y) - (l2 * l2) - (l1 * l1)) / (2 * l1 * l2));
@@ -239,20 +222,13 @@ private:
         // 第二リンク0~70
         th1 = -th1 + 60;
         th2 = th2 - 27;
-        if (th1 > maxdeg1)
-        {
+        if (th1 > maxdeg1) {
             th1 = maxdeg1;
-        }
-        else if (th1 < mindeg1)
-        {
+        } else if (th1 < mindeg1) {
             th1 = mindeg1;
-        }
-        else if (th2 > maxdeg2)
-        {
+        } else if (th2 > maxdeg2) {
             th2 = maxdeg2;
-        }
-        else if (th1 < mindeg1)
-        {
+        } else if (th1 < mindeg1) {
             th2 = mindeg2;
         }
 
@@ -268,18 +244,16 @@ private:
     rclcpp::TimerBase::SharedPtr timer_;
 
     std::vector<int16_t> data_;
-    std::mutex data_mutex_;
 };
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
     rclcpp::executors::MultiThreadedExecutor exec;
 
-    auto driver_interface = std::make_shared<DriverInterface>(TARGET_DEVICE_ID);
+    auto hardware_control = std::make_shared<HardWareControl>(TARGET_DEVICE_ID);
     auto omni_param = std::make_shared<Omni_para>();
-    exec.add_node(driver_interface);
+    exec.add_node(hardware_control);
     exec.add_node(omni_param);
     exec.spin();
 

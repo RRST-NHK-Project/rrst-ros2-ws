@@ -17,17 +17,13 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 // ROS
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
-#include <std_msgs/msg/float32_multi_array.hpp>
 #include "std_msgs/msg/int16_multi_array.hpp"
-
-#include <mutex>
+#include <std_msgs/msg/float32_multi_array.hpp>
 
 // 以下マイコンに合わせて設定
 #define TARGET_DEVICE_ID 6 // 宛先マイコンのID
 #define TX16NUM 24         // 送信データ数
 #define RX16NUM 17         // 受信データ数
-
-#define MC_PRINTF 0 // マイコン側のprintfを無効化・有効化(0 or 1)
 
 #define PUBLISH_RATE_MS 20 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
 
@@ -45,32 +41,25 @@ float deadzone = 0.3; // adjust DS4 deadzone
 float v1, v2, v3, v4; // 各メカナムホイールの速度指令値
 // v1:第一象限, v2:第二象限, v3:第三象限, v4:第四象限
 
-class Action
-{
+class Action {
 public:
-    static void for_up(std::vector<int16_t> &data)
-    {
+    static void for_up(std::vector<int16_t> &data) {
         data[17] = 1;
     }
-    static void for_down(std::vector<int16_t> &data)
-    {
+    static void for_down(std::vector<int16_t> &data) {
         data[17] = 0;
     }
-    static void back_up(std::vector<int16_t> &data)
-    {
+    static void back_up(std::vector<int16_t> &data) {
         data[18] = 1;
     }
-    static void back_down(std::vector<int16_t> &data)
-    {
+    static void back_down(std::vector<int16_t> &data) {
         data[18] = 0;
     }
 };
 
-class Omni_para : public rclcpp::Node
-{
+class Omni_para : public rclcpp::Node {
 public:
-    Omni_para() : Node("omni_tuner")
-    {
+    Omni_para() : Node("omni_tuner") {
 
         sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
             "omni_param",
@@ -84,11 +73,9 @@ private:
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_;
     std::vector<float> params = {0, 0, 0, 0}; // 受信したパラメータを保持
 
-    void param_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
-    {
+    void param_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
 
-        if (msg->data.size() < 4)
-        {
+        if (msg->data.size() < 4) {
             RCLCPP_WARN(this->get_logger(), "param message too short");
             return;
         }
@@ -99,13 +86,11 @@ private:
     }
 };
 
-class DriverInterface : public rclcpp::Node
-{
+class HardWareControl : public rclcpp::Node {
 public:
-    DriverInterface(uint8_t device_id)
-        : Node("driver_interface_" + std::to_string(device_id)),
-          device_id_(device_id)
-    {
+    HardWareControl(uint8_t device_id)
+        : Node("hardware_control_" + std::to_string(device_id)),
+          device_id_(device_id) {
 
         // 配列を0で初期化
         data_.assign(TX16NUM, 0);
@@ -113,7 +98,7 @@ public:
         // joyノードのSubscribe
         joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
             "joy", 10,
-            std::bind(&DriverInterface::ps4_listener_callback, this, std::placeholders::_1));
+            std::bind(&HardWareControl::ps4_listener_callback, this, std::placeholders::_1));
 
         // seial_bridgeへpublish
         publisher_ = this->create_publisher<std_msgs::msg::Int16MultiArray>(
@@ -122,12 +107,12 @@ public:
         // timer_callbackを呼び出すタイマーを作成
         timer_ = create_wall_timer(
             std::chrono::milliseconds(PUBLISH_RATE_MS),
-            std::bind(&DriverInterface::publisher_timer_callback, this));
+            std::bind(&HardWareControl::publisher_timer_callback, this));
 
         sensor_sub_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
             "serial_rx_" + std::to_string(device_id_),
             10,
-            std::bind(&DriverInterface::sensor_callback,
+            std::bind(&HardWareControl::sensor_callback,
                       this,
                       std::placeholders::_1));
 
@@ -136,8 +121,7 @@ public:
     }
 
 private:
-    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg)
-    {
+    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
 
         // コントローラーの入力を取得、使わない入力はコメントアウト推奨
         float LS_X = -1 * msg->axes[0];
@@ -176,13 +160,11 @@ private:
         static bool last_down = false;
         static bool down_latch = false;
 
-        if (UP && !last_up)
-        {
+        if (UP && !last_up) {
             up_latch = !up_latch;
         }
 
-        if (DOWN && !last_down)
-        {
+        if (DOWN && !last_down) {
             down_latch = !down_latch;
         }
         last_up = UP;
@@ -191,8 +173,7 @@ private:
         // 以降、配列data_を操作する
         float rad = atan2(LS_Y, LS_X);
 
-        if (R2_DIGITAL >= 0.3)
-        {
+        if (R2_DIGITAL >= 0.3) {
             float vx = cos(rad) * R2_DIGITAL;
             float vy = sin(rad) * R2_DIGITAL;
 
@@ -201,16 +182,12 @@ private:
             v4 = vy + vx;  // 前左
             v1 = vy - vx;  // 後左
             v3 = -vy - vx; // 後右
-        }
-        else if (RS_X >= deadzone || R1 == 1)
-        {
+        } else if (RS_X >= deadzone || R1 == 1) {
             v2 = sp_yaw;
             v4 = -sp_yaw;
             v1 = sp_yaw;
             v3 = -sp_yaw;
-        }
-        else if (RS_X <= -deadzone || L1 == 1)
-        {
+        } else if (RS_X <= -deadzone || L1 == 1) {
             v2 = -sp_yaw;
             v4 = sp_yaw;
             v1 = -sp_yaw;
@@ -218,8 +195,7 @@ private:
         }
 
         else if (
-            (fabsf(LS_X) <= deadzone) && (fabsf(LS_Y) <= deadzone) && (fabsf(RS_X) <= deadzone) && (fabsf(RS_Y) <= deadzone) && (R1 == 0) && (L1 == 0))
-        {
+            (fabsf(LS_X) <= deadzone) && (fabsf(LS_Y) <= deadzone) && (fabsf(RS_X) <= deadzone) && (fabsf(RS_Y) <= deadzone) && (R1 == 0) && (L1 == 0)) {
             v1 = 0.0;
             v2 = 0.0;
             v3 = 0.0;
@@ -234,20 +210,14 @@ private:
         v3 /= max_v;
         v4 /= max_v;
 
-        if (up_latch == true)
-        {
+        if (up_latch == true) {
             Action::for_up(data_);
-        }
-        else if (up_latch == false)
-        {
+        } else if (up_latch == false) {
             Action::for_down(data_);
         }
-        if (down_latch == true)
-        {
+        if (down_latch == true) {
             Action::back_up(data_);
-        }
-        else if (down_latch == false)
-        {
+        } else if (down_latch == false) {
             Action::back_down(data_);
         }
 
@@ -257,8 +227,7 @@ private:
         data_[10] = static_cast<int16_t>(v4 * duty_max);
     }
 
-    void publisher_timer_callback()
-    {
+    void publisher_timer_callback() {
         std_msgs::msg::Int16MultiArray msg;
 
         msg.data = data_;
@@ -267,12 +236,9 @@ private:
         print_data();
     }
 
-    void print_data()
-    {
-        std::lock_guard<std::mutex> lock(data_mutex_);
+    void print_data() {
         std::cout << "TX DATA: [";
-        for (size_t i = 0; i < data_.size(); ++i)
-        {
+        for (size_t i = 0; i < data_.size(); ++i) {
             std::cout << data_[i];
             if (i + 1 < data_.size())
                 std::cout << ", ";
@@ -282,11 +248,9 @@ private:
 
     void
     sensor_callback(
-        const std_msgs::msg::Int16MultiArray::SharedPtr msg)
-    {
+        const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
         // 最低限：サイズチェック
-        if (msg->data.size() < RX16NUM)
-        {
+        if (msg->data.size() < RX16NUM) {
             RCLCPP_WARN(this->get_logger(),
                         "serial_rx_%d: data too short (%zu)",
                         device_id_, msg->data.size());
@@ -324,18 +288,16 @@ private:
     rclcpp::TimerBase::SharedPtr timer_;
 
     std::vector<int16_t> data_;
-    std::mutex data_mutex_;
 };
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
     rclcpp::executors::MultiThreadedExecutor exec;
 
-    auto driver_interface = std::make_shared<DriverInterface>(TARGET_DEVICE_ID);
+    auto hardware_control = std::make_shared<HardWareControl>(TARGET_DEVICE_ID);
     auto omni_param = std::make_shared<Omni_para>();
-    exec.add_node(driver_interface);
+    exec.add_node(hardware_control);
     exec.add_node(omni_param);
     exec.spin();
 
