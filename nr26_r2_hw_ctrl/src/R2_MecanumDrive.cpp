@@ -223,6 +223,8 @@ private:
 
         if (CROSS) {
             Action::all_down(data_);
+            up_latch = false;
+            down_latch = false;
         }
 
         // 2026/02/14, 7,8,9,10を5,6,7,8に変更
