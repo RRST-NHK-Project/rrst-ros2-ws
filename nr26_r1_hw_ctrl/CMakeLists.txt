@@ -54,7 +54,7 @@ target_include_directories(r1_servo_cal PRIVATE ${nlohmann_json_SOURCE_DIR}/sing
 # インストール設定
 install(TARGETS
   r1_sd
-  r2_mc
+  r1_mc
   r1_servo_cal
   DESTINATION lib/${PROJECT_NAME})
 
