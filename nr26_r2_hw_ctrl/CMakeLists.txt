@@ -36,6 +36,9 @@ find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
+find_package(OpenCV REQUIRED)
+find_package(cv_bridge REQUIRED)
+find_package(nav_msgs REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -52,6 +55,9 @@ ament_target_dependencies(r2_md rclcpp std_msgs sensor_msgs geometry_msgs)
 add_executable(r2_mc src/R2_MotionCtrl.cpp)
 ament_target_dependencies(r2_mc rclcpp std_msgs sensor_msgs geometry_msgs)
 
+add_executable(r2_auto src/R2_AutoDrive.cpp)
+ament_target_dependencies(r2_auto rclcpp std_msgs sensor_msgs geometry_msgs)
+
 add_executable(r2_tuner src/R2_Tuner.cpp)
 ament_target_dependencies(r2_tuner rclcpp std_msgs sensor_msgs geometry_msgs)
 target_include_directories(r2_tuner PRIVATE ${nlohmann_json_SOURCE_DIR}/single_include)
@@ -60,6 +66,12 @@ add_executable(r2_hand_xy src/R2_HandXY.cpp)
 ament_target_dependencies(r2_hand_xy rclcpp std_msgs sensor_msgs geometry_msgs)
 target_include_directories(r2_hand_xy PRIVATE ${nlohmann_json_SOURCE_DIR}/single_include)
 
+add_executable(optical_flow_odom src/NR26_OpticalFlow_Odom.cpp)
+ament_target_dependencies(optical_flow_odom  rclcpp nav_msgs cv_bridge)
+  target_link_libraries(optical_flow_odom
+  ${OpenCV_LIBRARIES}
+)
+
 # インストール設定
 install(TARGETS
   nr26_r2_move
@@ -67,7 +79,9 @@ install(TARGETS
   r2_md
   r2_mc
   r2_tuner
+  r2_auto
   r2_hand_xy
+  optical_flow_odom
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
