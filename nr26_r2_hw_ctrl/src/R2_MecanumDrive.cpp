@@ -34,36 +34,49 @@ float back_speed = 50;
 float sp_yaw = 0.5;
 float deadzone = 0.3; // adjust DS4 deadzone
 
+constexpr double WHEEL_RADIUS = 0.05; // [m]
+constexpr double TREAD_X = 0.30;      // 前後半分 [m]
+constexpr double TREAD_Y = 0.30;      // 左右半分 [m]
+
 float v1, v2, v3, v4; // 各メカナムホイールの速度指令値
 // v1:第一象限, v2:第二象限, v3:第三象限, v4:第四象限
 
-class Action {
+class Action
+{
 public:
-    static void for_up(std::vector<int16_t> &data) {
+    static void for_up(std::vector<int16_t> &data)
+    {
         data[17] = 1;
     }
-    static void for_down(std::vector<int16_t> &data) {
+    static void for_down(std::vector<int16_t> &data)
+    {
         data[17] = 0;
     }
-    static void back_up(std::vector<int16_t> &data) {
+    static void back_up(std::vector<int16_t> &data)
+    {
         data[18] = 1;
     }
-    static void back_down(std::vector<int16_t> &data) {
+    static void back_down(std::vector<int16_t> &data)
+    {
         data[18] = 0;
     }
-    static void all_down(std::vector<int16_t> &data) {
+    static void all_down(std::vector<int16_t> &data)
+    {
         data[17] = 0;
         data[18] = 0;
     }
-    static void all_up(std::vector<int16_t> &data) {
+    static void all_up(std::vector<int16_t> &data)
+    {
         data[17] = 1;
         data[18] = 1;
     }
 };
 
-class ParamTuner : public rclcpp::Node {
+class ParamTuner : public rclcpp::Node
+{
 public:
-    ParamTuner() : Node("param_tuner") {
+    ParamTuner() : Node("param_tuner")
+    {
 
         sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
             "r2_mecanum_param",
@@ -77,9 +90,11 @@ private:
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_;
     std::vector<float> params = {0, 0, 0, 0}; // 受信したパラメータを保持
 
-    void param_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
+    void param_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
+    {
 
-        if (msg->data.size() < 4) {
+        if (msg->data.size() < 4)
+        {
             RCLCPP_WARN(this->get_logger(), "param message too short");
             return;
         }
@@ -90,11 +105,13 @@ private:
     }
 };
 
-class HardWareControl : public rclcpp::Node {
+class HardWareControl : public rclcpp::Node
+{
 public:
     HardWareControl(uint8_t device_id)
         : Node("hardware_control_" + std::to_string(device_id)),
-          device_id_(device_id) {
+          device_id_(device_id)
+    {
 
         // 配列を0で初期化
         data_.assign(TX16NUM, 0);
@@ -125,7 +142,14 @@ public:
     }
 
 private:
-    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
+    // ===== オドメトリ状態 =====
+    float X = 0, Y = 0, yaw_ = 0;
+    int16_t vel_prev_[4]{0};
+    bool vel_init_ = false;
+    rclcpp::Time last_time_;
+
+    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg)
+    {
 
         // コントローラーの入力を取得、使わない入力はコメントアウト推奨
         float LS_X = -1 * msg->axes[0];
@@ -164,11 +188,13 @@ private:
         static bool last_down = false;
         static bool down_latch = false;
 
-        if (UP && !last_up) {
+        if (UP && !last_up)
+        {
             up_latch = !up_latch;
         }
 
-        if (DOWN && !last_down) {
+        if (DOWN && !last_down)
+        {
             down_latch = !down_latch;
         }
         last_up = UP;
@@ -177,7 +203,8 @@ private:
         // 以降、配列data_を操作する
         float rad = atan2(LS_Y, LS_X);
 
-        if (R2_DIGITAL >= 0.3) {
+        if (R2_DIGITAL >= 0.3)
+        {
             float vx = cos(rad) * R2_DIGITAL;
             float vy = sin(rad) * R2_DIGITAL;
 
@@ -186,12 +213,16 @@ private:
             v4 = vy + vx;  // 前左
             v1 = vy - vx;  // 後左
             v3 = -vy - vx; // 後右
-        } else if (RS_X >= deadzone || R1 == 1) {
+        }
+        else if (RS_X >= deadzone || R1 == 1)
+        {
             v2 = sp_yaw;
             v4 = sp_yaw;
             v1 = sp_yaw;
             v3 = sp_yaw;
-        } else if (RS_X <= -deadzone || L1 == 1) {
+        }
+        else if (RS_X <= -deadzone || L1 == 1)
+        {
             v2 = -sp_yaw;
             v4 = -sp_yaw;
             v1 = -sp_yaw;
@@ -199,7 +230,8 @@ private:
         }
 
         else if (
-            (fabsf(LS_X) <= deadzone) && (fabsf(LS_Y) <= deadzone) && (fabsf(RS_X) <= deadzone) && (fabsf(RS_Y) <= deadzone) && (R1 == 0) && (L1 == 0)) {
+            (fabsf(LS_X) <= deadzone) && (fabsf(LS_Y) <= deadzone) && (fabsf(RS_X) <= deadzone) && (fabsf(RS_Y) <= deadzone) && (R1 == 0) && (L1 == 0))
+        {
             v1 = 0.0;
             v2 = 0.0;
             v3 = 0.0;
@@ -214,24 +246,32 @@ private:
         v3 /= max_v;
         v4 /= max_v;
 
-        if (up_latch == true) {
+        if (up_latch == true)
+        {
             Action::for_up(data_);
-        } else if (up_latch == false) {
+        }
+        else if (up_latch == false)
+        {
             Action::for_down(data_);
         }
-        if (down_latch == true) {
+        if (down_latch == true)
+        {
             Action::back_up(data_);
-        } else if (down_latch == false) {
+        }
+        else if (down_latch == false)
+        {
             Action::back_down(data_);
         }
 
-        if (CROSS) {
+        if (CROSS)
+        {
             Action::all_down(data_);
             up_latch = false;
             down_latch = false;
         }
 
-        if (TRIANGLE) {
+        if (TRIANGLE)
+        {
             Action::all_up(data_);
             up_latch = true;
             down_latch = true;
@@ -244,7 +284,8 @@ private:
         data_[8] = static_cast<int16_t>(v4 * duty_max);
     }
 
-    void publisher_timer_callback() {
+    void publisher_timer_callback()
+    {
         std_msgs::msg::Int16MultiArray msg;
 
         msg.data = data_;
@@ -253,9 +294,11 @@ private:
         print_data();
     }
 
-    void print_data() {
+    void print_data()
+    {
         std::cout << "TX DATA: [";
-        for (size_t i = 0; i < data_.size(); ++i) {
+        for (size_t i = 0; i < data_.size(); ++i)
+        {
             std::cout << data_[i];
             if (i + 1 < data_.size())
                 std::cout << ", ";
@@ -265,9 +308,11 @@ private:
 
     void
     sensor_callback(
-        const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
+        const std_msgs::msg::Int16MultiArray::SharedPtr msg)
+    {
         // 最低限：サイズチェック
-        if (msg->data.size() < RX16NUM) {
+        if (msg->data.size() < RX16NUM)
+        {
             RCLCPP_WARN(this->get_logger(),
                         "serial_rx_%d: data too short (%zu)",
                         device_id_, msg->data.size());
@@ -292,8 +337,45 @@ private:
         // int16_t SW7 = msg->data[15];
         // int16_t SW8 = msg->data[16];
 
-        // 以降、受信データを使った処理を記述
+        // int16_t angle1 = msg->data[7];
+        // int16_t angle2 = msg->data[8];
+        // int16_t angle3 = msg->data[9];
+        // int16_t angle4 = msg->data[10];
 
+        int16_t vel[4];
+        vel[0] = msg->data[11];
+        vel[1] = msg->data[12];
+        vel[2] = msg->data[13];
+        vel[3] = msg->data[14];
+
+        // 以降、受信データを使った処理を記述
+        if (!vel_init_)
+        {
+
+            last_time_ = now();
+            vel_init_ = true;
+            return;
+        }
+        double dt = (now() - last_time_).seconds();
+        last_time_ = now();
+        if (dt <= 0)
+            return;
+
+        float w[4];
+        for (int i = 0; i < 4; i++)
+        {
+            float omega = vel[i] * 2.0f * M_PI / 60.0f; // [rad/s]
+            w[i] = omega * WHEEL_RADIUS;
+        }
+        // 機体座標
+        float vy = (w[0] + w[1] + w[2] + w[3]) / 4.0;  // y軸方向
+        float vx = (-w[0] + w[1] - w[2] + w[3]) / 4.0; // x軸方向
+        float wz = (-w[0] + w[1] + w[2] - w[3]) / (4 * (TREAD_X + TREAD_Y));
+
+        // ワールド座標系に変換
+        X += (vx * cos(yaw_) - vy * sin(yaw_)) * dt;
+        Y += (vx * sin(yaw_) + vy * cos(yaw_)) * dt;
+        yaw_ += wz * dt;
         // 受信データ処理ここまで
     }
 
@@ -307,7 +389,8 @@ private:
     std::vector<int16_t> data_;
 };
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     rclcpp::init(argc, argv);
 
     rclcpp::executors::MultiThreadedExecutor exec;
