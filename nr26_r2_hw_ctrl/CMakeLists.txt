@@ -56,6 +56,10 @@ add_executable(r2_tuner src/R2_Tuner.cpp)
 ament_target_dependencies(r2_tuner rclcpp std_msgs sensor_msgs geometry_msgs)
 target_include_directories(r2_tuner PRIVATE ${nlohmann_json_SOURCE_DIR}/single_include)
 
+add_executable(r2_hand_xy src/R2_HandXY.cpp)
+ament_target_dependencies(r2_hand_xy rclcpp std_msgs sensor_msgs geometry_msgs)
+target_include_directories(r2_hand_xy PRIVATE ${nlohmann_json_SOURCE_DIR}/single_include)
+
 # インストール設定
 install(TARGETS
   nr26_r2_move
@@ -63,6 +67,7 @@ install(TARGETS
   r2_md
   r2_mc
   r2_tuner
+  r2_hand_xy
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
