@@ -138,7 +138,7 @@ private:
         // LR
         // マガジン調整用
         // =================================================================
-        static int MAG_ADJ_STEP = 5;
+        static int MAG_ADJ_STEP = 10;
         static int up_pre = 0;
         static int down_pre = 0;
         static int mag_servo_angle = 0;
@@ -158,18 +158,18 @@ private:
         // LR
         // マガジン調整用
         // =================================================================
-        static int MAG_ADJ_STEP_ = 5;
+        static int MAG_ADJ_STEP_ = 10;
         static int triangle_pre = 0;
         static int cross_pre = 0;
         static int mag_servo_angle_ = 0;
 
         if (TRIANGLE == 1 && triangle_pre == 0) {
-            mag_servo_angle_ += MAG_ADJ_STEP;
+            mag_servo_angle_ -= MAG_ADJ_STEP;
             data_[10] = mag_servo_angle_;
         }
         triangle_pre = TRIANGLE;
         if (CROSS == 1 && cross_pre == 0) {
-            mag_servo_angle_ -= MAG_ADJ_STEP;
+            mag_servo_angle_ += MAG_ADJ_STEP;
             data_[10] = mag_servo_angle_;
         }
         cross_pre = CROSS;
