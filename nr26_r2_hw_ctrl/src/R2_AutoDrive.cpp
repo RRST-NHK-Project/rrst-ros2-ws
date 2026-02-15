@@ -70,6 +70,10 @@ private:
     // ===== Joy =====
     void joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
 
+        // bool CROSS = msg->buttons[0];
+        bool CIRCLE = msg->buttons[1];
+        // bool TRIANGLE = msg->buttons[2];
+        // bool SQUARE = msg->buttons[3];
         bool OPTION = msg->buttons[9];
 
         // AUTO / MANUAL 切替
@@ -82,6 +86,40 @@ private:
         }
         last_option = OPTION;
 
+        // =================================================================
+        // CIRCLE:「棒ホールド機構」
+        // ボタンを一回押すごとに2つのサーボモーターの角度状態を同時に変化させる
+        // =================================================================
+        // angle = 10のとき最下部までお仕込み
+        // angle = 245のときマガジンに戻してる
+
+        static int circle_pre = 0;
+        static int t = 0;
+        static int CIRCLE_PUSH_MAX = 4;
+
+        if (CIRCLE == 1 && circle_pre == 0) {
+            t = (t + 1) % CIRCLE_PUSH_MAX;
+        }
+        if (t == 0) {
+            target_x = 1.0f;
+            target_y = 0.0f;
+        }
+        if (t == 1) {
+            target_x = 1.0f;
+            target_y = 1.0f;
+        }
+        if (t == 2) {
+            target_x = 0.0f;
+            target_y = 1.0f;
+        }
+
+        if (t == 3) {
+            target_x = 0.0f;
+            target_y = 0.0f;
+        }
+
+        circle_pre = CIRCLE;
+
         if (!auto_mode) {
             manual_control(msg);
         }
@@ -89,7 +127,7 @@ private:
 
     void manual_control(const sensor_msgs::msg::Joy::SharedPtr msg) {
 
-        float lx = msg->axes[0];
+        float lx = -msg->axes[0];
         float ly = msg->axes[1];
         float r2 = (-msg->axes[5] + 1.0f) * 0.5f;
 
