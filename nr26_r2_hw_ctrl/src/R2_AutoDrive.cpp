@@ -21,8 +21,8 @@ constexpr float duty_max = 100.0f;
 constexpr float WHEEL_RADIUS = 0.05f;
 
 // 自動制御ゲイン
-constexpr float KP_POS = 0.8f;
-constexpr float GOAL_TOL = 0.05f; // [m]
+constexpr float KP_POS = 2.0f;
+constexpr float GOAL_TOL = 0.03f; // [m]
 
 // ==========================
 
