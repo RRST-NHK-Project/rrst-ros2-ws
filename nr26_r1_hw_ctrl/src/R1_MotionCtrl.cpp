@@ -216,28 +216,28 @@ private:
 
         circle_pre = CIRCLE;
 
-       // =================================================================
-        // TRIANGLE:「棒取捨選択」
-        // 
         // =================================================================
-       
-        static int triangle_pre = 0;
-        static int tri_count=0;
-        static int tri_state;
-        static int ang_1=13;
-        static int ang_2=90;
+        // TRIANGLE:「棒取捨選択」
+        //
+        // =================================================================
 
-        if (TRIANGLE == 1 && triangle_pre == 0) tri_count++;
+        static int triangle_pre = 0;
+        static int tri_count = 0;
+        static int tri_state;
+        static int ang_1 = 13;
+        static int ang_2 = 90;
+
+        if (TRIANGLE == 1 && triangle_pre == 0)
+            tri_count++;
 
         tri_state = tri_count % 2;
 
         if (tri_state == 0) {
             data_[12] = ang_1;
-        }
-        else if (tri_state==1) {
+        } else if (tri_state == 1) {
             data_[12] = ang_2;
         }
-    
+
         triangle_pre = TRIANGLE;
 
         // =================================================================
@@ -381,7 +381,7 @@ private:
     rclcpp::TimerBase::SharedPtr timer_;
 
     std::vector<int16_t> data_;
-    
+
     // エンコーダースイッチの状態（0: 押されていない, 1: 押されている）
     int16_t micro1_sw_ = 0;
     int16_t micro2_sw_ = 0;
@@ -391,7 +391,7 @@ int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
     // figletでノード名を表示
-    std::string figletout = "figlet Serial Bridge Host";
+    std::string figletout = "figlet R1 Motion Ctrl";
     int result = std::system(figletout.c_str());
     if (result != 0) {
         std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
