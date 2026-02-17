@@ -166,6 +166,53 @@ private:
             R3_latch = !R3_latch;
         }
 
+        static bool lateral_lock = false; // 左右固定（真横移動）モード
+        static bool longi_lock   = false; // 上下固定（前後移動）モード
+        static bool last_LEFT    = false;
+        static bool last_RIGHT   = false;
+        static bool last_UP      = false;
+        static bool last_DOWN    = false;
+
+        if (LEFT == true && last_LEFT == false) {
+            lateral_lock = !lateral_lock;
+                if (lateral_lock == true) {
+                longi_lock = false;
+            }
+        }
+        if (RIGHT == true && last_RIGHT == false) {
+            lateral_lock = !lateral_lock;
+            if (lateral_lock == true) {
+                longi_lock = false;
+            }
+        }
+
+        if (UP == true && last_UP == false) {
+            longi_lock = !longi_lock;
+            if (longi_lock == true) {
+                lateral_lock = false;
+            }
+        }
+        if (DOWN == true && last_DOWN == false) {
+            longi_lock = !longi_lock;
+            if (longi_lock == true) {
+                lateral_lock = false;
+            }
+        }
+
+        last_LEFT  = LEFT;
+        last_RIGHT = RIGHT;
+        last_UP    = UP;
+        last_DOWN  = DOWN;
+
+        if (lateral_lock == true) {
+            deg = 45;
+        } else if (longi_lock == true) {
+            deg = 135;
+        } else {
+            float rad = atan2(LS_Y, LS_X);
+            deg = rad * 180 / M_PI;
+        }
+
         // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         // もとの移動方法！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
