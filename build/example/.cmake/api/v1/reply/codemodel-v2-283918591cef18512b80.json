@@ -1,0 +1,115 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-b005eea5a879e3c0b879.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.15"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6
+					]
+				}
+			],
+			"name" : "",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "example",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "example_uninstall::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-example_uninstall-ede1cf34a14f5fb9b4c8.json",
+					"name" : "example_uninstall",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "ps4_listener::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ps4_listener-532082fbca19fd70b94b.json",
+					"name" : "ps4_listener",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "simple_pub::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-simple_pub-44b2a7065e224129f560.json",
+					"name" : "simple_pub",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "simple_sub::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-simple_sub-0478cceabea29b563ac9.json",
+					"name" : "simple_sub",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "udp_send::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-udp_send-f7757e334d6c541b6ba4.json",
+					"name" : "udp_send",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "uninstall::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-uninstall-5f36d315ca16b0cc825e.json",
+					"name" : "uninstall",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "usb_serial::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-usb_serial-c1347a4cd42a4622145f.json",
+					"name" : "usb_serial",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/home/ubuntu/rrst-ros2-ws/build/example",
+		"source" : "/home/ubuntu/rrst-ros2-ws/example"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 6
+	}
+}

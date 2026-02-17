@@ -1,0 +1,31 @@
+[ 33%] Built target r1_servo_cal
+[ 66%] Built target r1_mc
+[ 83%] [32mBuilding CXX object CMakeFiles/r1_sd.dir/src/R1_SwerveDrive.cpp.o[0m
+[01m[K/home/ubuntu/rrst-ros2-ws/nr26_r1_hw_ctrl/src/R1_SwerveDrive.cpp:[m[K In member function ‘[01m[Kvoid HardWareControl::[01;32m[Kps4_listener_callback[m[K(sensor_msgs::msg::Joy_<std::allocator<void> >::SharedPtr)[m[K’:
+[01m[K/home/ubuntu/rrst-ros2-ws/nr26_r1_hw_ctrl/src/R1_SwerveDrive.cpp:135:21:[m[K [01;35m[Kwarning: [m[Kvariable ‘[01m[Klast_right[m[K’ set but not used [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-but-set-variable-Wunused-but-set-variable]8;;[m[K]
+  135 |         static bool [01;35m[Klast_right[m[K = false;
+      |                     [01;35m[K^~~~~~~~~~[m[K
+[100%] [32m[1mLinking CXX executable r1_sd[0m
+[100%] Built target r1_sd
+-- Install configuration: ""
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/lib/nr26_r1_hw_ctrl/r1_sd
+-- Set non-toolchain portion of runtime path of "/home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/lib/nr26_r1_hw_ctrl/r1_sd" to ""
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/lib/nr26_r1_hw_ctrl/r1_mc
+-- Set non-toolchain portion of runtime path of "/home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/lib/nr26_r1_hw_ctrl/r1_mc" to ""
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/lib/nr26_r1_hw_ctrl/r1_servo_cal
+-- Set non-toolchain portion of runtime path of "/home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/lib/nr26_r1_hw_ctrl/r1_servo_cal" to ""
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/ament_index/resource_index/package_run_dependencies/nr26_r1_hw_ctrl
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/ament_index/resource_index/parent_prefix_path/nr26_r1_hw_ctrl
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/environment/ament_prefix_path.sh
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/environment/ament_prefix_path.dsv
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/environment/path.sh
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/environment/path.dsv
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/local_setup.bash
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/local_setup.sh
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/local_setup.zsh
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/local_setup.dsv
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/package.dsv
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/ament_index/resource_index/packages/nr26_r1_hw_ctrl
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/cmake/nr26_r1_hw_ctrlConfig.cmake
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/cmake/nr26_r1_hw_ctrlConfig-version.cmake
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/package.xml

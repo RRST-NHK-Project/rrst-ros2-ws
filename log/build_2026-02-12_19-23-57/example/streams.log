@@ -1,0 +1,30 @@
+[0.041s] Invoking command in '/home/ubuntu/rrst-ros2-ws/build/example': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/example -- -j12 -l12
+[0.237s] [ 16%] Built target ps4_listener
+[0.284s] [ 33%] Built target simple_pub
+[0.285s] [ 50%] Built target usb_serial
+[0.295s] [ 83%] Built target udp_send
+[0.307s] [100%] Built target simple_sub
+[0.365s] Invoked command in '/home/ubuntu/rrst-ros2-ws/build/example' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/example -- -j12 -l12
+[0.371s] Invoking command in '/home/ubuntu/rrst-ros2-ws/build/example': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/example
+[0.404s] -- Install configuration: ""
+[0.405s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/lib/example/ps4_listener
+[0.405s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/lib/example/udp_send
+[0.405s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/lib/example/simple_pub
+[0.405s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/lib/example/simple_sub
+[0.405s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/lib/example/usb_serial
+[0.406s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/ament_index/resource_index/package_run_dependencies/example
+[0.406s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/ament_index/resource_index/parent_prefix_path/example
+[0.406s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/example/environment/ament_prefix_path.sh
+[0.406s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/example/environment/ament_prefix_path.dsv
+[0.406s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/example/environment/path.sh
+[0.406s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/example/environment/path.dsv
+[0.406s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/example/local_setup.bash
+[0.406s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/example/local_setup.sh
+[0.406s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/example/local_setup.zsh
+[0.406s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/example/local_setup.dsv
+[0.406s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/example/share/example/package.dsv
+[0.407s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/ament_index/resource_index/packages/example
+[0.407s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/example/cmake/exampleConfig.cmake
+[0.407s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/example/cmake/exampleConfig-version.cmake
+[0.407s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/example/package.xml
+[0.425s] Invoked command in '/home/ubuntu/rrst-ros2-ws/build/example' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/example

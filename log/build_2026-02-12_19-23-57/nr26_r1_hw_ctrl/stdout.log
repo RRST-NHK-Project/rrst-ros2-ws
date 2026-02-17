@@ -1,0 +1,25 @@
+[ 33%] Built target nr26_r1_servo_cal
+[ 50%] [32mBuilding CXX object CMakeFiles/nr26_pick.dir/src/NR26_pick.cpp.o[0m
+[ 83%] Built target nr26_sd
+[100%] [32m[1mLinking CXX executable nr26_pick[0m
+[100%] Built target nr26_pick
+-- Install configuration: ""
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/lib/nr26_r1_hw_ctrl/nr26_sd
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/lib/nr26_r1_hw_ctrl/nr26_pick
+-- Set non-toolchain portion of runtime path of "/home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/lib/nr26_r1_hw_ctrl/nr26_pick" to ""
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/lib/nr26_r1_hw_ctrl/nr26_r1_servo_cal
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/ament_index/resource_index/package_run_dependencies/nr26_r1_hw_ctrl
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/ament_index/resource_index/parent_prefix_path/nr26_r1_hw_ctrl
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/environment/ament_prefix_path.sh
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/environment/ament_prefix_path.dsv
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/environment/path.sh
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/environment/path.dsv
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/local_setup.bash
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/local_setup.sh
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/local_setup.zsh
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/local_setup.dsv
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/package.dsv
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/ament_index/resource_index/packages/nr26_r1_hw_ctrl
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/cmake/nr26_r1_hw_ctrlConfig.cmake
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/cmake/nr26_r1_hw_ctrlConfig-version.cmake
+-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/package.xml

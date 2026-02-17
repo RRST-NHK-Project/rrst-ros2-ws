@@ -1,0 +1,80 @@
+-- The C compiler identification is GNU 13.3.0
+-- The CXX compiler identification is GNU 13.3.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Found ament_cmake: 2.5.3 (/opt/ros/jazzy/share/ament_cmake/cmake)
+-- Found Python3: /usr/bin/python3 (found version "3.12.3") found components: Interpreter 
+-- Found rclcpp: 28.1.8 (/opt/ros/jazzy/share/rclcpp/cmake)
+-- Found rosidl_generator_c: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_c/cmake)
+-- Found rosidl_generator_cpp: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_cpp/cmake)
+-- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+-- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+-- Found rmw_implementation_cmake: 7.3.2 (/opt/ros/jazzy/share/rmw_implementation_cmake/cmake)
+-- Found rmw_fastrtps_cpp: 8.4.2 (/opt/ros/jazzy/share/rmw_fastrtps_cpp/cmake)
+-- Found OpenSSL: /usr/lib/x86_64-linux-gnu/libcrypto.so (found version "3.0.13")  
+-- Found FastRTPS: /opt/ros/jazzy/include (Required is at least version "2.13") 
+-- Using RMW implementation 'rmw_fastrtps_cpp' as default
+-- Found std_msgs: 5.3.6 (/opt/ros/jazzy/share/std_msgs/cmake)
+-- Found sensor_msgs: 5.3.6 (/opt/ros/jazzy/share/sensor_msgs/cmake)
+-- Found ament_lint_auto: 0.17.2 (/opt/ros/jazzy/share/ament_lint_auto/cmake)
+-- Added test 'cppcheck' to perform static code analysis on C / C++ code
+-- Configured cppcheck include dirs: 
+-- Configured cppcheck exclude dirs and/or files: 
+-- Added test 'lint_cmake' to check CMake code style
+-- Added test 'uncrustify' to check C / C++ code style
+-- Configured uncrustify additional arguments: 
+-- Added test 'xmllint' to check XML markup files
+-- Configuring done (2.5s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/ubuntu/rrst-ros2-ws/build/example
+[  8%] [32mBuilding CXX object CMakeFiles/udp_send.dir/src/include/IP.cpp.o[0m
+[ 33%] [32mBuilding CXX object CMakeFiles/udp_send.dir/src/include/UDP.cpp.o[0m
+[ 33%] [32mBuilding CXX object CMakeFiles/ps4_listener.dir/src/PS4_Listener.cpp.o[0m
+[ 33%] [32mBuilding CXX object CMakeFiles/simple_pub.dir/src/Simple_Publisher.cpp.o[0m
+[ 41%] [32mBuilding CXX object CMakeFiles/simple_sub.dir/src/Simple_Subscriber.cpp.o[0m
+[ 50%] [32mBuilding CXX object CMakeFiles/usb_serial.dir/src/Simple_Subscriber.cpp.o[0m
+[ 58%] [32mBuilding CXX object CMakeFiles/udp_send.dir/src/UDP_Send.cpp.o[0m
+[ 66%] [32m[1mLinking CXX executable simple_pub[0m
+[ 66%] Built target simple_pub
+[ 75%] [32m[1mLinking CXX executable usb_serial[0m
+[ 75%] Built target usb_serial
+[ 83%] [32m[1mLinking CXX executable ps4_listener[0m
+[ 91%] [32m[1mLinking CXX executable simple_sub[0m
+[ 91%] Built target ps4_listener
+[100%] [32m[1mLinking CXX executable udp_send[0m
+[100%] Built target simple_sub
+[100%] Built target udp_send
+-- Install configuration: ""
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/example/lib/example/ps4_listener
+-- Set non-toolchain portion of runtime path of "/home/ubuntu/rrst-ros2-ws/install/example/lib/example/ps4_listener" to ""
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/example/lib/example/udp_send
+-- Set non-toolchain portion of runtime path of "/home/ubuntu/rrst-ros2-ws/install/example/lib/example/udp_send" to ""
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/example/lib/example/simple_pub
+-- Set non-toolchain portion of runtime path of "/home/ubuntu/rrst-ros2-ws/install/example/lib/example/simple_pub" to ""
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/example/lib/example/simple_sub
+-- Set non-toolchain portion of runtime path of "/home/ubuntu/rrst-ros2-ws/install/example/lib/example/simple_sub" to ""
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/example/lib/example/usb_serial
+-- Set non-toolchain portion of runtime path of "/home/ubuntu/rrst-ros2-ws/install/example/lib/example/usb_serial" to ""
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/example/share/ament_index/resource_index/package_run_dependencies/example
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/example/share/ament_index/resource_index/parent_prefix_path/example
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/example/share/example/environment/ament_prefix_path.sh
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/example/share/example/environment/ament_prefix_path.dsv
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/example/share/example/environment/path.sh
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/example/share/example/environment/path.dsv
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/example/share/example/local_setup.bash
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/example/share/example/local_setup.sh
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/example/share/example/local_setup.zsh
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/example/share/example/local_setup.dsv
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/example/share/example/package.dsv
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/example/share/ament_index/resource_index/packages/example
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/example/share/example/cmake/exampleConfig.cmake
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/example/share/example/cmake/exampleConfig-version.cmake
+-- Installing: /home/ubuntu/rrst-ros2-ws/install/example/share/example/package.xml

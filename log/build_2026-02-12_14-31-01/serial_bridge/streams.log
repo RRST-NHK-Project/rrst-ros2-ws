@@ -1,0 +1,56 @@
+[0.046s] Invoking command in '/home/ubuntu/rrst-ros2-ws/build/serial_bridge': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake /home/ubuntu/rrst-ros2-ws/serial_bridge -DCMAKE_INSTALL_PREFIX=/home/ubuntu/rrst-ros2-ws/install/serial_bridge
+[0.244s] -- The C compiler identification is GNU 13.3.0
+[0.423s] -- The CXX compiler identification is GNU 13.3.0
+[0.454s] -- Detecting C compiler ABI info
+[0.622s] -- Detecting C compiler ABI info - done
+[0.636s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.637s] -- Detecting C compile features
+[0.638s] -- Detecting C compile features - done
+[0.657s] -- Detecting CXX compiler ABI info
+[0.847s] -- Detecting CXX compiler ABI info - done
+[0.871s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.871s] -- Detecting CXX compile features
+[0.872s] -- Detecting CXX compile features - done
+[0.882s] -- Found rclcpp: 28.1.8 (/opt/ros/jazzy/share/rclcpp/cmake)
+[1.215s] -- Found Python3: /usr/bin/python3 (found version "3.12.3") found components: Interpreter 
+[1.538s] -- Found rosidl_generator_c: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_c/cmake)
+[1.565s] -- Found rosidl_generator_cpp: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_cpp/cmake)
+[1.601s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[1.635s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[1.738s] -- Found rmw_implementation_cmake: 7.3.2 (/opt/ros/jazzy/share/rmw_implementation_cmake/cmake)
+[1.742s] -- Found rmw_fastrtps_cpp: 8.4.2 (/opt/ros/jazzy/share/rmw_fastrtps_cpp/cmake)
+[1.882s] -- Found OpenSSL: /usr/lib/x86_64-linux-gnu/libcrypto.so (found version "3.0.13")  
+[1.927s] -- Found FastRTPS: /opt/ros/jazzy/include (Required is at least version "2.13") 
+[1.983s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[2.141s] -- Found std_msgs: 5.3.6 (/opt/ros/jazzy/share/std_msgs/cmake)
+[2.375s] -- Configuring done (2.3s)
+[2.399s] -- Generating done (0.0s)
+[2.407s] -- Build files have been written to: /home/ubuntu/rrst-ros2-ws/build/serial_bridge
+[2.429s] Invoked command in '/home/ubuntu/rrst-ros2-ws/build/serial_bridge' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake /home/ubuntu/rrst-ros2-ws/serial_bridge -DCMAKE_INSTALL_PREFIX=/home/ubuntu/rrst-ros2-ws/install/serial_bridge
+[2.431s] Invoking command in '/home/ubuntu/rrst-ros2-ws/build/serial_bridge': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/serial_bridge -- -j12 -l12
+[2.509s] [ 25%] [32mBuilding CXX object CMakeFiles/serial_bridge_node.dir/src/bridge_node.cpp.o[0m
+[2.514s] [ 75%] [32mBuilding CXX object CMakeFiles/serial_bridge_node.dir/src/main.cpp.o[0m
+[2.514s] [ 75%] [32mBuilding CXX object CMakeFiles/serial_bridge_node.dir/src/port_scanner.cpp.o[0m
+[16.134s] [100%] [32m[1mLinking CXX executable serial_bridge_node[0m
+[16.540s] [100%] Built target serial_bridge_node
+[16.564s] Invoked command in '/home/ubuntu/rrst-ros2-ws/build/serial_bridge' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/serial_bridge -- -j12 -l12
+[16.567s] Invoking command in '/home/ubuntu/rrst-ros2-ws/build/serial_bridge': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/serial_bridge
+[16.584s] -- Install configuration: ""
+[16.585s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/lib/serial_bridge/serial_bridge_node
+[16.595s] -- Set non-toolchain portion of runtime path of "/home/ubuntu/rrst-ros2-ws/install/serial_bridge/lib/serial_bridge/serial_bridge_node" to ""
+[16.595s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/ament_index/resource_index/package_run_dependencies/serial_bridge
+[16.596s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/ament_index/resource_index/parent_prefix_path/serial_bridge
+[16.596s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/environment/ament_prefix_path.sh
+[16.596s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/environment/ament_prefix_path.dsv
+[16.596s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/environment/path.sh
+[16.597s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/environment/path.dsv
+[16.597s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/local_setup.bash
+[16.597s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/local_setup.sh
+[16.597s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/local_setup.zsh
+[16.598s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/local_setup.dsv
+[16.598s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/package.dsv
+[16.599s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/ament_index/resource_index/packages/serial_bridge
+[16.599s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/cmake/serial_bridgeConfig.cmake
+[16.599s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/cmake/serial_bridgeConfig-version.cmake
+[16.599s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/package.xml
+[16.604s] Invoked command in '/home/ubuntu/rrst-ros2-ws/build/serial_bridge' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/serial_bridge

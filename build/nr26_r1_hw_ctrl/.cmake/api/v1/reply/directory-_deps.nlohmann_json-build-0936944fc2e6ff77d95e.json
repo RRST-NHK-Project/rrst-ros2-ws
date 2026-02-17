@@ -1,0 +1,14 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : [],
+		"files" : [],
+		"nodes" : []
+	},
+	"installers" : [],
+	"paths" : 
+	{
+		"build" : "_deps/nlohmann_json-build",
+		"source" : "/home/ubuntu/rrst-ros2-ws/build/nr26_r1_hw_ctrl/_deps/nlohmann_json-src"
+	}
+}

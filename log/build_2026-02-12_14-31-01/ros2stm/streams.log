@@ -1,0 +1,64 @@
+[0.028s] Invoking command in '/home/ubuntu/rrst-ros2-ws/build/ros2stm': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake /home/ubuntu/rrst-ros2-ws/ros2stm -DCMAKE_INSTALL_PREFIX=/home/ubuntu/rrst-ros2-ws/install/ros2stm
+[0.258s] -- The C compiler identification is GNU 13.3.0
+[0.434s] -- The CXX compiler identification is GNU 13.3.0
+[0.466s] -- Detecting C compiler ABI info
+[0.641s] -- Detecting C compiler ABI info - done
+[0.655s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.655s] -- Detecting C compile features
+[0.656s] -- Detecting C compile features - done
+[0.672s] -- Detecting CXX compiler ABI info
+[0.859s] -- Detecting CXX compiler ABI info - done
+[0.883s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.883s] -- Detecting CXX compile features
+[0.885s] -- Detecting CXX compile features - done
+[0.892s] -- Found ament_cmake: 2.5.3 (/opt/ros/jazzy/share/ament_cmake/cmake)
+[1.223s] -- Found Python3: /usr/bin/python3 (found version "3.12.3") found components: Interpreter 
+[1.412s] -- Found rclcpp: 28.1.8 (/opt/ros/jazzy/share/rclcpp/cmake)
+[1.470s] -- Found rosidl_generator_c: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_c/cmake)
+[1.497s] -- Found rosidl_generator_cpp: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_cpp/cmake)
+[1.537s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[1.584s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[1.767s] -- Found rmw_implementation_cmake: 7.3.2 (/opt/ros/jazzy/share/rmw_implementation_cmake/cmake)
+[1.771s] -- Found rmw_fastrtps_cpp: 8.4.2 (/opt/ros/jazzy/share/rmw_fastrtps_cpp/cmake)
+[1.939s] -- Found OpenSSL: /usr/lib/x86_64-linux-gnu/libcrypto.so (found version "3.0.13")  
+[1.982s] -- Found FastRTPS: /opt/ros/jazzy/include (Required is at least version "2.13") 
+[2.034s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[2.149s] -- Found std_msgs: 5.3.6 (/opt/ros/jazzy/share/std_msgs/cmake)
+[2.180s] -- Found sensor_msgs: 5.3.6 (/opt/ros/jazzy/share/sensor_msgs/cmake)
+[2.286s] -- Found ament_lint_auto: 0.17.2 (/opt/ros/jazzy/share/ament_lint_auto/cmake)
+[2.525s] -- Added test 'cppcheck' to perform static code analysis on C / C++ code
+[2.525s] -- Configured cppcheck include dirs: 
+[2.525s] -- Configured cppcheck exclude dirs and/or files: 
+[2.527s] -- Added test 'lint_cmake' to check CMake code style
+[2.529s] -- Added test 'uncrustify' to check C / C++ code style
+[2.529s] -- Configured uncrustify additional arguments: 
+[2.530s] -- Added test 'xmllint' to check XML markup files
+[2.534s] -- Configuring done (2.5s)
+[2.558s] -- Generating done (0.0s)
+[2.566s] -- Build files have been written to: /home/ubuntu/rrst-ros2-ws/build/ros2stm
+[2.587s] Invoked command in '/home/ubuntu/rrst-ros2-ws/build/ros2stm' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake /home/ubuntu/rrst-ros2-ws/ros2stm -DCMAKE_INSTALL_PREFIX=/home/ubuntu/rrst-ros2-ws/install/ros2stm
+[2.588s] Invoking command in '/home/ubuntu/rrst-ros2-ws/build/ros2stm': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/ros2stm -- -j12 -l12
+[2.709s] [ 50%] [32mBuilding CXX object CMakeFiles/sb_tester.dir/src/Serial_Bridge_Tester.cpp.o[0m
+[12.409s] [100%] [32m[1mLinking CXX executable sb_tester[0m
+[12.860s] [100%] Built target sb_tester
+[12.887s] Invoked command in '/home/ubuntu/rrst-ros2-ws/build/ros2stm' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/ros2stm -- -j12 -l12
+[12.890s] Invoking command in '/home/ubuntu/rrst-ros2-ws/build/ros2stm': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/ros2stm
+[12.908s] -- Install configuration: ""
+[12.909s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2stm/lib/ros2stm/sb_tester
+[12.912s] -- Set non-toolchain portion of runtime path of "/home/ubuntu/rrst-ros2-ws/install/ros2stm/lib/ros2stm/sb_tester" to ""
+[12.912s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ament_index/resource_index/package_run_dependencies/ros2stm
+[12.912s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ament_index/resource_index/parent_prefix_path/ros2stm
+[12.913s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/environment/ament_prefix_path.sh
+[12.913s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/environment/ament_prefix_path.dsv
+[12.913s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/environment/path.sh
+[12.913s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/environment/path.dsv
+[12.914s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/local_setup.bash
+[12.916s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/local_setup.sh
+[12.917s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/local_setup.zsh
+[12.917s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/local_setup.dsv
+[12.917s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/package.dsv
+[12.917s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ament_index/resource_index/packages/ros2stm
+[12.917s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/cmake/ros2stmConfig.cmake
+[12.917s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/cmake/ros2stmConfig-version.cmake
+[12.918s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/package.xml
+[12.920s] Invoked command in '/home/ubuntu/rrst-ros2-ws/build/ros2stm' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/ros2stm

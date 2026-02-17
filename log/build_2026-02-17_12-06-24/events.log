@@ -1,0 +1,704 @@
+[0.000000] (-) TimerEvent: {}
+[0.000202] (example) JobQueued: {'identifier': 'example', 'dependencies': OrderedDict()}
+[0.000311] (nr26_r1_hw_ctrl) JobQueued: {'identifier': 'nr26_r1_hw_ctrl', 'dependencies': OrderedDict()}
+[0.000331] (nr26_r2_hw_ctrl) JobQueued: {'identifier': 'nr26_r2_hw_ctrl', 'dependencies': OrderedDict()}
+[0.000346] (ros2esp) JobQueued: {'identifier': 'ros2esp', 'dependencies': OrderedDict()}
+[0.000357] (ros2stm) JobQueued: {'identifier': 'ros2stm', 'dependencies': OrderedDict()}
+[0.000370] (ros2udp) JobQueued: {'identifier': 'ros2udp', 'dependencies': OrderedDict()}
+[0.000998] (example) JobStarted: {'identifier': 'example'}
+[0.012530] (nr26_r1_hw_ctrl) JobStarted: {'identifier': 'nr26_r1_hw_ctrl'}
+[0.017499] (nr26_r2_hw_ctrl) JobStarted: {'identifier': 'nr26_r2_hw_ctrl'}
+[0.023044] (ros2esp) JobStarted: {'identifier': 'ros2esp'}
+[0.028214] (ros2stm) JobStarted: {'identifier': 'ros2stm'}
+[0.034927] (ros2udp) JobStarted: {'identifier': 'ros2udp'}
+[0.042905] (example) JobProgress: {'identifier': 'example', 'progress': 'cmake'}
+[0.044134] (example) JobProgress: {'identifier': 'example', 'progress': 'build'}
+[0.044937] (example) Command: {'cmd': ['/usr/bin/cmake', '--build', '/home/ubuntu/rrst-ros2-ws/build/example', '--', '-j12', '-l12'], 'cwd': '/home/ubuntu/rrst-ros2-ws/build/example', 'env': OrderedDict({'LESSOPEN': '| /usr/bin/lesspipe %s', 'LANGUAGE': 'ja:en', 'USER': 'ubuntu', 'LC_TIME': 'ja_JP.UTF-8', 'XDG_SESSION_TYPE': 'wayland', 'CLUTTER_DISABLE_MIPMAPPED_TEXT': '1', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/home/ubuntu/ros2_ws/install/ldlidar_component/lib:/opt/ros/jazzy/opt/rviz_ogre_vendor/lib:/opt/ros/jazzy/lib/x86_64-linux-gnu:/opt/ros/jazzy/opt/gz_math_vendor/lib:/opt/ros/jazzy/opt/gz_utils_vendor/lib:/opt/ros/jazzy/opt/gz_cmake_vendor/lib:/opt/ros/jazzy/lib', 'HOME': '/home/ubuntu', 'OLDPWD': '/home/ubuntu', 'DESKTOP_SESSION': 'ubuntu', 'ROS_PYTHON_VERSION': '3', 'GNOME_SHELL_SESSION_MODE': 'ubuntu', 'GTK_MODULES': 'gail:atk-bridge', 'LC_MONETARY': 'ja_JP.UTF-8', 'SYSTEMD_EXEC_PID': '2279', 'GSM_SKIP_SSH_AGENT_WORKAROUND': 'true', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': 'truecolor', 'DEBUGINFOD_URLS': 'https://debuginfod.ubuntu.com', 'IM_CONFIG_PHASE': '1', 'WAYLAND_DISPLAY': 'wayland-0', 'COLCON_PREFIX_PATH': '/home/ubuntu/ros2_ws/install', 'ROS_DISTRO': 'jazzy', 'LOGNAME': 'ubuntu', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'MEMORY_PRESSURE_WATCH': '/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.Shell@wayland.service/memory.pressure', 'XDG_SESSION_CLASS': 'user', 'USERNAME': 'ubuntu', 'TERM': 'xterm-256color', 'GNOME_DESKTOP_SESSION_ID': 'this-is-deprecated', 'PATH': '/opt/ros/jazzy/bin:/home/ubuntu/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin', 'SESSION_MANAGER': 'local/ubuntu-FMVUUD007U:@/tmp/.ICE-unix/2248,unix/ubuntu-FMVUUD007U:/tmp/.ICE-unix/2248', 'PAPERSIZE': 'a4', 'XDG_MENU_PREFIX': 'gnome-', 'LC_ADDRESS': 'ja_JP.UTF-8', 'GNOME_TERMINAL_SCREEN': '/org/gnome/Terminal/screen/a11c4e17_8ef7_4438_8b8f_8726aaacc246', 'GNOME_SETUP_DISPLAY': ':1', 'XDG_RUNTIME_DIR': '/run/user/1000', 'DISPLAY': ':0', 'LANG': 'ja_JP.UTF-8', 'XDG_CURRENT_DESKTOP': 'ubuntu:GNOME', 'LC_TELEPHONE': 'ja_JP.UTF-8', 'XMODIFIERS': '@im=ibus', 'XDG_SESSION_DESKTOP': 'ubuntu', 'XAUTHORITY': '/run/user/1000/.mutter-Xwaylandauth.B4B6K3', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:', 'GNOME_TERMINAL_SERVICE': ':1.125', 'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh', 'AMENT_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/tukurotto:/home/ubuntu/ros2_ws/install/silby:/home/ubuntu/ros2_ws/install/sibyl:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/ldlidar:/home/ubuntu/ros2_ws/install/ldlidar_node:/home/ubuntu/ros2_ws/install/ldlidar_component:/home/ubuntu/ros2_ws/install/example:/home/ubuntu/ros2_ws/install/cpp_pubsub:/opt/ros/jazzy', 'SHELL': '/bin/bash', 'LC_NAME': 'ja_JP.UTF-8', 'QT_ACCESSIBILITY': '1', 'GDMSESSION': 'ubuntu', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'LC_MEASUREMENT': 'ja_JP.UTF-8', 'LC_IDENTIFICATION': 'ja_JP.UTF-8', 'ROS_AUTOMATIC_DISCOVERY_RANGE': 'SUBNET', 'QT_IM_MODULE': 'ibus', 'PWD': '/home/ubuntu/rrst-ros2-ws/build/example', 'LC_ALL': 'en_US.UTF-8', 'XDG_CONFIG_DIRS': '/etc/xdg/xdg-ubuntu:/etc/xdg', 'XDG_DATA_DIRS': '/usr/share/ubuntu:/usr/share/gnome:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop', 'PYTHONPATH': '/opt/ros/jazzy/lib/python3.12/site-packages', 'LC_NUMERIC': 'ja_JP.UTF-8', 'LC_PAPER': 'ja_JP.UTF-8', 'COLCON': '1', 'MEMORY_PRESSURE_WRITE': 'c29tZSAyMDAwMDAgMjAwMDAwMAA=', 'VTE_VERSION': '7600', 'CMAKE_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/tukurotto:/home/ubuntu/ros2_ws/install/silby:/home/ubuntu/ros2_ws/install/sibyl:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/maeda:/home/ubuntu/ros2_ws/install/ldlidar:/home/ubuntu/ros2_ws/install/ldlidar_node:/home/ubuntu/ros2_ws/install/ldlidar_component:/home/ubuntu/ros2_ws/install/example:/home/ubuntu/ros2_ws/install/cpp_pubsub:/opt/ros/jazzy/opt/gz_math_vendor:/opt/ros/jazzy/opt/gz_utils_vendor:/opt/ros/jazzy/opt/gz_cmake_vendor:/opt/ros/jazzy'}), 'shell': False}
+[0.048489] (nr26_r1_hw_ctrl) JobProgress: {'identifier': 'nr26_r1_hw_ctrl', 'progress': 'cmake'}
+[0.050957] (nr26_r1_hw_ctrl) JobProgress: {'identifier': 'nr26_r1_hw_ctrl', 'progress': 'build'}
+[0.051207] (nr26_r1_hw_ctrl) Command: {'cmd': ['/usr/bin/cmake', '--build', '/home/ubuntu/rrst-ros2-ws/build/nr26_r1_hw_ctrl', '--', '-j12', '-l12'], 'cwd': '/home/ubuntu/rrst-ros2-ws/build/nr26_r1_hw_ctrl', 'env': OrderedDict({'LESSOPEN': '| /usr/bin/lesspipe %s', 'LANGUAGE': 'ja:en', 'USER': 'ubuntu', 'LC_TIME': 'ja_JP.UTF-8', 'XDG_SESSION_TYPE': 'wayland', 'CLUTTER_DISABLE_MIPMAPPED_TEXT': '1', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/home/ubuntu/ros2_ws/install/ldlidar_component/lib:/opt/ros/jazzy/opt/rviz_ogre_vendor/lib:/opt/ros/jazzy/lib/x86_64-linux-gnu:/opt/ros/jazzy/opt/gz_math_vendor/lib:/opt/ros/jazzy/opt/gz_utils_vendor/lib:/opt/ros/jazzy/opt/gz_cmake_vendor/lib:/opt/ros/jazzy/lib', 'HOME': '/home/ubuntu', 'OLDPWD': '/home/ubuntu', 'DESKTOP_SESSION': 'ubuntu', 'ROS_PYTHON_VERSION': '3', 'GNOME_SHELL_SESSION_MODE': 'ubuntu', 'GTK_MODULES': 'gail:atk-bridge', 'LC_MONETARY': 'ja_JP.UTF-8', 'SYSTEMD_EXEC_PID': '2279', 'GSM_SKIP_SSH_AGENT_WORKAROUND': 'true', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': 'truecolor', 'DEBUGINFOD_URLS': 'https://debuginfod.ubuntu.com', 'IM_CONFIG_PHASE': '1', 'WAYLAND_DISPLAY': 'wayland-0', 'COLCON_PREFIX_PATH': '/home/ubuntu/ros2_ws/install', 'ROS_DISTRO': 'jazzy', 'LOGNAME': 'ubuntu', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'MEMORY_PRESSURE_WATCH': '/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.Shell@wayland.service/memory.pressure', 'XDG_SESSION_CLASS': 'user', 'USERNAME': 'ubuntu', 'TERM': 'xterm-256color', 'GNOME_DESKTOP_SESSION_ID': 'this-is-deprecated', 'PATH': '/opt/ros/jazzy/bin:/home/ubuntu/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin', 'SESSION_MANAGER': 'local/ubuntu-FMVUUD007U:@/tmp/.ICE-unix/2248,unix/ubuntu-FMVUUD007U:/tmp/.ICE-unix/2248', 'PAPERSIZE': 'a4', 'XDG_MENU_PREFIX': 'gnome-', 'LC_ADDRESS': 'ja_JP.UTF-8', 'GNOME_TERMINAL_SCREEN': '/org/gnome/Terminal/screen/a11c4e17_8ef7_4438_8b8f_8726aaacc246', 'GNOME_SETUP_DISPLAY': ':1', 'XDG_RUNTIME_DIR': '/run/user/1000', 'DISPLAY': ':0', 'LANG': 'ja_JP.UTF-8', 'XDG_CURRENT_DESKTOP': 'ubuntu:GNOME', 'LC_TELEPHONE': 'ja_JP.UTF-8', 'XMODIFIERS': '@im=ibus', 'XDG_SESSION_DESKTOP': 'ubuntu', 'XAUTHORITY': '/run/user/1000/.mutter-Xwaylandauth.B4B6K3', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:', 'GNOME_TERMINAL_SERVICE': ':1.125', 'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh', 'AMENT_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/tukurotto:/home/ubuntu/ros2_ws/install/silby:/home/ubuntu/ros2_ws/install/sibyl:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/ldlidar:/home/ubuntu/ros2_ws/install/ldlidar_node:/home/ubuntu/ros2_ws/install/ldlidar_component:/home/ubuntu/ros2_ws/install/example:/home/ubuntu/ros2_ws/install/cpp_pubsub:/opt/ros/jazzy', 'SHELL': '/bin/bash', 'LC_NAME': 'ja_JP.UTF-8', 'QT_ACCESSIBILITY': '1', 'GDMSESSION': 'ubuntu', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'LC_MEASUREMENT': 'ja_JP.UTF-8', 'LC_IDENTIFICATION': 'ja_JP.UTF-8', 'ROS_AUTOMATIC_DISCOVERY_RANGE': 'SUBNET', 'QT_IM_MODULE': 'ibus', 'PWD': '/home/ubuntu/rrst-ros2-ws/build/nr26_r1_hw_ctrl', 'LC_ALL': 'en_US.UTF-8', 'XDG_CONFIG_DIRS': '/etc/xdg/xdg-ubuntu:/etc/xdg', 'XDG_DATA_DIRS': '/usr/share/ubuntu:/usr/share/gnome:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop', 'PYTHONPATH': '/opt/ros/jazzy/lib/python3.12/site-packages', 'LC_NUMERIC': 'ja_JP.UTF-8', 'LC_PAPER': 'ja_JP.UTF-8', 'COLCON': '1', 'MEMORY_PRESSURE_WRITE': 'c29tZSAyMDAwMDAgMjAwMDAwMAA=', 'VTE_VERSION': '7600', 'CMAKE_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/tukurotto:/home/ubuntu/ros2_ws/install/silby:/home/ubuntu/ros2_ws/install/sibyl:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/maeda:/home/ubuntu/ros2_ws/install/ldlidar:/home/ubuntu/ros2_ws/install/ldlidar_node:/home/ubuntu/ros2_ws/install/ldlidar_component:/home/ubuntu/ros2_ws/install/example:/home/ubuntu/ros2_ws/install/cpp_pubsub:/opt/ros/jazzy/opt/gz_math_vendor:/opt/ros/jazzy/opt/gz_utils_vendor:/opt/ros/jazzy/opt/gz_cmake_vendor:/opt/ros/jazzy'}), 'shell': False}
+[0.052792] (nr26_r2_hw_ctrl) JobProgress: {'identifier': 'nr26_r2_hw_ctrl', 'progress': 'cmake'}
+[0.054568] (nr26_r2_hw_ctrl) JobProgress: {'identifier': 'nr26_r2_hw_ctrl', 'progress': 'build'}
+[0.055027] (nr26_r2_hw_ctrl) Command: {'cmd': ['/usr/bin/cmake', '--build', '/home/ubuntu/rrst-ros2-ws/build/nr26_r2_hw_ctrl', '--', '-j12', '-l12'], 'cwd': '/home/ubuntu/rrst-ros2-ws/build/nr26_r2_hw_ctrl', 'env': OrderedDict({'LESSOPEN': '| /usr/bin/lesspipe %s', 'LANGUAGE': 'ja:en', 'USER': 'ubuntu', 'LC_TIME': 'ja_JP.UTF-8', 'XDG_SESSION_TYPE': 'wayland', 'CLUTTER_DISABLE_MIPMAPPED_TEXT': '1', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/home/ubuntu/ros2_ws/install/ldlidar_component/lib:/opt/ros/jazzy/opt/rviz_ogre_vendor/lib:/opt/ros/jazzy/lib/x86_64-linux-gnu:/opt/ros/jazzy/opt/gz_math_vendor/lib:/opt/ros/jazzy/opt/gz_utils_vendor/lib:/opt/ros/jazzy/opt/gz_cmake_vendor/lib:/opt/ros/jazzy/lib', 'HOME': '/home/ubuntu', 'OLDPWD': '/home/ubuntu', 'DESKTOP_SESSION': 'ubuntu', 'ROS_PYTHON_VERSION': '3', 'GNOME_SHELL_SESSION_MODE': 'ubuntu', 'GTK_MODULES': 'gail:atk-bridge', 'LC_MONETARY': 'ja_JP.UTF-8', 'SYSTEMD_EXEC_PID': '2279', 'GSM_SKIP_SSH_AGENT_WORKAROUND': 'true', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': 'truecolor', 'DEBUGINFOD_URLS': 'https://debuginfod.ubuntu.com', 'IM_CONFIG_PHASE': '1', 'WAYLAND_DISPLAY': 'wayland-0', 'COLCON_PREFIX_PATH': '/home/ubuntu/ros2_ws/install', 'ROS_DISTRO': 'jazzy', 'LOGNAME': 'ubuntu', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'MEMORY_PRESSURE_WATCH': '/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.Shell@wayland.service/memory.pressure', 'XDG_SESSION_CLASS': 'user', 'USERNAME': 'ubuntu', 'TERM': 'xterm-256color', 'GNOME_DESKTOP_SESSION_ID': 'this-is-deprecated', 'PATH': '/opt/ros/jazzy/bin:/home/ubuntu/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin', 'SESSION_MANAGER': 'local/ubuntu-FMVUUD007U:@/tmp/.ICE-unix/2248,unix/ubuntu-FMVUUD007U:/tmp/.ICE-unix/2248', 'PAPERSIZE': 'a4', 'XDG_MENU_PREFIX': 'gnome-', 'LC_ADDRESS': 'ja_JP.UTF-8', 'GNOME_TERMINAL_SCREEN': '/org/gnome/Terminal/screen/a11c4e17_8ef7_4438_8b8f_8726aaacc246', 'GNOME_SETUP_DISPLAY': ':1', 'XDG_RUNTIME_DIR': '/run/user/1000', 'DISPLAY': ':0', 'LANG': 'ja_JP.UTF-8', 'XDG_CURRENT_DESKTOP': 'ubuntu:GNOME', 'LC_TELEPHONE': 'ja_JP.UTF-8', 'XMODIFIERS': '@im=ibus', 'XDG_SESSION_DESKTOP': 'ubuntu', 'XAUTHORITY': '/run/user/1000/.mutter-Xwaylandauth.B4B6K3', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:', 'GNOME_TERMINAL_SERVICE': ':1.125', 'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh', 'AMENT_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/tukurotto:/home/ubuntu/ros2_ws/install/silby:/home/ubuntu/ros2_ws/install/sibyl:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/ldlidar:/home/ubuntu/ros2_ws/install/ldlidar_node:/home/ubuntu/ros2_ws/install/ldlidar_component:/home/ubuntu/ros2_ws/install/example:/home/ubuntu/ros2_ws/install/cpp_pubsub:/opt/ros/jazzy', 'SHELL': '/bin/bash', 'LC_NAME': 'ja_JP.UTF-8', 'QT_ACCESSIBILITY': '1', 'GDMSESSION': 'ubuntu', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'LC_MEASUREMENT': 'ja_JP.UTF-8', 'LC_IDENTIFICATION': 'ja_JP.UTF-8', 'ROS_AUTOMATIC_DISCOVERY_RANGE': 'SUBNET', 'QT_IM_MODULE': 'ibus', 'PWD': '/home/ubuntu/rrst-ros2-ws/build/nr26_r2_hw_ctrl', 'LC_ALL': 'en_US.UTF-8', 'XDG_CONFIG_DIRS': '/etc/xdg/xdg-ubuntu:/etc/xdg', 'XDG_DATA_DIRS': '/usr/share/ubuntu:/usr/share/gnome:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop', 'PYTHONPATH': '/opt/ros/jazzy/lib/python3.12/site-packages', 'LC_NUMERIC': 'ja_JP.UTF-8', 'LC_PAPER': 'ja_JP.UTF-8', 'COLCON': '1', 'MEMORY_PRESSURE_WRITE': 'c29tZSAyMDAwMDAgMjAwMDAwMAA=', 'VTE_VERSION': '7600', 'CMAKE_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/tukurotto:/home/ubuntu/ros2_ws/install/silby:/home/ubuntu/ros2_ws/install/sibyl:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/maeda:/home/ubuntu/ros2_ws/install/ldlidar:/home/ubuntu/ros2_ws/install/ldlidar_node:/home/ubuntu/ros2_ws/install/ldlidar_component:/home/ubuntu/ros2_ws/install/example:/home/ubuntu/ros2_ws/install/cpp_pubsub:/opt/ros/jazzy/opt/gz_math_vendor:/opt/ros/jazzy/opt/gz_utils_vendor:/opt/ros/jazzy/opt/gz_cmake_vendor:/opt/ros/jazzy'}), 'shell': False}
+[0.057228] (ros2esp) JobProgress: {'identifier': 'ros2esp', 'progress': 'cmake'}
+[0.059453] (ros2esp) JobProgress: {'identifier': 'ros2esp', 'progress': 'build'}
+[0.060699] (ros2esp) Command: {'cmd': ['/usr/bin/cmake', '--build', '/home/ubuntu/rrst-ros2-ws/build/ros2esp', '--', '-j12', '-l12'], 'cwd': '/home/ubuntu/rrst-ros2-ws/build/ros2esp', 'env': OrderedDict({'LESSOPEN': '| /usr/bin/lesspipe %s', 'LANGUAGE': 'ja:en', 'USER': 'ubuntu', 'LC_TIME': 'ja_JP.UTF-8', 'XDG_SESSION_TYPE': 'wayland', 'CLUTTER_DISABLE_MIPMAPPED_TEXT': '1', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/home/ubuntu/ros2_ws/install/ldlidar_component/lib:/opt/ros/jazzy/opt/rviz_ogre_vendor/lib:/opt/ros/jazzy/lib/x86_64-linux-gnu:/opt/ros/jazzy/opt/gz_math_vendor/lib:/opt/ros/jazzy/opt/gz_utils_vendor/lib:/opt/ros/jazzy/opt/gz_cmake_vendor/lib:/opt/ros/jazzy/lib', 'HOME': '/home/ubuntu', 'OLDPWD': '/home/ubuntu', 'DESKTOP_SESSION': 'ubuntu', 'ROS_PYTHON_VERSION': '3', 'GNOME_SHELL_SESSION_MODE': 'ubuntu', 'GTK_MODULES': 'gail:atk-bridge', 'LC_MONETARY': 'ja_JP.UTF-8', 'SYSTEMD_EXEC_PID': '2279', 'GSM_SKIP_SSH_AGENT_WORKAROUND': 'true', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': 'truecolor', 'DEBUGINFOD_URLS': 'https://debuginfod.ubuntu.com', 'IM_CONFIG_PHASE': '1', 'WAYLAND_DISPLAY': 'wayland-0', 'COLCON_PREFIX_PATH': '/home/ubuntu/ros2_ws/install', 'ROS_DISTRO': 'jazzy', 'LOGNAME': 'ubuntu', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'MEMORY_PRESSURE_WATCH': '/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.Shell@wayland.service/memory.pressure', 'XDG_SESSION_CLASS': 'user', 'USERNAME': 'ubuntu', 'TERM': 'xterm-256color', 'GNOME_DESKTOP_SESSION_ID': 'this-is-deprecated', 'PATH': '/opt/ros/jazzy/bin:/home/ubuntu/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin', 'SESSION_MANAGER': 'local/ubuntu-FMVUUD007U:@/tmp/.ICE-unix/2248,unix/ubuntu-FMVUUD007U:/tmp/.ICE-unix/2248', 'PAPERSIZE': 'a4', 'XDG_MENU_PREFIX': 'gnome-', 'LC_ADDRESS': 'ja_JP.UTF-8', 'GNOME_TERMINAL_SCREEN': '/org/gnome/Terminal/screen/a11c4e17_8ef7_4438_8b8f_8726aaacc246', 'GNOME_SETUP_DISPLAY': ':1', 'XDG_RUNTIME_DIR': '/run/user/1000', 'DISPLAY': ':0', 'LANG': 'ja_JP.UTF-8', 'XDG_CURRENT_DESKTOP': 'ubuntu:GNOME', 'LC_TELEPHONE': 'ja_JP.UTF-8', 'XMODIFIERS': '@im=ibus', 'XDG_SESSION_DESKTOP': 'ubuntu', 'XAUTHORITY': '/run/user/1000/.mutter-Xwaylandauth.B4B6K3', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:', 'GNOME_TERMINAL_SERVICE': ':1.125', 'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh', 'AMENT_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/tukurotto:/home/ubuntu/ros2_ws/install/silby:/home/ubuntu/ros2_ws/install/sibyl:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/ldlidar:/home/ubuntu/ros2_ws/install/ldlidar_node:/home/ubuntu/ros2_ws/install/ldlidar_component:/home/ubuntu/ros2_ws/install/example:/home/ubuntu/ros2_ws/install/cpp_pubsub:/opt/ros/jazzy', 'SHELL': '/bin/bash', 'LC_NAME': 'ja_JP.UTF-8', 'QT_ACCESSIBILITY': '1', 'GDMSESSION': 'ubuntu', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'LC_MEASUREMENT': 'ja_JP.UTF-8', 'LC_IDENTIFICATION': 'ja_JP.UTF-8', 'ROS_AUTOMATIC_DISCOVERY_RANGE': 'SUBNET', 'QT_IM_MODULE': 'ibus', 'PWD': '/home/ubuntu/rrst-ros2-ws/build/ros2esp', 'LC_ALL': 'en_US.UTF-8', 'XDG_CONFIG_DIRS': '/etc/xdg/xdg-ubuntu:/etc/xdg', 'XDG_DATA_DIRS': '/usr/share/ubuntu:/usr/share/gnome:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop', 'PYTHONPATH': '/opt/ros/jazzy/lib/python3.12/site-packages', 'LC_NUMERIC': 'ja_JP.UTF-8', 'LC_PAPER': 'ja_JP.UTF-8', 'COLCON': '1', 'MEMORY_PRESSURE_WRITE': 'c29tZSAyMDAwMDAgMjAwMDAwMAA=', 'VTE_VERSION': '7600', 'CMAKE_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/tukurotto:/home/ubuntu/ros2_ws/install/silby:/home/ubuntu/ros2_ws/install/sibyl:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/maeda:/home/ubuntu/ros2_ws/install/ldlidar:/home/ubuntu/ros2_ws/install/ldlidar_node:/home/ubuntu/ros2_ws/install/ldlidar_component:/home/ubuntu/ros2_ws/install/example:/home/ubuntu/ros2_ws/install/cpp_pubsub:/opt/ros/jazzy/opt/gz_math_vendor:/opt/ros/jazzy/opt/gz_utils_vendor:/opt/ros/jazzy/opt/gz_cmake_vendor:/opt/ros/jazzy'}), 'shell': False}
+[0.064211] (ros2stm) JobProgress: {'identifier': 'ros2stm', 'progress': 'cmake'}
+[0.066222] (ros2stm) JobProgress: {'identifier': 'ros2stm', 'progress': 'build'}
+[0.067366] (ros2stm) Command: {'cmd': ['/usr/bin/cmake', '--build', '/home/ubuntu/rrst-ros2-ws/build/ros2stm', '--', '-j12', '-l12'], 'cwd': '/home/ubuntu/rrst-ros2-ws/build/ros2stm', 'env': OrderedDict({'LESSOPEN': '| /usr/bin/lesspipe %s', 'LANGUAGE': 'ja:en', 'USER': 'ubuntu', 'LC_TIME': 'ja_JP.UTF-8', 'XDG_SESSION_TYPE': 'wayland', 'CLUTTER_DISABLE_MIPMAPPED_TEXT': '1', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/home/ubuntu/ros2_ws/install/ldlidar_component/lib:/opt/ros/jazzy/opt/rviz_ogre_vendor/lib:/opt/ros/jazzy/lib/x86_64-linux-gnu:/opt/ros/jazzy/opt/gz_math_vendor/lib:/opt/ros/jazzy/opt/gz_utils_vendor/lib:/opt/ros/jazzy/opt/gz_cmake_vendor/lib:/opt/ros/jazzy/lib', 'HOME': '/home/ubuntu', 'OLDPWD': '/home/ubuntu', 'DESKTOP_SESSION': 'ubuntu', 'ROS_PYTHON_VERSION': '3', 'GNOME_SHELL_SESSION_MODE': 'ubuntu', 'GTK_MODULES': 'gail:atk-bridge', 'LC_MONETARY': 'ja_JP.UTF-8', 'SYSTEMD_EXEC_PID': '2279', 'GSM_SKIP_SSH_AGENT_WORKAROUND': 'true', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': 'truecolor', 'DEBUGINFOD_URLS': 'https://debuginfod.ubuntu.com', 'IM_CONFIG_PHASE': '1', 'WAYLAND_DISPLAY': 'wayland-0', 'COLCON_PREFIX_PATH': '/home/ubuntu/ros2_ws/install', 'ROS_DISTRO': 'jazzy', 'LOGNAME': 'ubuntu', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'MEMORY_PRESSURE_WATCH': '/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.Shell@wayland.service/memory.pressure', 'XDG_SESSION_CLASS': 'user', 'USERNAME': 'ubuntu', 'TERM': 'xterm-256color', 'GNOME_DESKTOP_SESSION_ID': 'this-is-deprecated', 'PATH': '/opt/ros/jazzy/bin:/home/ubuntu/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin', 'SESSION_MANAGER': 'local/ubuntu-FMVUUD007U:@/tmp/.ICE-unix/2248,unix/ubuntu-FMVUUD007U:/tmp/.ICE-unix/2248', 'PAPERSIZE': 'a4', 'XDG_MENU_PREFIX': 'gnome-', 'LC_ADDRESS': 'ja_JP.UTF-8', 'GNOME_TERMINAL_SCREEN': '/org/gnome/Terminal/screen/a11c4e17_8ef7_4438_8b8f_8726aaacc246', 'GNOME_SETUP_DISPLAY': ':1', 'XDG_RUNTIME_DIR': '/run/user/1000', 'DISPLAY': ':0', 'LANG': 'ja_JP.UTF-8', 'XDG_CURRENT_DESKTOP': 'ubuntu:GNOME', 'LC_TELEPHONE': 'ja_JP.UTF-8', 'XMODIFIERS': '@im=ibus', 'XDG_SESSION_DESKTOP': 'ubuntu', 'XAUTHORITY': '/run/user/1000/.mutter-Xwaylandauth.B4B6K3', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:', 'GNOME_TERMINAL_SERVICE': ':1.125', 'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh', 'AMENT_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/tukurotto:/home/ubuntu/ros2_ws/install/silby:/home/ubuntu/ros2_ws/install/sibyl:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/ldlidar:/home/ubuntu/ros2_ws/install/ldlidar_node:/home/ubuntu/ros2_ws/install/ldlidar_component:/home/ubuntu/ros2_ws/install/example:/home/ubuntu/ros2_ws/install/cpp_pubsub:/opt/ros/jazzy', 'SHELL': '/bin/bash', 'LC_NAME': 'ja_JP.UTF-8', 'QT_ACCESSIBILITY': '1', 'GDMSESSION': 'ubuntu', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'LC_MEASUREMENT': 'ja_JP.UTF-8', 'LC_IDENTIFICATION': 'ja_JP.UTF-8', 'ROS_AUTOMATIC_DISCOVERY_RANGE': 'SUBNET', 'QT_IM_MODULE': 'ibus', 'PWD': '/home/ubuntu/rrst-ros2-ws/build/ros2stm', 'LC_ALL': 'en_US.UTF-8', 'XDG_CONFIG_DIRS': '/etc/xdg/xdg-ubuntu:/etc/xdg', 'XDG_DATA_DIRS': '/usr/share/ubuntu:/usr/share/gnome:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop', 'PYTHONPATH': '/opt/ros/jazzy/lib/python3.12/site-packages', 'LC_NUMERIC': 'ja_JP.UTF-8', 'LC_PAPER': 'ja_JP.UTF-8', 'COLCON': '1', 'MEMORY_PRESSURE_WRITE': 'c29tZSAyMDAwMDAgMjAwMDAwMAA=', 'VTE_VERSION': '7600', 'CMAKE_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/tukurotto:/home/ubuntu/ros2_ws/install/silby:/home/ubuntu/ros2_ws/install/sibyl:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/maeda:/home/ubuntu/ros2_ws/install/ldlidar:/home/ubuntu/ros2_ws/install/ldlidar_node:/home/ubuntu/ros2_ws/install/ldlidar_component:/home/ubuntu/ros2_ws/install/example:/home/ubuntu/ros2_ws/install/cpp_pubsub:/opt/ros/jazzy/opt/gz_math_vendor:/opt/ros/jazzy/opt/gz_utils_vendor:/opt/ros/jazzy/opt/gz_cmake_vendor:/opt/ros/jazzy'}), 'shell': False}
+[0.079947] (ros2udp) JobProgress: {'identifier': 'ros2udp', 'progress': 'cmake'}
+[0.082641] (ros2udp) JobProgress: {'identifier': 'ros2udp', 'progress': 'build'}
+[0.083286] (ros2udp) Command: {'cmd': ['/usr/bin/cmake', '--build', '/home/ubuntu/rrst-ros2-ws/build/ros2udp', '--', '-j12', '-l12'], 'cwd': '/home/ubuntu/rrst-ros2-ws/build/ros2udp', 'env': OrderedDict({'LESSOPEN': '| /usr/bin/lesspipe %s', 'LANGUAGE': 'ja:en', 'USER': 'ubuntu', 'LC_TIME': 'ja_JP.UTF-8', 'XDG_SESSION_TYPE': 'wayland', 'CLUTTER_DISABLE_MIPMAPPED_TEXT': '1', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/home/ubuntu/ros2_ws/install/ldlidar_component/lib:/opt/ros/jazzy/opt/rviz_ogre_vendor/lib:/opt/ros/jazzy/lib/x86_64-linux-gnu:/opt/ros/jazzy/opt/gz_math_vendor/lib:/opt/ros/jazzy/opt/gz_utils_vendor/lib:/opt/ros/jazzy/opt/gz_cmake_vendor/lib:/opt/ros/jazzy/lib', 'HOME': '/home/ubuntu', 'OLDPWD': '/home/ubuntu', 'DESKTOP_SESSION': 'ubuntu', 'ROS_PYTHON_VERSION': '3', 'GNOME_SHELL_SESSION_MODE': 'ubuntu', 'GTK_MODULES': 'gail:atk-bridge', 'LC_MONETARY': 'ja_JP.UTF-8', 'SYSTEMD_EXEC_PID': '2279', 'GSM_SKIP_SSH_AGENT_WORKAROUND': 'true', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': 'truecolor', 'DEBUGINFOD_URLS': 'https://debuginfod.ubuntu.com', 'IM_CONFIG_PHASE': '1', 'WAYLAND_DISPLAY': 'wayland-0', 'COLCON_PREFIX_PATH': '/home/ubuntu/ros2_ws/install', 'ROS_DISTRO': 'jazzy', 'LOGNAME': 'ubuntu', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'MEMORY_PRESSURE_WATCH': '/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.Shell@wayland.service/memory.pressure', 'XDG_SESSION_CLASS': 'user', 'USERNAME': 'ubuntu', 'TERM': 'xterm-256color', 'GNOME_DESKTOP_SESSION_ID': 'this-is-deprecated', 'PATH': '/opt/ros/jazzy/bin:/home/ubuntu/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin', 'SESSION_MANAGER': 'local/ubuntu-FMVUUD007U:@/tmp/.ICE-unix/2248,unix/ubuntu-FMVUUD007U:/tmp/.ICE-unix/2248', 'PAPERSIZE': 'a4', 'XDG_MENU_PREFIX': 'gnome-', 'LC_ADDRESS': 'ja_JP.UTF-8', 'GNOME_TERMINAL_SCREEN': '/org/gnome/Terminal/screen/a11c4e17_8ef7_4438_8b8f_8726aaacc246', 'GNOME_SETUP_DISPLAY': ':1', 'XDG_RUNTIME_DIR': '/run/user/1000', 'DISPLAY': ':0', 'LANG': 'ja_JP.UTF-8', 'XDG_CURRENT_DESKTOP': 'ubuntu:GNOME', 'LC_TELEPHONE': 'ja_JP.UTF-8', 'XMODIFIERS': '@im=ibus', 'XDG_SESSION_DESKTOP': 'ubuntu', 'XAUTHORITY': '/run/user/1000/.mutter-Xwaylandauth.B4B6K3', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:', 'GNOME_TERMINAL_SERVICE': ':1.125', 'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh', 'AMENT_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/tukurotto:/home/ubuntu/ros2_ws/install/silby:/home/ubuntu/ros2_ws/install/sibyl:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/ldlidar:/home/ubuntu/ros2_ws/install/ldlidar_node:/home/ubuntu/ros2_ws/install/ldlidar_component:/home/ubuntu/ros2_ws/install/example:/home/ubuntu/ros2_ws/install/cpp_pubsub:/opt/ros/jazzy', 'SHELL': '/bin/bash', 'LC_NAME': 'ja_JP.UTF-8', 'QT_ACCESSIBILITY': '1', 'GDMSESSION': 'ubuntu', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'LC_MEASUREMENT': 'ja_JP.UTF-8', 'LC_IDENTIFICATION': 'ja_JP.UTF-8', 'ROS_AUTOMATIC_DISCOVERY_RANGE': 'SUBNET', 'QT_IM_MODULE': 'ibus', 'PWD': '/home/ubuntu/rrst-ros2-ws/build/ros2udp', 'LC_ALL': 'en_US.UTF-8', 'XDG_CONFIG_DIRS': '/etc/xdg/xdg-ubuntu:/etc/xdg', 'XDG_DATA_DIRS': '/usr/share/ubuntu:/usr/share/gnome:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop', 'PYTHONPATH': '/opt/ros/jazzy/lib/python3.12/site-packages', 'LC_NUMERIC': 'ja_JP.UTF-8', 'LC_PAPER': 'ja_JP.UTF-8', 'COLCON': '1', 'MEMORY_PRESSURE_WRITE': 'c29tZSAyMDAwMDAgMjAwMDAwMAA=', 'VTE_VERSION': '7600', 'CMAKE_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/tukurotto:/home/ubuntu/ros2_ws/install/silby:/home/ubuntu/ros2_ws/install/sibyl:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/maeda:/home/ubuntu/ros2_ws/install/ldlidar:/home/ubuntu/ros2_ws/install/ldlidar_node:/home/ubuntu/ros2_ws/install/ldlidar_component:/home/ubuntu/ros2_ws/install/example:/home/ubuntu/ros2_ws/install/cpp_pubsub:/opt/ros/jazzy/opt/gz_math_vendor:/opt/ros/jazzy/opt/gz_utils_vendor:/opt/ros/jazzy/opt/gz_cmake_vendor:/opt/ros/jazzy'}), 'shell': False}
+[0.099876] (-) TimerEvent: {}
+[0.141166] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'/usr/bin/figlet\n'}
+[0.141782] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'/usr/bin/figlet\n'}
+[0.148045] (ros2udp) StdoutLine: {'line': b'/usr/bin/figlet\n'}
+[0.200070] (-) TimerEvent: {}
+[0.221271] (ros2stm) StdoutLine: {'line': b'[100%] Built target sb_tester\n'}
+[0.224203] (example) StdoutLine: {'line': b'[ 16%] Built target simple_pub\n'}
+[0.224647] (example) StdoutLine: {'line': b'[ 91%] Built target udp_send\n'}
+[0.224805] (example) StdoutLine: {'line': b'[ 50%] Built target simple_sub\n'}
+[0.224925] (example) StdoutLine: {'line': b'[ 91%] Built target ps4_listener\n'}
+[0.225128] (example) StdoutLine: {'line': b'[100%] Built target usb_serial\n'}
+[0.245455] (ros2stm) CommandEnded: {'returncode': 0}
+[0.247392] (ros2stm) JobProgress: {'identifier': 'ros2stm', 'progress': 'install'}
+[0.260735] (ros2stm) Command: {'cmd': ['/usr/bin/cmake', '--install', '/home/ubuntu/rrst-ros2-ws/build/ros2stm'], 'cwd': '/home/ubuntu/rrst-ros2-ws/build/ros2stm', 'env': OrderedDict({'LESSOPEN': '| /usr/bin/lesspipe %s', 'LANGUAGE': 'ja:en', 'USER': 'ubuntu', 'LC_TIME': 'ja_JP.UTF-8', 'XDG_SESSION_TYPE': 'wayland', 'CLUTTER_DISABLE_MIPMAPPED_TEXT': '1', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/home/ubuntu/ros2_ws/install/ldlidar_component/lib:/opt/ros/jazzy/opt/rviz_ogre_vendor/lib:/opt/ros/jazzy/lib/x86_64-linux-gnu:/opt/ros/jazzy/opt/gz_math_vendor/lib:/opt/ros/jazzy/opt/gz_utils_vendor/lib:/opt/ros/jazzy/opt/gz_cmake_vendor/lib:/opt/ros/jazzy/lib', 'HOME': '/home/ubuntu', 'OLDPWD': '/home/ubuntu', 'DESKTOP_SESSION': 'ubuntu', 'ROS_PYTHON_VERSION': '3', 'GNOME_SHELL_SESSION_MODE': 'ubuntu', 'GTK_MODULES': 'gail:atk-bridge', 'LC_MONETARY': 'ja_JP.UTF-8', 'SYSTEMD_EXEC_PID': '2279', 'GSM_SKIP_SSH_AGENT_WORKAROUND': 'true', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': 'truecolor', 'DEBUGINFOD_URLS': 'https://debuginfod.ubuntu.com', 'IM_CONFIG_PHASE': '1', 'WAYLAND_DISPLAY': 'wayland-0', 'COLCON_PREFIX_PATH': '/home/ubuntu/ros2_ws/install', 'ROS_DISTRO': 'jazzy', 'LOGNAME': 'ubuntu', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'MEMORY_PRESSURE_WATCH': '/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.Shell@wayland.service/memory.pressure', 'XDG_SESSION_CLASS': 'user', 'USERNAME': 'ubuntu', 'TERM': 'xterm-256color', 'GNOME_DESKTOP_SESSION_ID': 'this-is-deprecated', 'PATH': '/opt/ros/jazzy/bin:/home/ubuntu/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin', 'SESSION_MANAGER': 'local/ubuntu-FMVUUD007U:@/tmp/.ICE-unix/2248,unix/ubuntu-FMVUUD007U:/tmp/.ICE-unix/2248', 'PAPERSIZE': 'a4', 'XDG_MENU_PREFIX': 'gnome-', 'LC_ADDRESS': 'ja_JP.UTF-8', 'GNOME_TERMINAL_SCREEN': '/org/gnome/Terminal/screen/a11c4e17_8ef7_4438_8b8f_8726aaacc246', 'GNOME_SETUP_DISPLAY': ':1', 'XDG_RUNTIME_DIR': '/run/user/1000', 'DISPLAY': ':0', 'LANG': 'ja_JP.UTF-8', 'XDG_CURRENT_DESKTOP': 'ubuntu:GNOME', 'LC_TELEPHONE': 'ja_JP.UTF-8', 'XMODIFIERS': '@im=ibus', 'XDG_SESSION_DESKTOP': 'ubuntu', 'XAUTHORITY': '/run/user/1000/.mutter-Xwaylandauth.B4B6K3', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:', 'GNOME_TERMINAL_SERVICE': ':1.125', 'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh', 'AMENT_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/tukurotto:/home/ubuntu/ros2_ws/install/silby:/home/ubuntu/ros2_ws/install/sibyl:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/ldlidar:/home/ubuntu/ros2_ws/install/ldlidar_node:/home/ubuntu/ros2_ws/install/ldlidar_component:/home/ubuntu/ros2_ws/install/example:/home/ubuntu/ros2_ws/install/cpp_pubsub:/opt/ros/jazzy', 'SHELL': '/bin/bash', 'LC_NAME': 'ja_JP.UTF-8', 'QT_ACCESSIBILITY': '1', 'GDMSESSION': 'ubuntu', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'LC_MEASUREMENT': 'ja_JP.UTF-8', 'LC_IDENTIFICATION': 'ja_JP.UTF-8', 'ROS_AUTOMATIC_DISCOVERY_RANGE': 'SUBNET', 'QT_IM_MODULE': 'ibus', 'PWD': '/home/ubuntu/rrst-ros2-ws/build/ros2stm', 'LC_ALL': 'en_US.UTF-8', 'XDG_CONFIG_DIRS': '/etc/xdg/xdg-ubuntu:/etc/xdg', 'XDG_DATA_DIRS': '/usr/share/ubuntu:/usr/share/gnome:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop', 'PYTHONPATH': '/opt/ros/jazzy/lib/python3.12/site-packages', 'LC_NUMERIC': 'ja_JP.UTF-8', 'LC_PAPER': 'ja_JP.UTF-8', 'COLCON': '1', 'MEMORY_PRESSURE_WRITE': 'c29tZSAyMDAwMDAgMjAwMDAwMAA=', 'VTE_VERSION': '7600', 'CMAKE_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/tukurotto:/home/ubuntu/ros2_ws/install/silby:/home/ubuntu/ros2_ws/install/sibyl:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/maeda:/home/ubuntu/ros2_ws/install/ldlidar:/home/ubuntu/ros2_ws/install/ldlidar_node:/home/ubuntu/ros2_ws/install/ldlidar_component:/home/ubuntu/ros2_ws/install/example:/home/ubuntu/ros2_ws/install/cpp_pubsub:/opt/ros/jazzy/opt/gz_math_vendor:/opt/ros/jazzy/opt/gz_utils_vendor:/opt/ros/jazzy/opt/gz_cmake_vendor:/opt/ros/jazzy'}), 'shell': False}
+[0.263432] (example) CommandEnded: {'returncode': 0}
+[0.265238] (example) JobProgress: {'identifier': 'example', 'progress': 'install'}
+[0.265810] (example) Command: {'cmd': ['/usr/bin/cmake', '--install', '/home/ubuntu/rrst-ros2-ws/build/example'], 'cwd': '/home/ubuntu/rrst-ros2-ws/build/example', 'env': OrderedDict({'LESSOPEN': '| /usr/bin/lesspipe %s', 'LANGUAGE': 'ja:en', 'USER': 'ubuntu', 'LC_TIME': 'ja_JP.UTF-8', 'XDG_SESSION_TYPE': 'wayland', 'CLUTTER_DISABLE_MIPMAPPED_TEXT': '1', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/home/ubuntu/ros2_ws/install/ldlidar_component/lib:/opt/ros/jazzy/opt/rviz_ogre_vendor/lib:/opt/ros/jazzy/lib/x86_64-linux-gnu:/opt/ros/jazzy/opt/gz_math_vendor/lib:/opt/ros/jazzy/opt/gz_utils_vendor/lib:/opt/ros/jazzy/opt/gz_cmake_vendor/lib:/opt/ros/jazzy/lib', 'HOME': '/home/ubuntu', 'OLDPWD': '/home/ubuntu', 'DESKTOP_SESSION': 'ubuntu', 'ROS_PYTHON_VERSION': '3', 'GNOME_SHELL_SESSION_MODE': 'ubuntu', 'GTK_MODULES': 'gail:atk-bridge', 'LC_MONETARY': 'ja_JP.UTF-8', 'SYSTEMD_EXEC_PID': '2279', 'GSM_SKIP_SSH_AGENT_WORKAROUND': 'true', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': 'truecolor', 'DEBUGINFOD_URLS': 'https://debuginfod.ubuntu.com', 'IM_CONFIG_PHASE': '1', 'WAYLAND_DISPLAY': 'wayland-0', 'COLCON_PREFIX_PATH': '/home/ubuntu/ros2_ws/install', 'ROS_DISTRO': 'jazzy', 'LOGNAME': 'ubuntu', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'MEMORY_PRESSURE_WATCH': '/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.Shell@wayland.service/memory.pressure', 'XDG_SESSION_CLASS': 'user', 'USERNAME': 'ubuntu', 'TERM': 'xterm-256color', 'GNOME_DESKTOP_SESSION_ID': 'this-is-deprecated', 'PATH': '/opt/ros/jazzy/bin:/home/ubuntu/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin', 'SESSION_MANAGER': 'local/ubuntu-FMVUUD007U:@/tmp/.ICE-unix/2248,unix/ubuntu-FMVUUD007U:/tmp/.ICE-unix/2248', 'PAPERSIZE': 'a4', 'XDG_MENU_PREFIX': 'gnome-', 'LC_ADDRESS': 'ja_JP.UTF-8', 'GNOME_TERMINAL_SCREEN': '/org/gnome/Terminal/screen/a11c4e17_8ef7_4438_8b8f_8726aaacc246', 'GNOME_SETUP_DISPLAY': ':1', 'XDG_RUNTIME_DIR': '/run/user/1000', 'DISPLAY': ':0', 'LANG': 'ja_JP.UTF-8', 'XDG_CURRENT_DESKTOP': 'ubuntu:GNOME', 'LC_TELEPHONE': 'ja_JP.UTF-8', 'XMODIFIERS': '@im=ibus', 'XDG_SESSION_DESKTOP': 'ubuntu', 'XAUTHORITY': '/run/user/1000/.mutter-Xwaylandauth.B4B6K3', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:', 'GNOME_TERMINAL_SERVICE': ':1.125', 'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh', 'AMENT_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/tukurotto:/home/ubuntu/ros2_ws/install/silby:/home/ubuntu/ros2_ws/install/sibyl:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/ldlidar:/home/ubuntu/ros2_ws/install/ldlidar_node:/home/ubuntu/ros2_ws/install/ldlidar_component:/home/ubuntu/ros2_ws/install/example:/home/ubuntu/ros2_ws/install/cpp_pubsub:/opt/ros/jazzy', 'SHELL': '/bin/bash', 'LC_NAME': 'ja_JP.UTF-8', 'QT_ACCESSIBILITY': '1', 'GDMSESSION': 'ubuntu', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'LC_MEASUREMENT': 'ja_JP.UTF-8', 'LC_IDENTIFICATION': 'ja_JP.UTF-8', 'ROS_AUTOMATIC_DISCOVERY_RANGE': 'SUBNET', 'QT_IM_MODULE': 'ibus', 'PWD': '/home/ubuntu/rrst-ros2-ws/build/example', 'LC_ALL': 'en_US.UTF-8', 'XDG_CONFIG_DIRS': '/etc/xdg/xdg-ubuntu:/etc/xdg', 'XDG_DATA_DIRS': '/usr/share/ubuntu:/usr/share/gnome:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop', 'PYTHONPATH': '/opt/ros/jazzy/lib/python3.12/site-packages', 'LC_NUMERIC': 'ja_JP.UTF-8', 'LC_PAPER': 'ja_JP.UTF-8', 'COLCON': '1', 'MEMORY_PRESSURE_WRITE': 'c29tZSAyMDAwMDAgMjAwMDAwMAA=', 'VTE_VERSION': '7600', 'CMAKE_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/tukurotto:/home/ubuntu/ros2_ws/install/silby:/home/ubuntu/ros2_ws/install/sibyl:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/maeda:/home/ubuntu/ros2_ws/install/ldlidar:/home/ubuntu/ros2_ws/install/ldlidar_node:/home/ubuntu/ros2_ws/install/ldlidar_component:/home/ubuntu/ros2_ws/install/example:/home/ubuntu/ros2_ws/install/cpp_pubsub:/opt/ros/jazzy/opt/gz_math_vendor:/opt/ros/jazzy/opt/gz_utils_vendor:/opt/ros/jazzy/opt/gz_cmake_vendor:/opt/ros/jazzy'}), 'shell': False}
+[0.269695] (ros2stm) StdoutLine: {'line': b'-- Install configuration: ""\n'}
+[0.270719] (ros2stm) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2stm/lib/ros2stm/sb_tester\n'}
+[0.271184] (ros2stm) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ament_index/resource_index/package_run_dependencies/ros2stm\n'}
+[0.271479] (ros2stm) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ament_index/resource_index/parent_prefix_path/ros2stm\n'}
+[0.271746] (ros2stm) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/environment/ament_prefix_path.sh\n'}
+[0.271940] (ros2stm) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/environment/ament_prefix_path.dsv\n'}
+[0.272134] (ros2stm) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/environment/path.sh\n'}
+[0.272385] (ros2stm) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/environment/path.dsv\n'}
+[0.272554] (ros2stm) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/local_setup.bash\n'}
+[0.272725] (ros2stm) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/local_setup.sh\n'}
+[0.272905] (ros2stm) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/local_setup.zsh\n'}
+[0.273084] (ros2stm) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/local_setup.dsv\n'}
+[0.273374] (ros2stm) StdoutLine: {'line': b'-- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/package.dsv\n'}
+[0.273611] (ros2stm) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ament_index/resource_index/packages/ros2stm\n'}
+[0.273696] (ros2stm) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/cmake/ros2stmConfig.cmake\n'}
+[0.273770] (ros2stm) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/cmake/ros2stmConfig-version.cmake\n'}
+[0.273834] (ros2stm) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/package.xml\n'}
+[0.276205] (ros2stm) CommandEnded: {'returncode': 0}
+[0.277475] (example) StdoutLine: {'line': b'-- Install configuration: ""\n'}
+[0.278064] (example) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/lib/example/ps4_listener\n'}
+[0.279081] (example) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/lib/example/udp_send\n'}
+[0.279511] (example) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/lib/example/simple_pub\n'}
+[0.280383] (example) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/lib/example/simple_sub\n'}
+[0.280933] (example) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/lib/example/usb_serial\n'}
+[0.281515] (example) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/ament_index/resource_index/package_run_dependencies/example\n'}
+[0.281826] (example) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/ament_index/resource_index/parent_prefix_path/example\n'}
+[0.281928] (example) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/example/environment/ament_prefix_path.sh\n'}
+[0.282002] (example) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/example/environment/ament_prefix_path.dsv\n'}
+[0.282068] (example) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/example/environment/path.sh\n'}
+[0.282155] (example) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/example/environment/path.dsv\n'}
+[0.282243] (example) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/example/local_setup.bash\n'}
+[0.282308] (example) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/example/local_setup.sh\n'}
+[0.282372] (example) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/example/local_setup.zsh\n'}
+[0.282435] (example) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/example/local_setup.dsv\n'}
+[0.282496] (example) StdoutLine: {'line': b'-- Installing: /home/ubuntu/rrst-ros2-ws/install/example/share/example/package.dsv\n'}
+[0.282630] (example) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/ament_index/resource_index/packages/example\n'}
+[0.282774] (example) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/example/cmake/exampleConfig.cmake\n'}
+[0.282970] (example) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/example/cmake/exampleConfig-version.cmake\n'}
+[0.283038] (example) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/example/share/example/package.xml\n'}
+[0.300324] (-) TimerEvent: {}
+[0.309982] (ros2stm) JobEnded: {'identifier': 'ros2stm', 'rc': 0}
+[0.311735] (example) CommandEnded: {'returncode': 0}
+[0.330501] (example) JobEnded: {'identifier': 'example', 'rc': 0}
+[0.400543] (-) TimerEvent: {}
+[0.501193] (-) TimerEvent: {}
+[0.601850] (-) TimerEvent: {}
+[0.702492] (-) TimerEvent: {}
+[0.712293] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Using the multi-header code from /home/ubuntu/rrst-ros2-ws/build/nr26_r1_hw_ctrl/_deps/nlohmann_json-src/include/\n'}
+[0.717307] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Found ament_cmake: 2.5.3 (/opt/ros/jazzy/share/ament_cmake/cmake)\n'}
+[0.733259] (ros2esp) StdoutLine: {'line': b'-- Using the multi-header code from /home/ubuntu/rrst-ros2-ws/build/ros2esp/_deps/nlohmann_json-src/include/\n'}
+[0.736991] (ros2esp) StdoutLine: {'line': b'-- Found ament_cmake: 2.5.3 (/opt/ros/jazzy/share/ament_cmake/cmake)\n'}
+[0.748034] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Using the multi-header code from /home/ubuntu/rrst-ros2-ws/build/nr26_r2_hw_ctrl/_deps/nlohmann_json-src/include/\n'}
+[0.751071] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Found ament_cmake: 2.5.3 (/opt/ros/jazzy/share/ament_cmake/cmake)\n'}
+[0.751733] (ros2udp) StdoutLine: {'line': b'-- Using the multi-header code from /home/ubuntu/rrst-ros2-ws/build/ros2udp/_deps/nlohmann_json-src/include/\n'}
+[0.753840] (ros2udp) StdoutLine: {'line': b'-- Found ament_cmake: 2.5.3 (/opt/ros/jazzy/share/ament_cmake/cmake)\n'}
+[0.802598] (-) TimerEvent: {}
+[0.903037] (-) TimerEvent: {}
+[1.003425] (-) TimerEvent: {}
+[1.103914] (-) TimerEvent: {}
+[1.125129] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Found rclcpp: 28.1.8 (/opt/ros/jazzy/share/rclcpp/cmake)\n'}
+[1.125582] (ros2udp) StdoutLine: {'line': b'-- Found rclcpp: 28.1.8 (/opt/ros/jazzy/share/rclcpp/cmake)\n'}
+[1.138414] (ros2esp) StdoutLine: {'line': b'-- Found rclcpp: 28.1.8 (/opt/ros/jazzy/share/rclcpp/cmake)\n'}
+[1.142006] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Found rclcpp: 28.1.8 (/opt/ros/jazzy/share/rclcpp/cmake)\n'}
+[1.168871] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Found rosidl_generator_c: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_c/cmake)\n'}
+[1.170646] (ros2esp) StdoutLine: {'line': b'-- Found rosidl_generator_c: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_c/cmake)\n'}
+[1.180739] (ros2udp) StdoutLine: {'line': b'-- Found rosidl_generator_c: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_c/cmake)\n'}
+[1.181650] (ros2esp) StdoutLine: {'line': b'-- Found rosidl_generator_cpp: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_cpp/cmake)\n'}
+[1.181902] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Found rosidl_generator_cpp: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_cpp/cmake)\n'}
+[1.195208] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Found rosidl_generator_c: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_c/cmake)\n'}
+[1.200299] (ros2udp) StdoutLine: {'line': b'-- Found rosidl_generator_cpp: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_cpp/cmake)\n'}
+[1.204045] (-) TimerEvent: {}
+[1.204418] (ros2esp) StdoutLine: {'line': b'-- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c\n'}
+[1.204826] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c\n'}
+[1.205986] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Found rosidl_generator_cpp: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_cpp/cmake)\n'}
+[1.225261] (ros2udp) StdoutLine: {'line': b'-- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c\n'}
+[1.227064] (ros2esp) StdoutLine: {'line': b'-- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp\n'}
+[1.227367] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp\n'}
+[1.231082] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c\n'}
+[1.255985] (ros2udp) StdoutLine: {'line': b'-- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp\n'}
+[1.262763] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp\n'}
+[1.304257] (-) TimerEvent: {}
+[1.319413] (ros2esp) StdoutLine: {'line': b'-- Found rmw_implementation_cmake: 7.3.2 (/opt/ros/jazzy/share/rmw_implementation_cmake/cmake)\n'}
+[1.321340] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Found rmw_implementation_cmake: 7.3.2 (/opt/ros/jazzy/share/rmw_implementation_cmake/cmake)\n'}
+[1.322226] (ros2esp) StdoutLine: {'line': b'-- Found rmw_fastrtps_cpp: 8.4.2 (/opt/ros/jazzy/share/rmw_fastrtps_cpp/cmake)\n'}
+[1.324715] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Found rmw_fastrtps_cpp: 8.4.2 (/opt/ros/jazzy/share/rmw_fastrtps_cpp/cmake)\n'}
+[1.356146] (ros2udp) StdoutLine: {'line': b'-- Found rmw_implementation_cmake: 7.3.2 (/opt/ros/jazzy/share/rmw_implementation_cmake/cmake)\n'}
+[1.358052] (ros2udp) StdoutLine: {'line': b'-- Found rmw_fastrtps_cpp: 8.4.2 (/opt/ros/jazzy/share/rmw_fastrtps_cpp/cmake)\n'}
+[1.404448] (-) TimerEvent: {}
+[1.417233] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Found rmw_implementation_cmake: 7.3.2 (/opt/ros/jazzy/share/rmw_implementation_cmake/cmake)\n'}
+[1.420552] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Found rmw_fastrtps_cpp: 8.4.2 (/opt/ros/jazzy/share/rmw_fastrtps_cpp/cmake)\n'}
+[1.430257] (ros2esp) StdoutLine: {'line': b"-- Using RMW implementation 'rmw_fastrtps_cpp' as default\n"}
+[1.455927] (nr26_r1_hw_ctrl) StdoutLine: {'line': b"-- Using RMW implementation 'rmw_fastrtps_cpp' as default\n"}
+[1.460391] (ros2udp) StdoutLine: {'line': b"-- Using RMW implementation 'rmw_fastrtps_cpp' as default\n"}
+[1.504650] (-) TimerEvent: {}
+[1.555007] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Found std_msgs: 5.3.6 (/opt/ros/jazzy/share/std_msgs/cmake)\n'}
+[1.558830] (ros2udp) StdoutLine: {'line': b'-- Found std_msgs: 5.3.6 (/opt/ros/jazzy/share/std_msgs/cmake)\n'}
+[1.559268] (nr26_r2_hw_ctrl) StdoutLine: {'line': b"-- Using RMW implementation 'rmw_fastrtps_cpp' as default\n"}
+[1.560809] (ros2esp) StdoutLine: {'line': b'-- Found std_msgs: 5.3.6 (/opt/ros/jazzy/share/std_msgs/cmake)\n'}
+[1.576562] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Found sensor_msgs: 5.3.6 (/opt/ros/jazzy/share/sensor_msgs/cmake)\n'}
+[1.576981] (ros2udp) StdoutLine: {'line': b'-- Found sensor_msgs: 5.3.6 (/opt/ros/jazzy/share/sensor_msgs/cmake)\n'}
+[1.582085] (ros2esp) StdoutLine: {'line': b'-- Found sensor_msgs: 5.3.6 (/opt/ros/jazzy/share/sensor_msgs/cmake)\n'}
+[1.604786] (-) TimerEvent: {}
+[1.640987] (ros2udp) StdoutLine: {'line': b'-- Found tf2: 0.36.9 (/opt/ros/jazzy/share/tf2/cmake)\n'}
+[1.642554] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Found tf2: 0.36.9 (/opt/ros/jazzy/share/tf2/cmake)\n'}
+[1.647827] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Found tf2_ros: 0.36.9 (/opt/ros/jazzy/share/tf2_ros/cmake)\n'}
+[1.649872] (ros2udp) StdoutLine: {'line': b'-- Found tf2_ros: 0.36.9 (/opt/ros/jazzy/share/tf2_ros/cmake)\n'}
+[1.674063] (ros2esp) StdoutLine: {'line': b'-- Found ament_lint_auto: 0.17.2 (/opt/ros/jazzy/share/ament_lint_auto/cmake)\n'}
+[1.704955] (-) TimerEvent: {}
+[1.725399] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Found std_msgs: 5.3.6 (/opt/ros/jazzy/share/std_msgs/cmake)\n'}
+[1.758873] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Found sensor_msgs: 5.3.6 (/opt/ros/jazzy/share/sensor_msgs/cmake)\n'}
+[1.805165] (-) TimerEvent: {}
+[1.809926] (ros2esp) StdoutLine: {'line': b"-- Added test 'cppcheck' to perform static code analysis on C / C++ code\n"}
+[1.811519] (ros2esp) StdoutLine: {'line': b'-- Configured cppcheck include dirs: \n'}
+[1.811765] (ros2esp) StdoutLine: {'line': b'-- Configured cppcheck exclude dirs and/or files: \n'}
+[1.813148] (ros2esp) StdoutLine: {'line': b"-- Added test 'lint_cmake' to check CMake code style\n"}
+[1.815710] (ros2esp) StdoutLine: {'line': b"-- Added test 'uncrustify' to check C / C++ code style\n"}
+[1.815969] (ros2esp) StdoutLine: {'line': b'-- Configured uncrustify additional arguments: \n'}
+[1.816768] (ros2esp) StdoutLine: {'line': b"-- Added test 'xmllint' to check XML markup files\n"}
+[1.819314] (ros2esp) StdoutLine: {'line': b'-- Configuring done (1.7s)\n'}
+[1.835558] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Found tf2_geometry_msgs: 0.36.9 (/opt/ros/jazzy/share/tf2_geometry_msgs/cmake)\n'}
+[1.839395] (ros2udp) StdoutLine: {'line': b'-- Found tf2_geometry_msgs: 0.36.9 (/opt/ros/jazzy/share/tf2_geometry_msgs/cmake)\n'}
+[1.842228] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Found eigen3_cmake_module: 0.3.0 (/opt/ros/jazzy/share/eigen3_cmake_module/cmake)\n'}
+[1.844467] (ros2udp) StdoutLine: {'line': b'-- Found eigen3_cmake_module: 0.3.0 (/opt/ros/jazzy/share/eigen3_cmake_module/cmake)\n'}
+[1.845354] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Ensuring Eigen3 include directory is part of orocos-kdl CMake target\n'}
+[1.846172] (ros2udp) StdoutLine: {'line': b'-- Ensuring Eigen3 include directory is part of orocos-kdl CMake target\n'}
+[1.848775] (ros2udp) StdoutLine: {'line': b'-- Found visualization_msgs: 5.3.6 (/opt/ros/jazzy/share/visualization_msgs/cmake)\n'}
+[1.850211] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Found visualization_msgs: 5.3.6 (/opt/ros/jazzy/share/visualization_msgs/cmake)\n'}
+[1.862651] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Found tf2: 0.36.9 (/opt/ros/jazzy/share/tf2/cmake)\n'}
+[1.871138] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Found tf2_ros: 0.36.9 (/opt/ros/jazzy/share/tf2_ros/cmake)\n'}
+[1.900261] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Found ament_lint_auto: 0.17.2 (/opt/ros/jazzy/share/ament_lint_auto/cmake)\n'}
+[1.905318] (-) TimerEvent: {}
+[1.925029] (ros2esp) StdoutLine: {'line': b'-- Generating done (0.1s)\n'}
+[1.954367] (ros2esp) StdoutLine: {'line': b'-- Build files have been written to: /home/ubuntu/rrst-ros2-ws/build/ros2esp\n'}
+[2.008200] (-) TimerEvent: {}
+[2.047280] (ros2esp) StdoutLine: {'line': b'[  7%] Built target nr25_mr_sd\n'}
+[2.049689] (ros2esp) StdoutLine: {'line': b'[ 14%] Built target nr26_r2_move\n'}
+[2.053279] (ros2esp) StdoutLine: {'line': b'[ 21%] Built target nr26_tuner\n'}
+[2.053669] (ros2esp) StdoutLine: {'line': b'[ 28%] Built target dokusute_tuner\n'}
+[2.058182] (ros2esp) StdoutLine: {'line': b'[ 35%] Built target mb_tester\n'}
+[2.061267] (ros2esp) StdoutLine: {'line': b'[ 46%] Built target nr26_omni\n'}
+[2.061744] (ros2esp) StdoutLine: {'line': b'[ 50%] Built target cr25_fes\n'}
+[2.063077] (ros2esp) StdoutLine: {'line': b'[ 57%] Built target nr26_omni_fb\n'}
+[2.065830] (ros2esp) StdoutLine: {'line': b'[ 64%] Built target mros_wip\n'}
+[2.069673] (ros2esp) StdoutLine: {'line': b'[ 71%] Built target pid_wip\n'}
+[2.072842] (ros2esp) StdoutLine: {'line': b'[ 78%] Built target pid_tuner\n'}
+[2.079514] (ros2esp) StdoutLine: {'line': b'[ 85%] Built target dokusute_move\n'}
+[2.085705] (ros2esp) StdoutLine: {'line': b'[ 92%] Built target sb_tester\n'}
+[2.096295] (ros2esp) StdoutLine: {'line': b'[100%] Built target sb_host\n'}
+[2.108354] (-) TimerEvent: {}
+[2.112247] (ros2esp) CommandEnded: {'returncode': 0}
+[2.113670] (ros2esp) JobProgress: {'identifier': 'ros2esp', 'progress': 'install'}
+[2.114722] (ros2esp) Command: {'cmd': ['/usr/bin/cmake', '--install', '/home/ubuntu/rrst-ros2-ws/build/ros2esp'], 'cwd': '/home/ubuntu/rrst-ros2-ws/build/ros2esp', 'env': OrderedDict({'LESSOPEN': '| /usr/bin/lesspipe %s', 'LANGUAGE': 'ja:en', 'USER': 'ubuntu', 'LC_TIME': 'ja_JP.UTF-8', 'XDG_SESSION_TYPE': 'wayland', 'CLUTTER_DISABLE_MIPMAPPED_TEXT': '1', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/home/ubuntu/ros2_ws/install/ldlidar_component/lib:/opt/ros/jazzy/opt/rviz_ogre_vendor/lib:/opt/ros/jazzy/lib/x86_64-linux-gnu:/opt/ros/jazzy/opt/gz_math_vendor/lib:/opt/ros/jazzy/opt/gz_utils_vendor/lib:/opt/ros/jazzy/opt/gz_cmake_vendor/lib:/opt/ros/jazzy/lib', 'HOME': '/home/ubuntu', 'OLDPWD': '/home/ubuntu', 'DESKTOP_SESSION': 'ubuntu', 'ROS_PYTHON_VERSION': '3', 'GNOME_SHELL_SESSION_MODE': 'ubuntu', 'GTK_MODULES': 'gail:atk-bridge', 'LC_MONETARY': 'ja_JP.UTF-8', 'SYSTEMD_EXEC_PID': '2279', 'GSM_SKIP_SSH_AGENT_WORKAROUND': 'true', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': 'truecolor', 'DEBUGINFOD_URLS': 'https://debuginfod.ubuntu.com', 'IM_CONFIG_PHASE': '1', 'WAYLAND_DISPLAY': 'wayland-0', 'COLCON_PREFIX_PATH': '/home/ubuntu/ros2_ws/install', 'ROS_DISTRO': 'jazzy', 'LOGNAME': 'ubuntu', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'MEMORY_PRESSURE_WATCH': '/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.Shell@wayland.service/memory.pressure', 'XDG_SESSION_CLASS': 'user', 'USERNAME': 'ubuntu', 'TERM': 'xterm-256color', 'GNOME_DESKTOP_SESSION_ID': 'this-is-deprecated', 'PATH': '/opt/ros/jazzy/bin:/home/ubuntu/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin', 'SESSION_MANAGER': 'local/ubuntu-FMVUUD007U:@/tmp/.ICE-unix/2248,unix/ubuntu-FMVUUD007U:/tmp/.ICE-unix/2248', 'PAPERSIZE': 'a4', 'XDG_MENU_PREFIX': 'gnome-', 'LC_ADDRESS': 'ja_JP.UTF-8', 'GNOME_TERMINAL_SCREEN': '/org/gnome/Terminal/screen/a11c4e17_8ef7_4438_8b8f_8726aaacc246', 'GNOME_SETUP_DISPLAY': ':1', 'XDG_RUNTIME_DIR': '/run/user/1000', 'DISPLAY': ':0', 'LANG': 'ja_JP.UTF-8', 'XDG_CURRENT_DESKTOP': 'ubuntu:GNOME', 'LC_TELEPHONE': 'ja_JP.UTF-8', 'XMODIFIERS': '@im=ibus', 'XDG_SESSION_DESKTOP': 'ubuntu', 'XAUTHORITY': '/run/user/1000/.mutter-Xwaylandauth.B4B6K3', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:', 'GNOME_TERMINAL_SERVICE': ':1.125', 'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh', 'AMENT_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/tukurotto:/home/ubuntu/ros2_ws/install/silby:/home/ubuntu/ros2_ws/install/sibyl:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/ldlidar:/home/ubuntu/ros2_ws/install/ldlidar_node:/home/ubuntu/ros2_ws/install/ldlidar_component:/home/ubuntu/ros2_ws/install/example:/home/ubuntu/ros2_ws/install/cpp_pubsub:/opt/ros/jazzy', 'SHELL': '/bin/bash', 'LC_NAME': 'ja_JP.UTF-8', 'QT_ACCESSIBILITY': '1', 'GDMSESSION': 'ubuntu', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'LC_MEASUREMENT': 'ja_JP.UTF-8', 'LC_IDENTIFICATION': 'ja_JP.UTF-8', 'ROS_AUTOMATIC_DISCOVERY_RANGE': 'SUBNET', 'QT_IM_MODULE': 'ibus', 'PWD': '/home/ubuntu/rrst-ros2-ws/build/ros2esp', 'LC_ALL': 'en_US.UTF-8', 'XDG_CONFIG_DIRS': '/etc/xdg/xdg-ubuntu:/etc/xdg', 'XDG_DATA_DIRS': '/usr/share/ubuntu:/usr/share/gnome:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop', 'PYTHONPATH': '/opt/ros/jazzy/lib/python3.12/site-packages', 'LC_NUMERIC': 'ja_JP.UTF-8', 'LC_PAPER': 'ja_JP.UTF-8', 'COLCON': '1', 'MEMORY_PRESSURE_WRITE': 'c29tZSAyMDAwMDAgMjAwMDAwMAA=', 'VTE_VERSION': '7600', 'CMAKE_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/tukurotto:/home/ubuntu/ros2_ws/install/silby:/home/ubuntu/ros2_ws/install/sibyl:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/maeda:/home/ubuntu/ros2_ws/install/ldlidar:/home/ubuntu/ros2_ws/install/ldlidar_node:/home/ubuntu/ros2_ws/install/ldlidar_component:/home/ubuntu/ros2_ws/install/example:/home/ubuntu/ros2_ws/install/cpp_pubsub:/opt/ros/jazzy/opt/gz_math_vendor:/opt/ros/jazzy/opt/gz_utils_vendor:/opt/ros/jazzy/opt/gz_cmake_vendor:/opt/ros/jazzy'}), 'shell': False}
+[2.119389] (nr26_r1_hw_ctrl) StdoutLine: {'line': b"-- Added test 'cppcheck' to perform static code analysis on C / C++ code\n"}
+[2.120016] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Configured cppcheck include dirs: \n'}
+[2.120262] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Configured cppcheck exclude dirs and/or files: \n'}
+[2.121046] (nr26_r1_hw_ctrl) StdoutLine: {'line': b"-- Added test 'flake8' to check Python code syntax and style conventions\n"}
+[2.121295] (nr26_r1_hw_ctrl) StdoutLine: {'line': b"-- Configured 'flake8' exclude dirs and/or files: \n"}
+[2.122303] (nr26_r1_hw_ctrl) StdoutLine: {'line': b"-- Added test 'lint_cmake' to check CMake code style\n"}
+[2.123131] (nr26_r1_hw_ctrl) StdoutLine: {'line': b"-- Added test 'pep257' to check Python code against some of the docstring style conventions in PEP 257\n"}
+[2.125241] (ros2esp) StdoutLine: {'line': b'-- Install configuration: ""\n'}
+[2.125969] (nr26_r1_hw_ctrl) StdoutLine: {'line': b"-- Added test 'uncrustify' to check C / C++ code style\n"}
+[2.126221] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Configured uncrustify additional arguments: \n'}
+[2.126444] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/lib/ros2esp/mros_wip\n'}
+[2.126934] (nr26_r1_hw_ctrl) StdoutLine: {'line': b"-- Added test 'xmllint' to check XML markup files\n"}
+[2.127298] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/lib/ros2esp/mb_tester\n'}
+[2.127986] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/lib/ros2esp/nr25_mr_sd\n'}
+[2.129031] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/lib/ros2esp/nr26_omni\n'}
+[2.129263] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Configuring done (2.0s)\n'}
+[2.130111] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/lib/ros2esp/nr26_omni_fb\n'}
+[2.131252] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/lib/ros2esp/nr26_tuner\n'}
+[2.132180] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/lib/ros2esp/cr25_fes\n'}
+[2.133533] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/lib/ros2esp/pid_wip\n'}
+[2.134547] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/lib/ros2esp/pid_tuner\n'}
+[2.135763] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/lib/ros2esp/dokusute_move\n'}
+[2.136772] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/lib/ros2esp/dokusute_tuner\n'}
+[2.137758] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/lib/ros2esp/sb_tester\n'}
+[2.139004] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/lib/ros2esp/nr26_r2_move\n'}
+[2.140271] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/lib/ros2esp/sb_host\n'}
+[2.140676] (ros2esp) StdoutLine: {'line': b'-- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ament_index/resource_index/package_run_dependencies/ros2esp\n'}
+[2.141030] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ament_index/resource_index/parent_prefix_path/ros2esp\n'}
+[2.141328] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/environment/ament_prefix_path.sh\n'}
+[2.141556] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/environment/ament_prefix_path.dsv\n'}
+[2.141724] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/environment/path.sh\n'}
+[2.141915] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/environment/path.dsv\n'}
+[2.142141] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/local_setup.bash\n'}
+[2.142332] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/local_setup.sh\n'}
+[2.142497] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/local_setup.zsh\n'}
+[2.142651] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/local_setup.dsv\n'}
+[2.142834] (ros2esp) StdoutLine: {'line': b'-- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/package.dsv\n'}
+[2.142991] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ament_index/resource_index/packages/ros2esp\n'}
+[2.143166] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/cmake/ros2espConfig.cmake\n'}
+[2.143333] (ros2esp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/cmake/ros2espConfig-version.cmake\n'}
+[2.143488] (ros2esp) StdoutLine: {'line': b'-- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/package.xml\n'}
+[2.146978] (ros2esp) CommandEnded: {'returncode': 0}
+[2.163271] (ros2udp) StdoutLine: {'line': b'-- Configuring done (2.0s)\n'}
+[2.172071] (ros2esp) JobEnded: {'identifier': 'ros2esp', 'rc': 0}
+[2.179516] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Found tf2_geometry_msgs: 0.36.9 (/opt/ros/jazzy/share/tf2_geometry_msgs/cmake)\n'}
+[2.185700] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Generating done (0.0s)\n'}
+[2.187387] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Found eigen3_cmake_module: 0.3.0 (/opt/ros/jazzy/share/eigen3_cmake_module/cmake)\n'}
+[2.190214] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Ensuring Eigen3 include directory is part of orocos-kdl CMake target\n'}
+[2.195453] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Found visualization_msgs: 5.3.6 (/opt/ros/jazzy/share/visualization_msgs/cmake)\n'}
+[2.195850] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'-- Build files have been written to: /home/ubuntu/rrst-ros2-ws/build/nr26_r1_hw_ctrl\n'}
+[2.208517] (-) TimerEvent: {}
+[2.261914] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'[ 16%] \x1b[32mBuilding CXX object CMakeFiles/r1_mc.dir/src/R1_MotionCtrl.cpp.o\x1b[0m\n'}
+[2.266929] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Found OpenCV: /usr (found version "4.6.0") \n'}
+[2.267786] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'[ 50%] \x1b[32mBuilding CXX object CMakeFiles/r1_sd.dir/src/R1_SwerveDrive.cpp.o\x1b[0m\n'}
+[2.268077] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'[ 50%] \x1b[32mBuilding CXX object CMakeFiles/r1_servo_cal.dir/src/R1_Servo_Calibrator.cpp.o\x1b[0m\n'}
+[2.269808] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Found cv_bridge: 4.1.0 (/opt/ros/jazzy/share/cv_bridge/cmake)\n'}
+[2.278655] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Found nav_msgs: 5.3.6 (/opt/ros/jazzy/share/nav_msgs/cmake)\n'}
+[2.308732] (-) TimerEvent: {}
+[2.341112] (ros2udp) StdoutLine: {'line': b'-- Generating done (0.2s)\n'}
+[2.342399] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Found ament_lint_auto: 0.17.2 (/opt/ros/jazzy/share/ament_lint_auto/cmake)\n'}
+[2.382451] (ros2udp) StdoutLine: {'line': b'-- Build files have been written to: /home/ubuntu/rrst-ros2-ws/build/ros2udp\n'}
+[2.408913] (-) TimerEvent: {}
+[2.481434] (ros2udp) StdoutLine: {'line': b'[  6%] Built target nr25_mr_sd\n'}
+[2.482600] (ros2udp) StdoutLine: {'line': b'[ 12%] Built target nr25_dr_sd\n'}
+[2.494024] (ros2udp) StdoutLine: {'line': b'[ 18%] Built target nr25_dr\n'}
+[2.502446] (ros2udp) StdoutLine: {'line': b'[ 25%] Built target nr25_enc\n'}
+[2.502803] (ros2udp) StdoutLine: {'line': b'[ 25%] Built target nr25_pr\n'}
+[2.504741] (ros2udp) StdoutLine: {'line': b'[ 29%] Built target nr25_dr_omni\n'}
+[2.505859] (ros2udp) StdoutLine: {'line': b'[ 34%] Built target nr25_mr_omni\n'}
+[2.510226] (-) TimerEvent: {}
+[2.519572] (ros2udp) StdoutLine: {'line': b'[ 37%] Built target nr25_enc_pid\n'}
+[2.520946] (ros2udp) StdoutLine: {'line': b'[ 46%] Built target nr25_vel2js\n'}
+[2.524946] (ros2udp) StdoutLine: {'line': b'[ 43%] Built target nr25_mr\n'}
+[2.526358] (ros2udp) StdoutLine: {'line': b'[ 53%] Built target nr25_dr_c610\n'}
+[2.528880] (ros2udp) StdoutLine: {'line': b'[ 57%] Built target nr25_pid\n'}
+[2.560295] (ros2udp) StdoutLine: {'line': b'[ 60%] Built target nr25_dr_servo_cal\n'}
+[2.562422] (ros2udp) StdoutLine: {'line': b'[ 64%] Built target nr25_mr_servo_cal\n'}
+[2.562678] (nr26_r2_hw_ctrl) StdoutLine: {'line': b"-- Added test 'cppcheck' to perform static code analysis on C / C++ code\n"}
+[2.562897] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Configured cppcheck include dirs: \n'}
+[2.563073] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Configured cppcheck exclude dirs and/or files: \n'}
+[2.563442] (nr26_r2_hw_ctrl) StdoutLine: {'line': b"-- Added test 'lint_cmake' to check CMake code style\n"}
+[2.564588] (nr26_r2_hw_ctrl) StdoutLine: {'line': b"-- Added test 'uncrustify' to check C / C++ code style\n"}
+[2.564775] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Configured uncrustify additional arguments: \n'}
+[2.565222] (ros2udp) StdoutLine: {'line': b'[ 67%] Built target nr25_dr_pr\n'}
+[2.566643] (nr26_r2_hw_ctrl) StdoutLine: {'line': b"-- Added test 'xmllint' to check XML markup files\n"}
+[2.567162] (ros2udp) StdoutLine: {'line': b'[ 70%] Built target nr25_dr_hcsr04\n'}
+[2.568629] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Configuring done (2.5s)\n'}
+[2.576831] (ros2udp) StdoutLine: {'line': b'[ 76%] Built target ld19_fs\n'}
+[2.577194] (ros2udp) StdoutLine: {'line': b'[ 78%] Built target mb_tester\n'}
+[2.578715] (ros2udp) StdoutLine: {'line': b'[ 84%] Built target pid_wip\n'}
+[2.585765] (ros2udp) StdoutLine: {'line': b'[ 87%] Built target pid_tuner\n'}
+[2.588499] (ros2udp) StdoutLine: {'line': b'[ 93%] Built target nr25_led\n'}
+[2.608296] (ros2udp) StdoutLine: {'line': b'[100%] Built target temp\n'}
+[2.610318] (-) TimerEvent: {}
+[2.631927] (ros2udp) CommandEnded: {'returncode': 0}
+[2.633551] (ros2udp) JobProgress: {'identifier': 'ros2udp', 'progress': 'install'}
+[2.634336] (ros2udp) Command: {'cmd': ['/usr/bin/cmake', '--install', '/home/ubuntu/rrst-ros2-ws/build/ros2udp'], 'cwd': '/home/ubuntu/rrst-ros2-ws/build/ros2udp', 'env': OrderedDict({'LESSOPEN': '| /usr/bin/lesspipe %s', 'LANGUAGE': 'ja:en', 'USER': 'ubuntu', 'LC_TIME': 'ja_JP.UTF-8', 'XDG_SESSION_TYPE': 'wayland', 'CLUTTER_DISABLE_MIPMAPPED_TEXT': '1', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/home/ubuntu/ros2_ws/install/ldlidar_component/lib:/opt/ros/jazzy/opt/rviz_ogre_vendor/lib:/opt/ros/jazzy/lib/x86_64-linux-gnu:/opt/ros/jazzy/opt/gz_math_vendor/lib:/opt/ros/jazzy/opt/gz_utils_vendor/lib:/opt/ros/jazzy/opt/gz_cmake_vendor/lib:/opt/ros/jazzy/lib', 'HOME': '/home/ubuntu', 'OLDPWD': '/home/ubuntu', 'DESKTOP_SESSION': 'ubuntu', 'ROS_PYTHON_VERSION': '3', 'GNOME_SHELL_SESSION_MODE': 'ubuntu', 'GTK_MODULES': 'gail:atk-bridge', 'LC_MONETARY': 'ja_JP.UTF-8', 'SYSTEMD_EXEC_PID': '2279', 'GSM_SKIP_SSH_AGENT_WORKAROUND': 'true', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': 'truecolor', 'DEBUGINFOD_URLS': 'https://debuginfod.ubuntu.com', 'IM_CONFIG_PHASE': '1', 'WAYLAND_DISPLAY': 'wayland-0', 'COLCON_PREFIX_PATH': '/home/ubuntu/ros2_ws/install', 'ROS_DISTRO': 'jazzy', 'LOGNAME': 'ubuntu', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'MEMORY_PRESSURE_WATCH': '/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.Shell@wayland.service/memory.pressure', 'XDG_SESSION_CLASS': 'user', 'USERNAME': 'ubuntu', 'TERM': 'xterm-256color', 'GNOME_DESKTOP_SESSION_ID': 'this-is-deprecated', 'PATH': '/opt/ros/jazzy/bin:/home/ubuntu/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin', 'SESSION_MANAGER': 'local/ubuntu-FMVUUD007U:@/tmp/.ICE-unix/2248,unix/ubuntu-FMVUUD007U:/tmp/.ICE-unix/2248', 'PAPERSIZE': 'a4', 'XDG_MENU_PREFIX': 'gnome-', 'LC_ADDRESS': 'ja_JP.UTF-8', 'GNOME_TERMINAL_SCREEN': '/org/gnome/Terminal/screen/a11c4e17_8ef7_4438_8b8f_8726aaacc246', 'GNOME_SETUP_DISPLAY': ':1', 'XDG_RUNTIME_DIR': '/run/user/1000', 'DISPLAY': ':0', 'LANG': 'ja_JP.UTF-8', 'XDG_CURRENT_DESKTOP': 'ubuntu:GNOME', 'LC_TELEPHONE': 'ja_JP.UTF-8', 'XMODIFIERS': '@im=ibus', 'XDG_SESSION_DESKTOP': 'ubuntu', 'XAUTHORITY': '/run/user/1000/.mutter-Xwaylandauth.B4B6K3', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:', 'GNOME_TERMINAL_SERVICE': ':1.125', 'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh', 'AMENT_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/tukurotto:/home/ubuntu/ros2_ws/install/silby:/home/ubuntu/ros2_ws/install/sibyl:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/ldlidar:/home/ubuntu/ros2_ws/install/ldlidar_node:/home/ubuntu/ros2_ws/install/ldlidar_component:/home/ubuntu/ros2_ws/install/example:/home/ubuntu/ros2_ws/install/cpp_pubsub:/opt/ros/jazzy', 'SHELL': '/bin/bash', 'LC_NAME': 'ja_JP.UTF-8', 'QT_ACCESSIBILITY': '1', 'GDMSESSION': 'ubuntu', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'LC_MEASUREMENT': 'ja_JP.UTF-8', 'LC_IDENTIFICATION': 'ja_JP.UTF-8', 'ROS_AUTOMATIC_DISCOVERY_RANGE': 'SUBNET', 'QT_IM_MODULE': 'ibus', 'PWD': '/home/ubuntu/rrst-ros2-ws/build/ros2udp', 'LC_ALL': 'en_US.UTF-8', 'XDG_CONFIG_DIRS': '/etc/xdg/xdg-ubuntu:/etc/xdg', 'XDG_DATA_DIRS': '/usr/share/ubuntu:/usr/share/gnome:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop', 'PYTHONPATH': '/opt/ros/jazzy/lib/python3.12/site-packages', 'LC_NUMERIC': 'ja_JP.UTF-8', 'LC_PAPER': 'ja_JP.UTF-8', 'COLCON': '1', 'MEMORY_PRESSURE_WRITE': 'c29tZSAyMDAwMDAgMjAwMDAwMAA=', 'VTE_VERSION': '7600', 'CMAKE_PREFIX_PATH': '/home/ubuntu/ros2_ws/install/tukurotto:/home/ubuntu/ros2_ws/install/silby:/home/ubuntu/ros2_ws/install/sibyl:/home/ubuntu/ros2_ws/install/ros2udp:/home/ubuntu/ros2_ws/install/maeda:/home/ubuntu/ros2_ws/install/ldlidar:/home/ubuntu/ros2_ws/install/ldlidar_node:/home/ubuntu/ros2_ws/install/ldlidar_component:/home/ubuntu/ros2_ws/install/example:/home/ubuntu/ros2_ws/install/cpp_pubsub:/opt/ros/jazzy/opt/gz_math_vendor:/opt/ros/jazzy/opt/gz_utils_vendor:/opt/ros/jazzy/opt/gz_cmake_vendor:/opt/ros/jazzy'}), 'shell': False}
+[2.651317] (ros2udp) StdoutLine: {'line': b'-- Install configuration: ""\n'}
+[2.652165] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_mr\n'}
+[2.653077] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Generating done (0.1s)\n'}
+[2.653492] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_mr_omni\n'}
+[2.654618] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_mr_sd\n'}
+[2.655697] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_dr\n'}
+[2.656684] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_dr_omni\n'}
+[2.657659] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_dr_sd\n'}
+[2.658778] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_enc\n'}
+[2.659926] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_pr\n'}
+[2.660941] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_vel2js\n'}
+[2.662175] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_enc_pid\n'}
+[2.663149] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_pid\n'}
+[2.664054] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_dr_c610\n'}
+[2.665074] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_mr_servo_cal\n'}
+[2.666037] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_dr_servo_cal\n'}
+[2.666959] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_dr_pr\n'}
+[2.668182] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_dr_hcsr04\n'}
+[2.669374] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/mb_tester\n'}
+[2.670324] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/ld19_fs\n'}
+[2.671156] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'-- Build files have been written to: /home/ubuntu/rrst-ros2-ws/build/nr26_r2_hw_ctrl\n'}
+[2.671508] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/pid_wip\n'}
+[2.672112] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/pid_tuner\n'}
+[2.673035] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_led\n'}
+[2.674147] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/temp\n'}
+[2.674505] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/launch\n'}
+[2.674817] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/launch/nr25_mr.py\n'}
+[2.675035] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/launch/nr25_dr.py\n'}
+[2.675247] (ros2udp) StdoutLine: {'line': b'-- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ament_index/resource_index/package_run_dependencies/ros2udp\n'}
+[2.675411] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ament_index/resource_index/parent_prefix_path/ros2udp\n'}
+[2.675568] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/environment/ament_prefix_path.sh\n'}
+[2.675774] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/environment/ament_prefix_path.dsv\n'}
+[2.676076] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/environment/path.sh\n'}
+[2.676287] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/environment/path.dsv\n'}
+[2.676457] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/local_setup.bash\n'}
+[2.676606] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/local_setup.sh\n'}
+[2.676757] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/local_setup.zsh\n'}
+[2.676907] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/local_setup.dsv\n'}
+[2.677057] (ros2udp) StdoutLine: {'line': b'-- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/package.dsv\n'}
+[2.677235] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ament_index/resource_index/packages/ros2udp\n'}
+[2.677396] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/cmake/ros2udpConfig.cmake\n'}
+[2.677558] (ros2udp) StdoutLine: {'line': b'-- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/cmake/ros2udpConfig-version.cmake\n'}
+[2.677707] (ros2udp) StdoutLine: {'line': b'-- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/package.xml\n'}
+[2.680033] (ros2udp) CommandEnded: {'returncode': 0}
+[2.703723] (ros2udp) JobEnded: {'identifier': 'ros2udp', 'rc': 0}
+[2.711285] (-) TimerEvent: {}
+[2.736493] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[  6%] \x1b[32mBuilding CXX object CMakeFiles/r2_mc.dir/src/R2_MotionCtrl.cpp.o\x1b[0m\n'}
+[2.743502] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[ 12%] \x1b[32mBuilding CXX object CMakeFiles/r2_tuner.dir/src/R2_Tuner.cpp.o\x1b[0m\n'}
+[2.744397] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[ 18%] \x1b[32mBuilding CXX object CMakeFiles/nr26_r2_action.dir/src/NR26_R2_Action.cpp.o\x1b[0m\n'}
+[2.745471] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[ 25%] \x1b[32mBuilding CXX object CMakeFiles/r2_auto.dir/src/R2_AutoDrive.cpp.o\x1b[0m\n'}
+[2.749389] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[ 31%] \x1b[32mBuilding CXX object CMakeFiles/r2_md.dir/src/R2_MecanumDrive.cpp.o\x1b[0m\n'}
+[2.750501] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[ 37%] \x1b[32mBuilding CXX object CMakeFiles/optical_flow_odom.dir/src/NR26_OpticalFlow_Odom.cpp.o\x1b[0m\n'}
+[2.765717] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[ 50%] \x1b[32mBuilding CXX object CMakeFiles/r2_hand_xy.dir/src/R2_HandXY.cpp.o\x1b[0m\n'}
+[2.766465] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[ 50%] \x1b[32mBuilding CXX object CMakeFiles/nr26_r2_move.dir/src/NR26_R2_Move.cpp.o\x1b[0m\n'}
+[2.812226] (-) TimerEvent: {}
+[2.912756] (-) TimerEvent: {}
+[3.016223] (-) TimerEvent: {}
+[3.116794] (-) TimerEvent: {}
+[3.217365] (-) TimerEvent: {}
+[3.317916] (-) TimerEvent: {}
+[3.418512] (-) TimerEvent: {}
+[3.519131] (-) TimerEvent: {}
+[3.620238] (-) TimerEvent: {}
+[3.721244] (-) TimerEvent: {}
+[3.825433] (-) TimerEvent: {}
+[3.926007] (-) TimerEvent: {}
+[4.026622] (-) TimerEvent: {}
+[4.127226] (-) TimerEvent: {}
+[4.227828] (-) TimerEvent: {}
+[4.328456] (-) TimerEvent: {}
+[4.433244] (-) TimerEvent: {}
+[4.533848] (-) TimerEvent: {}
+[4.634470] (-) TimerEvent: {}
+[4.735084] (-) TimerEvent: {}
+[4.835698] (-) TimerEvent: {}
+[4.937236] (-) TimerEvent: {}
+[5.037850] (-) TimerEvent: {}
+[5.139238] (-) TimerEvent: {}
+[5.239856] (-) TimerEvent: {}
+[5.341247] (-) TimerEvent: {}
+[5.441850] (-) TimerEvent: {}
+[5.543236] (-) TimerEvent: {}
+[5.643849] (-) TimerEvent: {}
+[5.746421] (-) TimerEvent: {}
+[5.847015] (-) TimerEvent: {}
+[5.947635] (-) TimerEvent: {}
+[6.048658] (-) TimerEvent: {}
+[6.150241] (-) TimerEvent: {}
+[6.250860] (-) TimerEvent: {}
+[6.352241] (-) TimerEvent: {}
+[6.452864] (-) TimerEvent: {}
+[6.554243] (-) TimerEvent: {}
+[6.654860] (-) TimerEvent: {}
+[6.756232] (-) TimerEvent: {}
+[6.856851] (-) TimerEvent: {}
+[6.965510] (-) TimerEvent: {}
+[7.066196] (-) TimerEvent: {}
+[7.099234] (nr26_r2_hw_ctrl) StderrLine: {'line': b'\x1b[01m\x1b[K/home/ubuntu/rrst-ros2-ws/nr26_r2_hw_ctrl/src/R2_MotionCtrl.cpp:\x1b[m\x1b[K In member function \xe2\x80\x98\x1b[01m\x1b[Kvoid HardWareControl::\x1b[01;32m\x1b[Kps4_listener_callback\x1b[m\x1b[K(sensor_msgs::msg::Joy_<std::allocator<void> >::SharedPtr)\x1b[m\x1b[K\xe2\x80\x99:\n'}
+[7.099704] (nr26_r2_hw_ctrl) StderrLine: {'line': b'\x1b[01m\x1b[K/home/ubuntu/rrst-ros2-ws/nr26_r2_hw_ctrl/src/R2_MotionCtrl.cpp:104:14:\x1b[m\x1b[K \x1b[01;35m\x1b[Kwarning: \x1b[m\x1b[Kunused variable \xe2\x80\x98\x1b[01m\x1b[KCIRCLE\x1b[m\x1b[K\xe2\x80\x99 [\x1b[01;35m\x1b[K\x1b]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-variable\x07-Wunused-variable\x1b]8;;\x07\x1b[m\x1b[K]\n'}
+[7.099863] (nr26_r2_hw_ctrl) StderrLine: {'line': b'  104 |         bool \x1b[01;35m\x1b[KCIRCLE\x1b[m\x1b[K = msg->buttons[1];\n'}
+[7.100012] (nr26_r2_hw_ctrl) StderrLine: {'line': b'      |              \x1b[01;35m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[7.100156] (nr26_r2_hw_ctrl) StderrLine: {'line': b'\x1b[01m\x1b[K/home/ubuntu/rrst-ros2-ws/nr26_r2_hw_ctrl/src/R2_MotionCtrl.cpp:106:14:\x1b[m\x1b[K \x1b[01;35m\x1b[Kwarning: \x1b[m\x1b[Kunused variable \xe2\x80\x98\x1b[01m\x1b[KSQUARE\x1b[m\x1b[K\xe2\x80\x99 [\x1b[01;35m\x1b[K\x1b]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-variable\x07-Wunused-variable\x1b]8;;\x07\x1b[m\x1b[K]\n'}
+[7.100305] (nr26_r2_hw_ctrl) StderrLine: {'line': b'  106 |         bool \x1b[01;35m\x1b[KSQUARE\x1b[m\x1b[K = msg->buttons[3];\n'}
+[7.100430] (nr26_r2_hw_ctrl) StderrLine: {'line': b'      |              \x1b[01;35m\x1b[K^~~~~~\x1b[m\x1b[K\n'}
+[7.104401] (nr26_r2_hw_ctrl) StderrLine: {'line': b'\x1b[01m\x1b[K/home/ubuntu/rrst-ros2-ws/nr26_r2_hw_ctrl/src/R2_MotionCtrl.cpp:113:14:\x1b[m\x1b[K \x1b[01;35m\x1b[Kwarning: \x1b[m\x1b[Kunused variable \xe2\x80\x98\x1b[01m\x1b[KL1\x1b[m\x1b[K\xe2\x80\x99 [\x1b[01;35m\x1b[K\x1b]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-variable\x07-Wunused-variable\x1b]8;;\x07\x1b[m\x1b[K]\n'}
+[7.104834] (nr26_r2_hw_ctrl) StderrLine: {'line': b'  113 |         bool \x1b[01;35m\x1b[KL1\x1b[m\x1b[K = msg->buttons[4];\n'}
+[7.104985] (nr26_r2_hw_ctrl) StderrLine: {'line': b'      |              \x1b[01;35m\x1b[K^~\x1b[m\x1b[K\n'}
+[7.105119] (nr26_r2_hw_ctrl) StderrLine: {'line': b'\x1b[01m\x1b[K/home/ubuntu/rrst-ros2-ws/nr26_r2_hw_ctrl/src/R2_MotionCtrl.cpp:114:14:\x1b[m\x1b[K \x1b[01;35m\x1b[Kwarning: \x1b[m\x1b[Kunused variable \xe2\x80\x98\x1b[01m\x1b[KR1\x1b[m\x1b[K\xe2\x80\x99 [\x1b[01;35m\x1b[K\x1b]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-variable\x07-Wunused-variable\x1b]8;;\x07\x1b[m\x1b[K]\n'}
+[7.105248] (nr26_r2_hw_ctrl) StderrLine: {'line': b'  114 |         bool \x1b[01;35m\x1b[KR1\x1b[m\x1b[K = msg->buttons[5];\n'}
+[7.105361] (nr26_r2_hw_ctrl) StderrLine: {'line': b'      |              \x1b[01;35m\x1b[K^~\x1b[m\x1b[K\n'}
+[7.105470] (nr26_r2_hw_ctrl) StderrLine: {'line': b'\x1b[01m\x1b[K/home/ubuntu/rrst-ros2-ws/nr26_r2_hw_ctrl/src/R2_MotionCtrl.cpp:161:20:\x1b[m\x1b[K \x1b[01;35m\x1b[Kwarning: \x1b[m\x1b[Kunused variable \xe2\x80\x98\x1b[01m\x1b[KMAG_ADJ_STEP_\x1b[m\x1b[K\xe2\x80\x99 [\x1b[01;35m\x1b[K\x1b]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-variable\x07-Wunused-variable\x1b]8;;\x07\x1b[m\x1b[K]\n'}
+[7.105586] (nr26_r2_hw_ctrl) StderrLine: {'line': b'  161 |         static int \x1b[01;35m\x1b[KMAG_ADJ_STEP_\x1b[m\x1b[K = 10;\n'}
+[7.105693] (nr26_r2_hw_ctrl) StderrLine: {'line': b'      |                    \x1b[01;35m\x1b[K^~~~~~~~~~~~~\x1b[m\x1b[K\n'}
+[7.161433] (nr26_r1_hw_ctrl) StderrLine: {'line': b'\x1b[01m\x1b[K/home/ubuntu/rrst-ros2-ws/nr26_r1_hw_ctrl/src/R1_SwerveDrive.cpp:\x1b[m\x1b[K In member function \xe2\x80\x98\x1b[01m\x1b[Kvoid HardWareControl::\x1b[01;32m\x1b[Kps4_listener_callback\x1b[m\x1b[K(sensor_msgs::msg::Joy_<std::allocator<void> >::SharedPtr)\x1b[m\x1b[K\xe2\x80\x99:\n'}
+[7.161896] (nr26_r1_hw_ctrl) StderrLine: {'line': b'\x1b[01m\x1b[K/home/ubuntu/rrst-ros2-ws/nr26_r1_hw_ctrl/src/R1_SwerveDrive.cpp:176:13:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Kleft\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope; did you mean \xe2\x80\x98\x1b[01m\x1b[Kstd::left\x1b[m\x1b[K\xe2\x80\x99?\n'}
+[7.162057] (nr26_r1_hw_ctrl) StderrLine: {'line': b'  176 |         if (\x1b[01;31m\x1b[Kleft\x1b[m\x1b[K == true && last_left == false){\n'}
+[7.162211] (nr26_r1_hw_ctrl) StderrLine: {'line': b'      |             \x1b[01;31m\x1b[K^~~~\x1b[m\x1b[K\n'}
+[7.162343] (nr26_r1_hw_ctrl) StderrLine: {'line': b'      |             \x1b[32m\x1b[Kstd::left\x1b[m\x1b[K\n'}
+[7.162476] (nr26_r1_hw_ctrl) StderrLine: {'line': b'In file included from \x1b[01m\x1b[K/usr/include/c++/13/ios:44\x1b[m\x1b[K,\n'}
+[7.162607] (nr26_r1_hw_ctrl) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/usr/include/c++/13/ostream:40\x1b[m\x1b[K,\n'}
+[7.162733] (nr26_r1_hw_ctrl) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/usr/include/c++/13/iostream:41\x1b[m\x1b[K,\n'}
+[7.162853] (nr26_r1_hw_ctrl) StderrLine: {'line': b'                 from \x1b[01m\x1b[K/home/ubuntu/rrst-ros2-ws/nr26_r1_hw_ctrl/src/R1_SwerveDrive.cpp:8\x1b[m\x1b[K:\n'}
+[7.163010] (nr26_r1_hw_ctrl) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/13/bits/ios_base.h:1042:3:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Kstd::left\x1b[m\x1b[K\xe2\x80\x99 declared here\n'}
+[7.163186] (nr26_r1_hw_ctrl) StderrLine: {'line': b' 1042 |   \x1b[01;36m\x1b[Kleft\x1b[m\x1b[K(ios_base& __base)\n'}
+[7.163309] (nr26_r1_hw_ctrl) StderrLine: {'line': b'      |   \x1b[01;36m\x1b[K^~~~\x1b[m\x1b[K\n'}
+[7.167245] (-) TimerEvent: {}
+[7.176067] (nr26_r1_hw_ctrl) StderrLine: {'line': b'\x1b[01m\x1b[K/home/ubuntu/rrst-ros2-ws/nr26_r1_hw_ctrl/src/R1_SwerveDrive.cpp:183:13:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Kup\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope; did you mean \xe2\x80\x98\x1b[01m\x1b[Kdup\x1b[m\x1b[K\xe2\x80\x99?\n'}
+[7.176541] (nr26_r1_hw_ctrl) StderrLine: {'line': b'  183 |         if (\x1b[01;31m\x1b[Kup\x1b[m\x1b[K == true && last_up ==false){\n'}
+[7.176697] (nr26_r1_hw_ctrl) StderrLine: {'line': b'      |             \x1b[01;31m\x1b[K^~\x1b[m\x1b[K\n'}
+[7.176829] (nr26_r1_hw_ctrl) StderrLine: {'line': b'      |             \x1b[32m\x1b[Kdup\x1b[m\x1b[K\n'}
+[7.191796] (nr26_r1_hw_ctrl) StderrLine: {'line': b'\x1b[01m\x1b[K/home/ubuntu/rrst-ros2-ws/nr26_r1_hw_ctrl/src/R1_SwerveDrive.cpp:187:17:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Klatereal_lock\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope; did you mean \xe2\x80\x98\x1b[01m\x1b[Klateral_lock\x1b[m\x1b[K\xe2\x80\x99?\n'}
+[7.192262] (nr26_r1_hw_ctrl) StderrLine: {'line': b'  187 |                 \x1b[01;31m\x1b[Klatereal_lock\x1b[m\x1b[K = false;\n'}
+[7.192427] (nr26_r1_hw_ctrl) StderrLine: {'line': b'      |                 \x1b[01;31m\x1b[K^~~~~~~~~~~~~\x1b[m\x1b[K\n'}
+[7.192560] (nr26_r1_hw_ctrl) StderrLine: {'line': b'      |                 \x1b[32m\x1b[Klateral_lock\x1b[m\x1b[K\n'}
+[7.204900] (nr26_r1_hw_ctrl) StderrLine: {'line': b'\x1b[01m\x1b[K/home/ubuntu/rrst-ros2-ws/nr26_r1_hw_ctrl/src/R1_SwerveDrive.cpp:190:13:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Kdown\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[7.205335] (nr26_r1_hw_ctrl) StderrLine: {'line': b'  190 |         if (\x1b[01;31m\x1b[Kdown\x1b[m\x1b[K == true && last_down == false){\n'}
+[7.205494] (nr26_r1_hw_ctrl) StderrLine: {'line': b'      |             \x1b[01;31m\x1b[K^~~~\x1b[m\x1b[K\n'}
+[7.219600] (nr26_r1_hw_ctrl) StderrLine: {'line': b'\x1b[01m\x1b[K/home/ubuntu/rrst-ros2-ws/nr26_r1_hw_ctrl/src/R1_SwerveDrive.cpp:193:17:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Klateral_loc\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope; did you mean \xe2\x80\x98\x1b[01m\x1b[Klateral_lock\x1b[m\x1b[K\xe2\x80\x99?\n'}
+[7.220017] (nr26_r1_hw_ctrl) StderrLine: {'line': b'  193 |                 \x1b[01;31m\x1b[Klateral_loc\x1b[m\x1b[K = false;\n'}
+[7.220204] (nr26_r1_hw_ctrl) StderrLine: {'line': b'      |                 \x1b[01;31m\x1b[K^~~~~~~~~~~\x1b[m\x1b[K\n'}
+[7.220333] (nr26_r1_hw_ctrl) StderrLine: {'line': b'      |                 \x1b[32m\x1b[Klateral_lock\x1b[m\x1b[K\n'}
+[7.222828] (nr26_r1_hw_ctrl) StderrLine: {'line': b'\x1b[01m\x1b[K/home/ubuntu/rrst-ros2-ws/nr26_r1_hw_ctrl/src/R1_SwerveDrive.cpp:197:21:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Kleft\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope; did you mean \xe2\x80\x98\x1b[01m\x1b[Kstd::left\x1b[m\x1b[K\xe2\x80\x99?\n'}
+[7.223223] (nr26_r1_hw_ctrl) StderrLine: {'line': b'  197 |         last_left = \x1b[01;31m\x1b[Kleft\x1b[m\x1b[K;\n'}
+[7.223375] (nr26_r1_hw_ctrl) StderrLine: {'line': b'      |                     \x1b[01;31m\x1b[K^~~~\x1b[m\x1b[K\n'}
+[7.223492] (nr26_r1_hw_ctrl) StderrLine: {'line': b'      |                     \x1b[32m\x1b[Kstd::left\x1b[m\x1b[K\n'}
+[7.223607] (nr26_r1_hw_ctrl) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/13/bits/ios_base.h:1042:3:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Kstd::left\x1b[m\x1b[K\xe2\x80\x99 declared here\n'}
+[7.223719] (nr26_r1_hw_ctrl) StderrLine: {'line': b' 1042 |   \x1b[01;36m\x1b[Kleft\x1b[m\x1b[K(ios_base& __base)\n'}
+[7.223826] (nr26_r1_hw_ctrl) StderrLine: {'line': b'      |   \x1b[01;36m\x1b[K^~~~\x1b[m\x1b[K\n'}
+[7.223967] (nr26_r1_hw_ctrl) StderrLine: {'line': b'\x1b[01m\x1b[K/home/ubuntu/rrst-ros2-ws/nr26_r1_hw_ctrl/src/R1_SwerveDrive.cpp:198:22:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Kright\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope; did you mean \xe2\x80\x98\x1b[01m\x1b[Kstd::right\x1b[m\x1b[K\xe2\x80\x99?\n'}
+[7.224084] (nr26_r1_hw_ctrl) StderrLine: {'line': b'  198 |         last_right = \x1b[01;31m\x1b[Kright\x1b[m\x1b[K;\n'}
+[7.224212] (nr26_r1_hw_ctrl) StderrLine: {'line': b'      |                      \x1b[01;31m\x1b[K^~~~~\x1b[m\x1b[K\n'}
+[7.224319] (nr26_r1_hw_ctrl) StderrLine: {'line': b'      |                      \x1b[32m\x1b[Kstd::right\x1b[m\x1b[K\n'}
+[7.224427] (nr26_r1_hw_ctrl) StderrLine: {'line': b'\x1b[01m\x1b[K/usr/include/c++/13/bits/ios_base.h:1050:3:\x1b[m\x1b[K \x1b[01;36m\x1b[Knote: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Kstd::right\x1b[m\x1b[K\xe2\x80\x99 declared here\n'}
+[7.224539] (nr26_r1_hw_ctrl) StderrLine: {'line': b' 1050 |   \x1b[01;36m\x1b[Kright\x1b[m\x1b[K(ios_base& __base)\n'}
+[7.224645] (nr26_r1_hw_ctrl) StderrLine: {'line': b'      |   \x1b[01;36m\x1b[K^~~~~\x1b[m\x1b[K\n'}
+[7.235218] (nr26_r1_hw_ctrl) StderrLine: {'line': b'\x1b[01m\x1b[K/home/ubuntu/rrst-ros2-ws/nr26_r1_hw_ctrl/src/R1_SwerveDrive.cpp:199:19:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Kup\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope; did you mean \xe2\x80\x98\x1b[01m\x1b[Kdup\x1b[m\x1b[K\xe2\x80\x99?\n'}
+[7.235612] (nr26_r1_hw_ctrl) StderrLine: {'line': b'  199 |         last_up = \x1b[01;31m\x1b[Kup\x1b[m\x1b[K;\n'}
+[7.235751] (nr26_r1_hw_ctrl) StderrLine: {'line': b'      |                   \x1b[01;31m\x1b[K^~\x1b[m\x1b[K\n'}
+[7.235858] (nr26_r1_hw_ctrl) StderrLine: {'line': b'      |                   \x1b[32m\x1b[Kdup\x1b[m\x1b[K\n'}
+[7.253831] (nr26_r1_hw_ctrl) StderrLine: {'line': b'\x1b[01m\x1b[K/home/ubuntu/rrst-ros2-ws/nr26_r1_hw_ctrl/src/R1_SwerveDrive.cpp:200:21:\x1b[m\x1b[K \x1b[01;31m\x1b[Kerror: \x1b[m\x1b[K\xe2\x80\x98\x1b[01m\x1b[Kdown\x1b[m\x1b[K\xe2\x80\x99 was not declared in this scope\n'}
+[7.254748] (nr26_r1_hw_ctrl) StderrLine: {'line': b'  200 |         last_down = \x1b[01;31m\x1b[Kdown\x1b[m\x1b[K;\n'}
+[7.254927] (nr26_r1_hw_ctrl) StderrLine: {'line': b'      |                     \x1b[01;31m\x1b[K^~~~\x1b[m\x1b[K\n'}
+[7.267422] (-) TimerEvent: {}
+[7.372523] (-) TimerEvent: {}
+[7.480313] (-) TimerEvent: {}
+[7.580884] (-) TimerEvent: {}
+[7.683535] (-) TimerEvent: {}
+[7.785428] (-) TimerEvent: {}
+[7.892195] (-) TimerEvent: {}
+[7.992647] (-) TimerEvent: {}
+[8.093125] (-) TimerEvent: {}
+[8.193621] (-) TimerEvent: {}
+[8.296657] (-) TimerEvent: {}
+[8.397148] (-) TimerEvent: {}
+[8.497608] (-) TimerEvent: {}
+[8.598208] (-) TimerEvent: {}
+[8.703952] (-) TimerEvent: {}
+[8.804768] (-) TimerEvent: {}
+[8.911440] (-) TimerEvent: {}
+[9.017505] (-) TimerEvent: {}
+[9.122505] (-) TimerEvent: {}
+[9.227500] (-) TimerEvent: {}
+[9.328124] (-) TimerEvent: {}
+[9.428909] (-) TimerEvent: {}
+[9.530409] (-) TimerEvent: {}
+[9.631241] (-) TimerEvent: {}
+[9.737420] (-) TimerEvent: {}
+[9.844411] (-) TimerEvent: {}
+[9.945208] (-) TimerEvent: {}
+[10.050472] (-) TimerEvent: {}
+[10.157445] (-) TimerEvent: {}
+[10.258369] (-) TimerEvent: {}
+[10.360407] (-) TimerEvent: {}
+[10.461245] (-) TimerEvent: {}
+[10.562053] (-) TimerEvent: {}
+[10.662869] (-) TimerEvent: {}
+[10.764462] (-) TimerEvent: {}
+[10.871417] (-) TimerEvent: {}
+[10.976448] (-) TimerEvent: {}
+[11.082526] (-) TimerEvent: {}
+[11.189496] (-) TimerEvent: {}
+[11.294526] (-) TimerEvent: {}
+[11.399531] (-) TimerEvent: {}
+[11.506967] (-) TimerEvent: {}
+[11.613505] (-) TimerEvent: {}
+[11.717288] (-) TimerEvent: {}
+[11.822499] (-) TimerEvent: {}
+[11.927531] (-) TimerEvent: {}
+[12.033221] (-) TimerEvent: {}
+[12.137496] (-) TimerEvent: {}
+[12.242531] (-) TimerEvent: {}
+[12.347526] (-) TimerEvent: {}
+[12.454533] (-) TimerEvent: {}
+[12.559340] (-) TimerEvent: {}
+[12.664503] (-) TimerEvent: {}
+[12.769517] (-) TimerEvent: {}
+[12.870085] (-) TimerEvent: {}
+[12.970631] (-) TimerEvent: {}
+[13.074409] (-) TimerEvent: {}
+[13.175204] (-) TimerEvent: {}
+[13.275990] (-) TimerEvent: {}
+[13.376830] (-) TimerEvent: {}
+[13.477650] (-) TimerEvent: {}
+[13.578437] (-) TimerEvent: {}
+[13.684436] (-) TimerEvent: {}
+[13.785009] (-) TimerEvent: {}
+[13.885633] (-) TimerEvent: {}
+[13.986410] (-) TimerEvent: {}
+[14.087190] (-) TimerEvent: {}
+[14.188909] (-) TimerEvent: {}
+[14.289763] (-) TimerEvent: {}
+[14.390581] (-) TimerEvent: {}
+[14.491437] (-) TimerEvent: {}
+[14.592248] (-) TimerEvent: {}
+[14.693060] (-) TimerEvent: {}
+[14.796485] (-) TimerEvent: {}
+[14.903975] (-) TimerEvent: {}
+[15.004524] (-) TimerEvent: {}
+[15.105241] (-) TimerEvent: {}
+[15.206014] (-) TimerEvent: {}
+[15.306789] (-) TimerEvent: {}
+[15.407551] (-) TimerEvent: {}
+[15.512477] (-) TimerEvent: {}
+[15.613204] (-) TimerEvent: {}
+[15.714674] (-) TimerEvent: {}
+[15.817232] (-) TimerEvent: {}
+[15.917813] (-) TimerEvent: {}
+[16.022468] (-) TimerEvent: {}
+[16.085806] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[ 56%] \x1b[32m\x1b[1mLinking CXX executable optical_flow_odom\x1b[0m\n'}
+[16.123059] (-) TimerEvent: {}
+[16.223607] (-) TimerEvent: {}
+[16.324373] (-) TimerEvent: {}
+[16.426189] (-) TimerEvent: {}
+[16.528419] (-) TimerEvent: {}
+[16.629166] (-) TimerEvent: {}
+[16.729868] (-) TimerEvent: {}
+[16.772319] (nr26_r1_hw_ctrl) StderrLine: {'line': b'gmake[2]: *** [CMakeFiles/r1_sd.dir/build.make:76: CMakeFiles/r1_sd.dir/src/R1_SwerveDrive.cpp.o] \xe3\x82\xa8\xe3\x83\xa9\xe3\x83\xbc 1\n'}
+[16.773420] (nr26_r1_hw_ctrl) StderrLine: {'line': b'gmake[1]: *** [CMakeFiles/Makefile2:158: CMakeFiles/r1_sd.dir/all] \xe3\x82\xa8\xe3\x83\xa9\xe3\x83\xbc 2\n'}
+[16.773655] (nr26_r1_hw_ctrl) StderrLine: {'line': b'gmake[1]: *** \xe6\x9c\xaa\xe5\xae\x8c\xe4\xba\x86\xe3\x81\xae\xe3\x82\xb8\xe3\x83\xa7\xe3\x83\x96\xe3\x82\x92\xe5\xbe\x85\xe3\x81\xa3\xe3\x81\xa6\xe3\x81\x84\xe3\x81\xbe\xe3\x81\x99....\n'}
+[16.830031] (-) TimerEvent: {}
+[16.930683] (-) TimerEvent: {}
+[17.031175] (-) TimerEvent: {}
+[17.132227] (-) TimerEvent: {}
+[17.233229] (-) TimerEvent: {}
+[17.334223] (-) TimerEvent: {}
+[17.435222] (-) TimerEvent: {}
+[17.536216] (-) TimerEvent: {}
+[17.598729] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[ 56%] Built target optical_flow_odom\n'}
+[17.636386] (-) TimerEvent: {}
+[17.736912] (-) TimerEvent: {}
+[17.837504] (-) TimerEvent: {}
+[17.938085] (-) TimerEvent: {}
+[18.038645] (-) TimerEvent: {}
+[18.139191] (-) TimerEvent: {}
+[18.188299] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'[ 66%] \x1b[32m\x1b[1mLinking CXX executable r1_servo_cal\x1b[0m\n'}
+[18.239355] (-) TimerEvent: {}
+[18.339911] (-) TimerEvent: {}
+[18.440631] (-) TimerEvent: {}
+[18.483647] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'[ 66%] Built target r1_servo_cal\n'}
+[18.540830] (-) TimerEvent: {}
+[18.641374] (-) TimerEvent: {}
+[18.741922] (-) TimerEvent: {}
+[18.842451] (-) TimerEvent: {}
+[18.897399] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[ 62%] \x1b[32m\x1b[1mLinking CXX executable r2_hand_xy\x1b[0m\n'}
+[18.942604] (-) TimerEvent: {}
+[19.042967] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[ 68%] \x1b[32m\x1b[1mLinking CXX executable r2_tuner\x1b[0m\n'}
+[19.043431] (-) TimerEvent: {}
+[19.143886] (-) TimerEvent: {}
+[19.244469] (-) TimerEvent: {}
+[19.345024] (-) TimerEvent: {}
+[19.355081] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[ 68%] Built target r2_hand_xy\n'}
+[19.367012] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[ 68%] Built target r2_tuner\n'}
+[19.445227] (-) TimerEvent: {}
+[19.545769] (-) TimerEvent: {}
+[19.646349] (-) TimerEvent: {}
+[19.746895] (-) TimerEvent: {}
+[19.847410] (-) TimerEvent: {}
+[19.947928] (-) TimerEvent: {}
+[20.048499] (-) TimerEvent: {}
+[20.149028] (-) TimerEvent: {}
+[20.249536] (-) TimerEvent: {}
+[20.350076] (-) TimerEvent: {}
+[20.450627] (-) TimerEvent: {}
+[20.551129] (-) TimerEvent: {}
+[20.651673] (-) TimerEvent: {}
+[20.752233] (-) TimerEvent: {}
+[20.852717] (-) TimerEvent: {}
+[20.953249] (-) TimerEvent: {}
+[21.053802] (-) TimerEvent: {}
+[21.154376] (-) TimerEvent: {}
+[21.254927] (-) TimerEvent: {}
+[21.355508] (-) TimerEvent: {}
+[21.456050] (-) TimerEvent: {}
+[21.556580] (-) TimerEvent: {}
+[21.657154] (-) TimerEvent: {}
+[21.757650] (-) TimerEvent: {}
+[21.858214] (-) TimerEvent: {}
+[21.958700] (-) TimerEvent: {}
+[22.059192] (-) TimerEvent: {}
+[22.159692] (-) TimerEvent: {}
+[22.260206] (-) TimerEvent: {}
+[22.360753] (-) TimerEvent: {}
+[22.461292] (-) TimerEvent: {}
+[22.561837] (-) TimerEvent: {}
+[22.662386] (-) TimerEvent: {}
+[22.762896] (-) TimerEvent: {}
+[22.863421] (-) TimerEvent: {}
+[22.888589] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[ 75%] \x1b[32m\x1b[1mLinking CXX executable r2_mc\x1b[0m\n'}
+[22.963615] (-) TimerEvent: {}
+[23.064203] (-) TimerEvent: {}
+[23.164716] (-) TimerEvent: {}
+[23.265288] (-) TimerEvent: {}
+[23.365872] (-) TimerEvent: {}
+[23.460404] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[ 75%] Built target r2_mc\n'}
+[23.466063] (-) TimerEvent: {}
+[23.566609] (-) TimerEvent: {}
+[23.667184] (-) TimerEvent: {}
+[23.767738] (-) TimerEvent: {}
+[23.868269] (-) TimerEvent: {}
+[23.907289] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[ 81%] \x1b[32m\x1b[1mLinking CXX executable r2_auto\x1b[0m\n'}
+[23.968471] (-) TimerEvent: {}
+[24.069010] (-) TimerEvent: {}
+[24.169546] (-) TimerEvent: {}
+[24.270225] (-) TimerEvent: {}
+[24.370825] (-) TimerEvent: {}
+[24.471391] (-) TimerEvent: {}
+[24.475366] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[ 81%] Built target r2_auto\n'}
+[24.571615] (-) TimerEvent: {}
+[24.672281] (-) TimerEvent: {}
+[24.772868] (-) TimerEvent: {}
+[24.873479] (-) TimerEvent: {}
+[24.974073] (-) TimerEvent: {}
+[25.074681] (-) TimerEvent: {}
+[25.175279] (-) TimerEvent: {}
+[25.275883] (-) TimerEvent: {}
+[25.376496] (-) TimerEvent: {}
+[25.477040] (-) TimerEvent: {}
+[25.577614] (-) TimerEvent: {}
+[25.678281] (-) TimerEvent: {}
+[25.778869] (-) TimerEvent: {}
+[25.879460] (-) TimerEvent: {}
+[25.980059] (-) TimerEvent: {}
+[26.080659] (-) TimerEvent: {}
+[26.108291] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[ 87%] \x1b[32m\x1b[1mLinking CXX executable r2_md\x1b[0m\n'}
+[26.180894] (-) TimerEvent: {}
+[26.257486] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'[ 83%] \x1b[32m\x1b[1mLinking CXX executable r1_mc\x1b[0m\n'}
+[26.281132] (-) TimerEvent: {}
+[26.381749] (-) TimerEvent: {}
+[26.482406] (-) TimerEvent: {}
+[26.583070] (-) TimerEvent: {}
+[26.683717] (-) TimerEvent: {}
+[26.784301] (-) TimerEvent: {}
+[26.884866] (-) TimerEvent: {}
+[26.985521] (-) TimerEvent: {}
+[27.042362] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[ 93%] \x1b[32m\x1b[1mLinking CXX executable nr26_r2_action\x1b[0m\n'}
+[27.085756] (-) TimerEvent: {}
+[27.186393] (-) TimerEvent: {}
+[27.269760] (nr26_r1_hw_ctrl) StdoutLine: {'line': b'[ 83%] Built target r1_mc\n'}
+[27.273366] (nr26_r1_hw_ctrl) StderrLine: {'line': b'gmake: *** [Makefile:146: all] \xe3\x82\xa8\xe3\x83\xa9\xe3\x83\xbc 2\n'}
+[27.278935] (nr26_r1_hw_ctrl) CommandEnded: {'returncode': 2}
+[27.286769] (-) TimerEvent: {}
+[27.300436] (nr26_r1_hw_ctrl) JobEnded: {'identifier': 'nr26_r1_hw_ctrl', 'rc': 2}
+[27.364192] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[ 93%] Built target r2_md\n'}
+[27.386974] (-) TimerEvent: {}
+[27.487540] (-) TimerEvent: {}
+[27.588239] (-) TimerEvent: {}
+[27.688800] (-) TimerEvent: {}
+[27.702608] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[ 93%] Built target nr26_r2_action\n'}
+[27.789070] (-) TimerEvent: {}
+[27.889718] (-) TimerEvent: {}
+[27.990329] (-) TimerEvent: {}
+[28.090918] (-) TimerEvent: {}
+[28.191574] (-) TimerEvent: {}
+[28.292179] (-) TimerEvent: {}
+[28.392773] (-) TimerEvent: {}
+[28.493399] (-) TimerEvent: {}
+[28.594046] (-) TimerEvent: {}
+[28.643169] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[100%] \x1b[32m\x1b[1mLinking CXX executable nr26_r2_move\x1b[0m\n'}
+[28.694408] (-) TimerEvent: {}
+[28.795020] (-) TimerEvent: {}
+[28.895603] (-) TimerEvent: {}
+[28.996200] (-) TimerEvent: {}
+[29.096840] (-) TimerEvent: {}
+[29.197327] (-) TimerEvent: {}
+[29.201076] (nr26_r2_hw_ctrl) StdoutLine: {'line': b'[100%] Built target nr26_r2_move\n'}
+[29.223009] (nr26_r2_hw_ctrl) JobEnded: {'identifier': 'nr26_r2_hw_ctrl', 'rc': 'SIGINT'}
+[29.235168] (-) EventReactorShutdown: {}

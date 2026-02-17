@@ -1,0 +1,29 @@
+[0.045s] Invoking command in '/home/ubuntu/rrst-ros2-ws/build/nr26_r1_hw_ctrl': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/nr26_r1_hw_ctrl -- -j12 -l12
+[0.268s] [ 33%] Built target nr26_sd
+[0.332s] [ 66%] Built target nr26_r1_servo_cal
+[0.379s] [ 83%] [32mBuilding CXX object CMakeFiles/nr26_pick.dir/src/NR26_pick.cpp.o[0m
+[12.543s] [100%] [32m[1mLinking CXX executable nr26_pick[0m
+[13.051s] [100%] Built target nr26_pick
+[13.069s] Invoked command in '/home/ubuntu/rrst-ros2-ws/build/nr26_r1_hw_ctrl' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/nr26_r1_hw_ctrl -- -j12 -l12
+[13.072s] Invoking command in '/home/ubuntu/rrst-ros2-ws/build/nr26_r1_hw_ctrl': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/nr26_r1_hw_ctrl
+[13.088s] -- Install configuration: ""
+[13.088s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/lib/nr26_r1_hw_ctrl/nr26_sd
+[13.089s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/lib/nr26_r1_hw_ctrl/nr26_pick
+[13.102s] -- Set non-toolchain portion of runtime path of "/home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/lib/nr26_r1_hw_ctrl/nr26_pick" to ""
+[13.103s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/lib/nr26_r1_hw_ctrl/nr26_r1_servo_cal
+[13.103s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/ament_index/resource_index/package_run_dependencies/nr26_r1_hw_ctrl
+[13.103s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/ament_index/resource_index/parent_prefix_path/nr26_r1_hw_ctrl
+[13.104s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/environment/ament_prefix_path.sh
+[13.104s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/environment/ament_prefix_path.dsv
+[13.104s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/environment/path.sh
+[13.104s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/environment/path.dsv
+[13.104s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/local_setup.bash
+[13.104s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/local_setup.sh
+[13.104s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/local_setup.zsh
+[13.105s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/local_setup.dsv
+[13.105s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/package.dsv
+[13.105s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/ament_index/resource_index/packages/nr26_r1_hw_ctrl
+[13.105s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/cmake/nr26_r1_hw_ctrlConfig.cmake
+[13.105s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/cmake/nr26_r1_hw_ctrlConfig-version.cmake
+[13.105s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/package.xml
+[13.107s] Invoked command in '/home/ubuntu/rrst-ros2-ws/build/nr26_r1_hw_ctrl' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/nr26_r1_hw_ctrl

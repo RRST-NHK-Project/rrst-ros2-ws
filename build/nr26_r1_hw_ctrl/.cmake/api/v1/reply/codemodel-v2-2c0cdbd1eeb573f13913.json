@@ -1,0 +1,124 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"childIndexes" : 
+					[
+						1
+					],
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-e1ad555dc913d552fd4e.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.15"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4
+					]
+				},
+				{
+					"build" : "_deps/nlohmann_json-build",
+					"jsonFile" : "directory-_deps.nlohmann_json-build-0936944fc2e6ff77d95e.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.1"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 1,
+					"source" : "/home/ubuntu/rrst-ros2-ws/build/nr26_r1_hw_ctrl/_deps/nlohmann_json-src"
+				}
+			],
+			"name" : "",
+			"projects" : 
+			[
+				{
+					"childIndexes" : 
+					[
+						1
+					],
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "nr26_r1_hw_ctrl",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						1
+					],
+					"name" : "nlohmann_json",
+					"parentIndex" : 0
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "nr26_r1_hw_ctrl_uninstall::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-nr26_r1_hw_ctrl_uninstall-3ec0e8efc73cf90f9847.json",
+					"name" : "nr26_r1_hw_ctrl_uninstall",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "r1_mc::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-r1_mc-fa33ad50346e41a8c8fc.json",
+					"name" : "r1_mc",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "r1_sd::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-r1_sd-9b161d82e102204dfe9d.json",
+					"name" : "r1_sd",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "r1_servo_cal::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-r1_servo_cal-537d4efa91cdf0a747ff.json",
+					"name" : "r1_servo_cal",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "uninstall::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-uninstall-64051cdea13a46de92ea.json",
+					"name" : "uninstall",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/home/ubuntu/rrst-ros2-ws/build/nr26_r1_hw_ctrl",
+		"source" : "/home/ubuntu/rrst-ros2-ws/nr26_r1_hw_ctrl"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 6
+	}
+}

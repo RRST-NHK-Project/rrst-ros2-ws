@@ -1,0 +1,124 @@
+-- The C compiler identification is GNU 13.3.0
+-- The CXX compiler identification is GNU 13.3.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+/usr/bin/figlet
+-- Using the multi-header code from /home/ubuntu/rrst-ros2-ws/build/ros2udp/_deps/nlohmann_json-src/include/
+-- Found ament_cmake: 2.5.3 (/opt/ros/jazzy/share/ament_cmake/cmake)
+-- Found Python3: /usr/bin/python3 (found version "3.12.3") found components: Interpreter 
+-- Found rclcpp: 28.1.8 (/opt/ros/jazzy/share/rclcpp/cmake)
+-- Found rosidl_generator_c: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_c/cmake)
+-- Found rosidl_generator_cpp: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_cpp/cmake)
+-- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+-- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+-- Found rmw_implementation_cmake: 7.3.2 (/opt/ros/jazzy/share/rmw_implementation_cmake/cmake)
+-- Found rmw_fastrtps_cpp: 8.4.2 (/opt/ros/jazzy/share/rmw_fastrtps_cpp/cmake)
+-- Found OpenSSL: /usr/lib/x86_64-linux-gnu/libcrypto.so (found version "3.0.13")  
+-- Found FastRTPS: /opt/ros/jazzy/include (Required is at least version "2.13") 
+-- Using RMW implementation 'rmw_fastrtps_cpp' as default
+-- Found std_msgs: 5.3.6 (/opt/ros/jazzy/share/std_msgs/cmake)
+-- Found sensor_msgs: 5.3.6 (/opt/ros/jazzy/share/sensor_msgs/cmake)
+-- Found tf2: 0.36.9 (/opt/ros/jazzy/share/tf2/cmake)
+-- Found tf2_ros: 0.36.9 (/opt/ros/jazzy/share/tf2_ros/cmake)
+-- Found tf2_geometry_msgs: 0.36.9 (/opt/ros/jazzy/share/tf2_geometry_msgs/cmake)
+-- Found eigen3_cmake_module: 0.3.0 (/opt/ros/jazzy/share/eigen3_cmake_module/cmake)
+-- Found Eigen3: TRUE (found version "3.4.0") 
+-- Ensuring Eigen3 include directory is part of orocos-kdl CMake target
+-- Found visualization_msgs: 5.3.6 (/opt/ros/jazzy/share/visualization_msgs/cmake)
+-- Configuring done (73.6s)
+-- Generating done (0.2s)
+-- Build files have been written to: /home/ubuntu/rrst-ros2-ws/build/ros2udp
+[  1%] [32mBuilding CXX object CMakeFiles/nr25_mr.dir/src/NR25_MR.cpp.o[0m
+[  3%] [32mBuilding CXX object CMakeFiles/nr25_dr_omni.dir/src/NR25_DR_Omni.cpp.o[0m
+[  6%] [32mBuilding CXX object CMakeFiles/nr25_enc.dir/src/NR25_ENC.cpp.o[0m
+[  7%] [32mBuilding CXX object CMakeFiles/nr25_pr.dir/src/NR25_Parameter_Tuner.cpp.o[0m
+[  7%] [32mBuilding CXX object CMakeFiles/nr25_dr_c610.dir/src/NR25_DR_C610.cpp.o[0m
+[  9%] [32mBuilding CXX object CMakeFiles/nr25_mr_sd.dir/src/NR25_MR_SwerveDrive.cpp.o[0m
+[ 10%] [32mBuilding CXX object CMakeFiles/nr25_vel2js.dir/src/NR25_Vel_to_JointState.cpp.o[0m
+[ 12%] [32mBuilding CXX object CMakeFiles/nr25_dr.dir/src/NR25_DR.cpp.o[0m
+[ 14%] [32mBuilding CXX object CMakeFiles/nr25_mr_omni.dir/src/NR25_MR_Omni.cpp.o[0m
+[ 15%] [32mBuilding CXX object CMakeFiles/nr25_pid.dir/src/NR25_PID.cpp.o[0m
+[ 17%] [32mBuilding CXX object CMakeFiles/nr25_dr_sd.dir/src/NR25_DR_SwerveDrive.cpp.o[0m
+[ 18%] [32mBuilding CXX object CMakeFiles/nr25_enc_pid.dir/src/NR25_ENC_PID.cpp.o[0m
+[ 20%] [32m[1mLinking CXX executable nr25_enc_pid[0m
+[ 20%] Built target nr25_enc_pid
+[ 21%] [32m[1mLinking CXX executable nr25_enc[0m
+[ 21%] Built target nr25_enc
+[ 23%] [32mBuilding CXX object CMakeFiles/nr25_dr_omni.dir/src/include/UDP.cpp.o[0m
+[ 25%] [32m[1mLinking CXX executable nr25_pr[0m
+[ 26%] [32m[1mLinking CXX executable nr25_dr_omni[0m
+[ 26%] Built target nr25_pr
+[ 28%] [32mBuilding CXX object CMakeFiles/nr25_pid.dir/src/include/UDP.cpp.o[0m
+[ 28%] Built target nr25_dr_omni
+[ 29%] [32mBuilding CXX object CMakeFiles/nr25_mr_omni.dir/src/include/UDP.cpp.o[0m
+[ 31%] [32m[1mLinking CXX executable nr25_pid[0m
+[ 31%] Built target nr25_pid
+[ 32%] [32m[1mLinking CXX executable nr25_mr_omni[0m
+[ 34%] [32mBuilding CXX object CMakeFiles/nr25_dr.dir/src/include/UDP.cpp.o[0m
+[ 34%] Built target nr25_mr_omni
+[ 35%] [32mBuilding CXX object CMakeFiles/nr25_dr_c610.dir/src/include/UDP.cpp.o[0m
+[ 37%] [32mBuilding CXX object CMakeFiles/nr25_mr.dir/src/include/UDP.cpp.o[0m
+[ 39%] [32mBuilding CXX object CMakeFiles/nr25_dr.dir/src/include/IP.cpp.o[0m
+[ 40%] [32mBuilding CXX object CMakeFiles/nr25_dr_c610.dir/src/include/IP.cpp.o[0m
+[ 42%] [32m[1mLinking CXX executable nr25_dr[0m
+[ 43%] [32mBuilding CXX object CMakeFiles/nr25_mr.dir/src/include/IP.cpp.o[0m
+[ 45%] [32m[1mLinking CXX executable nr25_mr[0m
+[ 46%] [32m[1mLinking CXX executable nr25_dr_c610[0m
+[ 46%] Built target nr25_dr
+[ 46%] Built target nr25_mr
+[ 46%] Built target nr25_dr_c610
+[ 48%] [32m[1mLinking CXX executable nr25_vel2js[0m
+[ 48%] Built target nr25_vel2js
+[ 50%] [32mBuilding CXX object CMakeFiles/nr25_dr_sd.dir/src/include/IP.cpp.o[0m
+[ 51%] [32mBuilding CXX object CMakeFiles/nr25_mr_sd.dir/src/include/IP.cpp.o[0m
+[ 53%] [32mBuilding CXX object CMakeFiles/nr25_dr_sd.dir/src/include/UDP.cpp.o[0m
+[ 54%] [32mBuilding CXX object CMakeFiles/nr25_mr_sd.dir/src/include/UDP.cpp.o[0m
+[ 56%] [32m[1mLinking CXX executable nr25_dr_sd[0m
+[ 57%] [32m[1mLinking CXX executable nr25_mr_sd[0m
+[ 57%] Built target nr25_dr_sd
+[ 57%] Built target nr25_mr_sd
+[ 59%] [32mBuilding CXX object CMakeFiles/temp.dir/src/Temp.cpp.o[0m
+[ 60%] [32mBuilding CXX object CMakeFiles/temp.dir/src/include/IP.cpp.o[0m
+[ 62%] [32mBuilding CXX object CMakeFiles/temp.dir/src/include/UDP_Lite.cpp.o[0m
+[ 64%] [32m[1mLinking CXX executable temp[0m
+[ 64%] Built target temp
+[ 65%] [32mBuilding CXX object CMakeFiles/nr25_led.dir/src/TeapLED_test.cpp.o[0m
+[ 67%] [32mBuilding CXX object CMakeFiles/nr25_led.dir/src/include/UDP.cpp.o[0m
+[ 68%] [32mBuilding CXX object CMakeFiles/nr25_led.dir/src/include/IP.cpp.o[0m
+[ 70%] [32m[1mLinking CXX executable nr25_led[0m
+[ 70%] Built target nr25_led
+[ 71%] [32mBuilding CXX object CMakeFiles/pid_wip.dir/src/include/IP.cpp.o[0m
+[ 75%] [32mBuilding CXX object CMakeFiles/pid_wip.dir/src/include/UDP.cpp.o[0m
+[ 75%] [32mBuilding CXX object CMakeFiles/pid_wip.dir/src/PID_WIP.cpp.o[0m
+[ 76%] [32mBuilding CXX object CMakeFiles/pid_tuner.dir/src/PID_Tuner.cpp.o[0m
+[ 78%] [32mBuilding CXX object CMakeFiles/ld19_fs.dir/src/LD19_FrontScan.cpp.o[0m
+[ 79%] [32mBuilding CXX object CMakeFiles/nr25_dr_hcsr04.dir/src/NR25_DR_HCSR04.cpp.o[0m
+[ 81%] [32mBuilding CXX object CMakeFiles/mb_tester.dir/src/MB_TESTER.cpp.o[0m
+[ 82%] [32mBuilding CXX object CMakeFiles/mb_tester.dir/src/include/UDP.cpp.o[0m
+[ 84%] [32m[1mLinking CXX executable mb_tester[0m
+[ 84%] Built target mb_tester
+[ 85%] [32mBuilding CXX object CMakeFiles/nr25_dr_servo_cal.dir/src/NR25_DR_Servo_Calibrator.cpp.o[0m
+[ 89%] [32mBuilding CXX object CMakeFiles/nr25_mr_servo_cal.dir/src/NR25_MR_Servo_Calibrator.cpp.o[0m
+[ 89%] [32mBuilding CXX object CMakeFiles/nr25_dr_pr.dir/src/NR25_DR_Parameter_Tuner.cpp.o[0m
+[ 90%] [32m[1mLinking CXX executable nr25_dr_hcsr04[0m
+[ 90%] Built target nr25_dr_hcsr04
+[ 92%] [32m[1mLinking CXX executable pid_tuner[0m
+[ 92%] Built target pid_tuner
+[ 93%] [32m[1mLinking CXX executable pid_wip[0m
+[ 93%] Built target pid_wip
+[ 95%] [32m[1mLinking CXX executable nr25_mr_servo_cal[0m
+[ 95%] Built target nr25_mr_servo_cal
+[ 96%] [32m[1mLinking CXX executable ld19_fs[0m
+[ 98%] [32m[1mLinking CXX executable nr25_dr_pr[0m
+[ 98%] Built target ld19_fs
+[ 98%] Built target nr25_dr_pr
+[100%] [32m[1mLinking CXX executable nr25_dr_servo_cal[0m
+[100%] Built target nr25_dr_servo_cal

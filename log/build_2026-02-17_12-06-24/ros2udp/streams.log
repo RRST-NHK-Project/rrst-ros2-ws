@@ -1,0 +1,89 @@
+[0.052s] Invoking command in '/home/ubuntu/rrst-ros2-ws/build/ros2udp': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/ros2udp -- -j12 -l12
+[0.113s] /usr/bin/figlet
+[0.716s] -- Using the multi-header code from /home/ubuntu/rrst-ros2-ws/build/ros2udp/_deps/nlohmann_json-src/include/
+[0.718s] -- Found ament_cmake: 2.5.3 (/opt/ros/jazzy/share/ament_cmake/cmake)
+[1.090s] -- Found rclcpp: 28.1.8 (/opt/ros/jazzy/share/rclcpp/cmake)
+[1.145s] -- Found rosidl_generator_c: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_c/cmake)
+[1.165s] -- Found rosidl_generator_cpp: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_cpp/cmake)
+[1.190s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[1.221s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[1.321s] -- Found rmw_implementation_cmake: 7.3.2 (/opt/ros/jazzy/share/rmw_implementation_cmake/cmake)
+[1.323s] -- Found rmw_fastrtps_cpp: 8.4.2 (/opt/ros/jazzy/share/rmw_fastrtps_cpp/cmake)
+[1.425s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[1.523s] -- Found std_msgs: 5.3.6 (/opt/ros/jazzy/share/std_msgs/cmake)
+[1.542s] -- Found sensor_msgs: 5.3.6 (/opt/ros/jazzy/share/sensor_msgs/cmake)
+[1.606s] -- Found tf2: 0.36.9 (/opt/ros/jazzy/share/tf2/cmake)
+[1.614s] -- Found tf2_ros: 0.36.9 (/opt/ros/jazzy/share/tf2_ros/cmake)
+[1.804s] -- Found tf2_geometry_msgs: 0.36.9 (/opt/ros/jazzy/share/tf2_geometry_msgs/cmake)
+[1.809s] -- Found eigen3_cmake_module: 0.3.0 (/opt/ros/jazzy/share/eigen3_cmake_module/cmake)
+[1.811s] -- Ensuring Eigen3 include directory is part of orocos-kdl CMake target
+[1.813s] -- Found visualization_msgs: 5.3.6 (/opt/ros/jazzy/share/visualization_msgs/cmake)
+[2.128s] -- Configuring done (2.0s)
+[2.306s] -- Generating done (0.2s)
+[2.347s] -- Build files have been written to: /home/ubuntu/rrst-ros2-ws/build/ros2udp
+[2.447s] [  6%] Built target nr25_mr_sd
+[2.447s] [ 12%] Built target nr25_dr_sd
+[2.459s] [ 18%] Built target nr25_dr
+[2.467s] [ 25%] Built target nr25_enc
+[2.467s] [ 25%] Built target nr25_pr
+[2.469s] [ 29%] Built target nr25_dr_omni
+[2.471s] [ 34%] Built target nr25_mr_omni
+[2.484s] [ 37%] Built target nr25_enc_pid
+[2.486s] [ 46%] Built target nr25_vel2js
+[2.490s] [ 43%] Built target nr25_mr
+[2.491s] [ 53%] Built target nr25_dr_c610
+[2.494s] [ 57%] Built target nr25_pid
+[2.527s] [ 60%] Built target nr25_dr_servo_cal
+[2.527s] [ 64%] Built target nr25_mr_servo_cal
+[2.531s] [ 67%] Built target nr25_dr_pr
+[2.532s] [ 70%] Built target nr25_dr_hcsr04
+[2.541s] [ 76%] Built target ld19_fs
+[2.542s] [ 78%] Built target mb_tester
+[2.543s] [ 84%] Built target pid_wip
+[2.550s] [ 87%] Built target pid_tuner
+[2.553s] [ 93%] Built target nr25_led
+[2.573s] [100%] Built target temp
+[2.597s] Invoked command in '/home/ubuntu/rrst-ros2-ws/build/ros2udp' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/ros2udp -- -j12 -l12
+[2.599s] Invoking command in '/home/ubuntu/rrst-ros2-ws/build/ros2udp': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/ros2udp
+[2.616s] -- Install configuration: ""
+[2.617s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_mr
+[2.618s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_mr_omni
+[2.619s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_mr_sd
+[2.620s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_dr
+[2.621s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_dr_omni
+[2.622s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_dr_sd
+[2.623s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_enc
+[2.625s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_pr
+[2.626s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_vel2js
+[2.627s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_enc_pid
+[2.628s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_pid
+[2.629s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_dr_c610
+[2.630s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_mr_servo_cal
+[2.631s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_dr_servo_cal
+[2.632s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_dr_pr
+[2.633s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_dr_hcsr04
+[2.634s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/mb_tester
+[2.635s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/ld19_fs
+[2.636s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/pid_wip
+[2.637s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/pid_tuner
+[2.638s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/nr25_led
+[2.639s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/ros2udp/temp
+[2.639s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/launch
+[2.639s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/launch/nr25_mr.py
+[2.640s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/launch/nr25_dr.py
+[2.640s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ament_index/resource_index/package_run_dependencies/ros2udp
+[2.640s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ament_index/resource_index/parent_prefix_path/ros2udp
+[2.640s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/environment/ament_prefix_path.sh
+[2.640s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/environment/ament_prefix_path.dsv
+[2.641s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/environment/path.sh
+[2.641s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/environment/path.dsv
+[2.641s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/local_setup.bash
+[2.641s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/local_setup.sh
+[2.641s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/local_setup.zsh
+[2.641s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/local_setup.dsv
+[2.642s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/package.dsv
+[2.642s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ament_index/resource_index/packages/ros2udp
+[2.642s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/cmake/ros2udpConfig.cmake
+[2.642s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/cmake/ros2udpConfig-version.cmake
+[2.642s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/package.xml
+[2.645s] Invoked command in '/home/ubuntu/rrst-ros2-ws/build/ros2udp' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/ros2udp

@@ -1,0 +1,514 @@
+[0.264s] DEBUG:colcon:Command line arguments: ['/usr/bin/colcon', 'build']
+[0.264s] DEBUG:colcon:Parsed command line arguments: Namespace(log_base=None, log_level=None, verb_name='build', build_base='build', install_base='install', merge_install=False, symlink_install=False, test_result_base=None, continue_on_error=False, executor='parallel', parallel_workers=12, event_handlers=None, ignore_user_meta=False, metas=['./colcon.meta'], base_paths=['.'], packages_ignore=None, packages_ignore_regex=None, paths=None, packages_up_to=None, packages_up_to_regex=None, packages_above=None, packages_above_and_dependencies=None, packages_above_depth=None, packages_select_by_dep=None, packages_skip_by_dep=None, packages_skip_up_to=None, packages_select_build_failed=False, packages_skip_build_finished=False, packages_select_test_failures=False, packages_skip_test_passed=False, packages_select=None, packages_skip=None, packages_select_regex=None, packages_skip_regex=None, packages_start=None, packages_end=None, allow_overriding=[], cmake_args=None, cmake_target=None, cmake_target_skip_unavailable=False, cmake_clean_cache=False, cmake_clean_first=False, cmake_force_configure=False, ament_cmake_args=None, catkin_cmake_args=None, catkin_skip_building_tests=False, mixin_files=None, mixin=None, verb_parser=<colcon_mixin.mixin.mixin_argument.MixinArgumentDecorator object at 0x7d90c7d88140>, verb_extension=<colcon_core.verb.build.BuildVerb object at 0x7d90c7d63cb0>, main=<bound method BuildVerb.main of <colcon_core.verb.build.BuildVerb object at 0x7d90c7d63cb0>>, mixin_verb=('build',))
+[0.339s] Level 1:colcon.colcon_core.package_discovery:discover_packages(colcon_meta) check parameters
+[0.339s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) check parameters
+[0.339s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) check parameters
+[0.339s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) check parameters
+[0.339s] Level 1:colcon.colcon_core.package_discovery:discover_packages(colcon_meta) discover
+[0.339s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) discover
+[0.339s] INFO:colcon.colcon_core.package_discovery:Crawling recursively for packages in '/home/ubuntu/rrst-ros2-ws'
+[0.340s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['ignore', 'ignore_ament_install']
+[0.340s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ignore'
+[0.340s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ignore_ament_install'
+[0.340s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['colcon_pkg']
+[0.340s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'colcon_pkg'
+[0.340s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['colcon_meta']
+[0.340s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'colcon_meta'
+[0.340s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['ros']
+[0.340s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ros'
+[0.374s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['cmake', 'python']
+[0.374s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'cmake'
+[0.374s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'python'
+[0.375s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['python_setup_py']
+[0.375s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'python_setup_py'
+[0.375s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines) by extensions ['ignore', 'ignore_ament_install']
+[0.375s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines) by extension 'ignore'
+[0.375s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines) by extension 'ignore_ament_install'
+[0.375s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines) by extensions ['colcon_pkg']
+[0.375s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines) by extension 'colcon_pkg'
+[0.375s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines) by extensions ['colcon_meta']
+[0.375s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines) by extension 'colcon_meta'
+[0.375s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines) by extensions ['ros']
+[0.375s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines) by extension 'ros'
+[0.375s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines) by extensions ['cmake', 'python']
+[0.375s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines) by extension 'cmake'
+[0.375s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines) by extension 'python'
+[0.375s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines) by extensions ['python_setup_py']
+[0.375s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines) by extension 'python_setup_py'
+[0.375s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)) by extensions ['ignore', 'ignore_ament_install']
+[0.376s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)) by extension 'ignore'
+[0.376s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)) by extension 'ignore_ament_install'
+[0.376s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)) by extensions ['colcon_pkg']
+[0.376s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)) by extension 'colcon_pkg'
+[0.376s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)) by extensions ['colcon_meta']
+[0.376s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)) by extension 'colcon_meta'
+[0.376s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)) by extensions ['ros']
+[0.376s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)) by extension 'ros'
+[0.376s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)) by extensions ['cmake', 'python']
+[0.376s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)) by extension 'cmake'
+[0.376s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)) by extension 'python'
+[0.376s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)) by extensions ['python_setup_py']
+[0.376s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)) by extension 'python_setup_py'
+[0.376s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)/KFS Image V1.0) by extensions ['ignore', 'ignore_ament_install']
+[0.376s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)/KFS Image V1.0) by extension 'ignore'
+[0.376s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)/KFS Image V1.0) by extension 'ignore_ament_install'
+[0.376s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)/KFS Image V1.0) by extensions ['colcon_pkg']
+[0.376s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)/KFS Image V1.0) by extension 'colcon_pkg'
+[0.376s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)/KFS Image V1.0) by extensions ['colcon_meta']
+[0.376s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)/KFS Image V1.0) by extension 'colcon_meta'
+[0.376s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)/KFS Image V1.0) by extensions ['ros']
+[0.376s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)/KFS Image V1.0) by extension 'ros'
+[0.377s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)/KFS Image V1.0) by extensions ['cmake', 'python']
+[0.377s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)/KFS Image V1.0) by extension 'cmake'
+[0.377s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)/KFS Image V1.0) by extension 'python'
+[0.377s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)/KFS Image V1.0) by extensions ['python_setup_py']
+[0.377s] Level 1:colcon.colcon_core.package_identification:_identify(KFS_judgement_machines/KFS_judgement_machine(AKAZA)/KFS Image V1.0) by extension 'python_setup_py'
+[0.377s] Level 1:colcon.colcon_core.package_identification:_identify(aruco_tracker) by extensions ['ignore', 'ignore_ament_install']
+[0.377s] Level 1:colcon.colcon_core.package_identification:_identify(aruco_tracker) by extension 'ignore'
+[0.377s] Level 1:colcon.colcon_core.package_identification:_identify(aruco_tracker) by extension 'ignore_ament_install'
+[0.377s] Level 1:colcon.colcon_core.package_identification:_identify(aruco_tracker) by extensions ['colcon_pkg']
+[0.377s] Level 1:colcon.colcon_core.package_identification:_identify(aruco_tracker) by extension 'colcon_pkg'
+[0.377s] Level 1:colcon.colcon_core.package_identification:_identify(aruco_tracker) by extensions ['colcon_meta']
+[0.377s] Level 1:colcon.colcon_core.package_identification:_identify(aruco_tracker) by extension 'colcon_meta'
+[0.377s] Level 1:colcon.colcon_core.package_identification:_identify(aruco_tracker) by extensions ['ros']
+[0.377s] Level 1:colcon.colcon_core.package_identification:_identify(aruco_tracker) by extension 'ros'
+[0.377s] Level 1:colcon.colcon_core.package_identification:_identify(aruco_tracker) by extensions ['cmake', 'python']
+[0.377s] Level 1:colcon.colcon_core.package_identification:_identify(aruco_tracker) by extension 'cmake'
+[0.377s] Level 1:colcon.colcon_core.package_identification:_identify(aruco_tracker) by extension 'python'
+[0.377s] Level 1:colcon.colcon_core.package_identification:_identify(aruco_tracker) by extensions ['python_setup_py']
+[0.377s] Level 1:colcon.colcon_core.package_identification:_identify(aruco_tracker) by extension 'python_setup_py'
+[0.377s] Level 1:colcon.colcon_core.package_identification:_identify(build) by extensions ['ignore', 'ignore_ament_install']
+[0.377s] Level 1:colcon.colcon_core.package_identification:_identify(build) by extension 'ignore'
+[0.377s] Level 1:colcon.colcon_core.package_identification:_identify(build) ignored
+[0.378s] Level 1:colcon.colcon_core.package_identification:_identify(example) by extensions ['ignore', 'ignore_ament_install']
+[0.378s] Level 1:colcon.colcon_core.package_identification:_identify(example) by extension 'ignore'
+[0.378s] Level 1:colcon.colcon_core.package_identification:_identify(example) by extension 'ignore_ament_install'
+[0.378s] Level 1:colcon.colcon_core.package_identification:_identify(example) by extensions ['colcon_pkg']
+[0.378s] Level 1:colcon.colcon_core.package_identification:_identify(example) by extension 'colcon_pkg'
+[0.378s] Level 1:colcon.colcon_core.package_identification:_identify(example) by extensions ['colcon_meta']
+[0.378s] Level 1:colcon.colcon_core.package_identification:_identify(example) by extension 'colcon_meta'
+[0.378s] Level 1:colcon.colcon_core.package_identification:_identify(example) by extensions ['ros']
+[0.378s] Level 1:colcon.colcon_core.package_identification:_identify(example) by extension 'ros'
+[0.384s] DEBUG:colcon.colcon_core.package_identification:Package 'example' with type 'ros.ament_cmake' and name 'example'
+[0.384s] Level 1:colcon.colcon_core.package_identification:_identify(install) by extensions ['ignore', 'ignore_ament_install']
+[0.384s] Level 1:colcon.colcon_core.package_identification:_identify(install) by extension 'ignore'
+[0.384s] Level 1:colcon.colcon_core.package_identification:_identify(install) ignored
+[0.385s] Level 1:colcon.colcon_core.package_identification:_identify(log) by extensions ['ignore', 'ignore_ament_install']
+[0.385s] Level 1:colcon.colcon_core.package_identification:_identify(log) by extension 'ignore'
+[0.385s] Level 1:colcon.colcon_core.package_identification:_identify(log) ignored
+[0.385s] Level 1:colcon.colcon_core.package_identification:_identify(microcontroller-ws) by extensions ['ignore', 'ignore_ament_install']
+[0.385s] Level 1:colcon.colcon_core.package_identification:_identify(microcontroller-ws) by extension 'ignore'
+[0.385s] Level 1:colcon.colcon_core.package_identification:_identify(microcontroller-ws) by extension 'ignore_ament_install'
+[0.385s] Level 1:colcon.colcon_core.package_identification:_identify(microcontroller-ws) by extensions ['colcon_pkg']
+[0.385s] Level 1:colcon.colcon_core.package_identification:_identify(microcontroller-ws) by extension 'colcon_pkg'
+[0.385s] Level 1:colcon.colcon_core.package_identification:_identify(microcontroller-ws) by extensions ['colcon_meta']
+[0.385s] Level 1:colcon.colcon_core.package_identification:_identify(microcontroller-ws) by extension 'colcon_meta'
+[0.385s] Level 1:colcon.colcon_core.package_identification:_identify(microcontroller-ws) by extensions ['ros']
+[0.385s] Level 1:colcon.colcon_core.package_identification:_identify(microcontroller-ws) by extension 'ros'
+[0.385s] Level 1:colcon.colcon_core.package_identification:_identify(microcontroller-ws) by extensions ['cmake', 'python']
+[0.385s] Level 1:colcon.colcon_core.package_identification:_identify(microcontroller-ws) by extension 'cmake'
+[0.385s] Level 1:colcon.colcon_core.package_identification:_identify(microcontroller-ws) by extension 'python'
+[0.385s] Level 1:colcon.colcon_core.package_identification:_identify(microcontroller-ws) by extensions ['python_setup_py']
+[0.385s] Level 1:colcon.colcon_core.package_identification:_identify(microcontroller-ws) by extension 'python_setup_py'
+[0.385s] Level 1:colcon.colcon_core.package_identification:_identify(nr26_r1_hw_ctrl) by extensions ['ignore', 'ignore_ament_install']
+[0.386s] Level 1:colcon.colcon_core.package_identification:_identify(nr26_r1_hw_ctrl) by extension 'ignore'
+[0.386s] Level 1:colcon.colcon_core.package_identification:_identify(nr26_r1_hw_ctrl) by extension 'ignore_ament_install'
+[0.386s] Level 1:colcon.colcon_core.package_identification:_identify(nr26_r1_hw_ctrl) by extensions ['colcon_pkg']
+[0.386s] Level 1:colcon.colcon_core.package_identification:_identify(nr26_r1_hw_ctrl) by extension 'colcon_pkg'
+[0.386s] Level 1:colcon.colcon_core.package_identification:_identify(nr26_r1_hw_ctrl) by extensions ['colcon_meta']
+[0.386s] Level 1:colcon.colcon_core.package_identification:_identify(nr26_r1_hw_ctrl) by extension 'colcon_meta'
+[0.386s] Level 1:colcon.colcon_core.package_identification:_identify(nr26_r1_hw_ctrl) by extensions ['ros']
+[0.386s] Level 1:colcon.colcon_core.package_identification:_identify(nr26_r1_hw_ctrl) by extension 'ros'
+[0.386s] DEBUG:colcon.colcon_core.package_identification:Package 'nr26_r1_hw_ctrl' with type 'ros.ament_cmake' and name 'nr26_r1_hw_ctrl'
+[0.387s] Level 1:colcon.colcon_core.package_identification:_identify(nr26_r2_hw_ctrl) by extensions ['ignore', 'ignore_ament_install']
+[0.387s] Level 1:colcon.colcon_core.package_identification:_identify(nr26_r2_hw_ctrl) by extension 'ignore'
+[0.387s] Level 1:colcon.colcon_core.package_identification:_identify(nr26_r2_hw_ctrl) by extension 'ignore_ament_install'
+[0.387s] Level 1:colcon.colcon_core.package_identification:_identify(nr26_r2_hw_ctrl) by extensions ['colcon_pkg']
+[0.387s] Level 1:colcon.colcon_core.package_identification:_identify(nr26_r2_hw_ctrl) by extension 'colcon_pkg'
+[0.387s] Level 1:colcon.colcon_core.package_identification:_identify(nr26_r2_hw_ctrl) by extensions ['colcon_meta']
+[0.387s] Level 1:colcon.colcon_core.package_identification:_identify(nr26_r2_hw_ctrl) by extension 'colcon_meta'
+[0.387s] Level 1:colcon.colcon_core.package_identification:_identify(nr26_r2_hw_ctrl) by extensions ['ros']
+[0.387s] Level 1:colcon.colcon_core.package_identification:_identify(nr26_r2_hw_ctrl) by extension 'ros'
+[0.388s] DEBUG:colcon.colcon_core.package_identification:Package 'nr26_r2_hw_ctrl' with type 'ros.ament_cmake' and name 'nr26_r2_hw_ctrl'
+[0.388s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding) by extensions ['ignore', 'ignore_ament_install']
+[0.388s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding) by extension 'ignore'
+[0.388s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding) by extension 'ignore_ament_install'
+[0.388s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding) by extensions ['colcon_pkg']
+[0.388s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding) by extension 'colcon_pkg'
+[0.388s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding) by extensions ['colcon_meta']
+[0.388s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding) by extension 'colcon_meta'
+[0.388s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding) by extensions ['ros']
+[0.388s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding) by extension 'ros'
+[0.388s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding) by extensions ['cmake', 'python']
+[0.388s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding) by extension 'cmake'
+[0.388s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding) by extension 'python'
+[0.388s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding) by extensions ['python_setup_py']
+[0.388s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding) by extension 'python_setup_py'
+[0.388s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/cpp_path_finding) by extensions ['ignore', 'ignore_ament_install']
+[0.389s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/cpp_path_finding) by extension 'ignore'
+[0.389s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/cpp_path_finding) by extension 'ignore_ament_install'
+[0.389s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/cpp_path_finding) by extensions ['colcon_pkg']
+[0.389s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/cpp_path_finding) by extension 'colcon_pkg'
+[0.389s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/cpp_path_finding) by extensions ['colcon_meta']
+[0.389s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/cpp_path_finding) by extension 'colcon_meta'
+[0.389s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/cpp_path_finding) by extensions ['ros']
+[0.389s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/cpp_path_finding) by extension 'ros'
+[0.389s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/cpp_path_finding) by extensions ['cmake', 'python']
+[0.389s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/cpp_path_finding) by extension 'cmake'
+[0.389s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/cpp_path_finding) by extension 'python'
+[0.389s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/cpp_path_finding) by extensions ['python_setup_py']
+[0.389s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/cpp_path_finding) by extension 'python_setup_py'
+[0.389s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/nhk2026_path) by extensions ['ignore', 'ignore_ament_install']
+[0.389s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/nhk2026_path) by extension 'ignore'
+[0.389s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/nhk2026_path) by extension 'ignore_ament_install'
+[0.389s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/nhk2026_path) by extensions ['colcon_pkg']
+[0.389s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/nhk2026_path) by extension 'colcon_pkg'
+[0.389s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/nhk2026_path) by extensions ['colcon_meta']
+[0.389s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/nhk2026_path) by extension 'colcon_meta'
+[0.389s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/nhk2026_path) by extensions ['ros']
+[0.389s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/nhk2026_path) by extension 'ros'
+[0.390s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/nhk2026_path) by extensions ['cmake', 'python']
+[0.390s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/nhk2026_path) by extension 'cmake'
+[0.390s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/nhk2026_path) by extension 'python'
+[0.390s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/nhk2026_path) by extensions ['python_setup_py']
+[0.390s] Level 1:colcon.colcon_core.package_identification:_identify(path_finding/nhk2026_path) by extension 'python_setup_py'
+[0.390s] Level 1:colcon.colcon_core.package_identification:_identify(ros2esp) by extensions ['ignore', 'ignore_ament_install']
+[0.390s] Level 1:colcon.colcon_core.package_identification:_identify(ros2esp) by extension 'ignore'
+[0.390s] Level 1:colcon.colcon_core.package_identification:_identify(ros2esp) by extension 'ignore_ament_install'
+[0.390s] Level 1:colcon.colcon_core.package_identification:_identify(ros2esp) by extensions ['colcon_pkg']
+[0.390s] Level 1:colcon.colcon_core.package_identification:_identify(ros2esp) by extension 'colcon_pkg'
+[0.390s] Level 1:colcon.colcon_core.package_identification:_identify(ros2esp) by extensions ['colcon_meta']
+[0.390s] Level 1:colcon.colcon_core.package_identification:_identify(ros2esp) by extension 'colcon_meta'
+[0.390s] Level 1:colcon.colcon_core.package_identification:_identify(ros2esp) by extensions ['ros']
+[0.390s] Level 1:colcon.colcon_core.package_identification:_identify(ros2esp) by extension 'ros'
+[0.391s] DEBUG:colcon.colcon_core.package_identification:Package 'ros2esp' with type 'ros.ament_cmake' and name 'ros2esp'
+[0.391s] Level 1:colcon.colcon_core.package_identification:_identify(ros2stm) by extensions ['ignore', 'ignore_ament_install']
+[0.391s] Level 1:colcon.colcon_core.package_identification:_identify(ros2stm) by extension 'ignore'
+[0.391s] Level 1:colcon.colcon_core.package_identification:_identify(ros2stm) by extension 'ignore_ament_install'
+[0.391s] Level 1:colcon.colcon_core.package_identification:_identify(ros2stm) by extensions ['colcon_pkg']
+[0.391s] Level 1:colcon.colcon_core.package_identification:_identify(ros2stm) by extension 'colcon_pkg'
+[0.391s] Level 1:colcon.colcon_core.package_identification:_identify(ros2stm) by extensions ['colcon_meta']
+[0.392s] Level 1:colcon.colcon_core.package_identification:_identify(ros2stm) by extension 'colcon_meta'
+[0.392s] Level 1:colcon.colcon_core.package_identification:_identify(ros2stm) by extensions ['ros']
+[0.392s] Level 1:colcon.colcon_core.package_identification:_identify(ros2stm) by extension 'ros'
+[0.392s] DEBUG:colcon.colcon_core.package_identification:Package 'ros2stm' with type 'ros.ament_cmake' and name 'ros2stm'
+[0.392s] Level 1:colcon.colcon_core.package_identification:_identify(ros2udp) by extensions ['ignore', 'ignore_ament_install']
+[0.393s] Level 1:colcon.colcon_core.package_identification:_identify(ros2udp) by extension 'ignore'
+[0.393s] Level 1:colcon.colcon_core.package_identification:_identify(ros2udp) by extension 'ignore_ament_install'
+[0.393s] Level 1:colcon.colcon_core.package_identification:_identify(ros2udp) by extensions ['colcon_pkg']
+[0.393s] Level 1:colcon.colcon_core.package_identification:_identify(ros2udp) by extension 'colcon_pkg'
+[0.393s] Level 1:colcon.colcon_core.package_identification:_identify(ros2udp) by extensions ['colcon_meta']
+[0.393s] Level 1:colcon.colcon_core.package_identification:_identify(ros2udp) by extension 'colcon_meta'
+[0.393s] Level 1:colcon.colcon_core.package_identification:_identify(ros2udp) by extensions ['ros']
+[0.393s] Level 1:colcon.colcon_core.package_identification:_identify(ros2udp) by extension 'ros'
+[0.394s] DEBUG:colcon.colcon_core.package_identification:Package 'ros2udp' with type 'ros.ament_cmake' and name 'ros2udp'
+[0.394s] Level 1:colcon.colcon_core.package_identification:_identify(serial_bridge) by extensions ['ignore', 'ignore_ament_install']
+[0.394s] Level 1:colcon.colcon_core.package_identification:_identify(serial_bridge) by extension 'ignore'
+[0.394s] Level 1:colcon.colcon_core.package_identification:_identify(serial_bridge) by extension 'ignore_ament_install'
+[0.394s] Level 1:colcon.colcon_core.package_identification:_identify(serial_bridge) by extensions ['colcon_pkg']
+[0.394s] Level 1:colcon.colcon_core.package_identification:_identify(serial_bridge) by extension 'colcon_pkg'
+[0.394s] Level 1:colcon.colcon_core.package_identification:_identify(serial_bridge) by extensions ['colcon_meta']
+[0.394s] Level 1:colcon.colcon_core.package_identification:_identify(serial_bridge) by extension 'colcon_meta'
+[0.394s] Level 1:colcon.colcon_core.package_identification:_identify(serial_bridge) by extensions ['ros']
+[0.394s] Level 1:colcon.colcon_core.package_identification:_identify(serial_bridge) by extension 'ros'
+[0.394s] Level 1:colcon.colcon_core.package_identification:_identify(serial_bridge) by extensions ['cmake', 'python']
+[0.394s] Level 1:colcon.colcon_core.package_identification:_identify(serial_bridge) by extension 'cmake'
+[0.394s] Level 1:colcon.colcon_core.package_identification:_identify(serial_bridge) by extension 'python'
+[0.394s] Level 1:colcon.colcon_core.package_identification:_identify(serial_bridge) by extensions ['python_setup_py']
+[0.394s] Level 1:colcon.colcon_core.package_identification:_identify(serial_bridge) by extension 'python_setup_py'
+[0.394s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) using defaults
+[0.395s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) discover
+[0.395s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) using defaults
+[0.395s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) discover
+[0.395s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) using defaults
+[0.422s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) check parameters
+[0.422s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) discover
+[0.425s] DEBUG:colcon.colcon_installed_package_information.package_discovery:Found 10 installed packages in /home/ubuntu/ros2_ws/install
+[0.426s] DEBUG:colcon.colcon_installed_package_information.package_discovery:Found 294 installed packages in /opt/ros/jazzy
+[0.428s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) using defaults
+[0.471s] Level 5:colcon.colcon_core.verb:set package 'example' build argument 'cmake_args' from command line to 'None'
+[0.472s] Level 5:colcon.colcon_core.verb:set package 'example' build argument 'cmake_target' from command line to 'None'
+[0.472s] Level 5:colcon.colcon_core.verb:set package 'example' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.472s] Level 5:colcon.colcon_core.verb:set package 'example' build argument 'cmake_clean_cache' from command line to 'False'
+[0.472s] Level 5:colcon.colcon_core.verb:set package 'example' build argument 'cmake_clean_first' from command line to 'False'
+[0.472s] Level 5:colcon.colcon_core.verb:set package 'example' build argument 'cmake_force_configure' from command line to 'False'
+[0.472s] Level 5:colcon.colcon_core.verb:set package 'example' build argument 'ament_cmake_args' from command line to 'None'
+[0.472s] Level 5:colcon.colcon_core.verb:set package 'example' build argument 'catkin_cmake_args' from command line to 'None'
+[0.472s] Level 5:colcon.colcon_core.verb:set package 'example' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.472s] DEBUG:colcon.colcon_core.verb:Building package 'example' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/ubuntu/rrst-ros2-ws/build/example', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/ubuntu/rrst-ros2-ws/install/example', 'merge_install': False, 'path': '/home/ubuntu/rrst-ros2-ws/example', 'symlink_install': False, 'test_result_base': None}
+[0.472s] Level 5:colcon.colcon_core.verb:set package 'nr26_r1_hw_ctrl' build argument 'cmake_args' from command line to 'None'
+[0.472s] Level 5:colcon.colcon_core.verb:set package 'nr26_r1_hw_ctrl' build argument 'cmake_target' from command line to 'None'
+[0.472s] Level 5:colcon.colcon_core.verb:set package 'nr26_r1_hw_ctrl' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.472s] Level 5:colcon.colcon_core.verb:set package 'nr26_r1_hw_ctrl' build argument 'cmake_clean_cache' from command line to 'False'
+[0.472s] Level 5:colcon.colcon_core.verb:set package 'nr26_r1_hw_ctrl' build argument 'cmake_clean_first' from command line to 'False'
+[0.472s] Level 5:colcon.colcon_core.verb:set package 'nr26_r1_hw_ctrl' build argument 'cmake_force_configure' from command line to 'False'
+[0.472s] Level 5:colcon.colcon_core.verb:set package 'nr26_r1_hw_ctrl' build argument 'ament_cmake_args' from command line to 'None'
+[0.472s] Level 5:colcon.colcon_core.verb:set package 'nr26_r1_hw_ctrl' build argument 'catkin_cmake_args' from command line to 'None'
+[0.472s] Level 5:colcon.colcon_core.verb:set package 'nr26_r1_hw_ctrl' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.472s] DEBUG:colcon.colcon_core.verb:Building package 'nr26_r1_hw_ctrl' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/ubuntu/rrst-ros2-ws/build/nr26_r1_hw_ctrl', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl', 'merge_install': False, 'path': '/home/ubuntu/rrst-ros2-ws/nr26_r1_hw_ctrl', 'symlink_install': False, 'test_result_base': None}
+[0.472s] Level 5:colcon.colcon_core.verb:set package 'nr26_r2_hw_ctrl' build argument 'cmake_args' from command line to 'None'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'nr26_r2_hw_ctrl' build argument 'cmake_target' from command line to 'None'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'nr26_r2_hw_ctrl' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'nr26_r2_hw_ctrl' build argument 'cmake_clean_cache' from command line to 'False'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'nr26_r2_hw_ctrl' build argument 'cmake_clean_first' from command line to 'False'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'nr26_r2_hw_ctrl' build argument 'cmake_force_configure' from command line to 'False'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'nr26_r2_hw_ctrl' build argument 'ament_cmake_args' from command line to 'None'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'nr26_r2_hw_ctrl' build argument 'catkin_cmake_args' from command line to 'None'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'nr26_r2_hw_ctrl' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.473s] DEBUG:colcon.colcon_core.verb:Building package 'nr26_r2_hw_ctrl' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/ubuntu/rrst-ros2-ws/build/nr26_r2_hw_ctrl', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/ubuntu/rrst-ros2-ws/install/nr26_r2_hw_ctrl', 'merge_install': False, 'path': '/home/ubuntu/rrst-ros2-ws/nr26_r2_hw_ctrl', 'symlink_install': False, 'test_result_base': None}
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'ros2esp' build argument 'cmake_args' from command line to 'None'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'ros2esp' build argument 'cmake_target' from command line to 'None'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'ros2esp' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'ros2esp' build argument 'cmake_clean_cache' from command line to 'False'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'ros2esp' build argument 'cmake_clean_first' from command line to 'False'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'ros2esp' build argument 'cmake_force_configure' from command line to 'False'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'ros2esp' build argument 'ament_cmake_args' from command line to 'None'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'ros2esp' build argument 'catkin_cmake_args' from command line to 'None'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'ros2esp' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.473s] DEBUG:colcon.colcon_core.verb:Building package 'ros2esp' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/ubuntu/rrst-ros2-ws/build/ros2esp', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/ubuntu/rrst-ros2-ws/install/ros2esp', 'merge_install': False, 'path': '/home/ubuntu/rrst-ros2-ws/ros2esp', 'symlink_install': False, 'test_result_base': None}
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'ros2stm' build argument 'cmake_args' from command line to 'None'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'ros2stm' build argument 'cmake_target' from command line to 'None'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'ros2stm' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'ros2stm' build argument 'cmake_clean_cache' from command line to 'False'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'ros2stm' build argument 'cmake_clean_first' from command line to 'False'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'ros2stm' build argument 'cmake_force_configure' from command line to 'False'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'ros2stm' build argument 'ament_cmake_args' from command line to 'None'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'ros2stm' build argument 'catkin_cmake_args' from command line to 'None'
+[0.473s] Level 5:colcon.colcon_core.verb:set package 'ros2stm' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.473s] DEBUG:colcon.colcon_core.verb:Building package 'ros2stm' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/ubuntu/rrst-ros2-ws/build/ros2stm', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/ubuntu/rrst-ros2-ws/install/ros2stm', 'merge_install': False, 'path': '/home/ubuntu/rrst-ros2-ws/ros2stm', 'symlink_install': False, 'test_result_base': None}
+[0.474s] Level 5:colcon.colcon_core.verb:set package 'ros2udp' build argument 'cmake_args' from command line to 'None'
+[0.474s] Level 5:colcon.colcon_core.verb:set package 'ros2udp' build argument 'cmake_target' from command line to 'None'
+[0.474s] Level 5:colcon.colcon_core.verb:set package 'ros2udp' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.474s] Level 5:colcon.colcon_core.verb:set package 'ros2udp' build argument 'cmake_clean_cache' from command line to 'False'
+[0.474s] Level 5:colcon.colcon_core.verb:set package 'ros2udp' build argument 'cmake_clean_first' from command line to 'False'
+[0.474s] Level 5:colcon.colcon_core.verb:set package 'ros2udp' build argument 'cmake_force_configure' from command line to 'False'
+[0.474s] Level 5:colcon.colcon_core.verb:set package 'ros2udp' build argument 'ament_cmake_args' from command line to 'None'
+[0.474s] Level 5:colcon.colcon_core.verb:set package 'ros2udp' build argument 'catkin_cmake_args' from command line to 'None'
+[0.474s] Level 5:colcon.colcon_core.verb:set package 'ros2udp' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.474s] DEBUG:colcon.colcon_core.verb:Building package 'ros2udp' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/ubuntu/rrst-ros2-ws/build/ros2udp', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/ubuntu/rrst-ros2-ws/install/ros2udp', 'merge_install': False, 'path': '/home/ubuntu/rrst-ros2-ws/ros2udp', 'symlink_install': False, 'test_result_base': None}
+[0.474s] INFO:colcon.colcon_core.executor:Executing jobs using 'parallel' executor
+[0.475s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:run_until_complete
+[0.475s] INFO:colcon.colcon_ros.task.ament_cmake.build:Building ROS package in '/home/ubuntu/rrst-ros2-ws/example' with build type 'ament_cmake'
+[0.476s] INFO:colcon.colcon_cmake.task.cmake.build:Building CMake package in '/home/ubuntu/rrst-ros2-ws/example'
+[0.481s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_core.shell.bat': Not used on non-Windows systems
+[0.482s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.482s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.487s] INFO:colcon.colcon_ros.task.ament_cmake.build:Building ROS package in '/home/ubuntu/rrst-ros2-ws/nr26_r1_hw_ctrl' with build type 'ament_cmake'
+[0.487s] INFO:colcon.colcon_cmake.task.cmake.build:Building CMake package in '/home/ubuntu/rrst-ros2-ws/nr26_r1_hw_ctrl'
+[0.488s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.488s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.492s] INFO:colcon.colcon_ros.task.ament_cmake.build:Building ROS package in '/home/ubuntu/rrst-ros2-ws/nr26_r2_hw_ctrl' with build type 'ament_cmake'
+[0.492s] INFO:colcon.colcon_cmake.task.cmake.build:Building CMake package in '/home/ubuntu/rrst-ros2-ws/nr26_r2_hw_ctrl'
+[0.492s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.492s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.497s] INFO:colcon.colcon_ros.task.ament_cmake.build:Building ROS package in '/home/ubuntu/rrst-ros2-ws/ros2esp' with build type 'ament_cmake'
+[0.497s] INFO:colcon.colcon_cmake.task.cmake.build:Building CMake package in '/home/ubuntu/rrst-ros2-ws/ros2esp'
+[0.497s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.498s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.503s] INFO:colcon.colcon_ros.task.ament_cmake.build:Building ROS package in '/home/ubuntu/rrst-ros2-ws/ros2stm' with build type 'ament_cmake'
+[0.503s] INFO:colcon.colcon_cmake.task.cmake.build:Building CMake package in '/home/ubuntu/rrst-ros2-ws/ros2stm'
+[0.504s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.504s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.510s] INFO:colcon.colcon_ros.task.ament_cmake.build:Building ROS package in '/home/ubuntu/rrst-ros2-ws/ros2udp' with build type 'ament_cmake'
+[0.510s] INFO:colcon.colcon_cmake.task.cmake.build:Building CMake package in '/home/ubuntu/rrst-ros2-ws/ros2udp'
+[0.510s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.510s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.522s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/ubuntu/rrst-ros2-ws/build/example': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/example -- -j12 -l12
+[0.527s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/ubuntu/rrst-ros2-ws/build/nr26_r1_hw_ctrl': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/nr26_r1_hw_ctrl -- -j12 -l12
+[0.531s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/ubuntu/rrst-ros2-ws/build/nr26_r2_hw_ctrl': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/nr26_r2_hw_ctrl -- -j12 -l12
+[0.539s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/ubuntu/rrst-ros2-ws/build/ros2esp': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/ros2esp -- -j12 -l12
+[0.545s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/ubuntu/rrst-ros2-ws/build/ros2stm': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/ros2stm -- -j12 -l12
+[0.563s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/ubuntu/rrst-ros2-ws/build/ros2udp': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/ros2udp -- -j12 -l12
+[0.721s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/ubuntu/rrst-ros2-ws/build/ros2stm' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/ros2stm -- -j12 -l12
+[0.736s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/ubuntu/rrst-ros2-ws/build/ros2stm': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/ros2stm
+[0.739s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/ubuntu/rrst-ros2-ws/build/example' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/example -- -j12 -l12
+[0.742s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/ubuntu/rrst-ros2-ws/build/example': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/example
+[0.751s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(ros2stm)
+[0.752s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/ubuntu/rrst-ros2-ws/build/ros2stm' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/ros2stm
+[0.761s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2stm' for CMake module files
+[0.762s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2stm' for CMake config files
+[0.762s] Level 1:colcon.colcon_core.shell:create_environment_hook('ros2stm', 'cmake_prefix_path')
+[0.762s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/hook/cmake_prefix_path.ps1'
+[0.763s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/hook/cmake_prefix_path.dsv'
+[0.764s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/hook/cmake_prefix_path.sh'
+[0.765s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2stm/lib'
+[0.765s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2stm/bin'
+[0.766s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2stm/lib/pkgconfig/ros2stm.pc'
+[0.766s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2stm/lib/python3.12/site-packages'
+[0.766s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2stm/bin'
+[0.766s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/package.ps1'
+[0.768s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/package.dsv'
+[0.769s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/package.sh'
+[0.771s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/package.bash'
+[0.773s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/package.zsh'
+[0.774s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/ubuntu/rrst-ros2-ws/install/ros2stm/share/colcon-core/packages/ros2stm)
+[0.775s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(ros2stm)
+[0.776s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2stm' for CMake module files
+[0.777s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2stm' for CMake config files
+[0.778s] Level 1:colcon.colcon_core.shell:create_environment_hook('ros2stm', 'cmake_prefix_path')
+[0.778s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/hook/cmake_prefix_path.ps1'
+[0.779s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/hook/cmake_prefix_path.dsv'
+[0.779s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/hook/cmake_prefix_path.sh'
+[0.780s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2stm/lib'
+[0.780s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2stm/bin'
+[0.780s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2stm/lib/pkgconfig/ros2stm.pc'
+[0.781s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2stm/lib/python3.12/site-packages'
+[0.781s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2stm/bin'
+[0.781s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/package.ps1'
+[0.782s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/package.dsv'
+[0.783s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/package.sh'
+[0.783s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/package.bash'
+[0.784s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2stm/share/ros2stm/package.zsh'
+[0.784s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/ubuntu/rrst-ros2-ws/install/ros2stm/share/colcon-core/packages/ros2stm)
+[0.786s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(example)
+[0.787s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/example' for CMake module files
+[0.788s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/ubuntu/rrst-ros2-ws/build/example' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/example
+[0.789s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/example' for CMake config files
+[0.789s] Level 1:colcon.colcon_core.shell:create_environment_hook('example', 'cmake_prefix_path')
+[0.790s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/rrst-ros2-ws/install/example/share/example/hook/cmake_prefix_path.ps1'
+[0.791s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/ubuntu/rrst-ros2-ws/install/example/share/example/hook/cmake_prefix_path.dsv'
+[0.792s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/rrst-ros2-ws/install/example/share/example/hook/cmake_prefix_path.sh'
+[0.793s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/example/lib'
+[0.793s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/example/bin'
+[0.793s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/example/lib/pkgconfig/example.pc'
+[0.794s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/example/lib/python3.12/site-packages'
+[0.794s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/example/bin'
+[0.795s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/example/share/example/package.ps1'
+[0.796s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/ubuntu/rrst-ros2-ws/install/example/share/example/package.dsv'
+[0.797s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/example/share/example/package.sh'
+[0.797s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/example/share/example/package.bash'
+[0.798s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/example/share/example/package.zsh'
+[0.798s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/ubuntu/rrst-ros2-ws/install/example/share/colcon-core/packages/example)
+[0.799s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(example)
+[0.799s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/example' for CMake module files
+[0.800s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/example' for CMake config files
+[0.800s] Level 1:colcon.colcon_core.shell:create_environment_hook('example', 'cmake_prefix_path')
+[0.800s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/rrst-ros2-ws/install/example/share/example/hook/cmake_prefix_path.ps1'
+[0.801s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/ubuntu/rrst-ros2-ws/install/example/share/example/hook/cmake_prefix_path.dsv'
+[0.801s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/rrst-ros2-ws/install/example/share/example/hook/cmake_prefix_path.sh'
+[0.802s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/example/lib'
+[0.802s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/example/bin'
+[0.802s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/example/lib/pkgconfig/example.pc'
+[0.802s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/example/lib/python3.12/site-packages'
+[0.802s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/example/bin'
+[0.802s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/example/share/example/package.ps1'
+[0.803s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/ubuntu/rrst-ros2-ws/install/example/share/example/package.dsv'
+[0.804s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/example/share/example/package.sh'
+[0.804s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/example/share/example/package.bash'
+[0.804s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/example/share/example/package.zsh'
+[0.805s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/ubuntu/rrst-ros2-ws/install/example/share/colcon-core/packages/example)
+[2.587s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/ubuntu/rrst-ros2-ws/build/ros2esp' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/ros2esp -- -j12 -l12
+[2.591s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/ubuntu/rrst-ros2-ws/build/ros2esp': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/ros2esp
+[2.621s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(ros2esp)
+[2.621s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2esp' for CMake module files
+[2.622s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/ubuntu/rrst-ros2-ws/build/ros2esp' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/ros2esp
+[2.624s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2esp' for CMake config files
+[2.624s] Level 1:colcon.colcon_core.shell:create_environment_hook('ros2esp', 'cmake_prefix_path')
+[2.625s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/hook/cmake_prefix_path.ps1'
+[2.626s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/hook/cmake_prefix_path.dsv'
+[2.626s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/hook/cmake_prefix_path.sh'
+[2.628s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2esp/lib'
+[2.628s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2esp/bin'
+[2.628s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2esp/lib/pkgconfig/ros2esp.pc'
+[2.629s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2esp/lib/python3.12/site-packages'
+[2.629s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2esp/bin'
+[2.630s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/package.ps1'
+[2.631s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/package.dsv'
+[2.631s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/package.sh'
+[2.632s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/package.bash'
+[2.633s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/package.zsh'
+[2.634s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/ubuntu/rrst-ros2-ws/install/ros2esp/share/colcon-core/packages/ros2esp)
+[2.635s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(ros2esp)
+[2.635s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2esp' for CMake module files
+[2.636s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2esp' for CMake config files
+[2.637s] Level 1:colcon.colcon_core.shell:create_environment_hook('ros2esp', 'cmake_prefix_path')
+[2.637s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/hook/cmake_prefix_path.ps1'
+[2.638s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/hook/cmake_prefix_path.dsv'
+[2.639s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/hook/cmake_prefix_path.sh'
+[2.640s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2esp/lib'
+[2.641s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2esp/bin'
+[2.641s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2esp/lib/pkgconfig/ros2esp.pc'
+[2.641s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2esp/lib/python3.12/site-packages'
+[2.642s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2esp/bin'
+[2.642s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/package.ps1'
+[2.643s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/package.dsv'
+[2.644s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/package.sh'
+[2.645s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/package.bash'
+[2.645s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2esp/share/ros2esp/package.zsh'
+[2.646s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/ubuntu/rrst-ros2-ws/install/ros2esp/share/colcon-core/packages/ros2esp)
+[3.107s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/ubuntu/rrst-ros2-ws/build/ros2udp' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/ros2udp -- -j12 -l12
+[3.110s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/ubuntu/rrst-ros2-ws/build/ros2udp': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/ros2udp
+[3.155s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(ros2udp)
+[3.155s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/ubuntu/rrst-ros2-ws/build/ros2udp' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/ros2udp
+[3.156s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2udp' for CMake module files
+[3.157s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2udp' for CMake config files
+[3.158s] Level 1:colcon.colcon_core.shell:create_environment_hook('ros2udp', 'cmake_prefix_path')
+[3.158s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/hook/cmake_prefix_path.ps1'
+[3.159s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/hook/cmake_prefix_path.dsv'
+[3.160s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/hook/cmake_prefix_path.sh'
+[3.161s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2udp/lib'
+[3.162s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2udp/bin'
+[3.162s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/pkgconfig/ros2udp.pc'
+[3.162s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/python3.12/site-packages'
+[3.163s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2udp/bin'
+[3.163s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/package.ps1'
+[3.164s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/package.dsv'
+[3.165s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/package.sh'
+[3.166s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/package.bash'
+[3.167s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/package.zsh'
+[3.167s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/ubuntu/rrst-ros2-ws/install/ros2udp/share/colcon-core/packages/ros2udp)
+[3.168s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(ros2udp)
+[3.169s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2udp' for CMake module files
+[3.170s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2udp' for CMake config files
+[3.171s] Level 1:colcon.colcon_core.shell:create_environment_hook('ros2udp', 'cmake_prefix_path')
+[3.171s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/hook/cmake_prefix_path.ps1'
+[3.172s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/hook/cmake_prefix_path.dsv'
+[3.172s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/hook/cmake_prefix_path.sh'
+[3.174s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2udp/lib'
+[3.174s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2udp/bin'
+[3.174s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/pkgconfig/ros2udp.pc'
+[3.174s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2udp/lib/python3.12/site-packages'
+[3.175s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/ros2udp/bin'
+[3.175s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/package.ps1'
+[3.176s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/package.dsv'
+[3.176s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/package.sh'
+[3.177s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/package.bash'
+[3.177s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/ros2udp/share/ros2udp/package.zsh'
+[3.178s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/ubuntu/rrst-ros2-ws/install/ros2udp/share/colcon-core/packages/ros2udp)
+[27.754s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/ubuntu/rrst-ros2-ws/build/nr26_r1_hw_ctrl' returned '2': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/nr26_r1_hw_ctrl -- -j12 -l12
+[27.756s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(nr26_r1_hw_ctrl)
+[27.756s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl' for CMake module files
+[27.758s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl' for CMake config files
+[27.759s] Level 1:colcon.colcon_core.shell:create_environment_hook('nr26_r1_hw_ctrl', 'cmake_prefix_path')
+[27.759s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/hook/cmake_prefix_path.ps1'
+[27.761s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/hook/cmake_prefix_path.dsv'
+[27.762s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/hook/cmake_prefix_path.sh'
+[27.764s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/lib'
+[27.764s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/bin'
+[27.765s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/lib/pkgconfig/nr26_r1_hw_ctrl.pc'
+[27.765s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/lib/python3.12/site-packages'
+[27.766s] Level 1:colcon.colcon_core.environment:checking '/home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/bin'
+[27.767s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/package.ps1'
+[27.769s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/package.dsv'
+[27.771s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/package.sh'
+[27.772s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/package.bash'
+[27.773s] INFO:colcon.colcon_core.shell:Creating package script '/home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/nr26_r1_hw_ctrl/package.zsh'
+[27.774s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/ubuntu/rrst-ros2-ws/install/nr26_r1_hw_ctrl/share/colcon-core/packages/nr26_r1_hw_ctrl)
+[29.708s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:closing loop
+[29.709s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:loop closed
+[29.709s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:run_until_complete finished with '2'
+[29.709s] DEBUG:colcon.colcon_core.event_reactor:joining thread
+[29.722s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_notification.desktop_notification.terminal_notifier': Not used on non-Darwin systems
+[29.722s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_notification.desktop_notification.win32': Not used on non-Windows systems
+[29.722s] INFO:colcon.colcon_notification.desktop_notification:Sending desktop notification using 'notify2'
+[29.749s] DEBUG:colcon.colcon_core.event_reactor:joined thread
+[29.750s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/ubuntu/rrst-ros2-ws/install/local_setup.ps1'
+[29.751s] INFO:colcon.colcon_core.shell:Creating prefix util module '/home/ubuntu/rrst-ros2-ws/install/_local_setup_util_ps1.py'
+[29.753s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/ubuntu/rrst-ros2-ws/install/setup.ps1'
+[29.755s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/ubuntu/rrst-ros2-ws/install/local_setup.sh'
+[29.756s] INFO:colcon.colcon_core.shell:Creating prefix util module '/home/ubuntu/rrst-ros2-ws/install/_local_setup_util_sh.py'
+[29.757s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/ubuntu/rrst-ros2-ws/install/setup.sh'
+[29.759s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/ubuntu/rrst-ros2-ws/install/local_setup.bash'
+[29.759s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/ubuntu/rrst-ros2-ws/install/setup.bash'
+[29.761s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/ubuntu/rrst-ros2-ws/install/local_setup.zsh'
+[29.762s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/ubuntu/rrst-ros2-ws/install/setup.zsh'

@@ -1,0 +1,4 @@
+[01m[K/home/ubuntu/rrst-ros2-ws/nr26_r1_hw_ctrl/src/R1_SwerveDrive.cpp:[m[K In member function ‘[01m[Kvoid HardWareControl::[01;32m[Kps4_listener_callback[m[K(sensor_msgs::msg::Joy_<std::allocator<void> >::SharedPtr)[m[K’:
+[01m[K/home/ubuntu/rrst-ros2-ws/nr26_r1_hw_ctrl/src/R1_SwerveDrive.cpp:135:21:[m[K [01;35m[Kwarning: [m[Kvariable ‘[01m[Klast_right[m[K’ set but not used [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-but-set-variable-Wunused-but-set-variable]8;;[m[K]
+  135 |         static bool [01;35m[Klast_right[m[K = false;
+      |                     [01;35m[K^~~~~~~~~~[m[K

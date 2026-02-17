@@ -1,0 +1,92 @@
+[0.030s] Invoking command in '/home/ubuntu/rrst-ros2-ws/build/ros2esp': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake /home/ubuntu/rrst-ros2-ws/ros2esp -DCMAKE_INSTALL_PREFIX=/home/ubuntu/rrst-ros2-ws/install/ros2esp
+[0.260s] -- The C compiler identification is GNU 13.3.0
+[0.436s] -- The CXX compiler identification is GNU 13.3.0
+[0.469s] -- Detecting C compiler ABI info
+[0.633s] -- Detecting C compiler ABI info - done
+[0.655s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.656s] -- Detecting C compile features
+[0.656s] -- Detecting C compile features - done
+[0.674s] -- Detecting CXX compiler ABI info
+[0.859s] -- Detecting CXX compiler ABI info - done
+[0.883s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.883s] -- Detecting CXX compile features
+[0.884s] -- Detecting CXX compile features - done
+[73.876s] -- Using the multi-header code from /home/ubuntu/rrst-ros2-ws/build/ros2esp/_deps/nlohmann_json-src/include/
+[73.888s] -- Found ament_cmake: 2.5.3 (/opt/ros/jazzy/share/ament_cmake/cmake)
+[74.485s] -- Found Python3: /usr/bin/python3 (found version "3.12.3") found components: Interpreter 
+[75.597s] -- Found rclcpp: 28.1.8 (/opt/ros/jazzy/share/rclcpp/cmake)
+[75.900s] -- Found rosidl_generator_c: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_c/cmake)
+[75.961s] -- Found rosidl_generator_cpp: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_cpp/cmake)
+[76.033s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[76.117s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[76.488s] -- Found rmw_implementation_cmake: 7.3.2 (/opt/ros/jazzy/share/rmw_implementation_cmake/cmake)
+[76.506s] -- Found rmw_fastrtps_cpp: 8.4.2 (/opt/ros/jazzy/share/rmw_fastrtps_cpp/cmake)
+[76.992s] -- Found OpenSSL: /usr/lib/x86_64-linux-gnu/libcrypto.so (found version "3.0.13")  
+[77.074s] -- Found FastRTPS: /opt/ros/jazzy/include (Required is at least version "2.13") 
+[77.181s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[77.543s] -- Found std_msgs: 5.3.6 (/opt/ros/jazzy/share/std_msgs/cmake)
+[77.618s] -- Found sensor_msgs: 5.3.6 (/opt/ros/jazzy/share/sensor_msgs/cmake)
+[77.942s] -- Found ament_lint_auto: 0.17.2 (/opt/ros/jazzy/share/ament_lint_auto/cmake)
+[78.442s] -- Added test 'cppcheck' to perform static code analysis on C / C++ code
+[78.446s] -- Configured cppcheck include dirs: 
+[78.449s] -- Configured cppcheck exclude dirs and/or files: 
+[78.453s] -- Added test 'lint_cmake' to check CMake code style
+[78.460s] -- Added test 'uncrustify' to check C / C++ code style
+[78.461s] -- Configured uncrustify additional arguments: 
+[78.466s] -- Added test 'xmllint' to check XML markup files
+[78.482s] -- Configuring done (78.4s)
+[79.142s] -- Generating done (0.5s)
+[79.432s] -- Build files have been written to: /home/ubuntu/rrst-ros2-ws/build/ros2esp
+[79.556s] Invoked command in '/home/ubuntu/rrst-ros2-ws/build/ros2esp' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake /home/ubuntu/rrst-ros2-ws/ros2esp -DCMAKE_INSTALL_PREFIX=/home/ubuntu/rrst-ros2-ws/install/ros2esp
+[79.557s] Invoking command in '/home/ubuntu/rrst-ros2-ws/build/ros2esp': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/ros2esp -- -j12 -l12
+[80.007s] [  3%] [32mBuilding CXX object CMakeFiles/dokusute_tuner.dir/src/dokusute_tuner.cpp.o[0m
+[80.026s] [  7%] [32mBuilding CXX object CMakeFiles/nr25_mr_sd.dir/src/NR25_MR_SwerveDrive.cpp.o[0m
+[80.065s] [ 10%] [32mBuilding CXX object CMakeFiles/mb_tester.dir/src/MB_TESTER.cpp.o[0m
+[80.069s] [ 14%] [32mBuilding CXX object CMakeFiles/pid_wip.dir/src/PID_WIP.cpp.o[0m
+[80.083s] [ 17%] [32mBuilding CXX object CMakeFiles/mros_wip.dir/src/mROS_WIP.cpp.o[0m
+[80.090s] [ 21%] [32mBuilding CXX object CMakeFiles/nr26_tuner.dir/src/NR26_R2_Tuner.cpp.o[0m
+[80.094s] [ 25%] [32mBuilding CXX object CMakeFiles/nr26_r2_move.dir/src/NR26_R2_move.cpp.o[0m
+[80.100s] [ 28%] [32mBuilding CXX object CMakeFiles/cr25_fes.dir/src/CR25_FES.cpp.o[0m
+[80.107s] [ 32%] [32mBuilding CXX object CMakeFiles/pid_tuner.dir/src/PID_Tuner.cpp.o[0m
+[80.110s] [ 35%] [32mBuilding CXX object CMakeFiles/nr26_omni.dir/src/NR26_omni.cpp.o[0m
+[80.148s] [ 39%] [32mBuilding CXX object CMakeFiles/nr26_omni_fb.dir/src/NR26_omni_FB.cpp.o[0m
+[80.162s] [ 42%] [32mBuilding CXX object CMakeFiles/dokusute_move.dir/src/dokusute_move.cpp.o[0m
+[113.285s] [01m[K/home/ubuntu/rrst-ros2-ws/ros2esp/src/dokusute_move.cpp:[m[K In member function ‘[01m[Kvoid PS4_Listener::[01;32m[Kps4_listener_callback[m[K(sensor_msgs::msg::Joy_<std::allocator<void> >::SharedPtr)[m[K’:
+[113.310s] [01m[K/home/ubuntu/rrst-ros2-ws/ros2esp/src/dokusute_move.cpp:187:14:[m[K [01;35m[Kwarning: [m[Kunused variable ‘[01m[KL1[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-variable-Wunused-variable]8;;[m[K]
+[113.319s]   187 |         bool [01;35m[KL1[m[K = msg->buttons[4];
+[113.325s]       |              [01;35m[K^~[m[K
+[129.302s] [ 46%] [32m[1mLinking CXX executable mb_tester[0m
+[131.645s] [ 46%] Built target mb_tester
+[139.946s] [ 50%] [32m[1mLinking CXX executable dokusute_tuner[0m
+[141.608s] [ 50%] Built target dokusute_tuner
+[152.494s] [ 53%] [32m[1mLinking CXX executable nr26_tuner[0m
+[152.880s] [ 57%] [32m[1mLinking CXX executable pid_tuner[0m
+[153.994s] [ 57%] Built target pid_tuner
+[155.269s] [ 57%] Built target nr26_tuner
+[164.400s] [ 60%] [32m[1mLinking CXX executable cr25_fes[0m
+[165.366s] [ 64%] [32m[1mLinking CXX executable mros_wip[0m
+[167.426s] [ 64%] Built target cr25_fes
+[167.897s] [ 64%] Built target mros_wip
+[168.318s] [ 67%] [32m[1mLinking CXX executable nr26_omni_fb[0m
+[169.170s] [ 71%] [32m[1mLinking CXX executable nr25_mr_sd[0m
+[169.410s] [ 75%] [32m[1mLinking CXX executable nr26_omni[0m
+[170.064s] [ 75%] Built target nr26_omni_fb
+[171.149s] [ 75%] Built target nr25_mr_sd
+[171.884s] [ 75%] Built target nr26_omni
+[176.882s] [ 78%] [32m[1mLinking CXX executable dokusute_move[0m
+[178.457s] [ 78%] Built target dokusute_move
+[180.640s] [ 82%] [32m[1mLinking CXX executable pid_wip[0m
+[181.495s] [ 82%] Built target pid_wip
+[184.758s] [ 85%] [32m[1mLinking CXX executable nr26_r2_move[0m
+[185.926s] [ 85%] Built target nr26_r2_move
+[185.989s] [ 89%] [32mBuilding CXX object CMakeFiles/sb_host.dir/src/Serial_Bridge_Host.cpp.o[0m
+[189.591s] [01m[K/home/ubuntu/rrst-ros2-ws/ros2esp/src/Serial_Bridge_Host.cpp:[m[K In member function ‘[01m[Kvoid HardWareControl::[01;32m[Kps4_listener_callback[m[K(sensor_msgs::msg::Joy_<std::allocator<void> >::SharedPtr)[m[K’:
+[189.595s] [01m[K/home/ubuntu/rrst-ros2-ws/ros2esp/src/Serial_Bridge_Host.cpp:95:71:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kmsg[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[189.596s]    95 | oid ps4_listener_callback([01;35m[Kconst sensor_msgs::msg::Joy::SharedPtr msg[m[K) {
+[189.596s]       |                           [01;35m[K~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~[m[K
+[189.596s] 
+[201.422s] [ 92%] [32m[1mLinking CXX executable sb_host[0m
+[202.086s] [ 92%] Built target sb_host
+[202.132s] [ 96%] [32mBuilding CXX object CMakeFiles/sb_tester.dir/src/Serial_Bridge_Tester.cpp.o[0m
+[208.885s] [100%] [32m[1mLinking CXX executable sb_tester[0m
+[209.269s] [100%] Built target sb_tester

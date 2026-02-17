@@ -1,0 +1,22 @@
+[0.081s] Invoking command in '/home/ubuntu/rrst-ros2-ws/build/serial_bridge': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/serial_bridge -- -j12 -l12
+[0.413s] [100%] Built target serial_bridge_node
+[0.469s] Invoked command in '/home/ubuntu/rrst-ros2-ws/build/serial_bridge' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/serial_bridge -- -j12 -l12
+[0.474s] Invoking command in '/home/ubuntu/rrst-ros2-ws/build/serial_bridge': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/serial_bridge
+[0.500s] -- Install configuration: ""
+[0.501s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/lib/serial_bridge/serial_bridge_node
+[0.501s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/ament_index/resource_index/package_run_dependencies/serial_bridge
+[0.502s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/ament_index/resource_index/parent_prefix_path/serial_bridge
+[0.503s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/environment/ament_prefix_path.sh
+[0.503s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/environment/ament_prefix_path.dsv
+[0.503s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/environment/path.sh
+[0.504s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/environment/path.dsv
+[0.504s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/local_setup.bash
+[0.508s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/local_setup.sh
+[0.508s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/local_setup.zsh
+[0.509s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/local_setup.dsv
+[0.509s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/package.dsv
+[0.509s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/ament_index/resource_index/packages/serial_bridge
+[0.509s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/cmake/serial_bridgeConfig.cmake
+[0.509s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/cmake/serial_bridgeConfig-version.cmake
+[0.510s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/serial_bridge/share/serial_bridge/package.xml
+[0.561s] Invoked command in '/home/ubuntu/rrst-ros2-ws/build/serial_bridge' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/serial_bridge

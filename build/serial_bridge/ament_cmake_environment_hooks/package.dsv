@@ -1,0 +1,4 @@
+source;share/serial_bridge/local_setup.bash
+source;share/serial_bridge/local_setup.dsv
+source;share/serial_bridge/local_setup.sh
+source;share/serial_bridge/local_setup.zsh

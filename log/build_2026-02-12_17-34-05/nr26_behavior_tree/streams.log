@@ -1,0 +1,20 @@
+[0.046s] Invoking command in '/home/ubuntu/rrst-ros2-ws/build/nr26_behavior_tree': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/nr26_behavior_tree -- -j12 -l12
+[0.163s] Invoked command in '/home/ubuntu/rrst-ros2-ws/build/nr26_behavior_tree' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/nr26_behavior_tree -- -j12 -l12
+[0.212s] Invoking command in '/home/ubuntu/rrst-ros2-ws/build/nr26_behavior_tree': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/nr26_behavior_tree
+[0.269s] -- Install configuration: ""
+[0.269s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_behavior_tree/share/ament_index/resource_index/package_run_dependencies/nr26_behavior_tree
+[0.270s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_behavior_tree/share/ament_index/resource_index/parent_prefix_path/nr26_behavior_tree
+[0.270s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_behavior_tree/share/nr26_behavior_tree/environment/ament_prefix_path.sh
+[0.270s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_behavior_tree/share/nr26_behavior_tree/environment/ament_prefix_path.dsv
+[0.270s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_behavior_tree/share/nr26_behavior_tree/environment/path.sh
+[0.270s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_behavior_tree/share/nr26_behavior_tree/environment/path.dsv
+[0.271s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_behavior_tree/share/nr26_behavior_tree/local_setup.bash
+[0.271s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_behavior_tree/share/nr26_behavior_tree/local_setup.sh
+[0.272s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_behavior_tree/share/nr26_behavior_tree/local_setup.zsh
+[0.272s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_behavior_tree/share/nr26_behavior_tree/local_setup.dsv
+[0.275s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_behavior_tree/share/nr26_behavior_tree/package.dsv
+[0.275s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_behavior_tree/share/ament_index/resource_index/packages/nr26_behavior_tree
+[0.275s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_behavior_tree/share/nr26_behavior_tree/cmake/nr26_behavior_treeConfig.cmake
+[0.276s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_behavior_tree/share/nr26_behavior_tree/cmake/nr26_behavior_treeConfig-version.cmake
+[0.276s] -- Up-to-date: /home/ubuntu/rrst-ros2-ws/install/nr26_behavior_tree/share/nr26_behavior_tree/package.xml
+[0.276s] Invoked command in '/home/ubuntu/rrst-ros2-ws/build/nr26_behavior_tree' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/nr26_behavior_tree

@@ -1,0 +1,16 @@
+[01m[K/home/ubuntu/rrst-ros2-ws/nr26_r2_hw_ctrl/src/R2_MotionCtrl.cpp:[m[K In member function ‘[01m[Kvoid HardWareControl::[01;32m[Kps4_listener_callback[m[K(sensor_msgs::msg::Joy_<std::allocator<void> >::SharedPtr)[m[K’:
+[01m[K/home/ubuntu/rrst-ros2-ws/nr26_r2_hw_ctrl/src/R2_MotionCtrl.cpp:104:14:[m[K [01;35m[Kwarning: [m[Kunused variable ‘[01m[KCIRCLE[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-variable-Wunused-variable]8;;[m[K]
+  104 |         bool [01;35m[KCIRCLE[m[K = msg->buttons[1];
+      |              [01;35m[K^~~~~~[m[K
+[01m[K/home/ubuntu/rrst-ros2-ws/nr26_r2_hw_ctrl/src/R2_MotionCtrl.cpp:106:14:[m[K [01;35m[Kwarning: [m[Kunused variable ‘[01m[KSQUARE[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-variable-Wunused-variable]8;;[m[K]
+  106 |         bool [01;35m[KSQUARE[m[K = msg->buttons[3];
+      |              [01;35m[K^~~~~~[m[K
+[01m[K/home/ubuntu/rrst-ros2-ws/nr26_r2_hw_ctrl/src/R2_MotionCtrl.cpp:113:14:[m[K [01;35m[Kwarning: [m[Kunused variable ‘[01m[KL1[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-variable-Wunused-variable]8;;[m[K]
+  113 |         bool [01;35m[KL1[m[K = msg->buttons[4];
+      |              [01;35m[K^~[m[K
+[01m[K/home/ubuntu/rrst-ros2-ws/nr26_r2_hw_ctrl/src/R2_MotionCtrl.cpp:114:14:[m[K [01;35m[Kwarning: [m[Kunused variable ‘[01m[KR1[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-variable-Wunused-variable]8;;[m[K]
+  114 |         bool [01;35m[KR1[m[K = msg->buttons[5];
+      |              [01;35m[K^~[m[K
+[01m[K/home/ubuntu/rrst-ros2-ws/nr26_r2_hw_ctrl/src/R2_MotionCtrl.cpp:161:20:[m[K [01;35m[Kwarning: [m[Kunused variable ‘[01m[KMAG_ADJ_STEP_[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-variable-Wunused-variable]8;;[m[K]
+  161 |         static int [01;35m[KMAG_ADJ_STEP_[m[K = 10;
+      |                    [01;35m[K^~~~~~~~~~~~~[m[K

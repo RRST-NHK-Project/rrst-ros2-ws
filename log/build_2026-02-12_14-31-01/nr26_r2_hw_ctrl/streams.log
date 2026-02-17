@@ -1,0 +1,81 @@
+[0.032s] Invoking command in '/home/ubuntu/rrst-ros2-ws/build/nr26_r2_hw_ctrl': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake /home/ubuntu/rrst-ros2-ws/nr26_r2_hw_ctrl -DCMAKE_INSTALL_PREFIX=/home/ubuntu/rrst-ros2-ws/install/nr26_r2_hw_ctrl
+[0.251s] -- The C compiler identification is GNU 13.3.0
+[0.443s] -- The CXX compiler identification is GNU 13.3.0
+[0.473s] -- Detecting C compiler ABI info
+[0.637s] -- Detecting C compiler ABI info - done
+[0.659s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.660s] -- Detecting C compile features
+[0.661s] -- Detecting C compile features - done
+[0.677s] -- Detecting CXX compiler ABI info
+[0.862s] -- Detecting CXX compiler ABI info - done
+[0.885s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.886s] -- Detecting CXX compile features
+[0.887s] -- Detecting CXX compile features - done
+[0.890s] /usr/bin/figlet
+[32.919s] -- Using the multi-header code from /home/ubuntu/rrst-ros2-ws/build/nr26_r2_hw_ctrl/_deps/nlohmann_json-src/include/
+[32.923s] -- Found ament_cmake: 2.5.3 (/opt/ros/jazzy/share/ament_cmake/cmake)
+[33.151s] -- Found Python3: /usr/bin/python3 (found version "3.12.3") found components: Interpreter 
+[33.311s] -- Found rclcpp: 28.1.8 (/opt/ros/jazzy/share/rclcpp/cmake)
+[33.371s] -- Found rosidl_generator_c: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_c/cmake)
+[33.401s] -- Found rosidl_generator_cpp: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_cpp/cmake)
+[33.433s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[33.456s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[33.589s] -- Found rmw_implementation_cmake: 7.3.2 (/opt/ros/jazzy/share/rmw_implementation_cmake/cmake)
+[33.599s] -- Found rmw_fastrtps_cpp: 8.4.2 (/opt/ros/jazzy/share/rmw_fastrtps_cpp/cmake)
+[33.768s] -- Found OpenSSL: /usr/lib/x86_64-linux-gnu/libcrypto.so (found version "3.0.13")  
+[33.802s] -- Found FastRTPS: /opt/ros/jazzy/include (Required is at least version "2.13") 
+[33.849s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[33.965s] -- Found std_msgs: 5.3.6 (/opt/ros/jazzy/share/std_msgs/cmake)
+[33.985s] -- Found sensor_msgs: 5.3.6 (/opt/ros/jazzy/share/sensor_msgs/cmake)
+[34.042s] -- Found tf2: 0.36.9 (/opt/ros/jazzy/share/tf2/cmake)
+[34.050s] -- Found tf2_ros: 0.36.9 (/opt/ros/jazzy/share/tf2_ros/cmake)
+[34.266s] -- Found tf2_geometry_msgs: 0.36.9 (/opt/ros/jazzy/share/tf2_geometry_msgs/cmake)
+[34.287s] -- Found eigen3_cmake_module: 0.3.0 (/opt/ros/jazzy/share/eigen3_cmake_module/cmake)
+[34.288s] -- Found Eigen3: TRUE (found version "3.4.0") 
+[34.289s] -- Ensuring Eigen3 include directory is part of orocos-kdl CMake target
+[34.293s] -- Found visualization_msgs: 5.3.6 (/opt/ros/jazzy/share/visualization_msgs/cmake)
+[34.344s] -- Found ament_lint_auto: 0.17.2 (/opt/ros/jazzy/share/ament_lint_auto/cmake)
+[34.489s] -- Added test 'cppcheck' to perform static code analysis on C / C++ code
+[34.489s] -- Configured cppcheck include dirs: 
+[34.489s] -- Configured cppcheck exclude dirs and/or files: 
+[34.491s] -- Added test 'flake8' to check Python code syntax and style conventions
+[34.491s] -- Configured 'flake8' exclude dirs and/or files: 
+[34.493s] -- Added test 'lint_cmake' to check CMake code style
+[34.495s] -- Added test 'pep257' to check Python code against some of the docstring style conventions in PEP 257
+[34.498s] -- Added test 'uncrustify' to check C / C++ code style
+[34.498s] -- Configured uncrustify additional arguments: 
+[34.499s] -- Added test 'xmllint' to check XML markup files
+[34.501s] -- Configuring done (34.5s)
+[34.522s] -- Generating done (0.0s)
+[34.535s] -- Build files have been written to: /home/ubuntu/rrst-ros2-ws/build/nr26_r2_hw_ctrl
+[34.552s] Invoked command in '/home/ubuntu/rrst-ros2-ws/build/nr26_r2_hw_ctrl' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake /home/ubuntu/rrst-ros2-ws/nr26_r2_hw_ctrl -DCMAKE_INSTALL_PREFIX=/home/ubuntu/rrst-ros2-ws/install/nr26_r2_hw_ctrl
+[34.553s] Invoking command in '/home/ubuntu/rrst-ros2-ws/build/nr26_r2_hw_ctrl': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/nr26_r2_hw_ctrl -- -j12 -l12
+[34.648s] [ 25%] [32mBuilding CXX object CMakeFiles/nr26_tuner.dir/src/NR26_R2_Tuner.cpp.o[0m
+[34.657s] [ 50%] [32mBuilding CXX object CMakeFiles/nr26_r2_move.dir/src/NR26_R2_Move.cpp.o[0m
+[45.854s] [ 75%] [32m[1mLinking CXX executable nr26_tuner[0m
+[46.329s] [ 75%] Built target nr26_tuner
+[59.380s] [100%] [32m[1mLinking CXX executable nr26_r2_move[0m
+[60.963s] [100%] Built target nr26_r2_move
+[61.011s] Invoked command in '/home/ubuntu/rrst-ros2-ws/build/nr26_r2_hw_ctrl' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/ubuntu/rrst-ros2-ws/build/nr26_r2_hw_ctrl -- -j12 -l12
+[61.021s] Invoking command in '/home/ubuntu/rrst-ros2-ws/build/nr26_r2_hw_ctrl': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/nr26_r2_hw_ctrl
+[61.053s] -- Install configuration: ""
+[61.055s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r2_hw_ctrl/lib/nr26_r2_hw_ctrl/nr26_r2_move
+[61.089s] -- Set non-toolchain portion of runtime path of "/home/ubuntu/rrst-ros2-ws/install/nr26_r2_hw_ctrl/lib/nr26_r2_hw_ctrl/nr26_r2_move" to ""
+[61.094s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r2_hw_ctrl/lib/nr26_r2_hw_ctrl/nr26_tuner
+[61.100s] -- Set non-toolchain portion of runtime path of "/home/ubuntu/rrst-ros2-ws/install/nr26_r2_hw_ctrl/lib/nr26_r2_hw_ctrl/nr26_tuner" to ""
+[61.104s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r2_hw_ctrl/share/ament_index/resource_index/package_run_dependencies/nr26_r2_hw_ctrl
+[61.109s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r2_hw_ctrl/share/ament_index/resource_index/parent_prefix_path/nr26_r2_hw_ctrl
+[61.111s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r2_hw_ctrl/share/nr26_r2_hw_ctrl/environment/ament_prefix_path.sh
+[61.113s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r2_hw_ctrl/share/nr26_r2_hw_ctrl/environment/ament_prefix_path.dsv
+[61.117s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r2_hw_ctrl/share/nr26_r2_hw_ctrl/environment/path.sh
+[61.119s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r2_hw_ctrl/share/nr26_r2_hw_ctrl/environment/path.dsv
+[61.119s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r2_hw_ctrl/share/nr26_r2_hw_ctrl/local_setup.bash
+[61.124s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r2_hw_ctrl/share/nr26_r2_hw_ctrl/local_setup.sh
+[61.124s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r2_hw_ctrl/share/nr26_r2_hw_ctrl/local_setup.zsh
+[61.126s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r2_hw_ctrl/share/nr26_r2_hw_ctrl/local_setup.dsv
+[61.128s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r2_hw_ctrl/share/nr26_r2_hw_ctrl/package.dsv
+[61.128s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r2_hw_ctrl/share/ament_index/resource_index/packages/nr26_r2_hw_ctrl
+[61.131s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r2_hw_ctrl/share/nr26_r2_hw_ctrl/cmake/nr26_r2_hw_ctrlConfig.cmake
+[61.132s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r2_hw_ctrl/share/nr26_r2_hw_ctrl/cmake/nr26_r2_hw_ctrlConfig-version.cmake
+[61.132s] -- Installing: /home/ubuntu/rrst-ros2-ws/install/nr26_r2_hw_ctrl/share/nr26_r2_hw_ctrl/package.xml
+[61.142s] Invoked command in '/home/ubuntu/rrst-ros2-ws/build/nr26_r2_hw_ctrl' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/ubuntu/rrst-ros2-ws/build/nr26_r2_hw_ctrl
