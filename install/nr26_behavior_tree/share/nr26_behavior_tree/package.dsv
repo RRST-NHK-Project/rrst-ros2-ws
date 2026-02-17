@@ -1,8 +1,0 @@
-source;share/nr26_behavior_tree/hook/cmake_prefix_path.ps1
-source;share/nr26_behavior_tree/hook/cmake_prefix_path.dsv
-source;share/nr26_behavior_tree/hook/cmake_prefix_path.sh
-source;share/nr26_behavior_tree/local_setup.bash
-source;share/nr26_behavior_tree/local_setup.dsv
-source;share/nr26_behavior_tree/local_setup.ps1
-source;share/nr26_behavior_tree/local_setup.sh
-source;share/nr26_behavior_tree/local_setup.zsh

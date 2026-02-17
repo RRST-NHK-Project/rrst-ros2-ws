@@ -1,8 +1,0 @@
-source;share/nr26_r2_hw_ctrl/hook/cmake_prefix_path.ps1
-source;share/nr26_r2_hw_ctrl/hook/cmake_prefix_path.dsv
-source;share/nr26_r2_hw_ctrl/hook/cmake_prefix_path.sh
-source;share/nr26_r2_hw_ctrl/local_setup.bash
-source;share/nr26_r2_hw_ctrl/local_setup.dsv
-source;share/nr26_r2_hw_ctrl/local_setup.ps1
-source;share/nr26_r2_hw_ctrl/local_setup.sh
-source;share/nr26_r2_hw_ctrl/local_setup.zsh

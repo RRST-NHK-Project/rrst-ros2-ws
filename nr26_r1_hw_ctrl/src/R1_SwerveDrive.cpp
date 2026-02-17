@@ -129,13 +129,6 @@ private:
         bool UP = msg->axes[7] == 1.0;
         bool DOWN = msg->axes[7] == -1.0;
 
-        static bool lateral_lock = false; // 左右固定フラグ
-        static bool longi_lock = false;   // 前後固定フラグ
-        static bool last_left = false;
-        static bool last_right = false;
-        static bool last_up = false;
-        static bool last_down = false;
-
         // bool L1 = msg->buttons[4];
         // bool R1 = msg->buttons[5];
 
@@ -171,46 +164,6 @@ private:
         }
         if (R3 && !last_R3) {
             R3_latch = !R3_latch;
-        }
-
-        if (LEFT == true && last_left == false){
-            lateral_lock =! lateral_lock;
-            
-            if (lateral_lock == true){
-                longi_lock = false;
-            }
-        }
-        if (RIGHT == true && last_right == false){
-            lateral_lock =! lateral_lock;
-            if (lateral_lock == true){
-                longi_lock = false;
-            }
-        }
-        if (UP == true && last_up ==false){
-            longi_lock =! longi_lock;
-            if (longi_lock == true){
-                lateral_lock = false;
-            }
-        }
-        if (DOWN == true && last_down == false){
-            longi_lock =! longi_lock;
-            if(longi_lock == true){
-                lateral_lock = false;
-            }
-        }
-
-        last_left = LEFT;
-        last_right = RIGHT;
-        last_up = UP;
-        last_down = DOWN;
-        
-        if (lateral_lock == true) {
-            deg = 45;
-        } else if (longi_lock == true) {
-            deg = 135;
-        } else {
-          float rad = atan2(LS_Y, LS_X);
-          deg = rad * 180 / M_PI;
         }
 
         // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
