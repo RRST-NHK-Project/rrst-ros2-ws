@@ -139,7 +139,7 @@ private:
         bool OPTION = msg->buttons[9];
         // bool PS = msg->buttons[10];
 
-        // bool L3 = msg->buttons[11];
+        bool L3 = msg->buttons[11];
         bool R3 = msg->buttons[12];
 
         static bool last_option = false;
@@ -166,52 +166,24 @@ private:
             R3_latch = !R3_latch;
         }
 
-        static bool lateral_lock = false; // 左右固定（真横移動）モード
-        static bool longi_lock   = false; // 上下固定（前後移動）モード
-        static bool last_LEFT    = false;
-        static bool last_RIGHT   = false;
-        static bool last_UP      = false;
-        static bool last_DOWN    = false;
+        static bool is_fixed_mode = false;
+        static int fixed_deg_value = 135;
+        static bool last_L3_state = false;
 
-        if (LEFT == true && last_LEFT == false) {
-            lateral_lock = !lateral_lock;
-                if (lateral_lock == true) {
-                longi_lock = false;
+        if (L3_pressed == true && last_L3_state == false) {
+            if (is_fixed_mode == false) {
+                if (UP == true || DOWN == true) {
+                    is_fixed_mode = true;
+                    fixed_deg_value = 135;
+                } else if (LEFT == true || RIGHT == true) {
+                    is_fixed_mode = true;
+                    fixed_deg_value = 45;
+                }
+            } else {
+                is_fixed_mode = false;
             }
         }
-        if (RIGHT == true && last_RIGHT == false) {
-            lateral_lock = !lateral_lock;
-            if (lateral_lock == true) {
-                longi_lock = false;
-            }
-        }
-
-        if (UP == true && last_UP == false) {
-            longi_lock = !longi_lock;
-            if (longi_lock == true) {
-                lateral_lock = false;
-            }
-        }
-        if (DOWN == true && last_DOWN == false) {
-            longi_lock = !longi_lock;
-            if (longi_lock == true) {
-                lateral_lock = false;
-            }
-        }
-
-        last_LEFT  = LEFT;
-        last_RIGHT = RIGHT;
-        last_UP    = UP;
-        last_DOWN  = DOWN;
-
-        if (lateral_lock == true) {
-            deg = 45;
-        } else if (longi_lock == true) {
-            deg = 135;
-        } else {
-            float rad = atan2(LS_Y, LS_X);
-            deg = rad * 180 / M_PI;
-        }
+        last_L3_state = L3_pressed;
 
         // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         // もとの移動方法！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
