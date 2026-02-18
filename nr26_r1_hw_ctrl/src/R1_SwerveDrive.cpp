@@ -170,7 +170,7 @@ private:
         static int fixed_deg_value = 135;
         static bool last_L3_state = false;
 
-        if (L3_pressed == true && last_L3_state == false) {
+        if (L3 == true && last_L3_state == false) {
             if (is_fixed_mode == false) {
                 if (UP == true || DOWN == true) {
                     is_fixed_mode = true;
@@ -183,7 +183,7 @@ private:
                 is_fixed_mode = false;
             }
         }
-        last_L3_state = L3_pressed;
+        last_L3_state = L3;
 
         // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         // もとの移動方法！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
