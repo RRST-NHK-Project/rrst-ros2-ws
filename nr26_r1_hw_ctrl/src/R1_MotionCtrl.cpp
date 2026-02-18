@@ -3,6 +3,7 @@ R1機構制御
 Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 */
 
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <iostream>
@@ -16,7 +17,8 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include <std_msgs/msg/int32_multi_array.hpp>
 
 // 以下マイコンに合わせて設定
-#define TARGET_DEVICE_ID 2 // 宛先マイコンのID
+#define OUTPUT_DEVICE_ID 2 // 出力マイコン（モーター制御）のID
+#define INPUT_DEVICE_ID  3 // 入力マイコン（マイクロスイッチ）のID
 #define TX16NUM 24         // 送信データ数
 #define RX16NUM 17         // 受信データ数
 
@@ -26,11 +28,64 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #define DEADZONE_L 0.3
 #define DEADZONE_R 0.3
 
+// =================================================================
+// マイクロスイッチの状態（ID=3のESP32から受信、2ノード間で共有）
+// atomic: スレッドセーフに読み書きするため
+// =================================================================
+std::atomic<int16_t> g_micro1_sw{0}; // マイクロスイッチ(上): 1=押されている
+std::atomic<int16_t> g_micro2_sw{0}; // マイクロスイッチ(下): 1=押されている
+
+// =================================================================
+// SwitchInputノード: ID=3のESP32からマイクロスイッチの状態を受信する
+// =================================================================
+class SwitchInput : public rclcpp::Node {
+public:
+    SwitchInput()
+        : Node("switch_input_" + std::to_string(INPUT_DEVICE_ID)) {
+
+        sw_sub_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
+            "serial_rx_" + std::to_string(INPUT_DEVICE_ID),
+            10,
+            std::bind(&SwitchInput::sw_callback, this, std::placeholders::_1));
+
+        RCLCPP_INFO(get_logger(),
+                    "SwitchInput: serial_rx_%d を受信開始", INPUT_DEVICE_ID);
+    }
+
+private:
+    void sw_callback(const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
+        // ESP32 MODE=3 (8個) や直接通信の場合に対応するため、チェックを緩和
+        if (msg->data.size() < 6) {
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000,
+                        "serial_rx_%d: データが短すぎます (%zu)",
+                        INPUT_DEVICE_ID, msg->data.size());
+            return;
+        }
+
+        // ESP32 esp32_serial_bridge の送信インデックス:
+        //   data[9]   = SW1 (マイクロスイッチ 上)
+        //   data[10]  = SW2 (マイクロスイッチ 下)
+        g_micro1_sw = msg->data[9]; 
+        g_micro2_sw = msg->data[10]; 
+
+        // デバッグ: 受信した全てのデータを表示（インデックス確認用）
+        std::string debug_str = "[ID " + std::to_string(INPUT_DEVICE_ID) + " RX] ";
+        for (size_t i = 0; i < msg->data.size(); i++) {
+            debug_str += "d[" + std::to_string(i) + "]=" + std::to_string(msg->data[i]) + " ";
+        }
+        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500, "%s", debug_str.c_str());
+    }
+
+    rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sw_sub_;
+};
+
+// =================================================================
+// HardWareControlノード: ID=2のESP32へモーター指令を送信する
+// =================================================================
 class HardWareControl : public rclcpp::Node {
 public:
-    HardWareControl(uint8_t device_id)
-        : Node("hardware_control_" + std::to_string(device_id)),
-          device_id_(device_id) {
+    HardWareControl()
+        : Node("hardware_control_" + std::to_string(OUTPUT_DEVICE_ID)) {
 
         // 配列を0で初期化
         data_.assign(TX16NUM, 0);
@@ -73,22 +128,22 @@ public:
 
         // seial_bridgeへpublish
         publisher_ = this->create_publisher<std_msgs::msg::Int16MultiArray>(
-            "serial_tx_" + std::to_string(device_id_), 10);
+            "serial_tx_" + std::to_string(OUTPUT_DEVICE_ID), 10);
 
         // timer_callbackを呼び出すタイマーを作成
         timer_ = create_wall_timer(
             std::chrono::milliseconds(PUBLISH_RATE_MS),
             std::bind(&HardWareControl::publisher_timer_callback, this));
 
-        sensor_sub_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
-            "serial_rx_" + std::to_string(device_id_),
-            10,
-            std::bind(&HardWareControl::sensor_callback,
-                      this,
-                      std::placeholders::_1));
+        // sensor_sub_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
+        //     "serial_rx_" + std::to_string(device_id_),
+        //     10,
+        //     std::bind(&HardWareControl::sensor_callback,
+        //               this,
+        //               std::placeholders::_1));
 
         RCLCPP_INFO(get_logger(),
-                    "serial_tx_%d started.", device_id_);
+                    "HardWareControl: serial_tx_%d 送信開始", OUTPUT_DEVICE_ID);
     }
 
 private:
@@ -131,6 +186,16 @@ private:
 
         // static bool last_share = false;
         // static bool share_latch = false;
+
+        // マイクロスイッチの状態をグローバル変数から取得
+        int16_t micro1_sw = g_micro1_sw.load(); 
+        int16_t micro2_sw = g_micro2_sw.load(); 
+
+        // 制御ノード側のデバッグログ
+        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
+            "【制御ノード表示】SW状態: 上=%d (%s), 下=%d (%s)", 
+            micro1_sw, micro1_sw ? "停止条件成立" : "通常",
+            micro2_sw, micro2_sw ? "停止条件成立" : "通常");
 
         // 以降、配列data_を操作する
         // =================================================================
@@ -279,23 +344,31 @@ private:
 
         // =================================================================
         // L1,R1:「フォークリフト上下」
-        // マイクロスイッチによる安全機構付き
-        // マイクロスイッチ(上)押下時: 正回転禁止
-        // マイクロスイッチ(下)押下時: 逆回転禁止
+        // マイクロスイッチによる安全機構付き（ID=3のESP32から受信）
+        // マイクロスイッチ(上)押下時: L1による正回転禁止、R1による逆回転は許可
+        // マイクロスイッチ(下)押下時: R1による逆回転禁止、L1による正回転は許可
         // =================================================================
 
-        if (L1 == 1 && micro1_sw_ == 0) {
-            // L1ボタンで正回転、ただしマイクロスイッチ(上)が押されていない場合のみ
+        // マイクロスイッチ(上): 押下時は正回転(L1)を禁止、逆回転(R1)のみ許可
+        // マイクロスイッチ(下): 押下時は逆回転(R1)を禁止、正回転(L1)のみ許可
+        if (L1 == 1 && micro1_sw == 0) {
+            // L1ボタンで正回転（マイクロスイッチ(上)が押されていない場合のみ）
             data_[2] = 127;
-        } else if (R1 == 1 && micro2_sw_ == 0) {
-            // R1ボタンで逆回転、ただしマイクロスイッチ(下)が押されていない場合のみ
+        } else if (R1 == 1 && micro2_sw == 0) {
+            // R1ボタンで逆回転（マイクロスイッチ(下)が押されていない場合のみ）
             data_[2] = -127;
+        } else if (R1 == 1 && micro1_sw == 1) {
+            // マイクロスイッチ(上)が押されていてもR1による逆回転は許可
+            data_[2] = -127;
+        } else if (L1 == 1 && micro2_sw == 1) {
+            // マイクロスイッチ(下)が押されていてもL1による正回転は許可
+            data_[2] = 127;
         } else {
-            // どちらのボタンも押されていない、またはスイッチが押されている場合は停止
+            // どちらのボタンも押されていない場合は停止
             data_[2] = 0;
         }
-        // ※この場合、SW1が押されているとき、R1が効かないk農政がある
-        // ※また、AW2においても押されているとき、L1が期下ない可能性があるので確認すべし
+        // ※この場合、SW1が押されているとき、R1が効かない可能性がある
+        // ※また、AW2においても押されているとき、L1が効かない可能性があるので確認すべし
 
         // =================================================================
         // LR
@@ -336,16 +409,16 @@ private:
         publisher_->publish(msg);
     }
 
-    void
-    sensor_callback(
-        const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
-        // 最低限：サイズチェック
-        if (msg->data.size() < RX16NUM) {
-            RCLCPP_WARN(this->get_logger(),
-                        "serial_rx_%d: data too short (%zu)",
-                        device_id_, msg->data.size());
-            return;
-        }
+    // void
+    // sensor_callback(
+    //     const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
+    //     // 最低限：サイズチェック
+    //     if (msg->data.size() < RX16NUM) {
+    //         RCLCPP_WARN(this->get_logger(),
+    //                     "serial_rx_%d: data too short (%zu)",
+    //                     device_id_, msg->data.size());
+    //         return;
+    //     }
 
         // int16_t ENC1 = msg->data[1];
         // int16_t ENC2 = msg->data[2];
@@ -356,8 +429,8 @@ private:
         // int16_t ENC7 = msg->data[7];
         // int16_t ENC8 = msg->data[8];
 
-        int16_t SW1 = msg->data[9];
-        int16_t SW2 = msg->data[10];
+        // int16_t SW1 = msg->data[9];
+        // int16_t SW2 = msg->data[10];
         // int16_t SW3 = msg->data[11];
         // int16_t SW4 = msg->data[12];
         // int16_t SW5 = msg->data[13];
@@ -367,24 +440,25 @@ private:
 
         // 以降、受信データを使った処理を記述
         // エンコーダースイッチの状態を保存（モーター制御で使用）
-        micro1_sw_ = SW1;
-        micro2_sw_ = SW2;
+        // micro1_sw_ = SW1;
+        // micro2_sw_ = SW2;
+
+        // デバッグ: マイクロスイッチの受信値を確認
+        // RCLCPP_INFO(get_logger(),
+        //             "[マイクロSW] 上(L1禁止用)=%s  下(R1禁止用)=%s",
+        //             micro1_sw_ ? "★押されている" : "　押されていない",
+        //             micro2_sw_ ? "★押されている" : "　押されていない");
 
         // 受信データ処理ここまで
-    }
+    // }
 
     uint8_t device_id_;
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
-    rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sensor_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     std::vector<int16_t> data_;
-
-    // エンコーダースイッチの状態（0: 押されていない, 1: 押されている）
-    int16_t micro1_sw_ = 0;
-    int16_t micro2_sw_ = 0;
 };
 
 int main(int argc, char *argv[]) {
@@ -405,8 +479,14 @@ int main(int argc, char *argv[]) {
 
     rclcpp::executors::MultiThreadedExecutor exec;
 
-    auto hardware_control = std::make_shared<HardWareControl>(TARGET_DEVICE_ID);
+    // ID=2: モーター出力ノード
+    auto hardware_control = std::make_shared<HardWareControl>();
     exec.add_node(hardware_control);
+
+    // ID=3: マイクロスイッチ入力ノード
+    auto switch_input = std::make_shared<SwitchInput>();
+    exec.add_node(switch_input);
+
     exec.spin();
 
     rclcpp::shutdown();
