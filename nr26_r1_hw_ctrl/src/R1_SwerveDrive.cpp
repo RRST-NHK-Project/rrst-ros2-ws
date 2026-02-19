@@ -139,7 +139,7 @@ private:
         bool OPTION = msg->buttons[9];
         // bool PS = msg->buttons[10];
 
-        // bool L3 = msg->buttons[11];
+        bool L3 = msg->buttons[11];
         bool R3 = msg->buttons[12];
 
         static bool last_option = false;
@@ -165,6 +165,25 @@ private:
         if (R3 && !last_R3) {
             R3_latch = !R3_latch;
         }
+
+        static bool is_fixed_mode = false;
+        static int fixed_deg_value = 135;
+        static bool last_L3_state = false;
+
+        if (L3 == true && last_L3_state == false) {
+            if (is_fixed_mode == false) {
+                if (UP == true || DOWN == true) {
+                    is_fixed_mode = true;
+                    fixed_deg_value = 135;
+                } else if (LEFT == true || RIGHT == true) {
+                    is_fixed_mode = true;
+                    fixed_deg_value = 45;
+                }
+            } else {
+                is_fixed_mode = false;
+            }
+        }
+        last_L3_state = L3;
 
         // ！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
         // もとの移動方法！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
