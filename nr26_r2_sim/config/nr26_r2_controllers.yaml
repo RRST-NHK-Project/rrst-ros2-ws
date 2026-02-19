@@ -1,0 +1,53 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 50 # Hz
+
+    # 使用するコントローラーの宣言
+    skid_steer_drive_controller:
+      type: diff_drive_controller/DiffDriveController
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+skid_steer_drive_controller:
+  ros__parameters:
+    # URDFで定義したジョイント名と一致させる
+    left_wheel_names: ["wheel_fl_joint", "wheel_rl_joint"]
+    right_wheel_names: ["wheel_fr_joint", "wheel_rr_joint"]
+
+    # ロボットの寸法設定
+    # wheel_separation: 左右の車輪の中心間距離 (base_width 0.3 + wheel_width 0.02)
+    wheel_separation: 0.32
+    wheel_radius: 0.05
+
+    # 補正係数（基本は1.0）
+    wheel_separation_multiplier: 1.0
+    left_wheel_radius_multiplier: 1.0
+    right_wheel_radius_multiplier: 1.0
+
+    # オドメトリ設定
+    publish_rate: 50.0
+    odom_frame_id: odom
+    base_frame_id: base_link
+    
+    # 速度コマンドの形式（JazzyではFalseにすると従来の Twist メッセージが使えます）
+    use_stamped_vel: false
+
+    # ログ出力レベル
+    publish_limited_velocity: true
+    publish_wheel_data: true
+
+    # 簡易的な速度制限 (必要に応じて値を調整してください)
+    linear:
+      x:
+        has_velocity_limits    : true
+        max_velocity           : 1.0  # m/s
+        min_velocity           : -1.0
+        has_acceleration_limits: true
+        max_acceleration       : 2.0  # m/s^2
+    angular:
+      z:
+        has_velocity_limits    : true
+        max_velocity           : 2.0  # rad/s
+        has_acceleration_limits: true
+        max_acceleration       : 4.0  # rad/s^2
