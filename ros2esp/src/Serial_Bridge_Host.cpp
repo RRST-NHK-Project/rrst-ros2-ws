@@ -16,9 +16,11 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include <std_msgs/msg/int32_multi_array.hpp>
 
 // 以下マイコンに合わせて設定
-#define TARGET_DEVICE_ID 2 // 宛先マイコンのID
-#define TX16NUM 24         // 送信データ数
-#define RX16NUM 17         // 受信データ数
+#define TX_DEVICE_ID 1 // 送信先マイコンのID
+#define RX_DEVICE_ID 1 // 受信先マイコンのID
+
+#define TX16NUM 24 // 送信データ数
+#define RX16NUM 17 // 受信データ数
 
 #define PUBLISH_RATE_MS 20 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
 
@@ -28,9 +30,10 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 
 class HardWareControl : public rclcpp::Node {
 public:
-    HardWareControl(uint8_t device_id)
-        : Node("hardware_control_" + std::to_string(device_id)),
-          device_id_(device_id) {
+    HardWareControl(uint8_t tx_device_id, uint8_t rx_device_id)
+        : Node("hardware_control_" + std::to_string(tx_device_id)),
+          tx_device_id_(tx_device_id),
+          rx_device_id_(rx_device_id) {
 
         // 配列を0で初期化
         data_.assign(TX16NUM, 0);
@@ -73,7 +76,7 @@ public:
 
         // seial_bridgeへpublish
         publisher_ = this->create_publisher<std_msgs::msg::Int16MultiArray>(
-            "serial_tx_" + std::to_string(device_id_), 10);
+            "serial_tx_" + std::to_string(tx_device_id_), 10);
 
         // timer_callbackを呼び出すタイマーを作成
         timer_ = create_wall_timer(
@@ -81,14 +84,14 @@ public:
             std::bind(&HardWareControl::publisher_timer_callback, this));
 
         sensor_sub_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
-            "serial_rx_" + std::to_string(device_id_),
+            "serial_rx_" + std::to_string(rx_device_id_),
             10,
             std::bind(&HardWareControl::sensor_callback,
                       this,
                       std::placeholders::_1));
 
         RCLCPP_INFO(get_logger(),
-                    "serial_tx_%d started.", device_id_);
+                    "serial_tx_%d started.", tx_device_id_);
     }
 
 private:
@@ -156,13 +159,6 @@ private:
     void
     sensor_callback(
         const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
-        // 最低限：サイズチェック
-        if (msg->data.size() < RX16NUM) {
-            RCLCPP_WARN(this->get_logger(),
-                        "serial_rx_%d: data too short (%zu)",
-                        device_id_, msg->data.size());
-            return;
-        }
 
         // int16_t ENC1 = msg->data[1];
         // int16_t ENC2 = msg->data[2];
@@ -215,7 +211,7 @@ int main(int argc, char *argv[]) {
 
     rclcpp::executors::MultiThreadedExecutor exec;
 
-    auto hardware_control = std::make_shared<HardWareControl>(TARGET_DEVICE_ID);
+    auto hardware_control = std::make_shared<HardWareControl>(TX_DEVICE_ID, RX_DEVICE_ID);
     exec.add_node(hardware_control);
     exec.spin();
 
