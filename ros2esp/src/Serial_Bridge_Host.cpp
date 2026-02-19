@@ -183,7 +183,8 @@ private:
         // 受信データ処理ここまで
     }
 
-    uint8_t device_id_;
+    uint8_t tx_device_id_;
+    uint8_t rx_device_id_;
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
