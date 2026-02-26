@@ -173,45 +173,40 @@ class SDM15(object):
         self.ser.write(cmd)
         self.ser.flush()
 
-    def _read(self) -> list:
-        """receive data from serial port"""
+    def _read(self) -> list[int]:
+        """
+        Read exactly ONE SDM15 frame
+        """
 
-        # wait until data is received
-        while self.ser.in_waiting == 0:
-            pass
+        # 1. ヘッダ同期
+        while True:
+            b = self.ser.read(1)
+            if not b:
+                raise FailedToReadError("timeout")
 
-        # read all data
-        recv = self.ser.read_all()
+            if b[0] == PACKET_HED1:
+                b2 = self.ser.read(1)
+                if b2 and b2[0] == PACKET_HED2:
+                    break
 
-        # check data is received
-        if recv is None or len(recv) == 0:
-            raise FailedToReadError("no data received")
+        # 2. CMD + LEN
+        header = [PACKET_HED1, PACKET_HED2]
+        cmd = self.ser.read(1)[0]
+        length = self.ser.read(1)[0]
 
-        # convert to hex
-        recv_hex = recv.hex(":").split(":")
+        # 3. DATA + CHECKSUM
+        data = list(self.ser.read(length + 1))
 
-        # check pixhawk
-        if recv_hex[0] != "aa" or recv_hex[1] != "55":
-            distance = float(
-                recv.decode("utf-8").replace("[Master]: ", "").replace("\r\n", "")
-            )
-            self.pixhawk = True
+        frame = header + [cmd, length] + data
 
-            return [distance]
+        # 4. checksum check
+        check_sum = frame[-1]
+        calc = self.check(frame[:-1])
 
-        # convert to int
-        recv_hex = [int(x, 16) for x in recv_hex]
+        if calc != check_sum:
+            raise CheckSumError(f"{check_sum} != {calc}")
 
-        # check sum
-        check_sum = recv_hex[-1]
-        cal_check_sum = self.check(recv_hex[0:-1])
-
-        # check check_sum
-        if cal_check_sum != check_sum:
-            print(f"check sum error: {check_sum} != {cal_check_sum}")
-            # raise CheckSumError("check sum error")
-
-        return recv_hex
+        return frame
 
     def check_scanning(self):
         """check lidar is scanning because some commands can only be executed when lidar is not scanning
