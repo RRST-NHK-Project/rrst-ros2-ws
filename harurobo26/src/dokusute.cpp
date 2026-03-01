@@ -2,6 +2,7 @@
 R1独ステ制御
 Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 */
+
 #include <chrono>
 #include <cmath>
 #include <iostream>
@@ -36,8 +37,6 @@ int truedeg = 0;
 // 速度
 int wheelspeed = 80; // 64;
 int yawspeed = 60;   // 32;
-// static int motorspeed = 0;
-// static int position = 0;
 
 // サーボの組み付け時のズレを補正（度数法）
 int SERVO1_CAL = 4;
@@ -121,9 +120,9 @@ private:
         // float RS_Y = msg->axes[4];
 
         bool CROSS = msg->buttons[0];
-        bool CIRCLE = msg->buttons[1];
-        bool TRIANGLE = msg->buttons[2];
-        bool SQUARE = msg->buttons[3];
+        // bool CIRCLE = msg->buttons[1];
+        // bool TRIANGLE = msg->buttons[2];
+        // bool SQUARE = msg->buttons[3];
 
         bool LEFT = msg->axes[6] == 1.0;
         bool RIGHT = msg->axes[6] == -1.0;
@@ -150,16 +149,8 @@ private:
         static bool share_latch = false;
 
         static bool last_R3 = false;
-//         static bool R3_latch = false;
-// //ALOHA's number
-// static bool circle_k = false;
-// static int count = 0;
-// static int s1 = 12;
-// static int s2 = 0;
-// data_[13] = s1;
-// data_[14] = s2;
-// static bool last_SQUARE = false;
-// static bool last_CIRCLE = false;
+        static bool R3_latch = false;
+
         // 以降、配列data_を操作する
 
         float rad = atan2(LS_Y, LS_X);
@@ -228,10 +219,10 @@ private:
             if ((fabs(LS_X) <= DEADZONE_R) && (fabs(LS_Y) <= DEADZONE_R) &&
                 (fabs(RS_X) <= DEADZONE_L)) {
                 deg = 135;
-                 data_[1] = 0;
-                 data_[2] = 0;
-                 data_[3] = 0;
-                 data_[4] = 0;
+                data_[1] = 0;
+                data_[2] = 0;
+                data_[3] = 0;
+                data_[4] = 0;
                 data_[9] = deg + SERVO1_CAL;
                 data_[10] = deg + SERVO2_CAL;
                 data_[11] = deg + SERVO3_CAL;
@@ -274,64 +265,8 @@ private:
                 data_[2] = wheelspeed * R2;
                 data_[3] = wheelspeed * R2;
                 data_[4] = wheelspeed * R2;
-        //     }
-        //     if(TRIANGLE){
-        //         position = position+4;
-        //         if(data_[7] >= 0 && data_[7] < 20){
-        //             data_[7]= data_[7]+4;
-        //         }
-        //         else{
-        //             data_[7]=20;
-        //         }
-        //         if(position>100){
-        //             data_[7]=0;
-        //             position = 100;
-        //         }
-        //     }
-        //     else if (CROSS){
-        //         position = position-4;
-        //         if (data_[7] <= 0 && data_[7] > -20){
-        //             data_[7]=data_[7]-4;
-        //         }
-        //         else{
-        //             data_[7] = -20;
-        //         }
-        //         if(position<-100){
-        //             data_[7]=0;
-        //             position = -100;
-        //         }
-        //     }         
-        //     else{
-        //         data_[7]= 0;
-        //     }
-            
-        //     if(SQUARE && last_SQUARE){
-        //         if(count %4 == 0){
-        //             s2 = 95;
-        //         } else if(count %4 == 1){
-        //             s1 = 90;
-        //         } else if(count %4 == 2){
-        //             s1 = 12;
-        //         } else if(count %4 == 3){
-        //             s2 = 0;
-        //         }
-        //         count++;
-        //     }
-        //   last_SQUARE = SQUARE;
-        //   static int coount = 0;
-        //   if(CIRCLE && !last_CIRCLE){
-        //    if(coount %2 == 0){
-        //     data_[17] = 1;
-        //     data_[18] = 1;
-        //     data_[19] = 1;
-        //    }else{
-        //     data_[17] = 0;
-        //     data_[18] = 0;
-        //     data_[19] = 0;
-        //    }
-        //    coount++;
-        //   }
-        //   last_CIRCLE = CIRCLE;
+            }
+
             // 独ステが扱えない範囲の変換
             if ((270 < deg) && (deg < 360)) {
                 deg = deg - 180;
@@ -522,10 +457,10 @@ private:
         // デバッグ用
         RCLCPP_INFO(
             get_logger(),
-            "data_[1-4]=[%d,%d,%d,%d], data_[9-12]=[%d,%d,%d,%d]"
+            "data_[1-4]=[%d,%d,%d,%d], data_[9-12]=[%d,%d,%d,%d]",
             data_[1], data_[2], data_[3], data_[4],
             data_[9], data_[10], data_[11], data_[12]);
-""
+
         // 配列操作ここまで
     }
 

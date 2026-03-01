@@ -15,7 +15,7 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include <std_msgs/msg/int32_multi_array.hpp>
 
 // 以下マイコンに合わせて設定
-#define TARGET_DEVICE_ID 1 // 宛先マイコンのID
+#define TARGET_DEVICE_ID 2 // 宛先マイコンのID
 #define TX16NUM 24         // 送信データ数
 #define RX16NUM 17         // 受信データ数
 
@@ -27,7 +27,8 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 
 // bool CHANGEMODE = false;
 // bool REVERSEMODE = false;
-// bool YAWMODE = false;
+ bool YAWMODE = false;
+ //static int supeed = 0;
 
 // // グローバル変数
 // int deg = 0;
@@ -36,7 +37,7 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 // // 速度
 // int wheelspeed = 80; // 64;
 // int yawspeed = 60;   // 32;
-static int position = 0;
+//static int position = 0;
 
 // // サーボの組み付け時のズレを補正（度数法）
 // int SERVO1_CAL = 4;
@@ -206,7 +207,7 @@ static bool last_CIRCLE = false;
 
         // XY座標での正しい角度truedeg
 
-        i//f (REVERSEMODE == 0) {
+        //if (REVERSEMODE == 0) {
         //     truedeg = deg;
         //     if ((0 <= truedeg) && (truedeg <= 180)) {
         //         truedeg = truedeg;
@@ -275,34 +276,25 @@ static bool last_CIRCLE = false;
             //     data_[4] = wheelspeed * R2;
             // }
             if(TRIANGLE){
-                position = position+4;
-                if(data_[7] >= 0 && data_[7] < 20){
+                if(data_[7]>= 0 && data_[7] < 20){
                     data_[7]= data_[7]+4;
                 }
-                else{
+                else if(data_[7]>20){
                     data_[7]=20;
                 }
-                if(position>100){
-                    data_[7]=0;
-                    position = 100;
-                }
+
             }
             else if (CROSS){
-                position = position-4;
                 if (data_[7] <= 0 && data_[7] > -20){
                     data_[7]=data_[7]-4;
                 }
-                else{
+                else if(data_[7]<-20){
                     data_[7] = -20;
                 }
-                if(position<-100){
+            } 
+                            else{
                     data_[7]=0;
-                    position = -100;
-                }
-            }         
-            else{
-                data_[7]= 0;
-            }
+                }        
             
             if(SQUARE && last_SQUARE){
                 if(count %4 == 0){
@@ -519,11 +511,14 @@ static bool last_CIRCLE = false;
         // std::cout << REVERSEMODE << std::endl;
 
         // デバッグ用
-        RCLCPP_INFO(
-            get_logger(),
-            "data_[7]=[%d], data_[9-12]=[%d,%d,%d,%d],data_[13-14]=[%d,%d],data[17-19]=[%d,%d,%d] position = [%d]",
+        RCLCPP_INFO_THROTTLE(
+    this->get_logger(),
+    *this->get_clock(),
+    20,  // 1000ms = 1秒ごと
+
+            "data[7]=[%d], data_[9-12]=[%d,%d,%d,%d],data_[13-14]=[%d,%d],data[17-19]=[%d,%d,%d]",
             data_[7],
-            data_[9], data_[10], data_[11], data_[12],data_[13],data_[14],data_[17],data_[18],data_[19], position);
+            data_[9], data_[10], data_[11], data_[12],data_[13],data_[14],data_[17],data_[18],data_[19]);
 
         // 配列操作ここまで
     }
@@ -600,8 +595,8 @@ static bool last_CIRCLE = false;
 //         SERVO4_CAL = msg->data[3];
 //     }
 
-//     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
-// };
+    rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr subscription_;
+//};
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
@@ -622,11 +617,11 @@ int main(int argc, char *argv[]) {
     rclcpp::executors::MultiThreadedExecutor exec;
 
     auto hardware_control = std::make_shared<HardWareControl>(TARGET_DEVICE_ID);
-    auto params_listener = std::make_shared<Params_Listener>();
+    //auto params_listener = std::make_shared<Params_Listener>();
     exec.add_node(hardware_control);
-    exec.add_node(params_listener);
+   // exec.add_node(params_listener);
     exec.spin();
-
+//
     rclcpp::shutdown();
     return 0;
 }
