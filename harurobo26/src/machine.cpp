@@ -156,8 +156,8 @@ static bool circle_k = false;
 static int count = 0;
 static int s1 = 12;
 static int s2 = 0;
-data_[13] = s1;
-data_[14] = s2;
+data_[9] = s1;
+data_[10] = s2;
 static bool last_SQUARE = false;
 static bool last_CIRCLE = false;
         // 以降、配列data_を操作する
@@ -276,27 +276,27 @@ static bool last_CIRCLE = false;
             //     data_[4] = wheelspeed * R2;
             // }
             if(TRIANGLE){
-                if(data_[7]>= 0 && data_[7] < 20){
-                    data_[7]= data_[7]+4;
+                if(data_[1]>= 0 && data_[1] < 80){
+                    data_[1]= data_[1]+16;
                 }
-                else if(data_[7]>20){
-                    data_[7]=20;
+                else if(data_[1]>80){
+                    data_[1]=80;
                 }
 
             }
             else if (CROSS){
-                if (data_[7] <= 0 && data_[7] > -20){
-                    data_[7]=data_[7]-4;
+                if (data_[1] <= 0 && data_[1] > -80){
+                    data_[1]=data_[1]-16;
                 }
-                else if(data_[7]<-20){
-                    data_[7] = -20;
+                else if(data_[1]<-80){
+                    data_[1] = -80;
                 }
             } 
                             else{
-                    data_[7]=0;
+                    data_[1]=0;
                 }        
             
-            if(SQUARE && last_SQUARE){
+            if(SQUARE && !last_SQUARE){
                 if(count %4 == 0){
                     s2 = 95;
                 } else if(count %4 == 1){
@@ -516,8 +516,8 @@ static bool last_CIRCLE = false;
     *this->get_clock(),
     20,  // 1000ms = 1秒ごと
 
-            "data[7]=[%d], data_[9-12]=[%d,%d,%d,%d],data_[13-14]=[%d,%d],data[17-19]=[%d,%d,%d]",
-            data_[7],
+            "data[1]=[%d], data_[9-12]=[%d,%d,%d,%d],data_[13-14]=[%d,%d],data[17-19]=[%d,%d,%d]",
+            data_[1],
             data_[9], data_[10], data_[11], data_[12],data_[13],data_[14],data_[17],data_[18],data_[19]);
 
         // 配列操作ここまで

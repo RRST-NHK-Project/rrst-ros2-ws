@@ -35,8 +35,8 @@ int deg = 0;
 int truedeg = 0;
 
 // 速度
-int wheelspeed = 80; // 64;
-int yawspeed = 60;   // 32;
+int wheelspeed = 25; // 64;
+int yawspeed = 25;  // 32;
 
 // サーボの組み付け時のズレを補正（度数法）
 int SERVO1_CAL = 4;
@@ -299,9 +299,9 @@ private:
                 data_[11] = 90 + SERVO3_CAL;
                 data_[12] = 180 + SERVO4_CAL;
                 data_[1] = yawspeed;
-                data_[2] = -yawspeed;
+                data_[2] = yawspeed;
                 data_[3] = -yawspeed;
-                data_[4] = yawspeed;
+                data_[4] = -yawspeed;
             }
             // 半時計回りYAW回転
             if (0 < RS_X && fabs(RS_X) >= DEADZONE_R) {
@@ -310,9 +310,9 @@ private:
                 data_[11] = 90 + SERVO3_CAL;
                 data_[12] = 180 + SERVO4_CAL;
                 data_[1] = -yawspeed;
-                data_[2] = yawspeed;
+                data_[2] = -yawspeed;
                 data_[3] = yawspeed;
-                data_[4] = -yawspeed;
+                data_[4] = yawspeed;
             }
         }
         // 反転モード
