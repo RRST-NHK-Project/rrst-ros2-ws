@@ -323,6 +323,25 @@ static bool last_CIRCLE = false;
            coount++;
           }
           last_CIRCLE = CIRCLE;
+          if((CIRCLE && !last_CIRCLE) && (LEFT)){
+            if(coount %2 == 1){
+
+            data_[17] = 0;
+            coount++;
+            }
+          }
+          if((CIRCLE && !last_CIRCLE) && (RIGHT)){
+            if(coount %2 == 1){
+                data_[18] = 0;
+                coount++;
+            }
+          }
+          if((CIRCLE && !last_CIRCLE) && (UP)){
+            if(coount %2 == 1){
+                data_[19] = 0;
+                coount++;
+            }
+          }
             // // 独ステが扱えない範囲の変換
             // if ((270 < deg) && (deg < 360)) {
             //     deg = deg - 180;
