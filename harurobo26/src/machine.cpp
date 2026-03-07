@@ -297,14 +297,15 @@ static bool last_CIRCLE = false;
                 }        
             
             if(SQUARE && !last_SQUARE){
-                if(count %4 == 0){
+                if(count %2 == 0){
                     s2 = 95;
+                if(s2 == 95){
+                    s1 = 90;}
                 } else if(count %4 == 1){
-                    s1 = 90;
-                } else if(count %4 == 2){
                     s1 = 12;
-                } else if(count %4 == 3){
+                    if(s1 == 12){
                     s2 = 0;
+                }
                 }
                 count++;
             }
