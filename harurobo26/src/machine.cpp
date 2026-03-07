@@ -161,8 +161,8 @@ data_[10] = s2;
 static bool last_SQUARE = false;
 static bool last_CIRCLE = false;
 static bool last_R1 = true;
-static int coount = 0;
-static int cooount = 0;
+static int count1 = 0;
+static int count2 = 0;
         // 以降、配列data_を操作する
 
         // float rad = atan2(LS_Y, LS_X);
@@ -317,7 +317,7 @@ static int cooount = 0;
           last_SQUARE = SQUARE;
           
           if(CIRCLE && !last_CIRCLE){
-           if(coount %2 == 0){
+           if(count1 %2 == 0){
             data_[17] = 1;
             data_[18] = 1;
             data_[19] = 1;
@@ -327,22 +327,22 @@ static int cooount = 0;
             data_[18] = 0;
             data_[19] = 0;
            }
-        coount++;
+        count1++;
           }
           if(R1 && !last_R1){
-            if(cooount %3 == 0){
+            if(count2 %3 == 0){
             data_[17] = 0;
-            }else if(cooount %3 == 1){
+            }else if(count2 %3 == 1){
                 data_[18] = 0;
             }
-          if(cooount %3 == 2){
+          if(count2 %3 == 2){
                 data_[19] = 0;
             }
-            cooount++;
-            coount++;
+            count2++;
+            count1++;
           }
           if(last_CIRCLE == true){
-                cooount = 0;
+                count2 = 0;
             }
         
            last_CIRCLE = CIRCLE;
