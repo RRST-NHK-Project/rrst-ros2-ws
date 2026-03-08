@@ -125,9 +125,9 @@ private:
         bool TRIANGLE = msg->buttons[2];
         bool SQUARE = msg->buttons[3];
 
-         bool LEFT = msg->axes[6] == 1.0;
-        bool RIGHT = msg->axes[6] == -1.0;
-        bool UP = msg->axes[7] == 1.0;
+        // bool LEFT = msg->axes[6] == 1.0;
+        // bool RIGHT = msg->axes[6] == -1.0;
+        // bool UP = msg->axes[7] == 1.0;
         // bool DOWN = msg->axes[7] == -1.0;
 
         // bool L1 = msg->buttons[4];
@@ -152,7 +152,7 @@ private:
         // static bool last_R3 = false;
         // static bool R3_latch = false;
 //ALOHA's number
-static bool circle_k = false;
+//static bool circle_k = false;
 static int count = 0;
 static int s1 = 12;
 static int s2 = 0;
