@@ -37,12 +37,21 @@ public:
     }
 
     // トリガー関数
+
     void start_step_up() {
+        if (mode_ != StepMode::NONE) {
+            RCLCPP_WARN(get_logger(), "Sequence busy. STEP_UP ignored.");
+            return; // 実行中なら無視
+        }
         mode_ = StepMode::STEP_UP;
         next_up(StepUpState::ALL_UP);
     }
 
     void start_step_down() {
+        if (mode_ != StepMode::NONE) {
+            RCLCPP_WARN(get_logger(), "Sequence busy. STEP_DOWN ignored.");
+            return; // 実行中なら無視
+        }
         mode_ = StepMode::STEP_DOWN;
         next_down(StepDownState::FIRST_FORWARD);
     }
