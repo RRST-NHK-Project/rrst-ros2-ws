@@ -66,13 +66,17 @@ public:
     }
 
 private:
-    // 待機時間（要調整）
+    // 以下シーケンス内で使用する変数
+    //  待機時間（要調整）
     static constexpr double up_first_forward_wait = 1.0;
     static constexpr double up_second_forward_wait = 1.0;
     static constexpr double up_final_forward_wait = 1.0;
     static constexpr double down_first_forward_wait = 1.0;
     static constexpr double down_second_forward_wait = 1.0;
     static constexpr double down_final_forward_wait = 1.0;
+
+    // 速度関連
+    static constexpr int forward_speed = 10;
 
     // モードの管理
     enum class StepMode {
@@ -130,48 +134,52 @@ private:
     // 機構関数
     void all_up() {
         RCLCPP_INFO(get_logger(), "ALL UP");
-        // ここに全てのサーボを上げる命令を書く
+        pkt.setTR(TR1, 1);
+        pkt.setTR(TR2, 1);
     }
 
     void front_down() {
         RCLCPP_INFO(get_logger(), "FRONT DOWN");
-        // ここに前のサーボを下げる命令を書く
+        pkt.setTR(TR1, 0);
     }
 
     void rear_down() {
         RCLCPP_INFO(get_logger(), "REAR DOWN");
-        // ここに後ろのサーボを下げる命令を書く
+        pkt.setTR(TR2, 0);
     }
 
     void stop_motion() {
         RCLCPP_INFO(get_logger(), "STOP");
-        // ここに全てのモーターを止める命令を書く
+        // 停止
     }
 
     void front_up() {
         RCLCPP_INFO(get_logger(), "FRONT UP");
-        // ここに前のサーボを上げる命令を書く
+        pkt.setTR(TR1, 1);
     }
 
     void rear_up() {
         RCLCPP_INFO(get_logger(), "REAR UP");
-        // ここに後ろのサーボを上げる命令を書く
+        pkt.setTR(TR2, 1);
     }
 
     void all_down() {
         RCLCPP_INFO(get_logger(), "ALL DOWN");
-        // ここに全てのサーボを下げる命令を書く
+        pkt.setTR(TR1, 0);
+        pkt.setTR(TR2, 0);
     }
 
     void move_forward() {
         RCLCPP_INFO(get_logger(), "MOVE FORWARD");
-        // ここに前進する命令を書く
+        pkt.setMD(MD5, forward_speed);
+        pkt.setMD(MD6, forward_speed);
+        pkt.setMD(MD7, forward_speed);
+        pkt.setMD(MD8, forward_speed);
     }
 
-    void move_backward() {
-        RCLCPP_INFO(get_logger(), "MOVE BACKWARD");
-        // ここに後退する命令を書く
-    }
+    // void move_backward() {
+    //     RCLCPP_INFO(get_logger(), "MOVE BACKWARD");
+    // }
 
     // 段差超えシーケンス（上り）
     void step_up_sequence() {
