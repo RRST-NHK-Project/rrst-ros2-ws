@@ -1,11 +1,6 @@
 /*
-RRST-NHK-Project 2026
-PS4コントローラーの入力を取得するサンプルプログラム
-esp32マイコンにアクチュエータ指令を送るサンプルプログラム
-
-ボタン操作について
- 上矢印：前輪上げ下げ
- 下矢印：後輪上げ下げ
+R2機構制御(シーケンス周り)
+Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 */
 
 // 標準
@@ -41,58 +36,7 @@ constexpr double TREAD_Y = 0.30;      // 左右半分 [m]
 float v1, v2, v3, v4; // 各メカナムホイールの速度指令値
 // v1:第一象限, v2:第二象限, v3:第三象限, v4:第四象限
 
-class Action {
-public:
-    static void for_up(std::vector<int16_t> &data) {
-        data[17] = 1;
-    }
-    static void for_down(std::vector<int16_t> &data) {
-        data[17] = 0;
-    }
-    static void back_up(std::vector<int16_t> &data) {
-        data[18] = 1;
-    }
-    static void back_down(std::vector<int16_t> &data) {
-        data[18] = 0;
-    }
-    static void all_down(std::vector<int16_t> &data) {
-        data[17] = 0;
-        data[18] = 0;
-    }
-    static void all_up(std::vector<int16_t> &data) {
-        data[17] = 1;
-        data[18] = 1;
-    }
-};
-
-class ParamTuner : public rclcpp::Node {
-public:
-    ParamTuner() : Node("param_tuner") {
-
-        sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
-            "r2_mecanum_param",
-            10,
-            std::bind(&ParamTuner::param_callback, this, std::placeholders::_1));
-
-        RCLCPP_INFO(this->get_logger(), "Param Tuner Node Started.");
-    }
-
-private:
-    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_;
-    std::vector<float> params = {0, 0, 0, 0}; // 受信したパラメータを保持
-
-    void param_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
-
-        if (msg->data.size() < 4) {
-            RCLCPP_WARN(this->get_logger(), "param message too short");
-            return;
-        }
-
-        // 受信した params をコピー
-        duty_max = msg->data[0];
-        // v4 = msg->data[3];
-    }
-};
+using namespace std::chrono_literals;
 
 class HardWareControl : public rclcpp::Node {
 public:
@@ -235,28 +179,28 @@ private:
         v3 /= max_v;
         v4 /= max_v;
 
-        if (up_latch == true) {
-            Action::for_up(data_);
-        } else if (up_latch == false) {
-            Action::for_down(data_);
-        }
-        if (down_latch == true) {
-            Action::back_up(data_);
-        } else if (down_latch == false) {
-            Action::back_down(data_);
-        }
+        // if (up_latch == true) {
+        //     Action::for_up(data_);
+        // } else if (up_latch == false) {
+        //     Action::for_down(data_);
+        // }
+        // if (down_latch == true) {
+        //     Action::back_up(data_);
+        // } else if (down_latch == false) {
+        //     Action::back_down(data_);
+        // }
 
-        if (CROSS) {
-            Action::all_down(data_);
-            up_latch = false;
-            down_latch = false;
-        }
+        // if (CROSS) {
+        //     Action::all_down(data_);
+        //     up_latch = false;
+        //     down_latch = false;
+        // }
 
-        if (TRIANGLE) {
-            Action::all_up(data_);
-            up_latch = true;
-            down_latch = true;
-        }
+        // if (TRIANGLE) {
+        //     Action::all_up(data_);
+        //     up_latch = true;
+        //     down_latch = true;
+        // }
 
         // 2026/02/14, 7,8,9,10を5,6,7,8に変更
         data_[5] = static_cast<int16_t>(v1 * duty_max);
@@ -368,11 +312,77 @@ private:
     std::vector<int16_t> data_;
 };
 
-int main(int argc, char *argv[]) {
+// 状態を管理しながらシーケンス制御
+class SequenceControl : public rclcpp::Node {
+public:
+    SequenceControl() : Node("sequence_ctrl_node") {
+        timer_ = this->create_wall_timer(
+            10ms,
+            std::bind(&SequenceControl::loop, this));
+    }
+
+private:
+    // ===== 状態 =====
+    enum State {
+        IDLE,
+        ARM_OPEN,
+        WAIT,
+        ARM_CLOSE,
+        FINISH
+    };
+
+    State state_ = ARM_OPEN;
+
+    rclcpp::Time start_time_;
+    rclcpp::TimerBase::SharedPtr timer_;
+
+    // ===== 機構関数 =====
+    void arm_open() {
+        RCLCPP_INFO(this->get_logger(), "Arm Open");
+    }
+
+    void arm_close() {
+        RCLCPP_INFO(this->get_logger(), "Arm Close");
+    }
+
+    // ===== 制御ループ =====
+    void loop() {
+        auto now = this->now();
+
+        switch (state_) {
+        case IDLE:
+            break;
+
+        case ARM_OPEN:
+            arm_open();
+            start_time_ = now;
+            state_ = WAIT;
+            break;
+
+        case WAIT:
+            if ((now - start_time_).seconds() > 0.5) {
+                state_ = ARM_CLOSE;
+            }
+            break;
+
+        case ARM_CLOSE:
+            arm_close();
+            state_ = FINISH;
+            break;
+
+        case FINISH:
+            RCLCPP_INFO(this->get_logger(), "Sequence finished");
+            state_ = IDLE;
+            break;
+        }
+    }
+};
+
+int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
 
     // figletでノード名を表示
-    std::string figletout = "figlet R2_Mecanum";
+    std::string figletout = "figlet R2_SequenceCtrl";
     int result = std::system(figletout.c_str());
     if (result != 0) {
         std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -387,9 +397,9 @@ int main(int argc, char *argv[]) {
     rclcpp::executors::MultiThreadedExecutor exec;
 
     auto hardware_control = std::make_shared<HardWareControl>(TARGET_DEVICE_ID);
-    auto param_tuner = std::make_shared<ParamTuner>();
+    auto sequence_control = std::make_shared<SequenceControl>();
     exec.add_node(hardware_control);
-    exec.add_node(param_tuner);
+    exec.add_node(sequence_control);
     exec.spin();
 
     rclcpp::shutdown();
