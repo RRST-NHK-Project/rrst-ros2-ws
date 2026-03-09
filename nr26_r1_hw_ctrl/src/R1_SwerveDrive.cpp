@@ -119,7 +119,7 @@ private:
         float RS_X = -1 * msg->axes[3];
         // float RS_Y = msg->axes[4];
 
-        bool CROSS = msg->buttons[0];
+        // bool CROSS = msg->buttons[0];
         // bool CIRCLE = msg->buttons[1];
         // bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
@@ -167,7 +167,7 @@ private:
         }
 
         static bool is_fixed_mode = false;
-        static int fixed_deg_value = 135;
+        static int fixed_deg_value = 135; //この変数何用？
         static bool last_L3_state = false;
 
         if (L3 == true && last_L3_state == false) {
@@ -384,20 +384,6 @@ private:
                 data_[2] = -wheelspeed * R2;
                 data_[3] = -wheelspeed * R2;
                 data_[4] = -wheelspeed * R2;
-            }
-
-            // 射出直前にサーボを直角に向けストップ
-            if (CROSS) {
-                data_[1] = 0;
-                data_[2] = 0;
-                data_[3] = 0;
-                data_[4] = 0;
-                data_[5] = 0;
-                data_[6] = 0;
-                data_[9] = 45 + SERVO1_CAL;
-                data_[10] = 45 + SERVO2_CAL;
-                data_[11] = 45 + SERVO3_CAL;
-                data_[12] = 45 + SERVO4_CAL;
             }
 
             // 独ステが扱えない範囲の変換

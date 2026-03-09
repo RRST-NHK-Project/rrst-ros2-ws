@@ -131,7 +131,7 @@ private:
         // bool DOWN = msg->axes[7] == -1.0;
 
         // bool L1 = msg->buttons[4];
-        // bool R1 = msg->buttons[5];
+        bool R1 = msg->buttons[5];
 
         // // float L2 = (-1 * msg->axes[2] + 1) / 2;
         // float R2 = (-1 * msg->axes[5] + 1) / 2;
@@ -152,7 +152,7 @@ private:
         // static bool last_R3 = false;
         // static bool R3_latch = false;
 //ALOHA's number
-static bool circle_k = false;
+//static bool circle_k = false;
 static int count = 0;
 static int s1 = 12;
 static int s2 = 0;
@@ -160,6 +160,9 @@ data_[9] = s1;
 data_[10] = s2;
 static bool last_SQUARE = false;
 static bool last_CIRCLE = false;
+static bool last_R1 = true;
+static int count1 = 0;
+static int count2 = 0;
         // 以降、配列data_を操作する
 
         // float rad = atan2(LS_Y, LS_X);
@@ -297,32 +300,53 @@ static bool last_CIRCLE = false;
                 }        
             
             if(SQUARE && !last_SQUARE){
-                if(count %4 == 0){
+                if(count %3 == 0){
                     s2 = 95;
-                } else if(count %4 == 1){
                     s1 = 90;
-                } else if(count %4 == 2){
+                    }
+                 else if(count %3 == 1){
                     s1 = 12;
-                } else if(count %4 == 3){
+                }
+
+                  else if(count %3 == 2){
                     s2 = 0;
                 }
                 count++;
             }
+            
           last_SQUARE = SQUARE;
-          static int coount = 0;
+          
           if(CIRCLE && !last_CIRCLE){
-           if(coount %2 == 0){
+           if(count1 %2 == 0){
             data_[17] = 1;
             data_[18] = 1;
             data_[19] = 1;
-           }else{
+           }
+           else{
             data_[17] = 0;
             data_[18] = 0;
             data_[19] = 0;
            }
-           coount++;
+        count1++;
           }
-          last_CIRCLE = CIRCLE;
+          if(R1 && !last_R1){
+            if(count2 %3 == 0){
+            data_[17] = 0;
+            }else if(count2 %3 == 1){
+                data_[18] = 0;
+            }
+          if(count2 %3 == 2){
+                data_[19] = 0;
+            }
+            count2++;
+            count1++;
+          }
+          if(last_CIRCLE == true){
+                count2 = 0;
+            }
+        
+           last_CIRCLE = CIRCLE;
+           last_R1 = R1; 
             // // 独ステが扱えない範囲の変換
             // if ((270 < deg) && (deg < 360)) {
             //     deg = deg - 180;

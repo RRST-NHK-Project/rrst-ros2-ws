@@ -17,8 +17,8 @@ esp32マイコンにアクチュエータ指令を送るサンプルプログラ
 // ROS
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
+#include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int16_multi_array.hpp"
-#include <std_msgs/msg/float32_multi_array.hpp>
 
 // 以下マイコンに合わせて設定
 #define TARGET_DEVICE_ID 6 // 宛先マイコンのID
@@ -370,6 +370,19 @@ private:
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
+
+    // figletでノード名を表示
+    std::string figletout = "figlet R2_Mecanum";
+    int result = std::system(figletout.c_str());
+    if (result != 0) {
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                  << std::endl;
+        std::cerr << "Please install 'figlet' with the following command:"
+                  << std::endl;
+        std::cerr << "sudo apt install figlet" << std::endl;
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                  << std::endl;
+    }
 
     rclcpp::executors::MultiThreadedExecutor exec;
 

@@ -241,7 +241,7 @@ int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
     // figletでノード名を表示
-    std::string figletout = "figlet Serial Bridge Host";
+    std::string figletout = "figlet R2_MotionCtrl";
     int result = std::system(figletout.c_str());
     if (result != 0) {
         std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"

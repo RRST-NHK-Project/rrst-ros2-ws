@@ -72,6 +72,9 @@ ament_target_dependencies(optical_flow_odom  rclcpp nav_msgs cv_bridge)
   ${OpenCV_LIBRARIES}
 )
 
+add_executable(r2_sc src/R2_SequenceCtrl.cpp)
+ament_target_dependencies(r2_sc rclcpp std_msgs sensor_msgs geometry_msgs)
+
 # インストール設定
 install(TARGETS
   nr26_r2_move
@@ -81,8 +84,14 @@ install(TARGETS
   r2_tuner
   r2_auto
   r2_hand_xy
+  r2_sc
   optical_flow_odom
   DESTINATION lib/${PROJECT_NAME})
+
+install(
+  DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

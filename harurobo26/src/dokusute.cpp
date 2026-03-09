@@ -39,10 +39,10 @@ int wheelspeed = 25; // 64;
 int yawspeed = 25;  // 32;
 
 // サーボの組み付け時のズレを補正（度数法）
-int SERVO1_CAL = 4;
-int SERVO2_CAL = 7;
+int SERVO1_CAL = 0;
+int SERVO2_CAL = 0;
 int SERVO3_CAL = 2;
-int SERVO4_CAL = -5;
+int SERVO4_CAL = 0;
 
 class HardWareControl : public rclcpp::Node {
 public:
