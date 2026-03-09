@@ -525,9 +525,9 @@ private:
         // data_[8] = static_cast<int16_t>(v4 * duty_max);
 
         pkt.setMD(MD5, static_cast<int16_t>(v1 * duty_max));
-        pkt.setMD(MD6, static_cast<int16_t>(v1 * duty_max));
-        pkt.setMD(MD7, static_cast<int16_t>(v1 * duty_max));
-        pkt.setMD(MD8, static_cast<int16_t>(v1 * duty_max));
+        pkt.setMD(MD6, static_cast<int16_t>(v2 * duty_max));
+        pkt.setMD(MD7, static_cast<int16_t>(v3 * duty_max));
+        pkt.setMD(MD8, static_cast<int16_t>(v4 * duty_max));
     }
 
     void publisher_timer_callback() {
