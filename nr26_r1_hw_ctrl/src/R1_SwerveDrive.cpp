@@ -167,7 +167,7 @@ private:
         }
 
         static bool is_fixed_mode = false;
-        static int fixed_deg_value = 135;
+        static int fixed_deg_value = 135; //この変数何用？
         static bool last_L3_state = false;
 
         if (L3 == true && last_L3_state == false) {
