@@ -15,6 +15,10 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int16_multi_array.hpp"
 
+// 自作
+#include "PacketController.hpp"
+PacketController pkt;
+
 // 以下マイコンに合わせて設定
 #define TARGET_DEVICE_ID 6 // 宛先マイコンのID
 #define TX16NUM 24         // 送信データ数
@@ -56,14 +60,19 @@ public:
         next_down(StepDownState::FIRST_FORWARD);
     }
 
+    // シーケンス実行中の判定
+    bool is_busy() const {
+        return mode_ != StepMode::NONE;
+    }
+
 private:
     // 待機時間（要調整）
-    static constexpr double up_first_forward_wait = 3.0;
-    static constexpr double up_second_forward_wait = 3.0;
-    static constexpr double up_final_forward_wait = 3.0;
-    static constexpr double down_first_forward_wait = 3.0;
-    static constexpr double down_second_forward_wait = 3.0;
-    static constexpr double down_final_forward_wait = 3.0;
+    static constexpr double up_first_forward_wait = 1.0;
+    static constexpr double up_second_forward_wait = 1.0;
+    static constexpr double up_final_forward_wait = 1.0;
+    static constexpr double down_first_forward_wait = 1.0;
+    static constexpr double down_second_forward_wait = 1.0;
+    static constexpr double down_final_forward_wait = 1.0;
 
     // モードの管理
     enum class StepMode {
@@ -334,9 +343,6 @@ public:
           device_id_(device_id),
           seq_(seq) {
 
-        // 配列を0で初期化
-        data_.assign(TX16NUM, 0);
-
         // joyノードのSubscribe
         joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
             "joy", 10,
@@ -384,6 +390,10 @@ private:
     rclcpp::Time last_time_;
 
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
+
+        if (seq_->is_busy()) {
+            return; // シーケンス実行中はコントローラーを無効化
+        }
 
         // コントローラーの入力を取得、使わない入力はコメントアウト推奨
         float LS_X = -1 * msg->axes[0];
@@ -509,26 +519,33 @@ private:
         // }
 
         // 2026/02/14, 7,8,9,10を5,6,7,8に変更
-        data_[5] = static_cast<int16_t>(v1 * duty_max);
-        data_[6] = static_cast<int16_t>(v2 * duty_max);
-        data_[7] = static_cast<int16_t>(v3 * duty_max);
-        data_[8] = static_cast<int16_t>(v4 * duty_max);
+        // data_[5] = static_cast<int16_t>(v1 * duty_max);
+        // data_[6] = static_cast<int16_t>(v2 * duty_max);
+        // data_[7] = static_cast<int16_t>(v3 * duty_max);
+        // data_[8] = static_cast<int16_t>(v4 * duty_max);
+
+        pkt.setMD(MD5, static_cast<int16_t>(v1 * duty_max));
+        pkt.setMD(MD6, static_cast<int16_t>(v1 * duty_max));
+        pkt.setMD(MD7, static_cast<int16_t>(v1 * duty_max));
+        pkt.setMD(MD8, static_cast<int16_t>(v1 * duty_max));
     }
 
     void publisher_timer_callback() {
         std_msgs::msg::Int16MultiArray msg;
 
-        msg.data = data_;
+        // msg.data = data_;
+        msg.data = pkt.toVector();
 
         publisher_->publish(msg);
-        // print_data();
+        print_data();
     }
 
     void print_data() {
+        const auto &pkt_data = pkt.data_;
         std::cout << "TX DATA: [";
-        for (size_t i = 0; i < data_.size(); ++i) {
-            std::cout << data_[i];
-            if (i + 1 < data_.size())
+        for (size_t i = 0; i < pkt_data.size(); ++i) {
+            std::cout << pkt_data[i];
+            if (i + 1 < pkt_data.size())
                 std::cout << ", ";
         }
         std::cout << "]" << std::endl;
