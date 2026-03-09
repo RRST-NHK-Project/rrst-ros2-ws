@@ -57,6 +57,14 @@ public:
     }
 
 private:
+    // 待機時間（要調整）
+    static constexpr double up_first_forward_wait = 3.0;
+    static constexpr double up_second_forward_wait = 3.0;
+    static constexpr double up_final_forward_wait = 3.0;
+    static constexpr double down_first_forward_wait = 3.0;
+    static constexpr double down_second_forward_wait = 3.0;
+    static constexpr double down_final_forward_wait = 3.0;
+
     // モードの管理
     enum class StepMode {
         NONE,
@@ -176,8 +184,9 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > 0.5)
+            if ((now_time - state_start_time_).seconds() > up_first_forward_wait) {
                 next_up(StepUpState::FRONT_DOWN);
+            }
             break;
 
         case StepUpState::FRONT_DOWN:
@@ -193,8 +202,9 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > 0.5)
+            if ((now_time - state_start_time_).seconds() > up_second_forward_wait) {
                 next_up(StepUpState::REAR_DOWN);
+            }
             break;
 
         case StepUpState::REAR_DOWN:
@@ -210,8 +220,9 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > 0.5)
+            if ((now_time - state_start_time_).seconds() > up_final_forward_wait) {
                 next_up(StepUpState::DONE);
+            }
             break;
 
         case StepUpState::DONE:
@@ -237,7 +248,9 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            next_down(StepDownState::FRONT_UP);
+            if ((now_time - state_start_time_).seconds() > down_first_forward_wait) {
+                next_down(StepDownState::FRONT_UP);
+            }
             break;
 
         case StepDownState::FRONT_UP:
@@ -245,8 +258,7 @@ private:
                 front_up();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > 0.5)
-                next_down(StepDownState::SECOND_FORWARD);
+            next_down(StepDownState::SECOND_FORWARD);
             break;
 
         case StepDownState::SECOND_FORWARD:
@@ -254,7 +266,9 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            next_down(StepDownState::REAR_UP);
+            if ((now_time - state_start_time_).seconds() > down_second_forward_wait) {
+                next_down(StepDownState::REAR_UP);
+            }
             break;
 
         case StepDownState::REAR_UP:
@@ -262,8 +276,7 @@ private:
                 rear_up();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > 0.5)
-                next_down(StepDownState::FINAL_FORWARD);
+            next_down(StepDownState::FINAL_FORWARD);
             break;
 
         case StepDownState::FINAL_FORWARD:
@@ -271,7 +284,9 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            next_down(StepDownState::ALL_DOWN);
+            if ((now_time - state_start_time_).seconds() > down_final_forward_wait) {
+                next_down(StepDownState::ALL_DOWN);
+            }
             break;
 
         case StepDownState::ALL_DOWN:
@@ -279,7 +294,8 @@ private:
                 all_down();
                 state_executed_ = true;
             }
-            next_down(StepDownState::DONE);
+            if ((now_time - state_start_time_).seconds() > 0.5)
+                next_down(StepDownState::DONE);
             break;
 
         case StepDownState::DONE:
