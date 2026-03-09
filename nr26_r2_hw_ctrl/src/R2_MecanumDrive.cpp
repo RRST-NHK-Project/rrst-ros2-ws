@@ -371,6 +371,19 @@ private:
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
+    // figletでノード名を表示
+    std::string figletout = "figlet R2_Mecanum";
+    int result = std::system(figletout.c_str());
+    if (result != 0) {
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                  << std::endl;
+        std::cerr << "Please install 'figlet' with the following command:"
+                  << std::endl;
+        std::cerr << "sudo apt install figlet" << std::endl;
+        std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                  << std::endl;
+    }
+
     rclcpp::executors::MultiThreadedExecutor exec;
 
     auto hardware_control = std::make_shared<HardWareControl>(TARGET_DEVICE_ID);
