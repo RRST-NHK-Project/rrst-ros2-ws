@@ -150,7 +150,12 @@ private:
 
     void stop_motion() {
         RCLCPP_INFO(get_logger(), "STOP");
-        // 停止
+        pkt.setTR(TR1, 0);
+        pkt.setTR(TR2, 0);
+        pkt.setMD(MD5, forward_speed);
+        pkt.setMD(MD6, forward_speed);
+        pkt.setMD(MD7, forward_speed);
+        pkt.setMD(MD8, forward_speed);
     }
 
     void front_up() {
