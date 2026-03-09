@@ -1,5 +1,5 @@
 /*
-R2機構制御(シーケンス周り)
+R2段差超えシーケンス（状態管理）
 Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 */
 
@@ -22,27 +22,292 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 
 #define PUBLISH_RATE_MS 20 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
 
-// 定数・変数
-float duty_max = 100;
-float for_speed = 50;
-float back_speed = 50;
-float sp_yaw = 0.5;
-float deadzone = 0.3; // adjust DS4 deadzone
-
-constexpr double WHEEL_RADIUS = 0.05; // [m]
-constexpr double TREAD_X = 0.30;      // 前後半分 [m]
-constexpr double TREAD_Y = 0.30;      // 左右半分 [m]
-
-float v1, v2, v3, v4; // 各メカナムホイールの速度指令値
-// v1:第一象限, v2:第二象限, v3:第三象限, v4:第四象限
-
 using namespace std::chrono_literals;
+
+class SequenceControl;
+class HardWareControl;
+
+// 状態を管理しながらシーケンス制御
+class SequenceControl : public rclcpp::Node {
+public:
+    SequenceControl() : Node("sequence_ctrl_node") {
+        timer_ = this->create_wall_timer(
+            10ms,
+            std::bind(&SequenceControl::loop, this));
+    }
+
+    // トリガー関数
+    void start_step_up() {
+        mode_ = StepMode::STEP_UP;
+        next_up(StepUpState::ALL_UP);
+    }
+
+    void start_step_down() {
+        mode_ = StepMode::STEP_DOWN;
+        next_down(StepDownState::FIRST_FORWARD);
+    }
+
+private:
+    // モードの管理
+    enum class StepMode {
+        NONE,
+        STEP_UP,
+        STEP_DOWN
+    };
+
+    // 状態管理（上り）
+    enum class StepUpState {
+        IDLE,
+        ALL_UP,
+        FIRST_FORWARD,
+        FRONT_DOWN,
+        SECOND_FORWARD,
+        REAR_DOWN,
+        FINAL_FORWARD,
+        DONE
+    };
+
+    // 状態管理（下り）
+    enum class StepDownState {
+        IDLE,
+        FIRST_FORWARD,
+        FRONT_UP,
+        SECOND_FORWARD,
+        REAR_UP,
+        FINAL_FORWARD,
+        ALL_DOWN,
+        DONE
+    };
+
+    StepMode mode_ = StepMode::NONE;
+
+    StepUpState state_up_ = StepUpState::IDLE;
+    StepDownState state_down_ = StepDownState::IDLE;
+
+    rclcpp::TimerBase::SharedPtr timer_;
+    rclcpp::Time state_start_time_;
+    bool state_executed_ = false; // 各状態での処理の実行状況を保存
+
+    // 状態遷移関数
+    void next_up(StepUpState next) {
+        state_start_time_ = this->now();
+        state_up_ = next;
+        state_executed_ = false;
+    }
+
+    void next_down(StepDownState next) {
+        state_start_time_ = this->now();
+        state_down_ = next;
+        state_executed_ = false;
+    }
+
+    // 機構関数
+    void all_up() {
+        RCLCPP_INFO(get_logger(), "ALL UP");
+        // ここに全てのサーボを上げる命令を書く
+    }
+
+    void front_down() {
+        RCLCPP_INFO(get_logger(), "FRONT DOWN");
+        // ここに前のサーボを下げる命令を書く
+    }
+
+    void rear_down() {
+        RCLCPP_INFO(get_logger(), "REAR DOWN");
+        // ここに後ろのサーボを下げる命令を書く
+    }
+
+    void stop_motion() {
+        RCLCPP_INFO(get_logger(), "STOP");
+        // ここに全てのモーターを止める命令を書く
+    }
+
+    void front_up() {
+        RCLCPP_INFO(get_logger(), "FRONT UP");
+        // ここに前のサーボを上げる命令を書く
+    }
+
+    void rear_up() {
+        RCLCPP_INFO(get_logger(), "REAR UP");
+        // ここに後ろのサーボを上げる命令を書く
+    }
+
+    void all_down() {
+        RCLCPP_INFO(get_logger(), "ALL DOWN");
+        // ここに全てのサーボを下げる命令を書く
+    }
+
+    void move_forward() {
+        RCLCPP_INFO(get_logger(), "MOVE FORWARD");
+        // ここに前進する命令を書く
+    }
+
+    void move_backward() {
+        RCLCPP_INFO(get_logger(), "MOVE BACKWARD");
+        // ここに後退する命令を書く
+    }
+
+    // 段差超えシーケンス（上り）
+    void step_up_sequence() {
+        auto now_time = now();
+        switch (state_up_) {
+        case StepUpState::IDLE:
+            break;
+
+        case StepUpState::ALL_UP:
+            if (!state_executed_) {
+                all_up();
+                state_executed_ = true;
+            }
+            next_up(StepUpState::FIRST_FORWARD);
+            break;
+
+        case StepUpState::FIRST_FORWARD:
+            if (!state_executed_) {
+                move_forward();
+                state_executed_ = true;
+            }
+            if ((now_time - state_start_time_).seconds() > 0.5)
+                next_up(StepUpState::FRONT_DOWN);
+            break;
+
+        case StepUpState::FRONT_DOWN:
+            if (!state_executed_) {
+                front_down();
+                state_executed_ = true;
+            }
+            next_up(StepUpState::SECOND_FORWARD);
+            break;
+
+        case StepUpState::SECOND_FORWARD:
+            if (!state_executed_) {
+                move_forward();
+                state_executed_ = true;
+            }
+            if ((now_time - state_start_time_).seconds() > 0.5)
+                next_up(StepUpState::REAR_DOWN);
+            break;
+
+        case StepUpState::REAR_DOWN:
+            if (!state_executed_) {
+                rear_down();
+                state_executed_ = true;
+            }
+            next_up(StepUpState::FINAL_FORWARD);
+            break;
+
+        case StepUpState::FINAL_FORWARD:
+            if (!state_executed_) {
+                move_forward();
+                state_executed_ = true;
+            }
+            if ((now_time - state_start_time_).seconds() > 0.5)
+                next_up(StepUpState::DONE);
+            break;
+
+        case StepUpState::DONE:
+            if (!state_executed_) {
+                stop_motion();
+                state_executed_ = true;
+            }
+            mode_ = StepMode::NONE;
+            state_up_ = StepUpState::IDLE;
+            break;
+        }
+    }
+
+    // 段差超えシーケンス（下り）
+    void step_down_sequence() {
+        auto now_time = now();
+        switch (state_down_) {
+        case StepDownState::IDLE:
+            break;
+
+        case StepDownState::FIRST_FORWARD:
+            if (!state_executed_) {
+                move_forward();
+                state_executed_ = true;
+            }
+            next_down(StepDownState::FRONT_UP);
+            break;
+
+        case StepDownState::FRONT_UP:
+            if (!state_executed_) {
+                front_up();
+                state_executed_ = true;
+            }
+            if ((now_time - state_start_time_).seconds() > 0.5)
+                next_down(StepDownState::SECOND_FORWARD);
+            break;
+
+        case StepDownState::SECOND_FORWARD:
+            if (!state_executed_) {
+                move_forward();
+                state_executed_ = true;
+            }
+            next_down(StepDownState::REAR_UP);
+            break;
+
+        case StepDownState::REAR_UP:
+            if (!state_executed_) {
+                rear_up();
+                state_executed_ = true;
+            }
+            if ((now_time - state_start_time_).seconds() > 0.5)
+                next_down(StepDownState::FINAL_FORWARD);
+            break;
+
+        case StepDownState::FINAL_FORWARD:
+            if (!state_executed_) {
+                move_forward();
+                state_executed_ = true;
+            }
+            next_down(StepDownState::ALL_DOWN);
+            break;
+
+        case StepDownState::ALL_DOWN:
+            if (!state_executed_) {
+                all_down();
+                state_executed_ = true;
+            }
+            next_down(StepDownState::DONE);
+            break;
+
+        case StepDownState::DONE:
+            if (!state_executed_) {
+                stop_motion();
+                state_executed_ = true;
+            }
+            mode_ = StepMode::NONE;
+            state_down_ = StepDownState::IDLE;
+            break;
+        }
+    }
+
+    void loop() {
+
+        switch (mode_) {
+
+        case StepMode::NONE:
+            break;
+
+        case StepMode::STEP_UP:
+            step_up_sequence();
+            break;
+
+        case StepMode::STEP_DOWN:
+            step_down_sequence();
+            break;
+        }
+    }
+};
 
 class HardWareControl : public rclcpp::Node {
 public:
-    HardWareControl(uint8_t device_id)
+    HardWareControl(uint8_t device_id, std::shared_ptr<SequenceControl> seq)
         : Node("hardware_control_" + std::to_string(device_id)),
-          device_id_(device_id) {
+          device_id_(device_id),
+          seq_(seq) {
 
         // 配列を0で初期化
         data_.assign(TX16NUM, 0);
@@ -73,6 +338,20 @@ public:
     }
 
 private:
+    // 定数・変数
+    float duty_max = 100;
+    float for_speed = 50;
+    float back_speed = 50;
+    float sp_yaw = 0.5;
+    float deadzone = 0.3; // adjust DS4 deadzone
+
+    static constexpr double WHEEL_RADIUS = 0.05; // [m]
+    static constexpr double TREAD_X = 0.30;      // 前後半分 [m]
+    static constexpr double TREAD_Y = 0.30;      // 左右半分 [m]
+
+    float v1, v2, v3, v4; // 各メカナムホイールの速度指令値
+                          // v1:第一象限, v2:第二象限, v3:第三象限, v4:第四象限
+
     // ===== オドメトリ状態 =====
     float X = 0, Y = 0, yaw_ = 0;
     int16_t vel_prev_[4]{0};
@@ -120,10 +399,12 @@ private:
 
         if (UP && !last_up) {
             up_latch = !up_latch;
+            seq_->start_step_up();
         }
 
         if (DOWN && !last_down) {
             down_latch = !down_latch;
+            seq_->start_step_down();
         }
         last_up = UP;
         last_down = DOWN;
@@ -310,72 +591,9 @@ private:
     rclcpp::TimerBase::SharedPtr timer_;
 
     std::vector<int16_t> data_;
-};
 
-// 状態を管理しながらシーケンス制御
-class SequenceControl : public rclcpp::Node {
-public:
-    SequenceControl() : Node("sequence_ctrl_node") {
-        timer_ = this->create_wall_timer(
-            10ms,
-            std::bind(&SequenceControl::loop, this));
-    }
-
-private:
-    // ===== 状態 =====
-    enum State {
-        IDLE,
-        ARM_OPEN,
-        WAIT,
-        ARM_CLOSE,
-        FINISH
-    };
-
-    State state_ = ARM_OPEN;
-
-    rclcpp::Time start_time_;
-    rclcpp::TimerBase::SharedPtr timer_;
-
-    // ===== 機構関数 =====
-    void arm_open() {
-        RCLCPP_INFO(this->get_logger(), "Arm Open");
-    }
-
-    void arm_close() {
-        RCLCPP_INFO(this->get_logger(), "Arm Close");
-    }
-
-    // ===== 制御ループ =====
-    void loop() {
-        auto now = this->now();
-
-        switch (state_) {
-        case IDLE:
-            break;
-
-        case ARM_OPEN:
-            arm_open();
-            start_time_ = now;
-            state_ = WAIT;
-            break;
-
-        case WAIT:
-            if ((now - start_time_).seconds() > 0.5) {
-                state_ = ARM_CLOSE;
-            }
-            break;
-
-        case ARM_CLOSE:
-            arm_close();
-            state_ = FINISH;
-            break;
-
-        case FINISH:
-            RCLCPP_INFO(this->get_logger(), "Sequence finished");
-            state_ = IDLE;
-            break;
-        }
-    }
+    // シーケンスの管理に使う
+    std::shared_ptr<SequenceControl> seq_;
 };
 
 int main(int argc, char **argv) {
@@ -396,8 +614,8 @@ int main(int argc, char **argv) {
 
     rclcpp::executors::MultiThreadedExecutor exec;
 
-    auto hardware_control = std::make_shared<HardWareControl>(TARGET_DEVICE_ID);
     auto sequence_control = std::make_shared<SequenceControl>();
+    auto hardware_control = std::make_shared<HardWareControl>(TARGET_DEVICE_ID, sequence_control);
     exec.add_node(hardware_control);
     exec.add_node(sequence_control);
     exec.spin();
