@@ -38,6 +38,8 @@ public:
             10,
             std::bind(&HardWareControl::sensor_callback, this, std::placeholders::_1));
 
+        odom_pub_ = this->create_publisher<std_msgs::msg::Float32MultiArray>("odom", 10);
+
         RCLCPP_INFO(get_logger(), "serial_rx_%d subscriber started.", device_id_);
     }
 
@@ -135,6 +137,24 @@ private:
         // yaw 正規化
         yaw_ = atan2(sin(yaw_), cos(yaw_));
 
+        // ===== 速度計算 =====
+        float dt = PUBLISH_RATE_MS / 1000.0f; // s
+        float vx = dx / dt;
+        float vy = dy / dt;
+        float wz = dtheta / dt;
+
+        // Publish
+        std_msgs::msg::Float32MultiArray odom_msg;
+        odom_msg.data.clear();
+        odom_msg.data.push_back(static_cast<float>(X));
+        odom_msg.data.push_back(static_cast<float>(Y));
+        odom_msg.data.push_back(static_cast<float>(yaw_)); // rad
+        odom_msg.data.push_back(vx);
+        odom_msg.data.push_back(vy);
+        odom_msg.data.push_back(wz);
+
+        odom_pub_->publish(odom_msg);
+
         RCLCPP_INFO(get_logger(),
                     "X: %.3f  Y: %.3f  Yaw: %.2f deg",
                     X, Y, yaw_ * 180.0 / M_PI);
@@ -144,6 +164,7 @@ private:
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
+    rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr odom_pub_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sensor_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
