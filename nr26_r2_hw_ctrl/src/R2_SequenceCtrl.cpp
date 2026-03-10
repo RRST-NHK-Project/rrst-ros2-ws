@@ -403,140 +403,90 @@ private:
     rclcpp::Time last_time_;
 
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
-
         if (seq_->is_busy()) {
-            return; // シーケンス実行中はコントローラーを無効化
+            return;
         }
 
-        // コントローラーの入力を取得、使わない入力はコメントアウト推奨
-        float LS_X = -1 * msg->axes[0];
-        float LS_Y = msg->axes[1];
-        float RS_X = -1 * msg->axes[3];
-        float RS_Y = msg->axes[4];
+        // ===== スティック =====
+        float LS_X = -msg->axes[0]; // 左右
+        float LS_Y = msg->axes[1];  // 前後
+        float RS_X = -msg->axes[3]; // 回転
 
-        bool CROSS = msg->buttons[0];
-        // bool CIRCLE = msg->buttons[1];
-        bool TRIANGLE = msg->buttons[2];
-        // bool SQUARE = msg->buttons[3];
+        float R2 = (-msg->axes[5] + 1) / 2;
 
-        // bool LEFT = msg->axes[6] == 1.0;
-        // bool RIGHT = msg->axes[6] == -1.0;
         bool UP = msg->axes[7] == 1.0;
         bool DOWN = msg->axes[7] == -1.0;
 
         bool L1 = msg->buttons[4];
         bool R1 = msg->buttons[5];
 
-        // float L2_DIGITAL = (-1 * msg->axes[2] + 1) / 2;
-        float R2_DIGITAL = (-1 * msg->axes[5] + 1) / 2;
-
-        // bool L2 = msg->buttons[6];
-        // bool R2 = msg->buttons[7];
-
-        // bool SHARE = msg->buttons[8];
-        // bool OPTION = msg->buttons[9];
-        // bool PS = msg->buttons[10];
-
-        // bool L3 = msg->buttons[11];
-        // bool R3 = msg->buttons[12];
-
+        // ===== シーケンス =====
         static bool last_up = false;
-        static bool up_latch = false;
         static bool last_down = false;
-        static bool down_latch = false;
 
         if (UP && !last_up) {
-            up_latch = !up_latch;
             seq_->start_step_up();
         }
 
         if (DOWN && !last_down) {
-            down_latch = !down_latch;
             seq_->start_step_down();
         }
+
         last_up = UP;
         last_down = DOWN;
 
-        // 以降、配列data_を操作する
-        float rad = atan2(LS_Y, LS_X);
+        // ===== デッドゾーン =====
+        if (fabsf(LS_X) < deadzone)
+            LS_X = 0;
+        if (fabsf(LS_Y) < deadzone)
+            LS_Y = 0;
+        if (fabsf(RS_X) < deadzone)
+            RS_X = 0;
 
-        if (R2_DIGITAL >= 0.3) {
+        // ===== 速度生成 =====
+        float vx = -LS_Y * R2;    // 前後
+        float vy = LS_X * R2;     // 左右
+        float wz = RS_X * sp_yaw; // 回転
 
-            float vx = cos(rad) * R2_DIGITAL;
-            float vy = sin(rad) * R2_DIGITAL;
+        // ===== メカナム逆運動学 =====
+        v1 = vx + vy + wz; // 前左
+        v3 = vx - vy - wz; // 前右
+        v4 = vx - vy + wz; // 後左
+        v2 = vx + vy - wz; // 後右
 
-            // canのIDごとなのでつけ直して動かすとき注意!!!!!
-            v2 = -vy + vx; // 前右
-            v4 = vy + vx;  // 前左
-            v1 = vy - vx;  // 後左
-            v3 = -vy - vx; // 後右
+        // ===== モータ向き補正 =====
+        v3 *= -1;
+        v2 *= -1;
 
-            // float vx = cos(rad) * R2_DIGITAL;
-            // float vy = sin(rad) * R2_DIGITAL;
-            // float wz = RS_X * sp_yaw;
-
-            // v1 = vy - vx - wz;
-            // v2 = -vy + vx - wz;
-            // v3 = -vy - vx + wz;
-            // v4 = vy + vx + wz;
-
-        } else if (RS_X >= deadzone || R1 == 1) {
-            v2 = sp_yaw;
-            v4 = sp_yaw;
+        // ===== その場回転 =====
+        if (R1) {
             v1 = sp_yaw;
-            v3 = sp_yaw;
-        } else if (RS_X <= -deadzone || L1 == 1) {
             v2 = -sp_yaw;
-            v4 = -sp_yaw;
-            v1 = -sp_yaw;
             v3 = -sp_yaw;
+            v4 = sp_yaw;
         }
 
-        else if (
-            (fabsf(LS_X) <= deadzone) && (fabsf(LS_Y) <= deadzone) && (fabsf(RS_X) <= deadzone) && (fabsf(RS_Y) <= deadzone) && (R1 == 0) && (L1 == 0)) {
-            v1 = 0.0;
-            v2 = 0.0;
-            v3 = 0.0;
-            v4 = 0.0;
+        if (L1) {
+            v1 = -sp_yaw;
+            v2 = sp_yaw;
+            v3 = sp_yaw;
+            v4 = -sp_yaw;
         }
 
-        // 正規化(これで全方向安定した速度出せる)
-        float max_v = std::max({fabsf(v1), fabsf(v2), fabsf(v3), fabsf(v4), 1.0f});
+        // ===== 正規化 =====
+        float max_v = std::max(
+            std::max(fabsf(v1), fabsf(v2)),
+            std::max(fabsf(v3), fabsf(v4)));
+
+        if (max_v < 1.0f)
+            max_v = 1.0f;
 
         v1 /= max_v;
         v2 /= max_v;
         v3 /= max_v;
         v4 /= max_v;
 
-        // if (up_latch == true) {
-        //     Action::for_up(data_);
-        // } else if (up_latch == false) {
-        //     Action::for_down(data_);
-        // }
-        // if (down_latch == true) {
-        //     Action::back_up(data_);
-        // } else if (down_latch == false) {
-        //     Action::back_down(data_);
-        // }
-
-        // if (CROSS) {
-        //     Action::all_down(data_);
-        //     up_latch = false;
-        //     down_latch = false;
-        // }
-
-        // if (TRIANGLE) {
-        //     Action::all_up(data_);
-        //     up_latch = true;
-        //     down_latch = true;
-        // }
-
-        // 2026/02/14, 7,8,9,10を5,6,7,8に変更
-        // data_[5] = static_cast<int16_t>(v1 * duty_max);
-        // data_[6] = static_cast<int16_t>(v2 * duty_max);
-        // data_[7] = static_cast<int16_t>(v3 * duty_max);
-        // data_[8] = static_cast<int16_t>(v4 * duty_max);
-
+        // ===== 出力 =====
         pkt.setMD(MD5, static_cast<int16_t>(v1 * duty_max));
         pkt.setMD(MD6, static_cast<int16_t>(v2 * duty_max));
         pkt.setMD(MD7, static_cast<int16_t>(v3 * duty_max));
