@@ -10,6 +10,7 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 
 // ROS
 #include "rclcpp/rclcpp.hpp"
+#include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int16_multi_array.hpp"
 
@@ -34,6 +35,11 @@ public:
         publisher_ = this->create_publisher<std_msgs::msg::Int16MultiArray>(
             "serial_tx_" + std::to_string(TARGET_DEVICE_ID), 10);
 
+        // joyノードのSubscribe
+        joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
+            "joy", 10,
+            std::bind(&PIDMecanumController::ps4_listener_callback, this, std::placeholders::_1));
+
         // タイマー
         timer_ = this->create_wall_timer(
             std::chrono::milliseconds(PUBLISH_RATE_MS),
@@ -42,10 +48,10 @@ public:
         // PIDパラメータ
         Kp_x_ = 1.0;
         Ki_x_ = 0.0;
-        Kd_x_ = 0.1;
+        Kd_x_ = 0.0;
         Kp_y_ = 1.0;
         Ki_y_ = 0.0;
-        Kd_y_ = 0.1;
+        Kd_y_ = 0.0;
 
         // 固定目標座標
         target_x_ = 0.3;
@@ -58,6 +64,7 @@ private:
     // ROS
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr odom_sub_;
     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
+    rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     // PID
@@ -134,6 +141,63 @@ private:
         RCLCPP_INFO(this->get_logger(),
                     "X: %.3f Y: %.3f yaw: %.3f | v1: %.2f v2: %.2f v3: %.2f v4: %.2f",
                     X_, Y_, yaw_, v1, v2, v3, v4);
+    }
+
+    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
+
+        // コントローラーの入力を取得、使わない入力はコメントアウト推奨
+        float LS_X = -1 * msg->axes[0];
+        float LS_Y = msg->axes[1];
+        float RS_X = -1 * msg->axes[3];
+        float RS_Y = msg->axes[4];
+
+        bool CROSS = msg->buttons[0];
+        // bool CIRCLE = msg->buttons[1];
+        bool TRIANGLE = msg->buttons[2];
+        // bool SQUARE = msg->buttons[3];
+
+        // bool LEFT = msg->axes[6] == 1.0;
+        // bool RIGHT = msg->axes[6] == -1.0;
+        bool UP = msg->axes[7] == 1.0;
+        bool DOWN = msg->axes[7] == -1.0;
+
+        bool L1 = msg->buttons[4];
+        bool R1 = msg->buttons[5];
+
+        // float L2_DIGITAL = (-1 * msg->axes[2] + 1) / 2;
+        float R2_DIGITAL = (-1 * msg->axes[5] + 1) / 2;
+
+        // bool L2 = msg->buttons[6];
+        // bool R2 = msg->buttons[7];
+
+        // bool SHARE = msg->buttons[8];
+        // bool OPTION = msg->buttons[9];
+        // bool PS = msg->buttons[10];
+
+        // bool L3 = msg->buttons[11];
+        // bool R3 = msg->buttons[12];
+
+        static bool last_up = false;
+        static bool up_latch = false;
+        static bool last_down = false;
+        static bool down_latch = false;
+
+        if (UP && !last_up) {
+            up_latch = !up_latch;
+            target_x_ = 30.0;
+            target_y_ = 30.0;
+        }
+
+        if (DOWN && !last_down) {
+            down_latch = !down_latch;
+            target_x_ = 0.0;
+            target_y_ = 0.0;
+        }
+        last_up = UP;
+        last_down = DOWN;
+
+        // 以降、配列data_を操作する
+        float rad = atan2(LS_Y, LS_X);
     }
 
     void publish_timer() {
