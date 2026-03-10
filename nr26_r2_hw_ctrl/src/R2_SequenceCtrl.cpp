@@ -396,7 +396,7 @@ private:
     float v1, v2, v3, v4; // 各メカナムホイールの速度指令値
                           // v1:第一象限, v2:第二象限, v3:第三象限, v4:第四象限
 
-    // ===== オドメトリ状態 =====
+    // オドメトリ状態
     float X = 0, Y = 0, yaw_ = 0;
     int16_t vel_prev_[4]{0};
     bool vel_init_ = false;
@@ -407,7 +407,6 @@ private:
             return;
         }
 
-        // ===== スティック =====
         float LS_X = -msg->axes[0]; // 左右
         float LS_Y = msg->axes[1];  // 前後
         float RS_X = -msg->axes[3]; // 回転
@@ -420,7 +419,6 @@ private:
         bool L1 = msg->buttons[4];
         bool R1 = msg->buttons[5];
 
-        // ===== シーケンス =====
         static bool last_up = false;
         static bool last_down = false;
 
@@ -435,7 +433,6 @@ private:
         last_up = UP;
         last_down = DOWN;
 
-        // ===== デッドゾーン =====
         if (fabsf(LS_X) < deadzone)
             LS_X = 0;
         if (fabsf(LS_Y) < deadzone)
@@ -443,22 +440,21 @@ private:
         if (fabsf(RS_X) < deadzone)
             RS_X = 0;
 
-        // ===== 速度生成 =====
         float vx = -LS_Y * R2;    // 前後
         float vy = LS_X * R2;     // 左右
         float wz = RS_X * sp_yaw; // 回転
 
-        // ===== メカナム逆運動学 =====
+        // 逆運動学
         v1 = vx + vy + wz; // 前左
         v3 = vx - vy - wz; // 前右
         v4 = vx - vy + wz; // 後左
         v2 = vx + vy - wz; // 後右
 
-        // ===== モータ向き補正 =====
+        // 向き補正
         v3 *= -1;
         v2 *= -1;
 
-        // ===== その場回転 =====
+        // 回転
         if (R1) {
             v1 = sp_yaw;
             v2 = -sp_yaw;
@@ -473,7 +469,7 @@ private:
             v4 = -sp_yaw;
         }
 
-        // ===== 正規化 =====
+        // 正規化
         float max_v = std::max(
             std::max(fabsf(v1), fabsf(v2)),
             std::max(fabsf(v3), fabsf(v4)));
@@ -486,7 +482,7 @@ private:
         v3 /= max_v;
         v4 /= max_v;
 
-        // ===== 出力 =====
+        // 出力
         pkt.setMD(MD5, static_cast<int16_t>(v1 * duty_max));
         pkt.setMD(MD6, static_cast<int16_t>(v2 * duty_max));
         pkt.setMD(MD7, static_cast<int16_t>(v3 * duty_max));
