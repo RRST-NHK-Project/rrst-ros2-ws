@@ -127,7 +127,7 @@ private:
 
         // ===== ワールド座標変換 =====
         double dx = dx_r * cos(yaw_) - dy_r * sin(yaw_);
-        double dy = dx_r * sin(yaw_) + dy_r * cos(yaw_);
+        double dy = -(dx_r * sin(yaw_) + dy_r * cos(yaw_));
 
         // ===== 更新 =====
         X += dx;
