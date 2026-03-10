@@ -399,43 +399,6 @@ private:
     float v1, v2, v3, v4; // 各メカナムホイールの速度指令値
                           // v1:第一象限, v2:第二象限, v3:第三象限, v4:第四象限
 
-    //===========================
-    // ODOM CONSTANT
-    //===========================
-
-    static constexpr double ODOM_WHEEL_DIAMETER = 0.05;
-    static constexpr double ODOM_WHEEL_RADIUS = ODOM_WHEEL_DIAMETER / 2.0;
-    static constexpr double ODOM_WHEEL_CIRC = M_PI * ODOM_WHEEL_DIAMETER;
-
-    static constexpr double ENCODER_RESOLUTION = 1024.0;
-
-    static constexpr double ENC_TO_M =
-        ODOM_WHEEL_CIRC / ENCODER_RESOLUTION;
-
-    static constexpr double ODOM_LR_DISTANCE = 0.385;
-    static constexpr double ODOM_F_OFFSET = 0.335;
-
-    static constexpr double ODOM_X_SCALE = 1.0;
-    static constexpr double ODOM_Y_SCALE = 1.0;
-    static constexpr double ODOM_YAW_SCALE = 1.0;
-
-    //===========================
-    // ODOM STATE
-    //===========================
-
-    // エンコーダ前回値
-    int16_t prev_f_ = 0;
-    int16_t prev_l_ = 0;
-    int16_t prev_r_ = 0;
-
-    // 初期化フラグ
-    bool enc_init_ = false;
-
-    // 自己位置
-    double X = 0.0;
-    double Y = 0.0;
-    double yaw_ = 0.0;
-
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
         if (seq_->is_busy()) {
             return;
@@ -552,64 +515,6 @@ private:
                         device_id_, msg->data.size());
             return;
         }
-
-        // ===== エンコーダ取得 (F L R) =====
-        int16_t enc_f = msg->data[1];
-        int16_t enc_l = msg->data[2];
-        int16_t enc_r = msg->data[3];
-
-        // 初期化
-        if (!enc_init_) {
-            prev_f_ = enc_f;
-            prev_l_ = enc_l;
-            prev_r_ = enc_r;
-            enc_init_ = true;
-            return;
-        }
-
-        // ===== 差分 (int16 wrap対応) =====
-        int16_t df = enc_f - prev_f_;
-        int16_t dl = enc_l - prev_l_;
-        int16_t dr = enc_r - prev_r_;
-
-        prev_f_ = enc_f;
-        prev_l_ = enc_l;
-        prev_r_ = enc_r;
-
-        // ===== パルス → 距離 =====
-        double dF = df * ENC_TO_M;
-        double dL = -dl * ENC_TO_M;
-        double dR = dr * ENC_TO_M;
-
-        // ===== 3輪オドメトリ =====
-
-        // 回転
-        double dtheta = (dR - dL) / ODOM_LR_DISTANCE;
-
-        // ロボット座標系移動
-        double dx_r = (dL + dR) * 0.5;
-        double dy_r = dF - ODOM_F_OFFSET * dtheta;
-
-        // キャリブレーション
-        dx_r *= ODOM_X_SCALE;
-        dy_r *= ODOM_Y_SCALE;
-        dtheta *= ODOM_YAW_SCALE;
-
-        // ===== ワールド座標変換 =====
-        double dx = dx_r * cos(yaw_) - dy_r * sin(yaw_);
-        double dy = dx_r * sin(yaw_) + dy_r * cos(yaw_);
-
-        // ===== 更新 =====
-        X += dx;
-        Y += dy;
-        yaw_ += dtheta;
-
-        // yaw 正規化
-        yaw_ = atan2(sin(yaw_), cos(yaw_));
-
-        RCLCPP_INFO(get_logger(),
-                    "X: %.3f  Y: %.3f  Yaw: %.2f deg",
-                    X, Y, yaw_ * 180.0 / M_PI);
     }
 
     uint8_t device_id_;
