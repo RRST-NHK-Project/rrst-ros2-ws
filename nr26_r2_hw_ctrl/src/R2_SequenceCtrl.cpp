@@ -16,7 +16,7 @@ L1、R1で回転しようとすると前進、後進してしまう
 #include <iostream>
 #include <thread>
 
-// ROS
+// ROS　
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
@@ -31,7 +31,7 @@ PacketController pkt;
 #define TX16NUM 24         // 送信データ数
 #define RX16NUM 17         // 受信データ数
 
-#define PUBLISH_RATE_MS 20 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
+#define PUBLISH_RATE_MS 50 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
 
 using namespace std::chrono_literals;
 
@@ -396,18 +396,45 @@ private:
     float sp_yaw = 0.5;
     float deadzone = 0.3; // adjust DS4 deadzone
 
-    static constexpr double WHEEL_RADIUS = 0.05; // [m]
-    static constexpr double TREAD_X = 0.30;      // 前後半分 [m]
-    static constexpr double TREAD_Y = 0.30;      // 左右半分 [m]
-
     float v1, v2, v3, v4; // 各メカナムホイールの速度指令値
                           // v1:第一象限, v2:第二象限, v3:第三象限, v4:第四象限
 
-    // オドメトリ状態
-    float X = 0, Y = 0, yaw_ = 0;
-    int16_t vel_prev_[4]{0};
-    bool vel_init_ = false;
-    rclcpp::Time last_time_;
+    //===========================
+    // ODOM CONSTANT
+    //===========================
+
+    static constexpr double ODOM_WHEEL_DIAMETER = 0.05;
+    static constexpr double ODOM_WHEEL_RADIUS = ODOM_WHEEL_DIAMETER / 2.0;
+    static constexpr double ODOM_WHEEL_CIRC = M_PI * ODOM_WHEEL_DIAMETER;
+
+    static constexpr double ENCODER_RESOLUTION = 1024.0;
+
+    static constexpr double ENC_TO_M =
+        ODOM_WHEEL_CIRC / ENCODER_RESOLUTION;
+
+    static constexpr double ODOM_LR_DISTANCE = 0.385;
+    static constexpr double ODOM_F_OFFSET = 0.335;
+
+    static constexpr double ODOM_X_SCALE = 1.0;
+    static constexpr double ODOM_Y_SCALE = 1.0;
+    static constexpr double ODOM_YAW_SCALE = 1.0;
+
+    //===========================
+    // ODOM STATE
+    //===========================
+
+    // エンコーダ前回値
+    int16_t prev_f_ = 0;
+    int16_t prev_l_ = 0;
+    int16_t prev_r_ = 0;
+
+    // 初期化フラグ
+    bool enc_init_ = false;
+
+    // 自己位置
+    double X = 0.0;
+    double Y = 0.0;
+    double yaw_ = 0.0;
 
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
         if (seq_->is_busy()) {
@@ -503,7 +530,7 @@ private:
         msg.data = pkt.toVector();
 
         publisher_->publish(msg);
-        print_data();
+        // print_data();
     }
 
     void print_data() {
@@ -517,10 +544,8 @@ private:
         std::cout << "]" << std::endl;
     }
 
-    void
-    sensor_callback(
+    void sensor_callback(
         const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
-        // 最低限：サイズチェック
         if (msg->data.size() < RX16NUM) {
             RCLCPP_WARN(this->get_logger(),
                         "serial_rx_%d: data too short (%zu)",
@@ -528,67 +553,63 @@ private:
             return;
         }
 
-        //  int16_t ENC1 = msg->data[1];
-        //  int16_t ENC2 = msg->data[2];
-        //  int16_t ENC3 = msg->data[3];
-        //  int16_t ENC4 = msg->data[4];
-        //  int16_t ENC5 = msg->data[5];
-        //  int16_t ENC6 = msg->data[6];
-        //  int16_t ENC7 = msg->data[7];
-        //  int16_t ENC8 = msg->data[8];
+        // ===== エンコーダ取得 (F L R) =====
+        int16_t enc_f = msg->data[1];
+        int16_t enc_l = msg->data[2];
+        int16_t enc_r = msg->data[3];
 
-        // int16_t SW1 = msg->data[9];
-        // int16_t SW2 = msg->data[10];
-        // int16_t SW3 = msg->data[11];
-        // int16_t SW4 = msg->data[12];
-        // int16_t SW5 = msg->data[13];
-        // int16_t SW6 = msg->data[14];
-        // int16_t SW7 = msg->data[15];
-        // int16_t SW8 = msg->data[16];
-
-        // int16_t angle1 = msg->data[7];
-        // int16_t angle2 = msg->data[8];
-        // int16_t angle3 = msg->data[9];
-        // int16_t angle4 = msg->data[10];
-
-        int16_t vel[4];
-        vel[0] = msg->data[11];
-        vel[1] = msg->data[12];
-        vel[2] = msg->data[13];
-        vel[3] = msg->data[14];
-
-        // 以降、受信データを使った処理を記述
-        if (!vel_init_) {
-
-            last_time_ = now();
-            vel_init_ = true;
+        // 初期化
+        if (!enc_init_) {
+            prev_f_ = enc_f;
+            prev_l_ = enc_l;
+            prev_r_ = enc_r;
+            enc_init_ = true;
             return;
         }
-        double dt = (now() - last_time_).seconds();
-        last_time_ = now();
-        if (dt <= 0)
-            return;
 
-        float w[4];
-        for (int i = 0; i < 4; i++) {
-            float omega = vel[i] * 2.0f * M_PI / 60.0f; // [rad/s]
-            w[i] = omega * WHEEL_RADIUS;
-        }
+        // ===== 差分 (int16 wrap対応) =====
+        int16_t df = enc_f - prev_f_;
+        int16_t dl = enc_l - prev_l_;
+        int16_t dr = enc_r - prev_r_;
 
-        float vy = (w[0] - w[1] - w[2] + w[3]) / 4.0f;
-        float vx = (-w[0] + w[1] - w[2] + w[3]) / 4.0f;
-        float wz = (-w[0] + w[1] + w[2] - w[3]) / (4.0f * (TREAD_X + TREAD_Y));
+        prev_f_ = enc_f;
+        prev_l_ = enc_l;
+        prev_r_ = enc_r;
 
-        X += (vx * cos(yaw_) - vy * sin(yaw_)) * dt;
-        Y += (vx * sin(yaw_) + vy * cos(yaw_)) * dt;
-        yaw_ += wz * dt;
+        // ===== パルス → 距離 =====
+        double dF = df * ENC_TO_M;
+        double dL = -dl * ENC_TO_M;
+        double dR = dr * ENC_TO_M;
+
+        // ===== 3輪オドメトリ =====
+
+        // 回転
+        double dtheta = (dR - dL) / ODOM_LR_DISTANCE;
+
+        // ロボット座標系移動
+        double dx_r = (dL + dR) * 0.5;
+        double dy_r = dF - ODOM_F_OFFSET * dtheta;
+
+        // キャリブレーション
+        dx_r *= ODOM_X_SCALE;
+        dy_r *= ODOM_Y_SCALE;
+        dtheta *= ODOM_YAW_SCALE;
+
+        // ===== ワールド座標変換 =====
+        double dx = dx_r * cos(yaw_) - dy_r * sin(yaw_);
+        double dy = dx_r * sin(yaw_) + dy_r * cos(yaw_);
+
+        // ===== 更新 =====
+        X += dx;
+        Y += dy;
+        yaw_ += dtheta;
+
+        // yaw 正規化
         yaw_ = atan2(sin(yaw_), cos(yaw_));
 
         RCLCPP_INFO(get_logger(),
-                    "X: %.2f m, Y: %.2f m, Yaw: %.2f deg",
+                    "X: %.3f  Y: %.3f  Yaw: %.2f deg",
                     X, Y, yaw_ * 180.0 / M_PI);
-
-        // 受信データ処理ここまで
     }
 
     uint8_t device_id_;
