@@ -240,10 +240,10 @@ private:
             data_[10] = BAR_RELE_ANGLE;
         }
         if (CROSS_PUSH_COUNT == 7) {
-            data_[9] = MAG_SERVO_ANGLE[5];
+            data_[9] = MAG_SERVO_ANGLE[8];
         }
         if (CROSS_PUSH_COUNT == 8) {
-            data_[9] = MAG_SERVO_ANGLE[6];
+            data_[9] = MAG_SERVO_ANGLE[5];
             data_[10] = BAR_HOLD_ANGLE;
         }
         if (CROSS_PUSH_COUNT == 9) {
@@ -253,10 +253,10 @@ private:
             data_[10] = BAR_RELE_ANGLE;
         }
         if (CROSS_PUSH_COUNT == 11) {
-            data_[9] = MAG_SERVO_ANGLE[7];
+            data_[9] = MAG_SERVO_ANGLE[9];
         }
         if (CROSS_PUSH_COUNT == 12) {
-            data_[9] = MAG_SERVO_ANGLE[8];
+            data_[9] = MAG_SERVO_ANGLE[6];
             data_[10] = BAR_HOLD_ANGLE;
         }
         if (CROSS_PUSH_COUNT == 13) {
@@ -266,10 +266,10 @@ private:
             data_[10] = BAR_RELE_ANGLE;
         }
         if (CROSS_PUSH_COUNT == 15) {
-            data_[9] = MAG_SERVO_ANGLE[9];
+            data_[9] = MAG_SERVO_ANGLE[10];
         }
         if (CROSS_PUSH_COUNT == 16) {
-            data_[9] = MAG_SERVO_ANGLE[10];
+            data_[9] = MAG_SERVO_ANGLE[7];
             data_[10] = BAR_HOLD_ANGLE;
         }
         if (CROSS_PUSH_COUNT == 17) {
