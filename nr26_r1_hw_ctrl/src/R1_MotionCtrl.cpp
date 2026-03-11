@@ -205,49 +205,49 @@ private:
 
         static int MAG_SERVO_ANGLE[] = {270, 228, 186, 146, 100, 58, 13, 141, 95, 50, 53, 5, 8};
         static int cross_pre = 0;
-        static int s = 0;
+        static int CROSS_PUSH_COUNT = 0;
         static int CROSS_PUSH_MAX = 13;
 
         if (CROSS == 1 && cross_pre == 0) {
-            s = (s + 1) % CROSS_PUSH_MAX;
+            CROSS_PUSH_COUNT = (CROSS_PUSH_COUNT + 1) % CROSS_PUSH_MAX;
         }
-        if (s == 0) {
+        if (CROSS_PUSH_COUNT == 0) {
             data_[9] = MAG_SERVO_ANGLE[0];
         }
-        if (s == 1) {
+        if (CROSS_PUSH_COUNT == 1) {
             data_[9] = MAG_SERVO_ANGLE[1];
         }
-        if (s == 2) {
+        if (CROSS_PUSH_COUNT == 2) {
             data_[9] = MAG_SERVO_ANGLE[2];
         }
-        if (s == 3) {
+        if (CROSS_PUSH_COUNT == 3) {
             data_[9] = MAG_SERVO_ANGLE[3];
         }
-        if (s == 4) {
+        if (CROSS_PUSH_COUNT == 4) {
             data_[9] = MAG_SERVO_ANGLE[4];
         }
-        if (s == 5) {
+        if (CROSS_PUSH_COUNT == 5) {
             data_[9] = MAG_SERVO_ANGLE[5];
         }
-        if (s == 6) {
+        if (CROSS_PUSH_COUNT == 6) {
             data_[9] = MAG_SERVO_ANGLE[6];
         }
-        if (s == 7) {
+        if (CROSS_PUSH_COUNT == 7) {
             data_[9] = MAG_SERVO_ANGLE[7];
         }
-        if (s == 8) {
+        if (CROSS_PUSH_COUNT == 8) {
             data_[9] = MAG_SERVO_ANGLE[8];
         }
-        if (s == 9) {
+        if (CROSS_PUSH_COUNT == 9) {
             data_[9] = MAG_SERVO_ANGLE[9];
         }
-        if (s == 10) {
+        if (CROSS_PUSH_COUNT == 10) {
             data_[9] = MAG_SERVO_ANGLE[10];
         }
-        if (s == 11) {
+        if (CROSS_PUSH_COUNT == 11) {
             data_[9] = MAG_SERVO_ANGLE[11];
         }
-        if (s == 12) {
+        if (CROSS_PUSH_COUNT == 12) {
             data_[9] = MAG_SERVO_ANGLE[12];
         }
         cross_pre = CROSS;
@@ -263,19 +263,19 @@ private:
         static int BAR_HOLD_ANGLE = 43;
         static int BAR_RELE_ANGLE = 245;
         static int circle_pre = 0;
-        static int t = 0;
+        static int CIRCLE_PUSH_COUNT = 0;
         static int CIRCLE_PUSH_MAX = 3;
 
         if (CIRCLE == 1 && circle_pre == 0) {
-            t = (t + 1) % CIRCLE_PUSH_MAX;
+            CIRCLE_PUSH_COUNT = (CIRCLE_PUSH_COUNT + 1) % CIRCLE_PUSH_MAX;
         }
-        if (t == 0) {
+        if (CIRCLE_PUSH_COUNT == 0) {
             data_[10] = BAR_RELE_ANGLE;
         }
-        if (t == 1) {
+        if (CIRCLE_PUSH_COUNT == 1) {
             data_[10] = BAR_HOLD_ANGLE;
         }
-        if (t == 2) {
+        if (CIRCLE_PUSH_COUNT == 2) {
             data_[10] = BAR_PUSH_ANGLE;
         }
 
