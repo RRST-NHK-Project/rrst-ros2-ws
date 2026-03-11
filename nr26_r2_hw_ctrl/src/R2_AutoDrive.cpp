@@ -1,261 +1,221 @@
-#include <algorithm>
+/*
+R2 PID メカナム制御ノード
+Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
+*/
+
+// 標準
 #include <chrono>
 #include <cmath>
-#include <vector>
+#include <iostream>
 
+// ROS
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
+#include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int16_multi_array.hpp"
 
-using namespace std::chrono_literals;
+// 自作
+#include "PacketController.hpp"
+PacketController pkt;
 
-// ===== 設定 =====
 #define TARGET_DEVICE_ID 6
-#define TX16NUM 24
-#define RX16NUM 17
-#define PUBLISH_RATE_MS 20
+#define PUBLISH_RATE_MS 50
 
-constexpr float duty_max = 100.0f;
-
-// オドメトリ用（XYのみ）
-constexpr float WHEEL_RADIUS = 0.05f;
-
-// 自動制御ゲイン
-constexpr float KP_POS = 2.0f;
-constexpr float GOAL_TOL = 0.03f; // [m]
-
-// ==========================
-
-class HardWareControl : public rclcpp::Node {
+class PIDMecanumController : public rclcpp::Node {
 public:
-    HardWareControl()
-        : Node("mecanum_auto_manual") {
+    PIDMecanumController()
+        : Node("pid_mecanum_controller") {
 
-        data_.assign(TX16NUM, 0);
+        // オドメトリ subscriber (X,Y,Yaw)
+        odom_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+            "odom", 10,
+            std::bind(&PIDMecanumController::odom_callback, this, std::placeholders::_1));
 
-        joy_sub_ = create_subscription<sensor_msgs::msg::Joy>(
-            "joy", 10,
-            std::bind(&HardWareControl::joy_callback, this, std::placeholders::_1));
-
-        rx_sub_ = create_subscription<std_msgs::msg::Int16MultiArray>(
-            "serial_rx_" + std::to_string(TARGET_DEVICE_ID),
-            10,
-            std::bind(&HardWareControl::rx_callback, this, std::placeholders::_1));
-
-        tx_pub_ = create_publisher<std_msgs::msg::Int16MultiArray>(
+        // マイコン送信
+        publisher_ = this->create_publisher<std_msgs::msg::Int16MultiArray>(
             "serial_tx_" + std::to_string(TARGET_DEVICE_ID), 10);
 
-        timer_ = create_wall_timer(
-            std::chrono::milliseconds(PUBLISH_RATE_MS),
-            std::bind(&HardWareControl::publish, this));
+        // joyノードのSubscribe
+        joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
+            "joy", 10,
+            std::bind(&PIDMecanumController::ps4_listener_callback, this, std::placeholders::_1));
 
-        RCLCPP_INFO(get_logger(), "AUTO / MANUAL mecanum node (NO YAW)");
+        // タイマー
+        timer_ = this->create_wall_timer(
+            std::chrono::milliseconds(PUBLISH_RATE_MS),
+            std::bind(&PIDMecanumController::publish_timer, this));
+
+        // PIDパラメータ
+        Kp_x_ = 1.0;
+        Ki_x_ = 0.0;
+        Kd_x_ = 0.0;
+        Kp_y_ = 1.0;
+        Ki_y_ = 0.0;
+        Kd_y_ = 0.0;
+
+        // 固定目標座標
+        target_x_ = 0.3;
+        target_y_ = 0.3;
+
+        prev_time_ = this->now();
     }
 
 private:
-    // ===== 状態 =====
-    float X = 0.0f;
-    float Y = 0.0f;
+    // ROS
+    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr odom_sub_;
+    rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
+    rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
+    rclcpp::TimerBase::SharedPtr timer_;
 
-    rclcpp::Time last_time;
-    bool odom_init = false;
+    // PID
+    double Kp_x_, Ki_x_, Kd_x_;
+    double Kp_y_, Ki_y_, Kd_y_;
+    double integral_x_ = 0.0;
+    double integral_y_ = 0.0;
+    double prev_error_x_ = 0.0;
+    double prev_error_y_ = 0.0;
+    rclcpp::Time prev_time_;
 
-    bool auto_mode = false;
-    bool last_option = false;
+    // odom
+    double X_ = 0.0, Y_ = 0.0, yaw_ = 0.0;
 
-    // 目標座標（ここを変える）
-    float target_x = 1.0f;
-    float target_y = 1.0f;
+    // 目標座標
+    double target_x_, target_y_;
 
-    // ===== Joy =====
-    void joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
+    // メカナムホイール速度
+    float duty_max = 100;
+    float v1, v2, v3, v4;
 
-        // bool CROSS = msg->buttons[0];
-        bool CIRCLE = msg->buttons[1];
-        // bool TRIANGLE = msg->buttons[2];
-        // bool SQUARE = msg->buttons[3];
-        bool OPTION = msg->buttons[9];
-
-        // AUTO / MANUAL 切替
-        if (OPTION && !last_option) {
-            auto_mode = !auto_mode;
-            RCLCPP_WARN(
-                get_logger(),
-                "MODE: %s",
-                auto_mode ? "AUTO" : "MANUAL");
-        }
-        last_option = OPTION;
-
-        // =================================================================
-        // CIRCLE:「棒ホールド機構」
-        // ボタンを一回押すごとに2つのサーボモーターの角度状態を同時に変化させる
-        // =================================================================
-        // angle = 10のとき最下部までお仕込み
-        // angle = 245のときマガジンに戻してる
-
-        static int circle_pre = 0;
-        static int t = 0;
-        static int CIRCLE_PUSH_MAX = 4;
-
-        if (CIRCLE == 1 && circle_pre == 0) {
-            t = (t + 1) % CIRCLE_PUSH_MAX;
-        }
-        if (t == 0) {
-            target_x = 1.0f;
-            target_y = 0.0f;
-        }
-        if (t == 1) {
-            target_x = 1.0f;
-            target_y = 1.0f;
-        }
-        if (t == 2) {
-            target_x = 0.0f;
-            target_y = 1.0f;
-        }
-
-        if (t == 3) {
-            target_x = 0.0f;
-            target_y = 0.0f;
-        }
-
-        circle_pre = CIRCLE;
-
-        if (!auto_mode) {
-            manual_control(msg);
-        }
-    }
-
-    void manual_control(const sensor_msgs::msg::Joy::SharedPtr msg) {
-
-        float lx = -msg->axes[0];
-        float ly = msg->axes[1];
-        float r2 = (-msg->axes[5] + 1.0f) * 0.5f;
-
-        if (r2 < 0.1f) {
-            set_wheel(0, 0, 0, 0);
+    void odom_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
+        if (msg->data.size() < 3)
             return;
-        }
 
-        float rad = std::atan2(ly, lx);
-        float vx = std::cos(rad) * r2;
-        float vy = std::sin(rad) * r2;
+        X_ = msg->data[0];
+        Y_ = msg->data[1];
+        yaw_ = msg->data[2];
 
-        drive_mecanum(vx, vy);
-    }
+        // 誤差計算（オドメトリに合わせて前進F→Y、左右L/R→X）
+        double error_x = target_x_ - X_;    // 左右方向
+        double error_y = -(target_y_ - Y_); // 前進方向
 
-    // ===== AUTO制御（XYのみ）=====
-    void auto_control() {
+        // PID制御
+        rclcpp::Time now = this->now();
+        double dt = (now - prev_time_).seconds();
+        prev_time_ = now;
 
-        float ex = target_x - X;
-        float ey = target_y - Y;
+        integral_x_ += error_x * dt;
+        integral_y_ += error_y * dt;
 
-        float dist = std::hypot(ex, ey);
-        if (dist < GOAL_TOL) {
-            set_wheel(0, 0, 0, 0);
-            return;
-        }
+        double derivative_x = (error_x - prev_error_x_) / dt;
+        double derivative_y = (error_y - prev_error_y_) / dt;
 
-        float vx = std::clamp(ex * KP_POS, -1.0f, 1.0f);
-        float vy = std::clamp(ey * KP_POS, -1.0f, 1.0f);
+        prev_error_x_ = error_x;
+        prev_error_y_ = error_y;
 
-        drive_mecanum(vx, vy);
+        double vx = Kp_x_ * error_x + Ki_x_ * integral_x_ + Kd_x_ * derivative_x; // 横方向
+        double vy = Kp_y_ * error_y + Ki_y_ * integral_y_ + Kd_y_ * derivative_y; // 前後方向
+        double wz = 0.0;                                                          // yaw固定
 
-        RCLCPP_INFO(
-            get_logger(),
-            "[AUTO] X=%.2f Y=%.2f",
-            X, Y);
-    }
+        // 逆運動学（前進Y+, 右X+）
+        v1 = vy + vx + wz; // 前左
+        v3 = vy - vx - wz; // 前右
+        v4 = vy - vx + wz; // 後左
+        v2 = vy + vx - wz; // 後右
 
-    // ===== メカナム逆運動学（回転なし）=====
-    void drive_mecanum(float vx, float vy) {
+        // 向き補正
+        v3 *= -1; // 前右
+        v2 *= -1; // 後右
+        // v1 *= -1;
+        // v4 *= -1;
 
-        float v1 = vy - vx;  // 後左
-        float v2 = -vy + vx; // 前右
-        float v3 = -vy - vx; // 後右
-        float v4 = vy + vx;  // 前左
-
-        float max_v = std::max({fabsf(v1),
-                                fabsf(v2),
-                                fabsf(v3),
-                                fabsf(v4),
-                                1.0f});
+        // 正規化
+        float max_v = std::max({fabsf(v1), fabsf(v2), fabsf(v3), fabsf(v4)});
+        if (max_v < 1.0f)
+            max_v = 1.0f;
 
         v1 /= max_v;
         v2 /= max_v;
         v3 /= max_v;
         v4 /= max_v;
 
-        set_wheel(v1, v2, v3, v4);
+        RCLCPP_INFO(this->get_logger(),
+                    "X: %.3f Y: %.3f yaw: %.3f | v1: %.2f v2: %.2f v3: %.2f v4: %.2f",
+                    X_, Y_, yaw_, v1, v2, v3, v4);
     }
 
-    void set_wheel(float v1, float v2, float v3, float v4) {
-        data_[5] = static_cast<int16_t>(v1 * duty_max);
-        data_[6] = static_cast<int16_t>(v2 * duty_max);
-        data_[7] = static_cast<int16_t>(v3 * duty_max);
-        data_[8] = static_cast<int16_t>(v4 * duty_max);
-    }
+    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
 
-    // ===== オドメトリ（XYのみ）=====
-    void rx_callback(const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
+        // コントローラーの入力を取得、使わない入力はコメントアウト推奨
+        float LS_X = -1 * msg->axes[0];
+        float LS_Y = msg->axes[1];
+        float RS_X = -1 * msg->axes[3];
+        float RS_Y = msg->axes[4];
 
-        if (msg->data.size() < RX16NUM)
-            return;
+        bool CROSS = msg->buttons[0];
+        // bool CIRCLE = msg->buttons[1];
+        bool TRIANGLE = msg->buttons[2];
+        // bool SQUARE = msg->buttons[3];
 
-        int16_t vel[4] = {
-            msg->data[11],
-            msg->data[12],
-            msg->data[13],
-            msg->data[14]};
+        // bool LEFT = msg->axes[6] == 1.0;
+        // bool RIGHT = msg->axes[6] == -1.0;
+        bool UP = msg->axes[7] == 1.0;
+        bool DOWN = msg->axes[7] == -1.0;
 
-        auto current_time = this->now();
+        bool L1 = msg->buttons[4];
+        bool R1 = msg->buttons[5];
 
-        if (!odom_init) {
-            last_time = current_time;
-            odom_init = true;
-            return;
+        // float L2_DIGITAL = (-1 * msg->axes[2] + 1) / 2;
+        float R2_DIGITAL = (-1 * msg->axes[5] + 1) / 2;
+
+        // bool L2 = msg->buttons[6];
+        // bool R2 = msg->buttons[7];
+
+        // bool SHARE = msg->buttons[8];
+        // bool OPTION = msg->buttons[9];
+        // bool PS = msg->buttons[10];
+
+        // bool L3 = msg->buttons[11];
+        // bool R3 = msg->buttons[12];
+
+        static bool last_up = false;
+        static bool up_latch = false;
+        static bool last_down = false;
+        static bool down_latch = false;
+
+        if (UP && !last_up) {
+            up_latch = !up_latch;
+            target_x_ = 30.0;
+            target_y_ = 30.0;
         }
 
-        float dt = (current_time - last_time).seconds();
-        last_time = current_time;
-        if (dt <= 0.0f)
-            return;
-
-        float w[4];
-        for (int i = 0; i < 4; i++) {
-            w[i] = vel[i] * 2.0f * M_PI / 60.0f * WHEEL_RADIUS;
+        if (DOWN && !last_down) {
+            down_latch = !down_latch;
+            target_x_ = 0.0;
+            target_y_ = 0.0;
         }
+        last_up = UP;
+        last_down = DOWN;
 
-        float vy = (w[0] - w[1] - w[2] + w[3]) / 4.0f;
-        float vx = (-w[0] + w[1] - w[2] + w[3]) / 4.0f;
-
-        X += vx * dt;
-        Y += vy * dt;
+        // 以降、配列data_を操作する
+        float rad = atan2(LS_Y, LS_X);
     }
 
-    // ===== publish =====
-    void publish() {
-
-        if (auto_mode)
-            auto_control();
+    void publish_timer() {
+        pkt.setMD(MD5, static_cast<int16_t>(v1 * duty_max));
+        pkt.setMD(MD6, static_cast<int16_t>(v2 * duty_max));
+        pkt.setMD(MD7, static_cast<int16_t>(v3 * duty_max));
+        pkt.setMD(MD8, static_cast<int16_t>(v4 * duty_max));
 
         std_msgs::msg::Int16MultiArray msg;
-        msg.data = data_;
-        tx_pub_->publish(msg);
+        msg.data = pkt.toVector();
+        publisher_->publish(msg);
     }
-
-    // ===== ROS =====
-    rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
-    rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr rx_sub_;
-    rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr tx_pub_;
-    rclcpp::TimerBase::SharedPtr timer_;
-
-    std::vector<int16_t> data_;
 };
 
-// ===== main =====
 int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<HardWareControl>());
+    auto node = std::make_shared<PIDMecanumController>();
+    rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;
 }

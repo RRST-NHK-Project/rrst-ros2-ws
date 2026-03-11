@@ -3,13 +3,20 @@ R2段差超えシーケンス（状態管理）
 Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 */
 
+/*
+R2について以下の不具合を確認しています。
+L1、R1で回転しようとすると前進、後進してしまう
+マイコンのモードによりロボマスとエンコーダの取得のみしかできずソレノイドの駆動ができない（新規モードの作成が必要）
+シーケンス内の前進において前進せずその場で回転してしまう
+*/
+
 // 標準
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
 #include <thread>
 
-// ROS
+// ROS　
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
@@ -24,7 +31,7 @@ PacketController pkt;
 #define TX16NUM 24         // 送信データ数
 #define RX16NUM 17         // 受信データ数
 
-#define PUBLISH_RATE_MS 20 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
+#define PUBLISH_RATE_MS 50 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
 
 using namespace std::chrono_literals;
 
@@ -389,154 +396,90 @@ private:
     float sp_yaw = 0.5;
     float deadzone = 0.3; // adjust DS4 deadzone
 
-    static constexpr double WHEEL_RADIUS = 0.05; // [m]
-    static constexpr double TREAD_X = 0.30;      // 前後半分 [m]
-    static constexpr double TREAD_Y = 0.30;      // 左右半分 [m]
-
     float v1, v2, v3, v4; // 各メカナムホイールの速度指令値
                           // v1:第一象限, v2:第二象限, v3:第三象限, v4:第四象限
 
-    // ===== オドメトリ状態 =====
-    float X = 0, Y = 0, yaw_ = 0;
-    int16_t vel_prev_[4]{0};
-    bool vel_init_ = false;
-    rclcpp::Time last_time_;
-
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
-
         if (seq_->is_busy()) {
-            return; // シーケンス実行中はコントローラーを無効化
+            return;
         }
 
-        // コントローラーの入力を取得、使わない入力はコメントアウト推奨
-        float LS_X = -1 * msg->axes[0];
-        float LS_Y = msg->axes[1];
-        float RS_X = -1 * msg->axes[3];
-        float RS_Y = msg->axes[4];
+        float LS_X = -msg->axes[0]; // 左右
+        float LS_Y = msg->axes[1];  // 前後
+        float RS_X = -msg->axes[3]; // 回転
 
-        bool CROSS = msg->buttons[0];
-        // bool CIRCLE = msg->buttons[1];
-        bool TRIANGLE = msg->buttons[2];
-        // bool SQUARE = msg->buttons[3];
+        float R2 = (-msg->axes[5] + 1) / 2;
 
-        // bool LEFT = msg->axes[6] == 1.0;
-        // bool RIGHT = msg->axes[6] == -1.0;
         bool UP = msg->axes[7] == 1.0;
         bool DOWN = msg->axes[7] == -1.0;
 
         bool L1 = msg->buttons[4];
         bool R1 = msg->buttons[5];
 
-        // float L2_DIGITAL = (-1 * msg->axes[2] + 1) / 2;
-        float R2_DIGITAL = (-1 * msg->axes[5] + 1) / 2;
-
-        // bool L2 = msg->buttons[6];
-        // bool R2 = msg->buttons[7];
-
-        // bool SHARE = msg->buttons[8];
-        // bool OPTION = msg->buttons[9];
-        // bool PS = msg->buttons[10];
-
-        // bool L3 = msg->buttons[11];
-        // bool R3 = msg->buttons[12];
-
         static bool last_up = false;
-        static bool up_latch = false;
         static bool last_down = false;
-        static bool down_latch = false;
 
         if (UP && !last_up) {
-            up_latch = !up_latch;
             seq_->start_step_up();
         }
 
         if (DOWN && !last_down) {
-            down_latch = !down_latch;
             seq_->start_step_down();
         }
+
         last_up = UP;
         last_down = DOWN;
 
-        // 以降、配列data_を操作する
-        float rad = atan2(LS_Y, LS_X);
+        if (fabsf(LS_X) < deadzone)
+            LS_X = 0;
+        if (fabsf(LS_Y) < deadzone)
+            LS_Y = 0;
+        if (fabsf(RS_X) < deadzone)
+            RS_X = 0;
 
-        if (R2_DIGITAL >= 0.3) {
+        float vx = -LS_Y * R2;    // 前後
+        float vy = LS_X * R2;     // 左右
+        float wz = RS_X * sp_yaw; // 回転
 
-            float vx = cos(rad) * R2_DIGITAL;
-            float vy = sin(rad) * R2_DIGITAL;
+        // 逆運動学
+        v1 = vx + vy + wz; // 前左
+        v3 = vx - vy - wz; // 前右
+        v4 = vx - vy + wz; // 後左
+        v2 = vx + vy - wz; // 後右
 
-            // canのIDごとなのでつけ直して動かすとき注意!!!!!
-            v2 = -vy + vx; // 前右
-            v4 = vy + vx;  // 前左
-            v1 = vy - vx;  // 後左
-            v3 = -vy - vx; // 後右
+        // 向き補正
+        v3 *= -1;
+        v2 *= -1;
 
-            // float vx = cos(rad) * R2_DIGITAL;
-            // float vy = sin(rad) * R2_DIGITAL;
-            // float wz = RS_X * sp_yaw;
-
-            // v1 = vy - vx - wz;
-            // v2 = -vy + vx - wz;
-            // v3 = -vy - vx + wz;
-            // v4 = vy + vx + wz;
-
-        } else if (RS_X >= deadzone || R1 == 1) {
-            v2 = sp_yaw;
-            v4 = sp_yaw;
+        // 回転
+        if (R1) {
             v1 = sp_yaw;
-            v3 = sp_yaw;
-        } else if (RS_X <= -deadzone || L1 == 1) {
             v2 = -sp_yaw;
-            v4 = -sp_yaw;
-            v1 = -sp_yaw;
             v3 = -sp_yaw;
+            v4 = sp_yaw;
         }
 
-        else if (
-            (fabsf(LS_X) <= deadzone) && (fabsf(LS_Y) <= deadzone) && (fabsf(RS_X) <= deadzone) && (fabsf(RS_Y) <= deadzone) && (R1 == 0) && (L1 == 0)) {
-            v1 = 0.0;
-            v2 = 0.0;
-            v3 = 0.0;
-            v4 = 0.0;
+        if (L1) {
+            v1 = -sp_yaw;
+            v2 = sp_yaw;
+            v3 = sp_yaw;
+            v4 = -sp_yaw;
         }
 
-        // 正規化(これで全方向安定した速度出せる)
-        float max_v = std::max({fabsf(v1), fabsf(v2), fabsf(v3), fabsf(v4), 1.0f});
+        // 正規化
+        float max_v = std::max(
+            std::max(fabsf(v1), fabsf(v2)),
+            std::max(fabsf(v3), fabsf(v4)));
+
+        if (max_v < 1.0f)
+            max_v = 1.0f;
 
         v1 /= max_v;
         v2 /= max_v;
         v3 /= max_v;
         v4 /= max_v;
 
-        // if (up_latch == true) {
-        //     Action::for_up(data_);
-        // } else if (up_latch == false) {
-        //     Action::for_down(data_);
-        // }
-        // if (down_latch == true) {
-        //     Action::back_up(data_);
-        // } else if (down_latch == false) {
-        //     Action::back_down(data_);
-        // }
-
-        // if (CROSS) {
-        //     Action::all_down(data_);
-        //     up_latch = false;
-        //     down_latch = false;
-        // }
-
-        // if (TRIANGLE) {
-        //     Action::all_up(data_);
-        //     up_latch = true;
-        //     down_latch = true;
-        // }
-
-        // 2026/02/14, 7,8,9,10を5,6,7,8に変更
-        // data_[5] = static_cast<int16_t>(v1 * duty_max);
-        // data_[6] = static_cast<int16_t>(v2 * duty_max);
-        // data_[7] = static_cast<int16_t>(v3 * duty_max);
-        // data_[8] = static_cast<int16_t>(v4 * duty_max);
-
+        // 出力
         pkt.setMD(MD5, static_cast<int16_t>(v1 * duty_max));
         pkt.setMD(MD6, static_cast<int16_t>(v2 * duty_max));
         pkt.setMD(MD7, static_cast<int16_t>(v3 * duty_max));
@@ -550,7 +493,7 @@ private:
         msg.data = pkt.toVector();
 
         publisher_->publish(msg);
-        print_data();
+        // print_data();
     }
 
     void print_data() {
@@ -564,78 +507,14 @@ private:
         std::cout << "]" << std::endl;
     }
 
-    void
-    sensor_callback(
+    void sensor_callback(
         const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
-        // 最低限：サイズチェック
         if (msg->data.size() < RX16NUM) {
             RCLCPP_WARN(this->get_logger(),
                         "serial_rx_%d: data too short (%zu)",
                         device_id_, msg->data.size());
             return;
         }
-
-        //  int16_t ENC1 = msg->data[1];
-        //  int16_t ENC2 = msg->data[2];
-        //  int16_t ENC3 = msg->data[3];
-        //  int16_t ENC4 = msg->data[4];
-        //  int16_t ENC5 = msg->data[5];
-        //  int16_t ENC6 = msg->data[6];
-        //  int16_t ENC7 = msg->data[7];
-        //  int16_t ENC8 = msg->data[8];
-
-        // int16_t SW1 = msg->data[9];
-        // int16_t SW2 = msg->data[10];
-        // int16_t SW3 = msg->data[11];
-        // int16_t SW4 = msg->data[12];
-        // int16_t SW5 = msg->data[13];
-        // int16_t SW6 = msg->data[14];
-        // int16_t SW7 = msg->data[15];
-        // int16_t SW8 = msg->data[16];
-
-        // int16_t angle1 = msg->data[7];
-        // int16_t angle2 = msg->data[8];
-        // int16_t angle3 = msg->data[9];
-        // int16_t angle4 = msg->data[10];
-
-        int16_t vel[4];
-        vel[0] = msg->data[11];
-        vel[1] = msg->data[12];
-        vel[2] = msg->data[13];
-        vel[3] = msg->data[14];
-
-        // 以降、受信データを使った処理を記述
-        if (!vel_init_) {
-
-            last_time_ = now();
-            vel_init_ = true;
-            return;
-        }
-        double dt = (now() - last_time_).seconds();
-        last_time_ = now();
-        if (dt <= 0)
-            return;
-
-        float w[4];
-        for (int i = 0; i < 4; i++) {
-            float omega = vel[i] * 2.0f * M_PI / 60.0f; // [rad/s]
-            w[i] = omega * WHEEL_RADIUS;
-        }
-
-        float vy = (w[0] - w[1] - w[2] + w[3]) / 4.0f;
-        float vx = (-w[0] + w[1] - w[2] + w[3]) / 4.0f;
-        float wz = (-w[0] + w[1] + w[2] - w[3]) / (4.0f * (TREAD_X + TREAD_Y));
-
-        X += (vx * cos(yaw_) - vy * sin(yaw_)) * dt;
-        Y += (vx * sin(yaw_) + vy * cos(yaw_)) * dt;
-        yaw_ += wz * dt;
-        yaw_ = atan2(sin(yaw_), cos(yaw_));
-
-        RCLCPP_INFO(get_logger(),
-                    "X: %.2f m, Y: %.2f m, Yaw: %.2f deg",
-                    X, Y, yaw_ * 180.0 / M_PI);
-
-        // 受信データ処理ここまで
     }
 
     uint8_t device_id_;

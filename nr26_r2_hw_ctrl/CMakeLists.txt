@@ -75,6 +75,12 @@ ament_target_dependencies(optical_flow_odom  rclcpp nav_msgs cv_bridge)
 add_executable(r2_sc src/R2_SequenceCtrl.cpp)
 ament_target_dependencies(r2_sc rclcpp std_msgs sensor_msgs geometry_msgs)
 
+add_executable(r2_odom src/R2_Odom.cpp)
+ament_target_dependencies(r2_odom rclcpp std_msgs sensor_msgs geometry_msgs)
+
+add_executable(r2_pp src/R2_PurePursuit.cpp)
+ament_target_dependencies(r2_pp rclcpp std_msgs sensor_msgs geometry_msgs)
+
 # インストール設定
 install(TARGETS
   nr26_r2_move
@@ -86,6 +92,8 @@ install(TARGETS
   r2_hand_xy
   r2_sc
   optical_flow_odom
+  r2_odom
+  r2_pp
   DESTINATION lib/${PROJECT_NAME})
 
 install(
