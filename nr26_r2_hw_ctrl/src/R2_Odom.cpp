@@ -148,9 +148,9 @@ private:
                          vx, vy, wz};
         odom_pub_->publish(odom_msg);
 
-        RCLCPP_INFO(get_logger(),
-                    "X: %.3f  Y: %.3f  Yaw: %.2f deg",
-                    X, Y, yaw_ * 180.0 / M_PI);
+        // RCLCPP_INFO(get_logger(),
+        //             "X: %.3f  Y: %.3f  Yaw: %.2f deg",
+        //             X, Y, yaw_ * 180.0 / M_PI);
 
         // オドメトリ（完全な）
         // nav_msgs/Odometry publish
