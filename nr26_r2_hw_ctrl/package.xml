@@ -17,6 +17,8 @@
   <depend>sensor_msgs</depend>
   <depend>cv_bridge</depend>
   <depend>image_transport</depend>
+  <depend>geometry_msgs</depend>
+  <depend>tf2_ros</depend>
 
 
   <export>

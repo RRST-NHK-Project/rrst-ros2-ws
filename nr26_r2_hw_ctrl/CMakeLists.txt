@@ -39,6 +39,8 @@ find_package(visualization_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -76,7 +78,11 @@ add_executable(r2_sc src/R2_SequenceCtrl.cpp)
 ament_target_dependencies(r2_sc rclcpp std_msgs sensor_msgs geometry_msgs)
 
 add_executable(r2_odom src/R2_Odom.cpp)
-ament_target_dependencies(r2_odom rclcpp std_msgs sensor_msgs geometry_msgs)
+ament_target_dependencies(r2_odom rclcpp std_msgs sensor_msgs nav_msgs geometry_msgs tf2_ros)
+
+add_executable(r2_wheel_odom src/R2_Wheel_Odom.cpp)
+ament_target_dependencies(r2_wheel_odom rclcpp std_msgs sensor_msgs geometry_msgs nav_msgs)
+
 
 add_executable(r2_pp src/R2_PurePursuit.cpp)
 ament_target_dependencies(r2_pp rclcpp std_msgs sensor_msgs geometry_msgs)
@@ -94,6 +100,7 @@ install(TARGETS
   optical_flow_odom
   r2_odom
   r2_pp
+  r2_wheel_odom
   DESTINATION lib/${PROJECT_NAME})
 
 install(

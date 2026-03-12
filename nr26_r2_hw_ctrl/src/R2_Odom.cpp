@@ -11,10 +11,13 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include <thread>
 
 // ROS
+#include "geometry_msgs/msg/transform_stamped.hpp"
+#include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int16_multi_array.hpp"
+#include "tf2_ros/transform_broadcaster.h"
 
 // 自作
 #include "PacketController.hpp"
@@ -24,7 +27,7 @@ PacketController pkt;
 #define TARGET_DEVICE_ID 6
 #define TX16NUM 24
 #define RX16NUM 17
-#define PUBLISH_RATE_MS 50 // ms
+#define PUBLISH_RATE_MS 20 // ms
 
 using namespace std::chrono_literals;
 
@@ -40,6 +43,12 @@ public:
             std::bind(&HardWareControl::sensor_callback, this, std::placeholders::_1));
 
         odom_pub_ = this->create_publisher<std_msgs::msg::Float32MultiArray>("odom", 10);
+
+        odom_nav_pub_ =
+            this->create_publisher<nav_msgs::msg::Odometry>("/odom", 10);
+
+        tf_broadcaster_ =
+            std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
         RCLCPP_INFO(get_logger(), "serial_rx_%d subscriber started.", device_id_);
     }
@@ -74,6 +83,8 @@ private:
                         device_id_, msg->data.size());
             return;
         }
+
+        // オドメトリ（X,Y,YAWのみ）
 
         // エンコーダ取得
         int16_t enc_f = msg->data[1];  // F:横方向
@@ -140,17 +151,69 @@ private:
         RCLCPP_INFO(get_logger(),
                     "X: %.3f  Y: %.3f  Yaw: %.2f deg",
                     X, Y, yaw_ * 180.0 / M_PI);
+
+        // オドメトリ（完全な）
+        // nav_msgs/Odometry publish
+
+        auto now = this->get_clock()->now();
+
+        nav_msgs::msg::Odometry odom;
+
+        odom.header.stamp = now;
+        odom.header.frame_id = "odom";
+        odom.child_frame_id = "base_link";
+
+        odom.pose.pose.position.x = X;
+        odom.pose.pose.position.y = Y;
+        odom.pose.pose.position.z = 0.0;
+
+        // quaternion
+        double qz = sin(yaw_ * 0.5);
+        double qw = cos(yaw_ * 0.5);
+
+        odom.pose.pose.orientation.x = 0.0;
+        odom.pose.pose.orientation.y = 0.0;
+        odom.pose.pose.orientation.z = qz;
+        odom.pose.pose.orientation.w = qw;
+
+        // velocity
+        odom.twist.twist.linear.x = vx;
+        odom.twist.twist.linear.y = vy;
+        odom.twist.twist.angular.z = wz;
+
+        odom_nav_pub_->publish(odom);
+
+        // TF broadcast
+
+        geometry_msgs::msg::TransformStamped tf;
+
+        tf.header.stamp = now;
+        tf.header.frame_id = "odom";
+        tf.child_frame_id = "base_link";
+
+        tf.transform.translation.x = X;
+        tf.transform.translation.y = Y;
+        tf.transform.translation.z = 0.0;
+
+        tf.transform.rotation.x = 0.0;
+        tf.transform.rotation.y = 0.0;
+        tf.transform.rotation.z = qz;
+        tf.transform.rotation.w = qw;
+
+        tf_broadcaster_->sendTransform(tf);
     }
 
     uint8_t device_id_;
     rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr odom_pub_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sensor_sub_;
+    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_nav_pub_;
+    std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 };
 
 int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
 
-    std::string figletout = "figlet R2_SequenceCtrl";
+    std::string figletout = "figlet R2_Ext_Odom";
     int result = std::system(figletout.c_str());
     if (result != 0) {
         std::cerr << "Please install 'figlet' with: sudo apt install figlet\n";
