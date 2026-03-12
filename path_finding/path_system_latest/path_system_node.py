@@ -5,7 +5,7 @@
 '''
  MAIN
  ^GUI --> plot3D
- ^^A*
+ ^^A*   --> Move ((→ ROS2通信へ))
  ^^^[Node]
 
  ^MapData

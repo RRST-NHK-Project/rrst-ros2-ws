@@ -5,9 +5,9 @@
 '''
  MAIN
  ^[GUI] --> plot3D
- ^^A*
+ ^^A*    --> Move ((→ ROS2通信へ))
  ^^^Node
- 
+
  ^MapData
 '''
 
@@ -15,9 +15,10 @@ import tkinter as tk
 from tkinter import messagebox
 
 # 分割用
-from path_system_astar import astar, calc_step_height
+from path_system_astar import astar
 from path_system_plot3d import plot_3d_maze_path
-from path_system_map import maze, height_map
+from path_system_move import Movement
+
 
 def create_tooltip(widget, text):
     tooltip = tk.Label(widget, text=text, background="yellow", relief="solid", borderwidth=1)
@@ -169,8 +170,15 @@ class PathfindingGUI:
                 print(f"経路: {path}")
                 print(f"総コスト: {total_cost}")
                 self.show_path(path)
+                
+                # Movement可視化
+                movement = Movement(path, self.height_map)
+                moves = movement.generate_moves()
+                print("(方向、 上り下り):", moves)  # （方向, 上下り）を表示
         
                 plot_3d_maze_path(self.height_map, self.maze, path,self.start_pos, self.goal_pos)
+
+                 
 
             else:
                 messagebox.showerror("エラー", "経路が見つかりませんでした。R1ブックを削除して再探索しましょう。")

@@ -5,12 +5,12 @@
 '''
  MAIN
  ^GUI --> [plot3D]
- ^^A*
+ ^^A*   --> Move ((→ ROS2通信へ))
  ^^^Node
-  
+
  ^MapData
 '''
-# 分割用
+
 
 import matplotlib.pyplot as plt
 import numpy as np

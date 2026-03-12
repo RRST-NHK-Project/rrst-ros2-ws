@@ -5,14 +5,15 @@
 '''
  [MAIN]
  ^GUI --> plot3D
- ^^A*
+ ^^A*   --> Move ((→ ROS2通信へ))
  ^^^Node
-  
+
  ^MapData
 '''
 # 分割用
 from path_system_node import Node
 from path_system_astar import astar, calc_step_height
+from path_system_move import Movement
 from path_system_gui import PathfindingGUI
 
 from path_system_map import maze, height_map
