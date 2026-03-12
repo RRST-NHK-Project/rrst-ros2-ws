@@ -75,7 +75,7 @@ private:
             return;
         }
 
-        // ===== エンコーダ取得 =====
+        // エンコーダ取得
         int16_t enc_f = msg->data[1];  // F:横方向
         int16_t enc_l = msg->data[2];  // L:前進方向
         int16_t enc_r = -msg->data[3]; // R:前進方向、符号反転済み
@@ -88,7 +88,7 @@ private:
             return;
         }
 
-        // 差分（wrap対応は省略）
+        // 差分
         int16_t df = enc_f - prev_f_;
         int16_t dl = enc_l - prev_l_;
         int16_t dr = enc_r - prev_r_;
@@ -102,7 +102,7 @@ private:
         double dL = dl * ENC_TO_M; // 前進
         double dR = dr * ENC_TO_M; // 前進
 
-        // ===== 3輪オドメトリ =====
+        // 3輪オドメトリ
         // F:横方向、L/R:前進・回転
         double dx_r = dF;                             // 機体右方向（X軸）
         double dy_r = (dL + dR) / 2.0;                // 前方向（Y軸）
