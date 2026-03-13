@@ -15,7 +15,7 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include "std_msgs/msg/int16_multi_array.hpp"
 
 // 自作
-#include "PacketController.hpp"
+#include "include/PacketController.hpp"
 PacketController pkt;
 
 #define TARGET_DEVICE_ID 6

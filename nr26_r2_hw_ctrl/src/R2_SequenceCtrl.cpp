@@ -23,7 +23,7 @@ L1、R1で回転しようとすると前進、後進してしまう
 #include "std_msgs/msg/int16_multi_array.hpp"
 
 // 自作
-#include "PacketController.hpp"
+#include "include/PacketController.hpp"
 PacketController pkt;
 
 // 以下マイコンに合わせて設定
