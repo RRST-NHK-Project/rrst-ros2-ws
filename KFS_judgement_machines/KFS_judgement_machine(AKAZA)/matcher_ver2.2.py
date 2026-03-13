@@ -202,15 +202,17 @@ def main():
     point_num_limit = 75  # 初期：100
 
     #モデルとマップのロード
-    model_path = r"C:\\Users\\riko2\\OneDrive\\KFS_judgement_machine(SGD)\\KFS_judgement_machine ver1.1.pth"
+    base_path = os.path.dirname(os.path.abspath(__file__))
+    model_path = os.path.join(base_path, '..', 'resource', 'KFS_judgt_machine_ver1.1.pth')
     cnn_model = load_ksf_model(model_path)
-    
-    list_path = r"C:\\Users\\riko2\\OneDrive\\KFS_judgement_machine(AKAZA)\\KFS_image_list.png"
+
+    list_path = os.path.join(base_path, '..', 'resource', 'KFS_image_list.png')
     map_img_orig = cv2.imread(list_path, 0)
     map_img = cv2.resize(map_img_orig, (int(map_img_orig.shape[1] * expand_map),
                                          int(map_img_orig.shape[0] * expand_map)))
     kp_map, des_map = akaze.detectAndCompute(map_img, None)
     height_map, width_map = map_img.shape[:2]
+
 
     # カメラ取得
     cap = cv2.VideoCapture(1)
@@ -296,8 +298,24 @@ def main():
                     m_center_deg = q_center_deg - deg_value # マップ側での中心点への角度
                     m_center_len = q_center_len/size_rate # マップ側での中心点への距離
                     m_center_rad = m_center_deg * math.pi / 180 # ラジアン変換
-                    m_xcenter = m_x1 + m_center_len * math.cos(m_center_rad) # マップ側での中心点X座標
-                    m_ycenter = m_y1 + m_center_len * math.sin(m_center_rad) # マップ側での中心点Y座標
+                    m_xcenter = m_x1 + m_center_len * math.cos(m_center_rad)
+                    m_ycenter = m_y1 + m_center_len * math.sin(m_center_rad)
+
+                    # マップの範囲内（0〜width, 0〜height）に収まっているかチェック
+                    if (0 <= m_xcenter <= self.width_map) and (0 <= m_ycenter <= self.height_map):
+    
+
+                        is_true = 1 if m_ycenter < (self.height_map / 2) else 0
+    
+                        # 予定通り [x, y, 真偽] の3要素でメッセージを作成
+                        msg = Int32MultiArray()
+                        msg.data = [int(m_xcenter), int(m_ycenter), is_true]
+    
+                         # トピック "KFS_judge" に送信
+                        self.publisher_.publish(msg)
+    
+                        # コンソールで確認用
+                        self.get_logger().info(f'Published: x={int(m_xcenter)}, y={int(m_ycenter)}, TF={is_true}')
 
                     if (0 <= m_xcenter <= width_map) and (0 <= m_ycenter <= height_map):
                         print(f"Match! x: {int(m_xcenter)}, y: {int(m_ycenter)}, deg: {deg_value:.2f}")
