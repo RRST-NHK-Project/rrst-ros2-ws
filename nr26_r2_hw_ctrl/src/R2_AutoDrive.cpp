@@ -91,7 +91,7 @@ private:
         double dt = (now - prev_time_).seconds();
         prev_time_ = now;
 
-        if (dt < 0.001)
+        if (dt < 0.001) // 0除算防止,PIDが壊れる
             return;
 
         // PID target

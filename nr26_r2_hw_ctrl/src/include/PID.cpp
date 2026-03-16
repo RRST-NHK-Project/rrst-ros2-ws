@@ -25,8 +25,13 @@ void PIDController::set_gain(float Kp, float Ki, float Kd) {
 
 float PIDController::update(float current, float dt) {
     Error_ = target_ - current;
-    Integral_ += (Error_ + last_Error_) * dt / 2; // 台形積分（単純加算でも可？）
+
+    Integral_ += (Error_ + last_Error_) * dt / 2;                       // 台形積分
+    float integral_limit = max_out_ / std::max(Ki_, 0.0001f);           // 積分上限の逆算,Kiが0のときの0除算防止
+    Integral_ = std::clamp(Integral_, -integral_limit, integral_limit); // 積分出力制限
+
     Differential_ = (Error_ - last_Error_) / dt;
+
     last_Error_ = Error_;
 
     float output = Kp_ * Error_ + Ki_ * Integral_ + Kd_ * Differential_;
