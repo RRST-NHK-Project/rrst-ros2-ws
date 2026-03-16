@@ -57,7 +57,7 @@ ament_target_dependencies(r2_md rclcpp std_msgs sensor_msgs geometry_msgs)
 add_executable(r2_mc src/R2_MotionCtrl.cpp)
 ament_target_dependencies(r2_mc rclcpp std_msgs sensor_msgs geometry_msgs)
 
-add_executable(r2_auto src/R2_AutoDrive.cpp)
+add_executable(r2_auto src/R2_AutoDrive.cpp src/include/PID.cpp)
 ament_target_dependencies(r2_auto rclcpp std_msgs sensor_msgs geometry_msgs)
 
 add_executable(r2_tuner src/R2_Tuner.cpp)
@@ -82,7 +82,6 @@ ament_target_dependencies(r2_odom rclcpp std_msgs sensor_msgs nav_msgs geometry_
 
 add_executable(r2_wheel_odom src/R2_Wheel_Odom.cpp)
 ament_target_dependencies(r2_wheel_odom rclcpp std_msgs sensor_msgs geometry_msgs nav_msgs)
-
 
 add_executable(r2_pp src/R2_PurePursuit.cpp)
 ament_target_dependencies(r2_pp rclcpp std_msgs sensor_msgs geometry_msgs)

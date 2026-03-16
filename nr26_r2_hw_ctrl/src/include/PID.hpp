@@ -21,5 +21,4 @@ private:
     float last_Error_;
     float Integral_;
     float Differential_;
-    float target_;
-}
+};

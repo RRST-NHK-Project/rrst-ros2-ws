@@ -1,5 +1,3 @@
-#pragma once
-
 #include "PID.hpp"
 #include <algorithm>
 
@@ -32,6 +30,6 @@ float PIDController::update(float current, float dt) {
     last_Error_ = Error_;
 
     float output = Kp_ * Error_ + Ki_ * Integral_ + Kd_ * Differential_;
-    output = std::clamp(output, -max_out_, max_out_); // アンチワインドアップ
+    output = std::clamp(output, -max_out_, max_out_); // 出力制限
     return output;
 }
