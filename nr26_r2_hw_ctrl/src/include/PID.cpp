@@ -24,6 +24,9 @@ void PIDController::set_gain(float Kp, float Ki, float Kd) {
 }
 
 float PIDController::update(float current, float dt) {
+
+    dt = std::max(dt, 0.0001f); // dtが0のときの0除算防止
+
     Error_ = target_ - current;
 
     Integral_ += (Error_ + last_Error_) * dt / 2;                       // 台形積分
