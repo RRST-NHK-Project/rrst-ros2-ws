@@ -7,6 +7,7 @@ public:
     PIDController(float Kp, float Ki, float Kd, float max_out);
     void set_target(float target);
     void set_gain(float Kp, float Ki, float Kd);
+    void reset();
     float update(float current, float dt);
 
 private:
@@ -19,6 +20,7 @@ private:
 
     float Error_;
     float last_Error_;
+    float last_current_;
     float Integral_;
     float Differential_;
 };
