@@ -213,12 +213,15 @@ private:
         static int cross_pre = 0;
         static int CROSS_PUSH_COUNT = 0;
         static int CROSS_PUSH_MAX = 20;
+        static int ang_1 = 13;
+        static int ang_2 = 90;
 
         if (CROSS == 1 && cross_pre == 0) {
             CROSS_PUSH_COUNT = (CROSS_PUSH_COUNT + 1) % CROSS_PUSH_MAX;
         }
         if (CROSS_PUSH_COUNT == 0) {
             data_[9] = MAG_SERVO_ANGLE[0];
+            data_[12] = ang_1;
         }
         if (CROSS_PUSH_COUNT == 1) {
             data_[9] = MAG_SERVO_ANGLE[1];
@@ -241,10 +244,12 @@ private:
         }
         if (CROSS_PUSH_COUNT == 7) {
             data_[9] = MAG_SERVO_ANGLE[8];
+            data_[12] = ang_2;
         }
         if (CROSS_PUSH_COUNT == 8) {
             data_[9] = MAG_SERVO_ANGLE[5];
             data_[10] = BAR_HOLD_ANGLE;
+            data_[12] = ang_1;
         }
         if (CROSS_PUSH_COUNT == 9) {
             data_[10] = BAR_PUSH_ANGLE;
@@ -254,10 +259,12 @@ private:
         }
         if (CROSS_PUSH_COUNT == 11) {
             data_[9] = MAG_SERVO_ANGLE[9];
+            data_[12] = ang_2;
         }
         if (CROSS_PUSH_COUNT == 12) {
             data_[9] = MAG_SERVO_ANGLE[6];
             data_[10] = BAR_HOLD_ANGLE;
+            data_[12] = ang_1;
         }
         if (CROSS_PUSH_COUNT == 13) {
             data_[10] = BAR_PUSH_ANGLE;
@@ -267,10 +274,12 @@ private:
         }
         if (CROSS_PUSH_COUNT == 15) {
             data_[9] = MAG_SERVO_ANGLE[10];
+            data_[12] = ang_2;
         }
         if (CROSS_PUSH_COUNT == 16) {
             data_[9] = MAG_SERVO_ANGLE[7];
             data_[10] = BAR_HOLD_ANGLE;
+            data_[12] = ang_1;
         }
         if (CROSS_PUSH_COUNT == 17) {
             data_[10] = BAR_PUSH_ANGLE;
@@ -280,6 +289,7 @@ private:
         }
         if (CROSS_PUSH_COUNT == 19) {
             data_[9] = MAG_SERVO_ANGLE[11];
+            data_[12] = ang_2;
         }
         cross_pre = CROSS;
 
@@ -314,31 +324,32 @@ private:
 
         // =================================================================
         // TRIANGLE:「棒取捨選択」
-        //
+        // ※とりあえずこの機能も統合
         // =================================================================
 
-        static int triangle_pre = 0;
-        static int tri_count = 0;
-        static int tri_state;
-        static int ang_1 = 13;
-        static int ang_2 = 90;
+        // static int triangle_pre = 0;
+        // static int tri_count = 0;
+        // static int tri_state;
+        // static int ang_1 = 13;
+        // static int ang_2 = 90;
 
-        if (TRIANGLE == 1 && triangle_pre == 0)
-            tri_count++;
+        // if (TRIANGLE == 1 && triangle_pre == 0)
+        //     tri_count++;
 
-        tri_state = tri_count % 2;
+        // tri_state = tri_count % 2;
 
-        if (tri_state == 0) {
-            data_[12] = ang_1;
-        } else if (tri_state == 1) {
-            data_[12] = ang_2;
-        }
+        // if (tri_state == 0) {
+        //     data_[12] = ang_1;
+        // } else if (tri_state == 1) {
+        //     data_[12] = ang_2;
+        // }
 
-        triangle_pre = TRIANGLE;
+        // triangle_pre = TRIANGLE;
 
         // =================================================================
         // SQUARE:「棒ロック」
         // ボタンを一回押すごとに2つのサーボモーターの角度状態を同時に変化させる
+        // （安全上の観点から現時点では統合不可）
         // =================================================================
 
         static int BAR_BTM_HOLD_ANGLE = 0;
@@ -390,10 +401,10 @@ private:
             data_[2] = -127;
         } else if (R1 == 1 && micro1_sw == 1) {
             // マイクロスイッチ(上)が押されていてもR1による逆回転は許可
-            data_[2] = -127;
+            data_[2] = 127;
         } else if (L1 == 1 && micro2_sw == 1) {
             // マイクロスイッチ(下)が押されていてもL1による正回転は許可
-            data_[2] = 127;
+            data_[2] = -127;
         } else {
             // どちらのボタンも押されていない場合は停止
             data_[2] = 0;
