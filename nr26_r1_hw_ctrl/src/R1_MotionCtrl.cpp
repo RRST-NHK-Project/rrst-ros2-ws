@@ -233,7 +233,6 @@ private:
             data_[9] = MAG_SERVO_ANGLE[3];
         }
         if (CROSS_PUSH_COUNT == 4) {
-            data_[9] = MAG_SERVO_ANGLE[4];
             data_[10] = BAR_HOLD_ANGLE;
         }
         if (CROSS_PUSH_COUNT == 5) {
@@ -244,12 +243,12 @@ private:
         }
         if (CROSS_PUSH_COUNT == 7) {
             data_[9] = MAG_SERVO_ANGLE[8];
-            data_[12] = ang_2;
+            // data_[12] = ang_2;
         }
         if (CROSS_PUSH_COUNT == 8) {
-            data_[9] = MAG_SERVO_ANGLE[5];
+            // data_[9] = MAG_SERVO_ANGLE[5];
             data_[10] = BAR_HOLD_ANGLE;
-            data_[12] = ang_1;
+            // data_[12] = ang_1;
         }
         if (CROSS_PUSH_COUNT == 9) {
             data_[10] = BAR_PUSH_ANGLE;
@@ -259,12 +258,12 @@ private:
         }
         if (CROSS_PUSH_COUNT == 11) {
             data_[9] = MAG_SERVO_ANGLE[9];
-            data_[12] = ang_2;
+            // data_[12] = ang_2;
         }
         if (CROSS_PUSH_COUNT == 12) {
-            data_[9] = MAG_SERVO_ANGLE[6];
+            data_[9] = MAG_SERVO_ANGLE[5];
             data_[10] = BAR_HOLD_ANGLE;
-            data_[12] = ang_1;
+            // data_[12] = ang_1;
         }
         if (CROSS_PUSH_COUNT == 13) {
             data_[10] = BAR_PUSH_ANGLE;
@@ -274,23 +273,25 @@ private:
         }
         if (CROSS_PUSH_COUNT == 15) {
             data_[9] = MAG_SERVO_ANGLE[10];
-            data_[12] = ang_2;
+            // data_[12] = ang_2;
         }
         if (CROSS_PUSH_COUNT == 16) {
-            data_[9] = MAG_SERVO_ANGLE[7];
+            data_[9] = MAG_SERVO_ANGLE[6];
             data_[10] = BAR_HOLD_ANGLE;
-            data_[12] = ang_1;
+            // data_[12] = ang_1;
         }
         if (CROSS_PUSH_COUNT == 17) {
             data_[10] = BAR_PUSH_ANGLE;
+            data_[9] = MAG_SERVO_ANGLE[5];
         }
          if (CROSS_PUSH_COUNT == 18) {
             data_[10] = BAR_RELE_ANGLE;
         }
         if (CROSS_PUSH_COUNT == 19) {
-            data_[9] = MAG_SERVO_ANGLE[11];
-            data_[12] = ang_2;
+            data_[9] = MAG_SERVO_ANGLE[6];
+            // data_[12] = ang_2;
         }
+
         cross_pre = CROSS;
 
         // =================================================================
