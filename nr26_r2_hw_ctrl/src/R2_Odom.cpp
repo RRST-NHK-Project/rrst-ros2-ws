@@ -42,7 +42,7 @@ public:
             10,
             std::bind(&HardWareControl::sensor_callback, this, std::placeholders::_1));
 
-        odom_pub_ = this->create_publisher<std_msgs::msg::Float32MultiArray>("odom_3", 10);
+        odom_pub_ = this->create_publisher<std_msgs::msg::Float32MultiArray>("odom_xy_yaw", 10);
 
         odom_nav_pub_ =
             this->create_publisher<nav_msgs::msg::Odometry>("/odom", 10);
