@@ -28,4 +28,15 @@ def generate_launch_description():
             output="screen",
         ),
 
+        Node(
+            package="sdm15_ros2",
+            executable="sdm15_range_node",
+            name="sdm15_node_3",
+            namespace="lidar3",
+            parameters=[
+                {"port": "/dev/ttyUSB2"},
+                {"baud": 460800},
+            ],
+            output="screen",
+        ),
     ])
