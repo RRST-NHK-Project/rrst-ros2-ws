@@ -27,7 +27,8 @@ public:
     PIDMecanumController()
         : Node("pid_mecanum_controller"),
           pid_x_(5.0, 0.0, 0.0, 1.0),
-          pid_y_(5.0, 0.0, 0.0, 1.0) {
+          pid_y_(5.0, 0.0, 0.0, 1.0),
+          pid_yaw_(3.0, 0.0, 0.0, 1.0) {
 
         // odom subscriber
         odom_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
@@ -38,7 +39,7 @@ public:
         publisher_ = this->create_publisher<std_msgs::msg::Int16MultiArray>(
             "serial_tx_" + std::to_string(TARGET_DEVICE_ID), 10);
 
-        // PS4 controller
+        // PS4入力
         joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
             "joy", 10,
             std::bind(&PIDMecanumController::ps4_listener_callback, this, std::placeholders::_1));
@@ -51,8 +52,10 @@ public:
         // 初期target
         target_x_ = 0.0;
         target_y_ = 0.0;
+        target_yaw_ = 0.0;
         pid_x_.set_target(target_x_);
         pid_y_.set_target(target_y_);
+        pid_yaw_.set_target(target_yaw_);
     }
 
 private:
@@ -65,6 +68,7 @@ private:
     // PID
     PIDController pid_x_;
     PIDController pid_y_;
+    PIDController pid_yaw_;
 
     // odom
     float X_ = 0.0;
@@ -74,6 +78,7 @@ private:
     // target
     float target_x_ = 0.0;
     float target_y_ = 0.0;
+    float target_yaw_ = 0.0;
 
     // 制御出力
     float vx_ = 0.0;
@@ -84,9 +89,7 @@ private:
     float duty_max = 100;
     float v1 = 0, v2 = 0, v3 = 0, v4 = 0;
 
-    // =====================
     // odom（状態更新のみ）
-    // =====================
     void odom_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
         if (msg->data.size() < 3)
             return;
@@ -96,9 +99,7 @@ private:
         yaw_ = msg->data[2];
     }
 
-    // =====================
     // PS4入力
-    // =====================
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
 
         float LS_X = -1 * msg->axes[0];
@@ -106,9 +107,13 @@ private:
 
         bool UP = msg->axes[7] == 1.0;
         bool DOWN = msg->axes[7] == -1.0;
+        bool LEFT = msg->axes[6] == 1.0;
+        bool RIGHT = msg->axes[6] == -1.0;
 
         static bool last_up = false;
         static bool last_down = false;
+        static bool last_left = false;
+        static bool last_right = false;
 
         // 目標変更（ここでPID更新＆リセット）
         if (UP && !last_up) {
@@ -133,22 +138,36 @@ private:
             pid_y_.reset();
         }
 
+        if (LEFT && !last_left) {
+            target_yaw_ += M_PI / 2; // 90度左回転
+
+            pid_yaw_.set_target(target_yaw_);
+            pid_yaw_.reset();
+        }
+
+        if (RIGHT && !last_right) {
+            target_yaw_ -= M_PI / 2; // 90度右回転
+
+            pid_yaw_.set_target(target_yaw_);
+            pid_yaw_.reset();
+        }
+
         last_up = UP;
         last_down = DOWN;
+        last_left = LEFT;
+        last_right = RIGHT;
 
-        float rad = atan2(LS_Y, LS_X);
+        // float rad = atan2(LS_Y, LS_X);
     }
 
-    // =====================
-    // 制御ループ（ここがメイン）
-    // =====================
+    // 制御ループ
     void publish_timer() {
         const float dt = PUBLISH_RATE_MS / 1000.0f;
 
         // PID計算
         vx_ = pid_x_.update(X_, dt);
         vy_ = -pid_y_.update(Y_, dt); // Y軸反転（座標系による）
-        wz_ = 0.0;
+        wz_ = pid_yaw_.update(yaw_, dt);
 
         // メカナム逆運動学
         v1 = vy_ + vx_ + wz_;
@@ -182,8 +201,8 @@ private:
 
         // デバッグ
         RCLCPP_INFO(this->get_logger(),
-                    "X: %.2f Y: %.2f | vx %.2f vy %.2f",
-                    X_, Y_, vx_, vy_);
+                    "X: %.2f Y: %.2f Yaw: %.2f | vx %.2f vy %.2f wz %.2f",
+                    X_, Y_, yaw_, vx_, vy_, wz_);
     }
 };
 
