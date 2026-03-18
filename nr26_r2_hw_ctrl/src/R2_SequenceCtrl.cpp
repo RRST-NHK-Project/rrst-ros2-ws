@@ -437,10 +437,29 @@ public:
                       std::placeholders::_1));
 
         // sdm15のSubscribe
-        sdm15_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+        sdm15_sub1_ = this->create_subscription<std_msgs::msg::Int32>(
             "/lidar1/sdm15/distance",
             rclcpp::SensorDataQoS(),
-            std::bind(&HardWareControl::sdm15_callback, this, std::placeholders::_1));
+            [this](std_msgs::msg::Int32::SharedPtr msg)
+            {
+                this->sdm15_callback(msg, 0);
+            });
+
+        sdm15_sub2_ = this->create_subscription<std_msgs::msg::Int32>(
+            "/lidar2/sdm15/distance",
+            rclcpp::SensorDataQoS(),
+            [this](std_msgs::msg::Int32::SharedPtr msg)
+            {
+                this->sdm15_callback(msg, 1);
+            });
+
+        sdm15_sub3_ = this->create_subscription<std_msgs::msg::Int32>(
+            "/lidar3/sdm15/distance",
+            rclcpp::SensorDataQoS(),
+            [this](std_msgs::msg::Int32::SharedPtr msg)
+            {
+                this->sdm15_callback(msg, 2);
+            });
 
         RCLCPP_INFO(get_logger(),
                     "serial_tx_%d started.", device_id_);
@@ -457,7 +476,7 @@ private:
     float v1, v2, v3, v4; // 各メカナムホイールの速度指令値
                           // v1:第一象限, v2:第二象限, v3:第三象限, v4:第四象限
 
-    int32_t sdm15_value_ = 0; // sdm15の距離値
+    int32_t sdm15_value[3] = {0, 0, 0}; // sdm15の値を保存する配列
 
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg)
     {
@@ -588,18 +607,22 @@ private:
         }
     }
 
-    void sdm15_callback(const std_msgs::msg::Int32::SharedPtr msg)
+    void sdm15_callback(const std_msgs::msg::Int32::SharedPtr msg, int index)
     {
-        sdm15_value_ = msg->data;
+        sdm15_value[index] = msg->data;
 
-        RCLCPP_INFO(this->get_logger(), "distance: %d", sdm15_value_);
+        RCLCPP_INFO(this->get_logger(),
+                    "distance: %d, %d, %d",
+                    sdm15_value[0], sdm15_value[1], sdm15_value[2]);
     }
     uint8_t device_id_;
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sensor_sub_;
-    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr sdm15_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr sdm15_sub1_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr sdm15_sub2_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr sdm15_sub3_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     std::vector<int16_t> data_;
