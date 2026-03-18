@@ -3,6 +3,9 @@ R1機構制御
 Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 */
 
+// まだ未確認なので絶対に許可なしに起動しないこと！！
+// 破壊しても自己責任！！
+
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -199,130 +202,170 @@ private:
 
         // 以降、配列data_を操作する
         // =================================================================
-        // CROSS:「マガジン回転」
+        // CROSS:「マガジン回転」※未確認！絶対に起動するな！！自己責任！！
         // ボタンを一回押すごとにサーボモーターを45°づつ回転する
         // =================================================================
 
         static int MAG_SERVO_ANGLE[] = {270, 228, 186, 146, 100, 58, 13, 141, 95, 50, 53, 5, 8};
+        static int BAR_PUSH_ANGLE = 10;
+        static int BAR_HOLD_ANGLE = 43;
+        static int BAR_RELE_ANGLE = 245;
         static int cross_pre = 0;
-        static int s = 0;
-        static int CROSS_PUSH_MAX = 13;
+        static int CROSS_PUSH_COUNT = 0;
+        static int CROSS_PUSH_MAX = 20;
+        static int ang_1 = 13;
+        static int ang_2 = 90;
 
         if (CROSS == 1 && cross_pre == 0) {
-            s = (s + 1) % CROSS_PUSH_MAX;
+            CROSS_PUSH_COUNT = (CROSS_PUSH_COUNT + 1) % CROSS_PUSH_MAX;
         }
-        if (s == 0) {
+        if (CROSS_PUSH_COUNT == 0) {
             data_[9] = MAG_SERVO_ANGLE[0];
+            data_[12] = ang_1;
         }
-        if (s == 1) {
+        if (CROSS_PUSH_COUNT == 1) {
             data_[9] = MAG_SERVO_ANGLE[1];
         }
-        if (s == 2) {
+        if (CROSS_PUSH_COUNT == 2) {
             data_[9] = MAG_SERVO_ANGLE[2];
         }
-        if (s == 3) {
+        if (CROSS_PUSH_COUNT == 3) {
             data_[9] = MAG_SERVO_ANGLE[3];
         }
-        if (s == 4) {
-            data_[9] = MAG_SERVO_ANGLE[4];
+        if (CROSS_PUSH_COUNT == 4) {
+            data_[10] = BAR_HOLD_ANGLE;
         }
-        if (s == 5) {
+        if (CROSS_PUSH_COUNT == 5) {
+            data_[10] = BAR_PUSH_ANGLE;
+        }
+        if (CROSS_PUSH_COUNT == 6) {
+            data_[10] = BAR_RELE_ANGLE;
+        }
+        if (CROSS_PUSH_COUNT == 7) {
+            data_[9] = MAG_SERVO_ANGLE[8];
+            // data_[12] = ang_2;
+        }
+        if (CROSS_PUSH_COUNT == 8) {
+            // data_[9] = MAG_SERVO_ANGLE[5];
+            data_[10] = BAR_HOLD_ANGLE;
+            // data_[12] = ang_1;
+        }
+        if (CROSS_PUSH_COUNT == 9) {
+            data_[10] = BAR_PUSH_ANGLE;
+        }
+         if (CROSS_PUSH_COUNT == 10) {
+            data_[10] = BAR_RELE_ANGLE;
+        }
+        if (CROSS_PUSH_COUNT == 11) {
+            data_[9] = MAG_SERVO_ANGLE[9];
+            // data_[12] = ang_2;
+        }
+        if (CROSS_PUSH_COUNT == 12) {
+            data_[9] = MAG_SERVO_ANGLE[5];
+            data_[10] = BAR_HOLD_ANGLE;
+            // data_[12] = ang_1;
+        }
+        if (CROSS_PUSH_COUNT == 13) {
+            data_[10] = BAR_PUSH_ANGLE;
+        }
+         if (CROSS_PUSH_COUNT == 14) {
+            data_[10] = BAR_RELE_ANGLE;
+        }
+        if (CROSS_PUSH_COUNT == 15) {
+            data_[9] = MAG_SERVO_ANGLE[10];
+            // data_[12] = ang_2;
+        }
+        if (CROSS_PUSH_COUNT == 16) {
+            data_[9] = MAG_SERVO_ANGLE[6];
+            data_[10] = BAR_HOLD_ANGLE;
+            // data_[12] = ang_1;
+        }
+        if (CROSS_PUSH_COUNT == 17) {
+            data_[10] = BAR_PUSH_ANGLE;
             data_[9] = MAG_SERVO_ANGLE[5];
         }
-        if (s == 6) {
+         if (CROSS_PUSH_COUNT == 18) {
+            data_[10] = BAR_RELE_ANGLE;
+        }
+        if (CROSS_PUSH_COUNT == 19) {
             data_[9] = MAG_SERVO_ANGLE[6];
+            // data_[12] = ang_2;
         }
-        if (s == 7) {
-            data_[9] = MAG_SERVO_ANGLE[7];
-        }
-        if (s == 8) {
-            data_[9] = MAG_SERVO_ANGLE[8];
-        }
-        if (s == 9) {
-            data_[9] = MAG_SERVO_ANGLE[9];
-        }
-        if (s == 10) {
-            data_[9] = MAG_SERVO_ANGLE[10];
-        }
-        if (s == 11) {
-            data_[9] = MAG_SERVO_ANGLE[11];
-        }
-        if (s == 12) {
-            data_[9] = MAG_SERVO_ANGLE[12];
-        }
+
         cross_pre = CROSS;
 
         // =================================================================
-        // CIRCLE:「棒ホールド機構」
+        // CIRCLE:「棒ホールド機構」※CROSSと統合済み
         // ボタンを一回押すごとに2つのサーボモーターの角度状態を同時に変化させる
         // =================================================================
         // angle = 10のとき最下部までお仕込み
         // angle = 245のときマガジンに戻してる
 
-        static int BAR_PUSH_ANGLE = 10;
-        static int BAR_HOLD_ANGLE = 43;
-        static int BAR_RELE_ANGLE = 245;
-        static int circle_pre = 0;
-        static int t = 0;
-        static int CIRCLE_PUSH_MAX = 3;
+        // static int BAR_PUSH_ANGLE = 10;
+        // static int BAR_HOLD_ANGLE = 43;
+        // static int BAR_RELE_ANGLE = 245;
+        // static int circle_pre = 0;
+        // static int CIRCLE_PUSH_COUNT = 0;
+        // static int CIRCLE_PUSH_MAX = 3;
 
-        if (CIRCLE == 1 && circle_pre == 0) {
-            t = (t + 1) % CIRCLE_PUSH_MAX;
-        }
-        if (t == 0) {
-            data_[10] = BAR_RELE_ANGLE;
-        }
-        if (t == 1) {
-            data_[10] = BAR_HOLD_ANGLE;
-        }
-        if (t == 2) {
-            data_[10] = BAR_PUSH_ANGLE;
-        }
+        // if (CIRCLE == 1 && circle_pre == 0) {
+        //     CIRCLE_PUSH_COUNT = (CIRCLE_PUSH_COUNT + 1) % CIRCLE_PUSH_MAX;
+        // }
+        // if (CIRCLE_PUSH_COUNT == 0) {
+        //     data_[10] = BAR_RELE_ANGLE;
+        // }
+        // if (CIRCLE_PUSH_COUNT == 1) {
+        //     data_[10] = BAR_HOLD_ANGLE;
+        // }
+        // if (CIRCLE_PUSH_COUNT == 2) {
+        //     data_[10] = BAR_PUSH_ANGLE;
+        // }
 
-        circle_pre = CIRCLE;
+        // circle_pre = CIRCLE;
 
         // =================================================================
         // TRIANGLE:「棒取捨選択」
-        //
+        // ※とりあえずこの機能も統合
         // =================================================================
 
-        static int triangle_pre = 0;
-        static int tri_count = 0;
-        static int tri_state;
-        static int ang_1 = 13;
-        static int ang_2 = 90;
+        // static int triangle_pre = 0;
+        // static int tri_count = 0;
+        // static int tri_state;
+        // static int ang_1 = 13;
+        // static int ang_2 = 90;
 
-        if (TRIANGLE == 1 && triangle_pre == 0)
-            tri_count++;
+        // if (TRIANGLE == 1 && triangle_pre == 0)
+        //     tri_count++;
 
-        tri_state = tri_count % 2;
+        // tri_state = tri_count % 2;
 
-        if (tri_state == 0) {
-            data_[12] = ang_1;
-        } else if (tri_state == 1) {
-            data_[12] = ang_2;
-        }
+        // if (tri_state == 0) {
+        //     data_[12] = ang_1;
+        // } else if (tri_state == 1) {
+        //     data_[12] = ang_2;
+        // }
 
-        triangle_pre = TRIANGLE;
+        // triangle_pre = TRIANGLE;
 
         // =================================================================
         // SQUARE:「棒ロック」
         // ボタンを一回押すごとに2つのサーボモーターの角度状態を同時に変化させる
+        // （安全上の観点から現時点では統合不可）
         // =================================================================
 
         static int BAR_BTM_HOLD_ANGLE = 0;
         static int BAR_BTM_ANGLE = 150;
         static int square_pre = 0;
-        static int u = 0;
+        static int SQUARE_PUSH_COUNT = 0;
         static int SQUARE_PUSH_MAX = 2;
 
         if (SQUARE == 1 && square_pre == 0) {
-            u = (u + 1) % SQUARE_PUSH_MAX;
+            SQUARE_PUSH_COUNT = (SQUARE_PUSH_COUNT + 1) % SQUARE_PUSH_MAX;
         }
-        if (u == 0) {
+        if (SQUARE_PUSH_COUNT == 0) {
             data_[11] = BAR_BTM_ANGLE;
         }
-        if (u == 1) {
+        if (SQUARE_PUSH_COUNT == 1) {
             data_[11] = BAR_BTM_HOLD_ANGLE;
         }
 
@@ -359,16 +402,16 @@ private:
             data_[2] = -127;
         } else if (R1 == 1 && micro1_sw == 1) {
             // マイクロスイッチ(上)が押されていてもR1による逆回転は許可
-            data_[2] = -127;
+            data_[2] = 127;
         } else if (L1 == 1 && micro2_sw == 1) {
             // マイクロスイッチ(下)が押されていてもL1による正回転は許可
-            data_[2] = 127;
+            data_[2] = -127;
         } else {
             // どちらのボタンも押されていない場合は停止
             data_[2] = 0;
         }
-        // ※この場合、SW1が押されているとき、R1が効かない可能性がある
-        // ※また、AW2においても押されているとき、L1が効かない可能性があるので確認すべし
+        // ※この場合、SW1が押されているとき、R1が効かない可能性がある 
+        // ※また、AW2においても押されているとき、L1が効かない可能性があるので確認すべし->確認済み
 
         // =================================================================
         // LR

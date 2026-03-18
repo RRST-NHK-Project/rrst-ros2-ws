@@ -23,7 +23,7 @@ L1、R1で回転しようとすると前進、後進してしまう
 #include "std_msgs/msg/int16_multi_array.hpp"
 
 // 自作
-#include "PacketController.hpp"
+#include "include/PacketController.hpp"
 PacketController pkt;
 
 // 以下マイコンに合わせて設定
@@ -39,9 +39,11 @@ class SequenceControl;
 class HardWareControl;
 
 // 状態を管理しながらシーケンス制御
-class SequenceControl : public rclcpp::Node {
+class SequenceControl : public rclcpp::Node
+{
 public:
-    SequenceControl() : Node("sequence_ctrl_node") {
+    SequenceControl() : Node("sequence_ctrl_node")
+    {
         timer_ = this->create_wall_timer(
             10ms,
             std::bind(&SequenceControl::loop, this));
@@ -49,8 +51,10 @@ public:
 
     // トリガー関数
 
-    void start_step_up() {
-        if (mode_ != StepMode::NONE) {
+    void start_step_up()
+    {
+        if (mode_ != StepMode::NONE)
+        {
             RCLCPP_WARN(get_logger(), "Sequence busy. STEP_UP ignored.");
             return; // 実行中なら無視
         }
@@ -58,8 +62,10 @@ public:
         next_up(StepUpState::ALL_UP);
     }
 
-    void start_step_down() {
-        if (mode_ != StepMode::NONE) {
+    void start_step_down()
+    {
+        if (mode_ != StepMode::NONE)
+        {
             RCLCPP_WARN(get_logger(), "Sequence busy. STEP_DOWN ignored.");
             return; // 実行中なら無視
         }
@@ -68,32 +74,35 @@ public:
     }
 
     // シーケンス実行中の判定
-    bool is_busy() const {
+    bool is_busy() const
+    {
         return mode_ != StepMode::NONE;
     }
 
 private:
     // 以下シーケンス内で使用する変数
     //  待機時間（要調整）
-    static constexpr double up_first_forward_wait = 1.0;
-    static constexpr double up_second_forward_wait = 1.0;
-    static constexpr double up_final_forward_wait = 1.0;
+    static constexpr double up_first_forward_wait = 2.0;
+    static constexpr double up_second_forward_wait = 7.0;
+    static constexpr double up_final_forward_wait = 3.0;
     static constexpr double down_first_forward_wait = 1.0;
     static constexpr double down_second_forward_wait = 1.0;
     static constexpr double down_final_forward_wait = 1.0;
 
     // 速度関連
-    static constexpr int forward_speed = 10;
+    static constexpr int forward_speed = 20;
 
     // モードの管理
-    enum class StepMode {
+    enum class StepMode
+    {
         NONE,
         STEP_UP,
         STEP_DOWN
     };
 
     // 状態管理（上り）
-    enum class StepUpState {
+    enum class StepUpState
+    {
         IDLE,
         ALL_UP,
         FIRST_FORWARD,
@@ -105,7 +114,8 @@ private:
     };
 
     // 状態管理（下り）
-    enum class StepDownState {
+    enum class StepDownState
+    {
         IDLE,
         FIRST_FORWARD,
         FRONT_UP,
@@ -126,67 +136,77 @@ private:
     bool state_executed_ = false; // 各状態での処理の実行状況を保存
 
     // 状態遷移関数
-    void next_up(StepUpState next) {
+    void next_up(StepUpState next)
+    {
         state_start_time_ = this->now();
         state_up_ = next;
         state_executed_ = false;
     }
 
-    void next_down(StepDownState next) {
+    void next_down(StepDownState next)
+    {
         state_start_time_ = this->now();
         state_down_ = next;
         state_executed_ = false;
     }
 
     // 機構関数
-    void all_up() {
+    void all_up()
+    {
         RCLCPP_INFO(get_logger(), "ALL UP");
         pkt.setTR(TR1, 1);
         pkt.setTR(TR2, 1);
     }
 
-    void front_down() {
+    void front_down()
+    {
         RCLCPP_INFO(get_logger(), "FRONT DOWN");
-        pkt.setTR(TR1, 0);
-    }
-
-    void rear_down() {
-        RCLCPP_INFO(get_logger(), "REAR DOWN");
         pkt.setTR(TR2, 0);
     }
 
-    void stop_motion() {
+    void rear_down()
+    {
+        RCLCPP_INFO(get_logger(), "REAR DOWN");
+        pkt.setTR(TR1, 0);
+    }
+
+    void stop_motion()
+    {
         RCLCPP_INFO(get_logger(), "STOP");
         pkt.setTR(TR1, 0);
         pkt.setTR(TR2, 0);
-        pkt.setMD(MD5, forward_speed);
-        pkt.setMD(MD6, forward_speed);
-        pkt.setMD(MD7, forward_speed);
-        pkt.setMD(MD8, forward_speed);
+        pkt.setMD(MD5, 0);
+        pkt.setMD(MD6, 0);
+        pkt.setMD(MD7, 0);
+        pkt.setMD(MD8, 0);
     }
 
-    void front_up() {
+    void front_up()
+    {
         RCLCPP_INFO(get_logger(), "FRONT UP");
-        pkt.setTR(TR1, 1);
-    }
-
-    void rear_up() {
-        RCLCPP_INFO(get_logger(), "REAR UP");
         pkt.setTR(TR2, 1);
     }
 
-    void all_down() {
+    void rear_up()
+    {
+        RCLCPP_INFO(get_logger(), "REAR UP");
+        pkt.setTR(TR1, 1);
+    }
+
+    void all_down()
+    {
         RCLCPP_INFO(get_logger(), "ALL DOWN");
         pkt.setTR(TR1, 0);
         pkt.setTR(TR2, 0);
     }
 
-    void move_forward() {
+    void move_forward()
+    {
         RCLCPP_INFO(get_logger(), "MOVE FORWARD");
-        pkt.setMD(MD5, forward_speed);
+        pkt.setMD(MD5, -forward_speed);
         pkt.setMD(MD6, forward_speed);
         pkt.setMD(MD7, forward_speed);
-        pkt.setMD(MD8, forward_speed);
+        pkt.setMD(MD8, -forward_speed);
     }
 
     // void move_backward() {
@@ -194,14 +214,17 @@ private:
     // }
 
     // 段差超えシーケンス（上り）
-    void step_up_sequence() {
+    void step_up_sequence()
+    {
         auto now_time = now();
-        switch (state_up_) {
+        switch (state_up_)
+        {
         case StepUpState::IDLE:
             break;
 
         case StepUpState::ALL_UP:
-            if (!state_executed_) {
+            if (!state_executed_)
+            {
                 all_up();
                 state_executed_ = true;
             }
@@ -209,17 +232,20 @@ private:
             break;
 
         case StepUpState::FIRST_FORWARD:
-            if (!state_executed_) {
+            if (!state_executed_)
+            {
                 move_forward();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > up_first_forward_wait) {
+            if ((now_time - state_start_time_).seconds() > up_first_forward_wait)
+            {
                 next_up(StepUpState::FRONT_DOWN);
             }
             break;
 
         case StepUpState::FRONT_DOWN:
-            if (!state_executed_) {
+            if (!state_executed_)
+            {
                 front_down();
                 state_executed_ = true;
             }
@@ -227,17 +253,20 @@ private:
             break;
 
         case StepUpState::SECOND_FORWARD:
-            if (!state_executed_) {
+            if (!state_executed_)
+            {
                 move_forward();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > up_second_forward_wait) {
+            if ((now_time - state_start_time_).seconds() > up_second_forward_wait)
+            {
                 next_up(StepUpState::REAR_DOWN);
             }
             break;
 
         case StepUpState::REAR_DOWN:
-            if (!state_executed_) {
+            if (!state_executed_)
+            {
                 rear_down();
                 state_executed_ = true;
             }
@@ -245,17 +274,20 @@ private:
             break;
 
         case StepUpState::FINAL_FORWARD:
-            if (!state_executed_) {
+            if (!state_executed_)
+            {
                 move_forward();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > up_final_forward_wait) {
+            if ((now_time - state_start_time_).seconds() > up_final_forward_wait)
+            {
                 next_up(StepUpState::DONE);
             }
             break;
 
         case StepUpState::DONE:
-            if (!state_executed_) {
+            if (!state_executed_)
+            {
                 stop_motion();
                 state_executed_ = true;
             }
@@ -266,24 +298,29 @@ private:
     }
 
     // 段差超えシーケンス（下り）
-    void step_down_sequence() {
+    void step_down_sequence()
+    {
         auto now_time = now();
-        switch (state_down_) {
+        switch (state_down_)
+        {
         case StepDownState::IDLE:
             break;
 
         case StepDownState::FIRST_FORWARD:
-            if (!state_executed_) {
+            if (!state_executed_)
+            {
                 move_forward();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > down_first_forward_wait) {
+            if ((now_time - state_start_time_).seconds() > down_first_forward_wait)
+            {
                 next_down(StepDownState::FRONT_UP);
             }
             break;
 
         case StepDownState::FRONT_UP:
-            if (!state_executed_) {
+            if (!state_executed_)
+            {
                 front_up();
                 state_executed_ = true;
             }
@@ -291,17 +328,20 @@ private:
             break;
 
         case StepDownState::SECOND_FORWARD:
-            if (!state_executed_) {
+            if (!state_executed_)
+            {
                 move_forward();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > down_second_forward_wait) {
+            if ((now_time - state_start_time_).seconds() > down_second_forward_wait)
+            {
                 next_down(StepDownState::REAR_UP);
             }
             break;
 
         case StepDownState::REAR_UP:
-            if (!state_executed_) {
+            if (!state_executed_)
+            {
                 rear_up();
                 state_executed_ = true;
             }
@@ -309,17 +349,20 @@ private:
             break;
 
         case StepDownState::FINAL_FORWARD:
-            if (!state_executed_) {
+            if (!state_executed_)
+            {
                 move_forward();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > down_final_forward_wait) {
+            if ((now_time - state_start_time_).seconds() > down_final_forward_wait)
+            {
                 next_down(StepDownState::ALL_DOWN);
             }
             break;
 
         case StepDownState::ALL_DOWN:
-            if (!state_executed_) {
+            if (!state_executed_)
+            {
                 all_down();
                 state_executed_ = true;
             }
@@ -328,7 +371,8 @@ private:
             break;
 
         case StepDownState::DONE:
-            if (!state_executed_) {
+            if (!state_executed_)
+            {
                 stop_motion();
                 state_executed_ = true;
             }
@@ -338,30 +382,37 @@ private:
         }
     }
 
-    void loop() {
+    void loop()
+    {
 
-        switch (mode_) {
+        switch (mode_)
+        {
 
         case StepMode::NONE:
+            std::cout << "None sequence" << std::endl;
             break;
 
         case StepMode::STEP_UP:
             step_up_sequence();
+            std::cout << "Up sequence" << std::endl;
             break;
 
         case StepMode::STEP_DOWN:
             step_down_sequence();
+            std::cout << "Down sequence" << std::endl;
             break;
         }
     }
 };
 
-class HardWareControl : public rclcpp::Node {
+class HardWareControl : public rclcpp::Node
+{
 public:
     HardWareControl(uint8_t device_id, std::shared_ptr<SequenceControl> seq)
         : Node("hardware_control_" + std::to_string(device_id)),
           device_id_(device_id),
-          seq_(seq) {
+          seq_(seq)
+    {
 
         // joyノードのSubscribe
         joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
@@ -399,8 +450,10 @@ private:
     float v1, v2, v3, v4; // 各メカナムホイールの速度指令値
                           // v1:第一象限, v2:第二象限, v3:第三象限, v4:第四象限
 
-    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
-        if (seq_->is_busy()) {
+    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg)
+    {
+        if (seq_->is_busy())
+        {
             return;
         }
 
@@ -419,11 +472,13 @@ private:
         static bool last_up = false;
         static bool last_down = false;
 
-        if (UP && !last_up) {
+        if (UP && !last_up)
+        {
             seq_->start_step_up();
         }
 
-        if (DOWN && !last_down) {
+        if (DOWN && !last_down)
+        {
             seq_->start_step_down();
         }
 
@@ -452,14 +507,16 @@ private:
         v2 *= -1;
 
         // 回転
-        if (R1) {
+        if (R1)
+        {
             v1 = sp_yaw;
             v2 = -sp_yaw;
             v3 = -sp_yaw;
             v4 = sp_yaw;
         }
 
-        if (L1) {
+        if (L1)
+        {
             v1 = -sp_yaw;
             v2 = sp_yaw;
             v3 = sp_yaw;
@@ -486,7 +543,8 @@ private:
         pkt.setMD(MD8, static_cast<int16_t>(v4 * duty_max));
     }
 
-    void publisher_timer_callback() {
+    void publisher_timer_callback()
+    {
         std_msgs::msg::Int16MultiArray msg;
 
         // msg.data = data_;
@@ -496,10 +554,12 @@ private:
         // print_data();
     }
 
-    void print_data() {
+    void print_data()
+    {
         const auto &pkt_data = pkt.data_;
         std::cout << "TX DATA: [";
-        for (size_t i = 0; i < pkt_data.size(); ++i) {
+        for (size_t i = 0; i < pkt_data.size(); ++i)
+        {
             std::cout << pkt_data[i];
             if (i + 1 < pkt_data.size())
                 std::cout << ", ";
@@ -508,8 +568,10 @@ private:
     }
 
     void sensor_callback(
-        const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
-        if (msg->data.size() < RX16NUM) {
+        const std_msgs::msg::Int16MultiArray::SharedPtr msg)
+    {
+        if (msg->data.size() < RX16NUM)
+        {
             RCLCPP_WARN(this->get_logger(),
                         "serial_rx_%d: data too short (%zu)",
                         device_id_, msg->data.size());
@@ -530,13 +592,15 @@ private:
     std::shared_ptr<SequenceControl> seq_;
 };
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
     rclcpp::init(argc, argv);
 
     // figletでノード名を表示
     std::string figletout = "figlet R2_SequenceCtrl";
     int result = std::system(figletout.c_str());
-    if (result != 0) {
+    if (result != 0)
+    {
         std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
                   << std::endl;
         std::cerr << "Please install 'figlet' with the following command:"

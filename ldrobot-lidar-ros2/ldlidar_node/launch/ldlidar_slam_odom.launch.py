@@ -1,18 +1,3 @@
-# Copyright 2024 Walter Lucetti
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-###########################################################################
-
 import os
 
 from ament_index_python.packages import get_package_share_directory
@@ -43,10 +28,7 @@ def generate_launch_description():
         executable="lifecycle_manager",
         name="lifecycle_manager",
         output="screen",
-        parameters=[
-            # YAML files
-            lc_mgr_config_path  # Parameters
-        ],
+        parameters=[lc_mgr_config_path],
     )
 
     # SLAM Toolbox node in async mode
@@ -57,10 +39,33 @@ def generate_launch_description():
         name="slam_toolbox",
         output="screen",
         parameters=[
-            # YAML files
-            slam_config_path  # Parameters
+            slam_config_path,
+            {"odom_frame": "odom"},
+            {"base_frame": "base_link"},
         ],
         remappings=[("/scan", "/ldlidar_node/scan")],
+    )
+
+    # --- 追加: 実際のオドメトリ発行ノード (C++コード側) ---
+    # ※package名とexecutable名は、ご自身のCMakeLists.txtの設定に合わせて書き換えてください
+    real_odom_node = Node(
+        package="nr26_r2_hw_ctrl",
+        executable="r2_odom",
+        name="r2_odom",
+        output="log",
+    )
+
+    # --- 追加: base_link から LIDAR への静的TF ---
+    # オドメトリが odom -> base_link を作るので、
+    # センサーの位置(base_linkから見たLIDARの位置)を定義する必要があります。
+    base_to_lidar_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="base_to_lidar_broadcaster",
+        output="screen",
+        # 引数: x y z yaw pitch roll parent_frame child_frame
+        # ここではLIDARが機体中心(0,0,0)にあると仮定しています
+        arguments=["0", "0", "0", "0", "0", "0", "base_link", "ldlidar_link"],
     )
 
     # Include LDLidar launch
@@ -74,21 +79,12 @@ def generate_launch_description():
         launch_arguments={"node_name": "ldlidar_node"}.items(),
     )
 
-    # Fake odom publisher
-    fake_odom = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="static_transform_publisher",
-        output="screen",
-        arguments=["0", "0", "0", "0", "0", "0", "odom", "ldlidar_base"],
-    )
-
     # RVIZ2 settings
     rviz2_config = os.path.join(
         get_package_share_directory("ldlidar_node"), "config", "ldlidar_slam.rviz"
     )
 
-    # RVIZ2node
+    # RVIZ2 node
     rviz2_node = Node(
         package="rviz2",
         executable="rviz2",
@@ -97,22 +93,19 @@ def generate_launch_description():
         arguments=[["-d"], [rviz2_config]],
     )
 
-    # Define LaunchDescription variable
     ld = LaunchDescription()
 
-    # Launch Nav2 Lifecycle Manager
+    # 1. ライフサイクルマネージャー
     ld.add_action(lc_mgr_node)
-
-    # Launch SLAM Toolbox node
+    # 2. SLAM Toolbox
     ld.add_action(slam_toolbox_node)
-
-    # Launch fake odom publisher node
-    ld.add_action(fake_odom)
-
-    # Call LDLidar launch
+    # 3. 実際のオドメトリノード (C++)
+    ld.add_action(real_odom_node)
+    # 4. ロボットとLIDARの相対位置関係のTF
+    ld.add_action(base_to_lidar_tf)
+    # 5. LIDARドライバ
     ld.add_action(ldlidar_launch)
-
-    # Start RVIZ2
+    # 6. 可視化
     ld.add_action(rviz2_node)
 
     return ld
