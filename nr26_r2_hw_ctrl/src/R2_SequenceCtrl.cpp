@@ -8,6 +8,10 @@ R2について以下の不具合を確認しています。
 L1、R1で回転しようとすると前進、後進してしまう
 マイコンのモードによりロボマスとエンコーダの取得のみしかできずソレノイドの駆動ができない（新規モードの作成が必要）
 シーケンス内の前進において前進せずその場で回転してしまう
+現状
+前 sdm15_value_[1],sdm15_value_[0],sdm15_value_[2] 後
+順番ずつ装着する
+
 */
 
 // 標準
@@ -248,10 +252,10 @@ private:
         auto now_time = now();
         switch (state_up_)
         {
-        case StepUpState::IDLE:
+        case StepUpState::IDLE: // アイドリングストップ
             break;
 
-        case StepUpState::ALL_UP:
+        case StepUpState::ALL_UP: // 全て上げる
             if (!state_executed_)
             {
                 all_up();
@@ -260,7 +264,7 @@ private:
             next_up(StepUpState::FIRST_FORWARD);
             break;
 
-        case StepUpState::FIRST_FORWARD:
+        case StepUpState::FIRST_FORWARD: // 前進
             if (!state_executed_)
             {
                 move_forward();
@@ -272,7 +276,7 @@ private:
             }
             break;
 
-        case StepUpState::FRONT_DOWN:
+        case StepUpState::FRONT_DOWN: // 前を下げる
             if (!state_executed_)
             {
                 front_down();
@@ -281,7 +285,7 @@ private:
             next_up(StepUpState::SECOND_FORWARD);
             break;
 
-        case StepUpState::SECOND_FORWARD:
+        case StepUpState::SECOND_FORWARD: // 前進
             if (!state_executed_)
             {
                 move_forward();
@@ -297,7 +301,7 @@ private:
             }
             break;
 
-        case StepUpState::REAR_DOWN:
+        case StepUpState::REAR_DOWN: // 後ろを下げる
             if (!state_executed_)
             {
                 rear_down();
@@ -306,7 +310,7 @@ private:
             next_up(StepUpState::FINAL_FORWARD);
             break;
 
-        case StepUpState::FINAL_FORWARD:
+        case StepUpState::FINAL_FORWARD: // 前進
             if (!state_executed_)
             {
                 move_forward();
