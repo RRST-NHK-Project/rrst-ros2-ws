@@ -167,18 +167,6 @@ private:
 
         // float rad = atan2(LS_Y, LS_X);
     }
-
-    float angle_error(float target, float current)
-    {
-        float error = target - current;
-
-        while (error > M_PI)
-            error -= 2.0 * M_PI;
-        while (error < -M_PI)
-            error += 2.0 * M_PI;
-
-        return error;
-    }
     // 制御ループ
     void publish_timer()
     {
@@ -187,15 +175,8 @@ private:
         // PID計算
         vx_ = pid_x_.update(X_, dt);
         vy_ = -pid_y_.update(Y_, dt); // Y軸反転（座標系による）
+        wz_ = -pid_yaw_.update(yaw_, dt);
 
-        float err_yaw = angle_error(target_yaw_, yaw_);
-        wz_ = -pid_yaw_.update_error(err_yaw, dt);
-
-        if (fabs(err_yaw) < 0.02) // 約1度
-        {
-            wz_ = 0.0;
-        }
-        //  wz_ = -pid_yaw_.update(yaw_, dt);
         float cos_yaw = cos(-yaw_);
         float sin_yaw = sin(-yaw_);
 
