@@ -180,6 +180,7 @@ private:
         float cos_yaw = cos(-yaw_);
         float sin_yaw = sin(-yaw_);
 
+        // オドメトリのデータをロボット座標系に変換
         float vx_robot = cos_yaw * vx_ + sin_yaw * vy_;
         float vy_robot = -sin_yaw * vx_ + cos_yaw * vy_;
 
