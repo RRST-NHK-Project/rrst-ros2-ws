@@ -79,19 +79,30 @@ public:
     {
         return mode_ != StepMode::NONE;
     }
+    // sdm15の値を更新する関数
+    void set_sdm15_value(int index, int32_t value)
+    {
+        sdm15_value_[index] = value;
+    }
 
 private:
     // 以下シーケンス内で使用する変数
     //  待機時間（要調整）
     static constexpr double up_first_forward_wait = 2.0;
     static constexpr double up_second_forward_wait = 7.0;
-    static constexpr double up_final_forward_wait = 3.0;
+    static constexpr double up_final_forward_wait = 6.0;
     static constexpr double down_first_forward_wait = 1.0;
     static constexpr double down_second_forward_wait = 1.0;
     static constexpr double down_final_forward_wait = 1.0;
 
     // 速度関連
-    static constexpr int forward_speed = 20;
+    static constexpr int forward_speed = 30;
+    static constexpr int up_speed = 40;
+    static constexpr int dis = 100;      // 障害物と見なす距離の閾値（要調整）
+    static constexpr int down_dis = 150; // sdm15の値がこの時間(ms)更新されなければタイムアウトと見なす
+
+    // シーケンスの状態管理に必要な変数
+    int32_t sdm15_value_[3] = {0, 0, 0};
 
     // モードの管理
     enum class StepMode
@@ -120,6 +131,7 @@ private:
         IDLE,
         FIRST_FORWARD,
         FRONT_UP,
+        STOP,
         SECOND_FORWARD,
         REAR_UP,
         FINAL_FORWARD,
@@ -169,6 +181,10 @@ private:
     {
         RCLCPP_INFO(get_logger(), "REAR DOWN");
         pkt.setTR(TR1, 0);
+        pkt.setMD(MD5, -up_speed);
+        pkt.setMD(MD6, up_speed);
+        pkt.setMD(MD7, up_speed);
+        pkt.setMD(MD8, -up_speed);
     }
 
     void stop_motion()
@@ -186,6 +202,10 @@ private:
     {
         RCLCPP_INFO(get_logger(), "FRONT UP");
         pkt.setTR(TR2, 1);
+        pkt.setMD(MD5, 0);
+        pkt.setMD(MD6, 0);
+        pkt.setMD(MD7, 0);
+        pkt.setMD(MD8, 0);
     }
 
     void rear_up()
@@ -210,6 +230,14 @@ private:
         pkt.setMD(MD8, -forward_speed);
     }
 
+    void move_stop()
+    {
+        RCLCPP_INFO(get_logger(), "MOVE STOP");
+        pkt.setMD(MD5, 10);
+        pkt.setMD(MD6, 10);
+        pkt.setMD(MD7, 10);
+        pkt.setMD(MD8, 10);
+    }
     // void move_backward() {
     //     RCLCPP_INFO(get_logger(), "MOVE BACKWARD");
     // }
@@ -259,7 +287,11 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > up_second_forward_wait)
+            // if ((now_time - state_start_time_).seconds() > up_second_forward_wait)
+            // {
+            //     next_up(StepUpState::REAR_DOWN);
+            // }
+            if (sdm15_value_[0] < dis)
             {
                 next_up(StepUpState::REAR_DOWN);
             }
@@ -313,7 +345,7 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > down_first_forward_wait)
+            if (sdm15_value_[1] > down_dis)
             {
                 next_down(StepDownState::FRONT_UP);
             }
@@ -325,7 +357,18 @@ private:
                 front_up();
                 state_executed_ = true;
             }
-            next_down(StepDownState::SECOND_FORWARD);
+            next_down(StepDownState::STOP);
+            break;
+        case StepDownState::STOP:
+            if (!state_executed_)
+            {
+                move_stop();
+                state_executed_ = true;
+            }
+            if ((now_time - state_start_time_).seconds() > down_second_forward_wait)
+            {
+                next_down(StepDownState::SECOND_FORWARD);
+            }
             break;
 
         case StepDownState::SECOND_FORWARD:
@@ -334,7 +377,7 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > down_second_forward_wait)
+            if (sdm15_value_[0] > down_dis)
             {
                 next_down(StepDownState::REAR_UP);
             }
@@ -355,7 +398,7 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > down_final_forward_wait)
+            if (sdm15_value_[2] > down_dis)
             {
                 next_down(StepDownState::ALL_DOWN);
             }
@@ -611,9 +654,11 @@ private:
     {
         sdm15_value[index] = msg->data;
 
-        RCLCPP_INFO(this->get_logger(),
-                    "distance: %d, %d, %d",
-                    sdm15_value[0], sdm15_value[1], sdm15_value[2]);
+        seq_->set_sdm15_value(index, msg->data);
+
+        // RCLCPP_INFO(this->get_logger(),
+        //             "distance: %d, %d, %d",
+        //             sdm15_value[0], sdm15_value[1], sdm15_value[2]);
     }
     uint8_t device_id_;
 
