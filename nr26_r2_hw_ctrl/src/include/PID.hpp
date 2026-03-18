@@ -2,13 +2,15 @@
 
 #include <algorithm>
 
-class PIDController {
+class PIDController
+{
 public:
     PIDController(float Kp, float Ki, float Kd, float max_out);
     void set_target(float target);
     void set_gain(float Kp, float Ki, float Kd);
     void reset();
     float update(float current, float dt);
+    float update_error(float error, float dt);
 
 private:
     float Kp_;
