@@ -187,7 +187,7 @@ def draw_final(result_img, m_xcenter, m_ycenter, deg_value, width_query):
     plt.show()
 
 
-def main():
+def main(self):
     print("realtime matching start")
     # 初期設定（ループの外で1回だけ実行) ←←←←←重要パラメーター慎重に扱うように！！！！
     akaze = cv2.AKAZE_create()
