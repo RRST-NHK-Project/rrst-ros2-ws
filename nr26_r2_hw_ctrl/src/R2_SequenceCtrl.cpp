@@ -21,6 +21,7 @@ L1、R1で回転しようとすると前進、後進してしまう
 #include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int16_multi_array.hpp"
+#include "std_msgs/msg/int32.hpp"
 
 // 自作
 #include "include/PacketController.hpp"
@@ -389,17 +390,17 @@ private:
         {
 
         case StepMode::NONE:
-            std::cout << "None sequence" << std::endl;
+            // std::cout << "None sequence" << std::endl;
             break;
 
         case StepMode::STEP_UP:
             step_up_sequence();
-            std::cout << "Up sequence" << std::endl;
+            // std::cout << "Up sequence" << std::endl;
             break;
 
         case StepMode::STEP_DOWN:
             step_down_sequence();
-            std::cout << "Down sequence" << std::endl;
+            // std::cout << "Down sequence" << std::endl;
             break;
         }
     }
@@ -435,6 +436,12 @@ public:
                       this,
                       std::placeholders::_1));
 
+        // sdm15のSubscribe
+        sdm15_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+            "/lidar1/sdm15/distance",
+            rclcpp::SensorDataQoS(),
+            std::bind(&HardWareControl::sdm15_callback, this, std::placeholders::_1));
+
         RCLCPP_INFO(get_logger(),
                     "serial_tx_%d started.", device_id_);
     }
@@ -449,6 +456,8 @@ private:
 
     float v1, v2, v3, v4; // 各メカナムホイールの速度指令値
                           // v1:第一象限, v2:第二象限, v3:第三象限, v4:第四象限
+
+    int32_t sdm15_value_ = 0; // sdm15の距離値
 
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg)
     {
@@ -579,11 +588,18 @@ private:
         }
     }
 
+    void sdm15_callback(const std_msgs::msg::Int32::SharedPtr msg)
+    {
+        sdm15_value_ = msg->data;
+
+        RCLCPP_INFO(this->get_logger(), "distance: %d", sdm15_value_);
+    }
     uint8_t device_id_;
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sensor_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr sdm15_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     std::vector<int16_t> data_;
