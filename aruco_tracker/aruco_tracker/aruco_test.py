@@ -1,96 +1,121 @@
 import cv2
 import numpy as np
 from cv2 import aruco
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import PoseStamped
+from std_msgs.msg import Int32
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
 
-def main():
+class ArucoPosePublisher(Node):
+    def __init__(self):
+        super().__init__('aruco_pose_publisher')
 
-    # カメラを開く
-    # 0 はデフォルトのカメラ（USBカメラや内蔵カメラ）
-    cap = cv2.VideoCapture(4, cv2.CAP_V4L2)
+        # Publisher
+        self.pose_pub = self.create_publisher(PoseStamped, 'aruco_pose', 10)
+        self.id_pub = self.create_publisher(Int32, 'aruco_id', 10)
+        self.bridge = CvBridge()
+        self.image_pub = self.create_publisher(Image, '/camera/image_raw', 10)
+      
+        # Camera
+        self.cap = cv2.VideoCapture(4, cv2.CAP_V4L2)
+        if not self.cap.isOpened():
+            self.get_logger().error("カメラが開けません")
+            exit()
 
-    if not cap.isOpened():
-        print("カメラが開けません")
-        exit()
+        # ArUco
+        self.aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
+        self.parameters = aruco.DetectorParameters_create()
 
-    # ArUco 辞書
-    #4x4 サイズ、50 個のマーカー
-    aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
-    parameters = aruco.DetectorParameters_create()
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        self.parameters.cornerRefinementMethod = aruco.CORNER_REFINE_NONE
 
-    # ===== カメラ内部パラメータ（仮）=====
-    camera_matrix = np.array([
-        [600,   0, 320],
-        [  0, 600, 240],
-        [  0,   0,   1]
-    ], dtype=np.float32)
+        # Camera params
+        self.camera_matrix = np.array([
+            [600,   0, 320],
+            [  0, 600, 240],
+            [  0,   0,   1]
+        ], dtype=np.float32)
 
-    #| 値       | 意味            |
-    #| ------- | ------------- |
-    #| 600     | 焦点距離 fx, fy   |
-    #| 320,240 | 画像中心 (cx, cy) |
-    #| 下段      | 固定            |
+        self.dist_coeffs = np.zeros((5, 1))
+        self.marker_length = 0.05
 
+        # Timer (30 FPS)
+        self.timer = self.create_timer(1.0/30.0, self.timer_callback)
 
-    dist_coeffs = np.zeros((5, 1))
-
-    # ===== マーカーの実サイズ（m）=====
-    marker_length = 0.05  # 5cm
-
-    while True:
-        ret, frame = cap.read() #ret:取得成功フラグ, frame:取得画像
+    def timer_callback(self):
+        ret, frame = self.cap.read()
         if not ret:
-            print("フレーム取得失敗")
-            break
+            self.get_logger().warn("フレーム取得失敗")
+            return
 
-        # マーカー検出 corners:マーカーの4隅の座標, ids:マーカーID, rejected:検出失敗マーカー
+        ret, frame = self.cap.read()
+        
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
         corners, ids, rejected = aruco.detectMarkers(
-            frame, aruco_dict, parameters=parameters
+            
+            gray, self.aruco_dict, parameters=self.parameters
         )
 
-        if ids is not None:
-            # マーカー枠描画
-            aruco.drawDetectedMarkers(frame, corners, ids)
+        img_msg = self.bridge.cv2_to_imgmsg(frame, encoding='bgr8')
+        self.image_pub.publish(img_msg)
 
-            # ===== 姿勢推定 =====
+
+        if ids is not None:
+
             rvecs, tvecs, _ = aruco.estimatePoseSingleMarkers(
                 corners,
-                marker_length,
-                camera_matrix,
-                dist_coeffs
+                self.marker_length,
+                self.camera_matrix,
+                self.dist_coeffs
             )
 
-            for i in range(len(ids)):
-                # 座標軸描画
-                cv2.drawFrameAxes(
-                    frame,
-                    camera_matrix,
-                    dist_coeffs,
-                    rvecs[i],
-                    tvecs[i],
-                    0.03  # 軸の長さ（m）
-                )
+            # 1つ目のマーカーだけ publish（複数対応も可能）
+            t = tvecs[0][0]
+            r = rvecs[0][0]
+            marker_id = int(ids[0][0])
 
-                # 位置表示（カメラ座標系）
-                t = tvecs[i][0]
-                text = f"ID:{ids[i][0]} x:{t[0]:.2f} y:{t[1]:.2f} z:{t[2]:.2f} m"
-                cv2.putText(
-                    frame,
-                    text,
-                    (10, 30 + 30 * i),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (0, 255, 0),
-                    2
-                )
+            # PoseStamped
+            pose_msg = PoseStamped()
+            pose_msg.header.stamp = self.get_clock().now().to_msg()
+            pose_msg.header.frame_id = "camera"
 
-        cv2.imshow("Aruco Pose Estimation", frame)
+            pose_msg.pose.position.x = float(t[0])
+            pose_msg.pose.position.y = float(t[1])
+            pose_msg.pose.position.z = float(t[2])
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+            # rvec → quaternion（OpenCV の Rodrigues）
+            R, _ = cv2.Rodrigues(r)
+            qw = np.sqrt(1.0 + R[0,0] + R[1,1] + R[2,2]) / 2.0
+            qx = (R[2,1] - R[1,2]) / (4.0 * qw)
+            qy = (R[0,2] - R[2,0]) / (4.0 * qw)
+            qz = (R[1,0] - R[0,1]) / (4.0 * qw)
 
-    cap.release()
-    cv2.destroyAllWindows()
+            pose_msg.pose.orientation.x = float(qx)
+            pose_msg.pose.orientation.y = float(qy)
+            pose_msg.pose.orientation.z = float(qz)
+            pose_msg.pose.orientation.w = float(qw)
 
+            # Publish
+            self.pose_pub.publish(pose_msg)
+
+            id_msg = Int32()
+            id_msg.data = marker_id
+            self.id_pub.publish(id_msg)
+
+            # Debug print
+            self.get_logger().info(
+                f"ID:{marker_id} Pos=({t[0]:.2f}, {t[1]:.2f}, {t[2]:.2f})"
+            )
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = ArucoPosePublisher()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

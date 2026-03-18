@@ -28,6 +28,7 @@ setup(
         'aruco_generator = aruco_tracker.aruco_generator:main',
         'camera = aruco_tracker.camera:main',
         'camera_calibration = aruco_tracker.camera_calibration:main',
+        'aruco_viewer = aruco_tracker.aruco_viewer:main'
         ],
     },
 )
