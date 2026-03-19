@@ -1,3 +1,4 @@
+import os
 from setuptools import find_packages, setup
 
 package_name = 'aruco_tracker'
@@ -10,13 +11,15 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        (os.path.join('share', package_name, 'launch'),
+            ['launch/aruco.launch.py']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='ubuntu',
     maintainer_email='koki2022@gmail.com',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    description='ArUco marker detection package',
+    license='Apache-2.0',
     extras_require={
         'test': [
             'pytest',
@@ -24,11 +27,12 @@ setup(
     },
     entry_points={
         'console_scripts': [
-        'aruco_test = aruco_tracker.aruco_test:main',
-        'aruco_generator = aruco_tracker.aruco_generator:main',
-        'camera = aruco_tracker.camera:main',
-        'camera_calibration = aruco_tracker.camera_calibration:main',
-        'aruco_viewer = aruco_tracker.aruco_viewer:main'
+            'aruco_detector = aruco_tracker.aruco_detector_node:main',
+            'aruco_test = aruco_tracker.aruco_test:main',
+            'aruco_generator = aruco_tracker.aruco_generator:main',
+            'camera = aruco_tracker.camera:main',
+            'camera_calibration = aruco_tracker.camera_calibration:main',
+            'aruco_viewer = aruco_tracker.aruco_viewer:main',
         ],
     },
 )
