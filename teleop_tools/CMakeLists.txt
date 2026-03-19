@@ -10,6 +10,22 @@ find_package(ament_cmake REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+
+add_executable(sb_tester src/Serial_Bridge_Tester.cpp)
+ament_target_dependencies(sb_tester rclcpp std_msgs sensor_msgs geometry_msgs)
+
+add_executable(sb_host src/Serial_Bridge_Host.cpp)
+ament_target_dependencies(sb_host rclcpp std_msgs sensor_msgs geometry_msgs)
+
+# インストール設定
+install(TARGETS
+  sb_tester
+  sb_host
+  DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
