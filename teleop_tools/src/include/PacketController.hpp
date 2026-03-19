@@ -58,11 +58,10 @@ enum DataIndex : int {
     TR4,
     TR5,
     TR6,
-    TR7,
-    TR8 // 17~24
+    TR7 // 17~23
 };
 
-constexpr int DATA_SIZE = 25;
+constexpr int DATA_SIZE = 24;
 
 class PacketController {
 public:
@@ -85,7 +84,7 @@ public:
     }
 
     void setTR(int index, bool value) {
-        if (index < 17 || index > 24)
+        if (index < 17 || index > 23)
             return;
         data_[index] = value ? 1 : 0;
     }
