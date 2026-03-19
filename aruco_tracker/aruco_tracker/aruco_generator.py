@@ -1,36 +1,67 @@
-# GPT製注意
-
 import cv2
-import cv2.aruco as aruco
-import os
+import numpy as np
+from PIL import Image
+
+aruco = cv2.aruco
+
+# ===== 設定 =====
+dpi = 300
+
+# A4サイズ(px)
+A4_WIDTH = int(210 / 25.4 * dpi)
+A4_HEIGHT = int(297 / 25.4 * dpi)
+
+aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
+
+marker_size = 800  # ←ここだけ変えればOK（px）
+
+margin = 20  # マーカー間の余白(px)
+
+# =================
+
+
+def create_marker(marker_id, size):
+    return aruco.drawMarker(aruco_dict, marker_id, size)
+
 
 def main():
-    # このスクリプト(.py)と同じディレクトリを取得
-    script_dir = os.path.dirname(os.path.abspath(__file__))
+    canvas = np.ones((A4_HEIGHT, A4_WIDTH), dtype=np.uint8) * 255
 
-    # 使用する辞書を選択
-    aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
+    step = marker_size + margin
 
-    # マーカー設定
+    cols = A4_WIDTH // step
+    rows = A4_HEIGHT // step
+
     marker_id = 0
-    marker_size = 200  # ピクセル単位
 
-    # マーカー生成
-    marker_image = aruco.generateImageMarker(aruco_dict, marker_id, marker_size)
+    for y in range(rows):
+        for x in range(cols):
+            marker = create_marker(marker_id % 50, marker_size)
 
-    # 保存パスを作成
-    filename = f"aruco_marker_{marker_id}.png"
-    save_path = os.path.join(script_dir, filename)
+            pos_x = x * step + margin // 2
+            pos_y = y * step + margin // 2
 
-    # 画像を保存
-    cv2.imwrite(save_path, marker_image)
-    print(f"Saved: {save_path}")
+            canvas[pos_y : pos_y + marker_size, pos_x : pos_x + marker_size] = marker
 
-    # 表示（任意）
-    cv2.imshow("ArUco Marker", marker_image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+            # ID表示（必要なければ消してOK）
+            cv2.putText(
+                canvas,
+                str(marker_id % 50),
+                (pos_x, pos_y + marker_size + 15),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0),
+                1,
+                cv2.LINE_AA,
+            )
 
-if __name__ == '__main__':
+            marker_id += 1
+
+    img = Image.fromarray(canvas)
+    img.save(f"aruco_A4_size_{marker_size}.png")
+
+    print(f"完了：{cols}x{rows} = {cols*rows}個配置")
+
+
+if __name__ == "__main__":
     main()
-
