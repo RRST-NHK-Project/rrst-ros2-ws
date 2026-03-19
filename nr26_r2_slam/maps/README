@@ -1,0 +1,4 @@
+# このディレクトリに slam_toolbox で保存した地図ファイルを置いてください。
+# 地図の保存方法:
+#   ros2 run nav2_map_server map_saver_cli -f <このディレクトリへのパス>/my_map
+#   または slam_toolbox の RViz2 パネルの "Serialize Map" ボタンを使用してください。
