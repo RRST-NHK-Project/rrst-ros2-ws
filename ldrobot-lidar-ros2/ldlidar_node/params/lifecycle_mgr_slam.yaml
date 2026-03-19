@@ -5,7 +5,7 @@
 /**:
   ros__parameters:
     autostart: True
-    node_names: ['ldlidar_node']
+    node_names: ['slam_toolbox']
     bond_timeout: 5.0
     attempt_respawn_reconnection: true
     bond_respawn_max_duration: 10.0
