@@ -11,17 +11,17 @@ from cv_bridge import CvBridge
 
 class ArucoPosePublisher(Node):
     def __init__(self):
-        super().__init__('aruco_pose_publisher')
+        super().__init__("aruco_pose_publisher")
 
         # Publishers
-        self.pose_pub = self.create_publisher(PoseStamped, 'aruco_pose', 10)
-        self.id_pub = self.create_publisher(Int32, 'aruco_id', 10)
-        self.distance_pub = self.create_publisher(Float32, 'aruco_distance', 10)
+        self.pose_pub = self.create_publisher(PoseStamped, "aruco_pose", 10)
+        self.id_pub = self.create_publisher(Int32, "aruco_id", 10)
+        self.distance_pub = self.create_publisher(Float32, "aruco_distance", 10)
         self.bridge = CvBridge()
-        self.image_pub = self.create_publisher(Image, '/camera/image_raw', 10)
+        self.image_pub = self.create_publisher(Image, "/camera/image_raw", 10)
 
         # Camera
-        self.cap = cv2.VideoCapture(4, cv2.CAP_V4L2)
+        self.cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
         if not self.cap.isOpened():
             self.get_logger().error("カメラが開けません")
             exit()
@@ -42,23 +42,24 @@ class ArucoPosePublisher(Node):
         self.parameters.cornerRefinementMethod = aruco.CORNER_REFINE_NONE
 
         # Camera params (placeholder – load from calibration file when available)
-        self.camera_matrix = np.array([
-            [600,   0, 320],
-            [  0, 600, 240],
-            [  0,   0,   1]
-        ], dtype=np.float32)
+        self.camera_matrix = np.array(
+            [[600, 0, 320], [0, 600, 240], [0, 0, 1]], dtype=np.float32
+        )
 
         self.dist_coeffs = np.zeros((5, 1))
         self.marker_length = 0.05  # マーカーの一辺の長さ [m]
 
         # Marker object points for solvePnP (used when estimatePoseSingleMarkers unavailable)
         half = self.marker_length / 2.0
-        self._obj_pts = np.array([
-            [-half,  half, 0],
-            [ half,  half, 0],
-            [ half, -half, 0],
-            [-half, -half, 0],
-        ], dtype=np.float32)
+        self._obj_pts = np.array(
+            [
+                [-half, half, 0],
+                [half, half, 0],
+                [half, -half, 0],
+                [-half, -half, 0],
+            ],
+            dtype=np.float32,
+        )
 
         # Timer (30 FPS)
         self.timer = self.create_timer(1.0 / 30.0, self.timer_callback)
@@ -79,8 +80,10 @@ class ArucoPosePublisher(Node):
             return rvecs[0][0], tvecs[0][0]
         except AttributeError:
             _, r, t = cv2.solvePnP(
-                self._obj_pts, corners[0][0],
-                self.camera_matrix, self.dist_coeffs,
+                self._obj_pts,
+                corners[0][0],
+                self.camera_matrix,
+                self.dist_coeffs,
                 flags=cv2.SOLVEPNP_IPPE_SQUARE,
             )
             return r.flatten(), t.flatten()
@@ -124,7 +127,7 @@ class ArucoPosePublisher(Node):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         corners, ids, _ = self._detect_markers(gray)
 
-        img_msg = self.bridge.cv2_to_imgmsg(frame, encoding='bgr8')
+        img_msg = self.bridge.cv2_to_imgmsg(frame, encoding="bgr8")
         self.image_pub.publish(img_msg)
 
         if ids is not None:
@@ -139,7 +142,7 @@ class ArucoPosePublisher(Node):
             # PoseStamped
             pose_msg = PoseStamped()
             pose_msg.header.stamp = self.get_clock().now().to_msg()
-            pose_msg.header.frame_id = 'camera'
+            pose_msg.header.frame_id = "camera"
 
             pose_msg.pose.position.x = float(t[0])
             pose_msg.pose.position.y = float(t[1])
@@ -166,9 +169,9 @@ class ArucoPosePublisher(Node):
             self.distance_pub.publish(dist_msg)
 
             self.get_logger().info(
-                f'ID:{marker_id} '
-                f'Pos=({t[0]:.2f}, {t[1]:.2f}, {t[2]:.2f}) '
-                f'Dist={distance:.2f}m'
+                f"ID:{marker_id} "
+                f"Pos=({t[0]:.2f}, {t[1]:.2f}, {t[2]:.2f}) "
+                f"Dist={distance:.2f}m"
             )
 
 
@@ -180,5 +183,5 @@ def main(args=None):
     rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
