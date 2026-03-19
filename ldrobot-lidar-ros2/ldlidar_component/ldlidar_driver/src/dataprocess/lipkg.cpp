@@ -69,7 +69,10 @@ LiPkg::LiPkg()
   measure_point_frequence_(4500),
   get_timestamp_(nullptr),
   last_pkg_timestamp_(0),
-  first_frame_(true)
+  first_frame_(true),
+  parse_state_(PARSE_HEADER),
+  parse_count_(0),
+  parse_tmp_{}
 {
 
 }
@@ -102,40 +105,32 @@ void LiPkg::SetProductType(LDType type_number)
 
 bool LiPkg::AnalysisOne(uint8_t byte)
 {
-  static enum
-  {
-    HEADER,
-    VER_LEN,
-    DATA,
-  } state = HEADER;
-  static uint16_t count = 0;
-  static uint8_t tmp[128] = {0};
-  static uint16_t pkg_count = sizeof(LiDARFrameTypeDef);
+  static const uint16_t pkg_count = sizeof(LiDARFrameTypeDef);
 
-  switch (state) {
-    case HEADER:
+  switch (parse_state_) {
+    case PARSE_HEADER:
       if (byte == PKG_HEADER) {
-        tmp[count++] = byte;
-        state = VER_LEN;
+        parse_tmp_[parse_count_++] = byte;
+        parse_state_ = PARSE_VER_LEN;
       }
       break;
-    case VER_LEN:
+    case PARSE_VER_LEN:
       if (byte == PKG_VER_LEN) {
-        tmp[count++] = byte;
-        state = DATA;
+        parse_tmp_[parse_count_++] = byte;
+        parse_state_ = PARSE_DATA;
       } else {
-        state = HEADER;
-        count = 0;
+        parse_state_ = PARSE_HEADER;
+        parse_count_ = 0;
         return false;
       }
       break;
-    case DATA:
-      tmp[count++] = byte;
-      if (count >= pkg_count) {
-        memcpy((uint8_t *)&pkg_, tmp, pkg_count);
+    case PARSE_DATA:
+      parse_tmp_[parse_count_++] = byte;
+      if (parse_count_ >= pkg_count) {
+        memcpy((uint8_t *)&pkg_, parse_tmp_, pkg_count);
         uint8_t crc = CalCRC8((uint8_t *)&pkg_, pkg_count - 1);
-        state = HEADER;
-        count = 0;
+        parse_state_ = PARSE_HEADER;
+        parse_count_ = 0;
         if (crc == pkg_.crc8) {
           return true;
         } else {
@@ -322,12 +317,7 @@ void LiPkg::RegisterTimestampGetFunctional(std::function<uint64_t(void)> timesta
 
 bool LiPkg::GetLidarPowerOnCommStatus(void)
 {
-  if (is_poweron_comm_normal_) {
-    is_poweron_comm_normal_ = false;
-    return true;
-  } else {
-    return false;
-  }
+  return is_poweron_comm_normal_.exchange(false);
 }
 
 void LiPkg::EnableFilter(bool is_enable)

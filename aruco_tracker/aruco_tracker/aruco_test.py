@@ -4,45 +4,119 @@ from cv2 import aruco
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
-from std_msgs.msg import Int32
+from std_msgs.msg import Float32, Int32
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 
+
 class ArucoPosePublisher(Node):
     def __init__(self):
-        super().__init__('aruco_pose_publisher')
+        super().__init__("aruco_pose_publisher")
 
-        # Publisher
-        self.pose_pub = self.create_publisher(PoseStamped, 'aruco_pose', 10)
-        self.id_pub = self.create_publisher(Int32, 'aruco_id', 10)
+        # Publishers
+        self.pose_pub = self.create_publisher(PoseStamped, "aruco_pose", 10)
+        self.id_pub = self.create_publisher(Int32, "aruco_id", 10)
+        self.distance_pub = self.create_publisher(Float32, "aruco_distance", 10)
         self.bridge = CvBridge()
-        self.image_pub = self.create_publisher(Image, '/camera/image_raw', 10)
-      
+        self.image_pub = self.create_publisher(Image, "/camera/image_raw", 10)
+
         # Camera
-        self.cap = cv2.VideoCapture(4, cv2.CAP_V4L2)
+        self.cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
         if not self.cap.isOpened():
             self.get_logger().error("カメラが開けません")
             exit()
 
-        # ArUco
+        # ArUco dictionary
         self.aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
-        self.parameters = aruco.DetectorParameters_create()
+
+        # Support both old (OpenCV < 4.7) and new (OpenCV >= 4.7) detector API
+        try:
+            self.parameters = aruco.DetectorParameters()
+            self.detector = aruco.ArucoDetector(self.aruco_dict, self.parameters)
+            self._use_new_api = True
+        except AttributeError:
+            self.parameters = aruco.DetectorParameters_create()  # type: ignore[attr-defined]
+            self._use_new_api = False
 
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self.parameters.cornerRefinementMethod = aruco.CORNER_REFINE_NONE
 
-        # Camera params
-        self.camera_matrix = np.array([
-            [600,   0, 320],
-            [  0, 600, 240],
-            [  0,   0,   1]
-        ], dtype=np.float32)
+        # Camera params (placeholder – load from calibration file when available)
+        self.camera_matrix = np.array(
+            [[600, 0, 320], [0, 600, 240], [0, 0, 1]], dtype=np.float32
+        )
 
         self.dist_coeffs = np.zeros((5, 1))
-        self.marker_length = 0.05
+        self.marker_length = 0.05  # マーカーの一辺の長さ [m]
+
+        # Marker object points for solvePnP (used when estimatePoseSingleMarkers unavailable)
+        half = self.marker_length / 2.0
+        self._obj_pts = np.array(
+            [
+                [-half, half, 0],
+                [half, half, 0],
+                [half, -half, 0],
+                [-half, -half, 0],
+            ],
+            dtype=np.float32,
+        )
 
         # Timer (30 FPS)
-        self.timer = self.create_timer(1.0/30.0, self.timer_callback)
+        self.timer = self.create_timer(1.0 / 30.0, self.timer_callback)
+
+    def _detect_markers(self, gray):
+        if self._use_new_api:
+            return self.detector.detectMarkers(gray)
+        return aruco.detectMarkers(  # type: ignore[attr-defined]
+            gray, self.aruco_dict, parameters=self.parameters
+        )
+
+    def _estimate_pose(self, corners):
+        """ポーズ推定 – estimatePoseSingleMarkers が利用できない場合は solvePnP を使用."""
+        try:
+            rvecs, tvecs, _ = aruco.estimatePoseSingleMarkers(  # type: ignore[attr-defined]
+                corners, self.marker_length, self.camera_matrix, self.dist_coeffs
+            )
+            return rvecs[0][0], tvecs[0][0]
+        except AttributeError:
+            _, r, t = cv2.solvePnP(
+                self._obj_pts,
+                corners[0][0],
+                self.camera_matrix,
+                self.dist_coeffs,
+                flags=cv2.SOLVEPNP_IPPE_SQUARE,
+            )
+            return r.flatten(), t.flatten()
+
+    @staticmethod
+    def _rotation_to_quaternion(R):
+        """回転行列をクォータニオン (x, y, z, w) に変換する (Shepperd法)."""
+        trace = R[0, 0] + R[1, 1] + R[2, 2]
+        if trace > 0:
+            s = 0.5 / np.sqrt(trace + 1.0)
+            qw = 0.25 / s
+            qx = (R[2, 1] - R[1, 2]) * s
+            qy = (R[0, 2] - R[2, 0]) * s
+            qz = (R[1, 0] - R[0, 1]) * s
+        elif R[0, 0] > R[1, 1] and R[0, 0] > R[2, 2]:
+            s = 2.0 * np.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2])
+            qw = (R[2, 1] - R[1, 2]) / s
+            qx = 0.25 * s
+            qy = (R[0, 1] + R[1, 0]) / s
+            qz = (R[0, 2] + R[2, 0]) / s
+        elif R[1, 1] > R[2, 2]:
+            s = 2.0 * np.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2])
+            qw = (R[0, 2] - R[2, 0]) / s
+            qx = (R[0, 1] + R[1, 0]) / s
+            qy = 0.25 * s
+            qz = (R[1, 2] + R[2, 1]) / s
+        else:
+            s = 2.0 * np.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1])
+            qw = (R[1, 0] - R[0, 1]) / s
+            qx = (R[0, 2] + R[2, 0]) / s
+            qy = (R[1, 2] + R[2, 1]) / s
+            qz = 0.25 * s
+        return float(qx), float(qy), float(qz), float(qw)
 
     def timer_callback(self):
         ret, frame = self.cap.read()
@@ -50,32 +124,20 @@ class ArucoPosePublisher(Node):
             self.get_logger().warn("フレーム取得失敗")
             return
 
-        ret, frame = self.cap.read()
-        
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        corners, ids, _ = self._detect_markers(gray)
 
-        corners, ids, rejected = aruco.detectMarkers(
-            
-            gray, self.aruco_dict, parameters=self.parameters
-        )
-
-        img_msg = self.bridge.cv2_to_imgmsg(frame, encoding='bgr8')
+        img_msg = self.bridge.cv2_to_imgmsg(frame, encoding="bgr8")
         self.image_pub.publish(img_msg)
 
-
         if ids is not None:
-
-            rvecs, tvecs, _ = aruco.estimatePoseSingleMarkers(
-                corners,
-                self.marker_length,
-                self.camera_matrix,
-                self.dist_coeffs
-            )
+            r, t = self._estimate_pose(corners)
 
             # 1つ目のマーカーだけ publish（複数対応も可能）
-            t = tvecs[0][0]
-            r = rvecs[0][0]
             marker_id = int(ids[0][0])
+
+            # カメラからマーカーまでのユークリッド距離 [m]
+            distance = float(np.linalg.norm(t))
 
             # PoseStamped
             pose_msg = PoseStamped()
@@ -86,12 +148,9 @@ class ArucoPosePublisher(Node):
             pose_msg.pose.position.y = float(t[1])
             pose_msg.pose.position.z = float(t[2])
 
-            # rvec → quaternion（OpenCV の Rodrigues）
+            # rvec → quaternion（OpenCV の Rodrigues → Shepperd法）
             R, _ = cv2.Rodrigues(r)
-            qw = np.sqrt(1.0 + R[0,0] + R[1,1] + R[2,2]) / 2.0
-            qx = (R[2,1] - R[1,2]) / (4.0 * qw)
-            qy = (R[0,2] - R[2,0]) / (4.0 * qw)
-            qz = (R[1,0] - R[0,1]) / (4.0 * qw)
+            qx, qy, qz, qw = self._rotation_to_quaternion(R)
 
             pose_msg.pose.orientation.x = float(qx)
             pose_msg.pose.orientation.y = float(qy)
@@ -105,10 +164,16 @@ class ArucoPosePublisher(Node):
             id_msg.data = marker_id
             self.id_pub.publish(id_msg)
 
-            # Debug print
+            dist_msg = Float32()
+            dist_msg.data = distance
+            self.distance_pub.publish(dist_msg)
+
             self.get_logger().info(
-                f"ID:{marker_id} Pos=({t[0]:.2f}, {t[1]:.2f}, {t[2]:.2f})"
+                f"ID:{marker_id} "
+                f"Pos=({t[0]:.2f}, {t[1]:.2f}, {t[2]:.2f}) "
+                f"Dist={distance:.2f}m"
             )
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -117,5 +182,6 @@ def main(args=None):
     node.destroy_node()
     rclpy.shutdown()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

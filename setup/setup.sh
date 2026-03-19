@@ -21,5 +21,8 @@ sudo apt-get install -y libudev-dev
 sudo apt-get install -y ros-jazzy-diagnostic-updater
 sudo apt-get install -y ros-jazzy-nav2-util
 
+# 以下ArUco用
+sudo apt install libopencv-dev python3-opencv
+
 # 他のスクリプトに一括で実行権限を渡す
 sudo chmod +x "${HOME}/ros2_ws/src/setup/"*.sh || true #エラーが出ても無視
