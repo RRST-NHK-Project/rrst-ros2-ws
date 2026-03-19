@@ -8,6 +8,7 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <mutex>
 #include <thread>
 
 // ROS
@@ -52,35 +53,11 @@ public:
 
         RCLCPP_INFO(get_logger(), "serial_rx_%d subscriber started.", device_id_);
 
-        // SLAMが起動時にTFを即座に利用できるよう、初期位置(原点)のTFとオドメトリを発行する
-        // （シリアルデータが届く前にキューにスキャンが溜まるのを防ぐ）
-        auto now = this->get_clock()->now();
-
-        nav_msgs::msg::Odometry init_odom;
-        init_odom.header.stamp = now;
-        init_odom.header.frame_id = "odom";
-        init_odom.child_frame_id = "base_link";
-        init_odom.pose.pose.position.x = 0.0;
-        init_odom.pose.pose.position.y = 0.0;
-        init_odom.pose.pose.position.z = 0.0;
-        init_odom.pose.pose.orientation.x = 0.0;
-        init_odom.pose.pose.orientation.y = 0.0;
-        init_odom.pose.pose.orientation.z = 0.0;
-        init_odom.pose.pose.orientation.w = 1.0;
-        odom_nav_pub_->publish(init_odom);
-
-        geometry_msgs::msg::TransformStamped init_tf;
-        init_tf.header.stamp = now;
-        init_tf.header.frame_id = "odom";
-        init_tf.child_frame_id = "base_link";
-        init_tf.transform.translation.x = 0.0;
-        init_tf.transform.translation.y = 0.0;
-        init_tf.transform.translation.z = 0.0;
-        init_tf.transform.rotation.x = 0.0;
-        init_tf.transform.rotation.y = 0.0;
-        init_tf.transform.rotation.z = 0.0;
-        init_tf.transform.rotation.w = 1.0;
-        tf_broadcaster_->sendTransform(init_tf);
+        // SLAMが起動時から常に odom → base_link TF を提供するため、定周期タイマーで発行する
+        // （シリアルデータが届く前・途切れた場合でもキューにスキャンが溜まるのを防ぐ）
+        tf_timer_ = this->create_wall_timer(
+            std::chrono::milliseconds(PUBLISH_RATE_MS),
+            std::bind(&HardWareControl::publishCurrentState, this));
     }
 
 private:
@@ -105,6 +82,58 @@ private:
     double X = 0.0;
     double Y = 0.0;
     double yaw_ = 0.0;
+
+    // 速度（publishCurrentState で参照するため保持）
+    float vx_ = 0.0f;
+    float vy_ = 0.0f;
+    float wz_ = 0.0f;
+
+    std::mutex pose_mutex_;
+
+    // 現在の姿勢・速度を odom トピックおよび TF として定周期発行する
+    void publishCurrentState() {
+        double x, y, yaw;
+        float vx, vy, wz;
+        {
+            std::lock_guard<std::mutex> lock(pose_mutex_);
+            x = X; y = Y; yaw = yaw_;
+            vx = vx_; vy = vy_; wz = wz_;
+        }
+
+        auto now = this->get_clock()->now();
+
+        double qz = sin(yaw * 0.5);
+        double qw = cos(yaw * 0.5);
+
+        nav_msgs::msg::Odometry odom;
+        odom.header.stamp = now;
+        odom.header.frame_id = "odom";
+        odom.child_frame_id = "base_link";
+        odom.pose.pose.position.x = x;
+        odom.pose.pose.position.y = y;
+        odom.pose.pose.position.z = 0.0;
+        odom.pose.pose.orientation.x = 0.0;
+        odom.pose.pose.orientation.y = 0.0;
+        odom.pose.pose.orientation.z = qz;
+        odom.pose.pose.orientation.w = qw;
+        odom.twist.twist.linear.x = vx;
+        odom.twist.twist.linear.y = vy;
+        odom.twist.twist.angular.z = wz;
+        odom_nav_pub_->publish(odom);
+
+        geometry_msgs::msg::TransformStamped tf;
+        tf.header.stamp = now;
+        tf.header.frame_id = "odom";
+        tf.child_frame_id = "base_link";
+        tf.transform.translation.x = x;
+        tf.transform.translation.y = y;
+        tf.transform.translation.z = 0.0;
+        tf.transform.rotation.x = 0.0;
+        tf.transform.rotation.y = 0.0;
+        tf.transform.rotation.z = qz;
+        tf.transform.rotation.w = qw;
+        tf_broadcaster_->sendTransform(tf);
+    }
 
     void sensor_callback(const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
         if (msg->data.size() < RX16NUM) {
@@ -154,83 +183,38 @@ private:
         dy_r *= ODOM_Y_SCALE;
         dtheta *= ODOM_YAW_SCALE;
 
-        // ワールド座標変換
-        double dx = dx_r * cos(yaw_) - dy_r * sin(yaw_);
-        double dy = dx_r * sin(yaw_) + dy_r * cos(yaw_);
-
-        // 位置更新
-        X += dx;
-        Y += dy;
-        yaw_ += dtheta;
-        yaw_ = atan2(sin(yaw_), cos(yaw_));
-
-        // 速度計算
+        // ワールド座標変換・位置更新・速度計算を 1 つのクリティカルセクションで実施
+        // （yaw_ の読み取りと書き込みを分離しないことでデータレースを防ぐ）
         float dt = PUBLISH_RATE_MS / 1000.0f;
-        float vx = dx / dt;
-        float vy = dy / dt;
-        float wz = dtheta / dt;
+        float x_f, y_f, yaw_f;
+        {
+            std::lock_guard<std::mutex> lock(pose_mutex_);
 
-        // Publish
+            double dx = dx_r * cos(yaw_) - dy_r * sin(yaw_);
+            double dy = dx_r * sin(yaw_) + dy_r * cos(yaw_);
+
+            X += dx;
+            Y += dy;
+            yaw_ += dtheta;
+            yaw_ = atan2(sin(yaw_), cos(yaw_));
+
+            vx_ = static_cast<float>(dx) / dt;
+            vy_ = static_cast<float>(dy) / dt;
+            wz_ = static_cast<float>(dtheta) / dt;
+
+            x_f = static_cast<float>(X);
+            y_f = static_cast<float>(Y);
+            yaw_f = static_cast<float>(yaw_);
+        }
+
+        // Float32MultiArray（odom_xy_yaw）を発行
         std_msgs::msg::Float32MultiArray odom_msg;
-        odom_msg.data = {static_cast<float>(X),
-                         static_cast<float>(Y),
-                         static_cast<float>(yaw_),
-                         vx, vy, wz};
+        odom_msg.data = {x_f, y_f, yaw_f, vx_, vy_, wz_};
         odom_pub_->publish(odom_msg);
 
         // RCLCPP_INFO(get_logger(),
         //             "X: %.3f  Y: %.3f  Yaw: %.2f deg",
         //             X, Y, yaw_ * 180.0 / M_PI);
-
-        // オドメトリ（完全な）
-        // nav_msgs/Odometry publish
-
-        auto now = this->get_clock()->now();
-
-        nav_msgs::msg::Odometry odom;
-
-        odom.header.stamp = now;
-        odom.header.frame_id = "odom";
-        odom.child_frame_id = "base_link";
-
-        odom.pose.pose.position.x = X;
-        odom.pose.pose.position.y = Y;
-        odom.pose.pose.position.z = 0.0;
-
-        // quaternion
-        double qz = sin(yaw_ * 0.5);
-        double qw = cos(yaw_ * 0.5);
-
-        odom.pose.pose.orientation.x = 0.0;
-        odom.pose.pose.orientation.y = 0.0;
-        odom.pose.pose.orientation.z = qz;
-        odom.pose.pose.orientation.w = qw;
-
-        // velocity
-        odom.twist.twist.linear.x = vx;
-        odom.twist.twist.linear.y = vy;
-        odom.twist.twist.angular.z = wz;
-
-        odom_nav_pub_->publish(odom);
-
-        // TF broadcast
-
-        geometry_msgs::msg::TransformStamped tf;
-
-        tf.header.stamp = now;
-        tf.header.frame_id = "odom";
-        tf.child_frame_id = "base_link";
-
-        tf.transform.translation.x = X;
-        tf.transform.translation.y = Y;
-        tf.transform.translation.z = 0.0;
-
-        tf.transform.rotation.x = 0.0;
-        tf.transform.rotation.y = 0.0;
-        tf.transform.rotation.z = qz;
-        tf.transform.rotation.w = qw;
-
-        tf_broadcaster_->sendTransform(tf);
     }
 
     uint8_t device_id_;
@@ -238,6 +222,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sensor_sub_;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_nav_pub_;
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+    rclcpp::TimerBase::SharedPtr tf_timer_;
 };
 
 int main(int argc, char **argv) {
