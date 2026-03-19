@@ -89,11 +89,18 @@ def generate_launch_description():
     # ------------------------------------------------------------------ #
     # 5. RViz2 可視化
     # ------------------------------------------------------------------ #
+    rviz2_config = os.path.join(
+        get_package_share_directory('nr26_r2_slam'),
+        'config',
+        'slam_mapping.rviz'
+    )
+
     rviz2_node = Node(
         package='rviz2',
         executable='rviz2',
         name='rviz2',
-        output='screen'
+        output='screen',
+        arguments=['-d', rviz2_config]
     )
 
     return LaunchDescription([
