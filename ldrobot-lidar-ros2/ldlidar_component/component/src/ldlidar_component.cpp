@@ -103,6 +103,10 @@ void LdLidarComponent::getCommParams()
     " * Serial port: ");
 
   getParam(
+    "comm.baudrate", _baudrate, _baudrate, "Serial communication baudrate", false,
+    " * Baudrate: ");
+
+  getParam(
     "comm.timeout_msec", _readTimeOut_msec, _readTimeOut_msec, "Data reading timeout in msec",
     false, " * Timeout [msec]: ");
   // <---- Communication
@@ -431,14 +435,15 @@ bool LdLidarComponent::initLidarComm()
     RCLCPP_INFO_STREAM(get_logger(), "***** LDLidar opened on port '" << _serialPort << "' *****");
   } else {
     RCLCPP_ERROR(get_logger(), "!!! LDLidar not opened !!!");
-    exit(EXIT_FAILURE);
+    return false;
   }
 
   if (_lidar->WaitLidarCommConnect(3000)) {
     RCLCPP_INFO(get_logger(), " * LDLidar communication OK");
   } else {
     RCLCPP_ERROR(get_logger(), " !!! LDLidar communication KO !!!");
-    exit(EXIT_FAILURE);
+    _lidar->Stop();
+    return false;
   }
 
   return true;

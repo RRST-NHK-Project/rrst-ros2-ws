@@ -23,6 +23,7 @@
 #define __LIPKG_H
 
 
+#include <atomic>
 #include <chrono>
 #include <functional>
 #include <mutex>
@@ -94,6 +95,8 @@ public:
       lidarstatus_ = LidarStatus::NORMAL;
       last_pkg_timestamp_ = 0;
       first_frame_ = true;
+      parse_state_ = PARSE_HEADER;
+      parse_count_ = 0;
     }
 
 private:
@@ -101,7 +104,7 @@ private:
     uint16_t timestamp_;
     double speed_;
     bool is_frame_ready_;
-    bool is_poweron_comm_normal_;
+    std::atomic<bool> is_poweron_comm_normal_;
     bool is_filter_;
     LidarStatus lidarstatus_;
     int measure_point_frequence_;
@@ -128,6 +131,13 @@ private:
     bool IsFrameReady(void);
     // Lidar data frame readiness flag reset
     void ResetFrameReady(void);
+
+    // Parser state machine member variables (replaces static locals in AnalysisOne)
+    static constexpr size_t PARSE_BUFFER_SIZE = 128;
+    enum ParseStateEnum { PARSE_HEADER, PARSE_VER_LEN, PARSE_DATA };
+    ParseStateEnum parse_state_;
+    uint16_t parse_count_;
+    uint8_t parse_tmp_[PARSE_BUFFER_SIZE];
   };
 
 } // namespace ldlidar
