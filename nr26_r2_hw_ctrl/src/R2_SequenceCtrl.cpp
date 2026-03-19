@@ -8,6 +8,10 @@ R2について以下の不具合を確認しています。
 L1、R1で回転しようとすると前進、後進してしまう
 マイコンのモードによりロボマスとエンコーダの取得のみしかできずソレノイドの駆動ができない（新規モードの作成が必要）
 シーケンス内の前進において前進せずその場で回転してしまう
+現状
+前 sdm15_value_[1],sdm15_value_[0],sdm15_value_[2] 後
+順番ずつ装着する
+
 */
 
 // 標準
@@ -21,6 +25,7 @@ L1、R1で回転しようとすると前進、後進してしまう
 #include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int16_multi_array.hpp"
+#include "std_msgs/msg/int32.hpp"
 
 // 自作
 #include "include/PacketController.hpp"
@@ -78,19 +83,30 @@ public:
     {
         return mode_ != StepMode::NONE;
     }
+    // sdm15の値を更新する関数
+    void set_sdm15_value(int index, int32_t value)
+    {
+        sdm15_value_[index] = value;
+    }
 
 private:
     // 以下シーケンス内で使用する変数
     //  待機時間（要調整）
     static constexpr double up_first_forward_wait = 2.0;
     static constexpr double up_second_forward_wait = 7.0;
-    static constexpr double up_final_forward_wait = 3.0;
+    static constexpr double up_final_forward_wait = 6.0;
     static constexpr double down_first_forward_wait = 1.0;
     static constexpr double down_second_forward_wait = 1.0;
     static constexpr double down_final_forward_wait = 1.0;
 
     // 速度関連
-    static constexpr int forward_speed = 20;
+    static constexpr int forward_speed = 30;
+    static constexpr int up_speed = 40;
+    static constexpr int dis = 100;      // 障害物と見なす距離の閾値（要調整）
+    static constexpr int down_dis = 150; // sdm15の値がこの時間(ms)更新されなければタイムアウトと見なす
+
+    // シーケンスの状態管理に必要な変数
+    int32_t sdm15_value_[3] = {0, 0, 0};
 
     // モードの管理
     enum class StepMode
@@ -119,6 +135,7 @@ private:
         IDLE,
         FIRST_FORWARD,
         FRONT_UP,
+        STOP,
         SECOND_FORWARD,
         REAR_UP,
         FINAL_FORWARD,
@@ -168,6 +185,10 @@ private:
     {
         RCLCPP_INFO(get_logger(), "REAR DOWN");
         pkt.setTR(TR1, 0);
+        pkt.setMD(MD5, -up_speed);
+        pkt.setMD(MD6, up_speed);
+        pkt.setMD(MD7, up_speed);
+        pkt.setMD(MD8, -up_speed);
     }
 
     void stop_motion()
@@ -185,6 +206,10 @@ private:
     {
         RCLCPP_INFO(get_logger(), "FRONT UP");
         pkt.setTR(TR2, 1);
+        pkt.setMD(MD5, 0);
+        pkt.setMD(MD6, 0);
+        pkt.setMD(MD7, 0);
+        pkt.setMD(MD8, 0);
     }
 
     void rear_up()
@@ -209,6 +234,14 @@ private:
         pkt.setMD(MD8, -forward_speed);
     }
 
+    void move_stop()
+    {
+        RCLCPP_INFO(get_logger(), "MOVE STOP");
+        pkt.setMD(MD5, 10);
+        pkt.setMD(MD6, 10);
+        pkt.setMD(MD7, 10);
+        pkt.setMD(MD8, 10);
+    }
     // void move_backward() {
     //     RCLCPP_INFO(get_logger(), "MOVE BACKWARD");
     // }
@@ -219,10 +252,10 @@ private:
         auto now_time = now();
         switch (state_up_)
         {
-        case StepUpState::IDLE:
+        case StepUpState::IDLE: // アイドリングストップ
             break;
 
-        case StepUpState::ALL_UP:
+        case StepUpState::ALL_UP: // 全て上げる
             if (!state_executed_)
             {
                 all_up();
@@ -231,7 +264,7 @@ private:
             next_up(StepUpState::FIRST_FORWARD);
             break;
 
-        case StepUpState::FIRST_FORWARD:
+        case StepUpState::FIRST_FORWARD: // 前進
             if (!state_executed_)
             {
                 move_forward();
@@ -243,7 +276,7 @@ private:
             }
             break;
 
-        case StepUpState::FRONT_DOWN:
+        case StepUpState::FRONT_DOWN: // 前を下げる
             if (!state_executed_)
             {
                 front_down();
@@ -252,19 +285,23 @@ private:
             next_up(StepUpState::SECOND_FORWARD);
             break;
 
-        case StepUpState::SECOND_FORWARD:
+        case StepUpState::SECOND_FORWARD: // 前進
             if (!state_executed_)
             {
                 move_forward();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > up_second_forward_wait)
+            // if ((now_time - state_start_time_).seconds() > up_second_forward_wait)
+            // {
+            //     next_up(StepUpState::REAR_DOWN);
+            // }
+            if (sdm15_value_[0] < dis)
             {
                 next_up(StepUpState::REAR_DOWN);
             }
             break;
 
-        case StepUpState::REAR_DOWN:
+        case StepUpState::REAR_DOWN: // 後ろを下げる
             if (!state_executed_)
             {
                 rear_down();
@@ -273,7 +310,7 @@ private:
             next_up(StepUpState::FINAL_FORWARD);
             break;
 
-        case StepUpState::FINAL_FORWARD:
+        case StepUpState::FINAL_FORWARD: // 前進
             if (!state_executed_)
             {
                 move_forward();
@@ -312,7 +349,7 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > down_first_forward_wait)
+            if (sdm15_value_[1] > down_dis)
             {
                 next_down(StepDownState::FRONT_UP);
             }
@@ -324,7 +361,18 @@ private:
                 front_up();
                 state_executed_ = true;
             }
-            next_down(StepDownState::SECOND_FORWARD);
+            next_down(StepDownState::STOP);
+            break;
+        case StepDownState::STOP:
+            if (!state_executed_)
+            {
+                move_stop();
+                state_executed_ = true;
+            }
+            if ((now_time - state_start_time_).seconds() > down_second_forward_wait)
+            {
+                next_down(StepDownState::SECOND_FORWARD);
+            }
             break;
 
         case StepDownState::SECOND_FORWARD:
@@ -333,7 +381,7 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > down_second_forward_wait)
+            if (sdm15_value_[0] > down_dis)
             {
                 next_down(StepDownState::REAR_UP);
             }
@@ -354,7 +402,7 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > down_final_forward_wait)
+            if (sdm15_value_[2] > down_dis)
             {
                 next_down(StepDownState::ALL_DOWN);
             }
@@ -389,17 +437,17 @@ private:
         {
 
         case StepMode::NONE:
-            std::cout << "None sequence" << std::endl;
+            // std::cout << "None sequence" << std::endl;
             break;
 
         case StepMode::STEP_UP:
             step_up_sequence();
-            std::cout << "Up sequence" << std::endl;
+            // std::cout << "Up sequence" << std::endl;
             break;
 
         case StepMode::STEP_DOWN:
             step_down_sequence();
-            std::cout << "Down sequence" << std::endl;
+            // std::cout << "Down sequence" << std::endl;
             break;
         }
     }
@@ -435,6 +483,31 @@ public:
                       this,
                       std::placeholders::_1));
 
+        // sdm15のSubscribe
+        sdm15_sub1_ = this->create_subscription<std_msgs::msg::Int32>(
+            "/lidar1/sdm15/distance",
+            rclcpp::SensorDataQoS(),
+            [this](std_msgs::msg::Int32::SharedPtr msg)
+            {
+                this->sdm15_callback(msg, 0);
+            });
+
+        sdm15_sub2_ = this->create_subscription<std_msgs::msg::Int32>(
+            "/lidar2/sdm15/distance",
+            rclcpp::SensorDataQoS(),
+            [this](std_msgs::msg::Int32::SharedPtr msg)
+            {
+                this->sdm15_callback(msg, 1);
+            });
+
+        sdm15_sub3_ = this->create_subscription<std_msgs::msg::Int32>(
+            "/lidar3/sdm15/distance",
+            rclcpp::SensorDataQoS(),
+            [this](std_msgs::msg::Int32::SharedPtr msg)
+            {
+                this->sdm15_callback(msg, 2);
+            });
+
         RCLCPP_INFO(get_logger(),
                     "serial_tx_%d started.", device_id_);
     }
@@ -449,6 +522,8 @@ private:
 
     float v1, v2, v3, v4; // 各メカナムホイールの速度指令値
                           // v1:第一象限, v2:第二象限, v3:第三象限, v4:第四象限
+
+    int32_t sdm15_value[3] = {0, 0, 0}; // sdm15の値を保存する配列
 
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg)
     {
@@ -579,11 +654,24 @@ private:
         }
     }
 
+    void sdm15_callback(const std_msgs::msg::Int32::SharedPtr msg, int index)
+    {
+        sdm15_value[index] = msg->data;
+
+        seq_->set_sdm15_value(index, msg->data);
+
+        // RCLCPP_INFO(this->get_logger(),
+        //             "distance: %d, %d, %d",
+        //             sdm15_value[0], sdm15_value[1], sdm15_value[2]);
+    }
     uint8_t device_id_;
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sensor_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr sdm15_sub1_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr sdm15_sub2_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr sdm15_sub3_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     std::vector<int16_t> data_;

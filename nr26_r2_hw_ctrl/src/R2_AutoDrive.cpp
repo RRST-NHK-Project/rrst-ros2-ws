@@ -22,13 +22,15 @@ PacketController pkt;
 #define TARGET_DEVICE_ID 6
 #define PUBLISH_RATE_MS 50
 
-class PIDMecanumController : public rclcpp::Node {
+class PIDMecanumController : public rclcpp::Node
+{
 public:
     PIDMecanumController()
         : Node("pid_mecanum_controller"),
           pid_x_(5.0, 0.0, 0.0, 1.0),
           pid_y_(5.0, 0.0, 0.0, 1.0),
-          pid_yaw_(3.0, 0.0, 0.0, 1.0) {
+          pid_yaw_(3.0, 0.0, 0.0, 1.0)
+    {
 
         // odom subscriber
         odom_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
@@ -90,7 +92,8 @@ private:
     float v1 = 0, v2 = 0, v3 = 0, v4 = 0;
 
     // odom（状態更新のみ）
-    void odom_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
+    void odom_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
+    {
         if (msg->data.size() < 3)
             return;
 
@@ -100,7 +103,8 @@ private:
     }
 
     // PS4入力
-    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
+    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg)
+    {
 
         float LS_X = -1 * msg->axes[0];
         float LS_Y = msg->axes[1];
@@ -116,7 +120,8 @@ private:
         static bool last_right = false;
 
         // 目標変更（ここでPID更新＆リセット）
-        if (UP && !last_up) {
+        if (UP && !last_up)
+        {
             target_x_ = 0.3;
             target_y_ = 0.3;
 
@@ -127,7 +132,8 @@ private:
             pid_y_.reset();
         }
 
-        if (DOWN && !last_down) {
+        if (DOWN && !last_down)
+        {
             target_x_ = 0.0;
             target_y_ = 0.0;
 
@@ -138,14 +144,16 @@ private:
             pid_y_.reset();
         }
 
-        if (LEFT && !last_left) {
+        if (LEFT && !last_left)
+        {
             target_yaw_ += M_PI / 2; // 90度左回転
 
             pid_yaw_.set_target(target_yaw_);
             pid_yaw_.reset();
         }
 
-        if (RIGHT && !last_right) {
+        if (RIGHT && !last_right)
+        {
             target_yaw_ -= M_PI / 2; // 90度右回転
 
             pid_yaw_.set_target(target_yaw_);
@@ -159,21 +167,32 @@ private:
 
         // float rad = atan2(LS_Y, LS_X);
     }
-
     // 制御ループ
-    void publish_timer() {
+    void publish_timer()
+    {
         const float dt = PUBLISH_RATE_MS / 1000.0f;
 
         // PID計算
         vx_ = pid_x_.update(X_, dt);
         vy_ = -pid_y_.update(Y_, dt); // Y軸反転（座標系による）
-        wz_ = pid_yaw_.update(yaw_, dt);
+        wz_ = -pid_yaw_.update(yaw_, dt);
 
+        float cos_yaw = cos(-yaw_);
+        float sin_yaw = sin(-yaw_);
+
+        // オドメトリのデータをロボット座標系に変換
+        float vx_robot = cos_yaw * vx_ + sin_yaw * vy_;
+        float vy_robot = -sin_yaw * vx_ + cos_yaw * vy_;
+
+        v1 = vy_robot + vx_robot + wz_;
+        v3 = vy_robot - vx_robot - wz_;
+        v4 = vy_robot - vx_robot + wz_;
+        v2 = vy_robot + vx_robot - wz_;
         // メカナム逆運動学
-        v1 = vy_ + vx_ + wz_;
-        v3 = vy_ - vx_ - wz_;
-        v4 = vy_ - vx_ + wz_;
-        v2 = vy_ + vx_ - wz_;
+        // v1 = vy_ + vx_ + wz_;
+        // v3 = vy_ - vx_ - wz_;
+        // v4 = vy_ - vx_ + wz_;
+        // v2 = vy_ + vx_ - wz_;
 
         // 右側モータ反転
         v3 *= -1;
@@ -206,7 +225,8 @@ private:
     }
 };
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
     rclcpp::init(argc, argv);
     auto node = std::make_shared<PIDMecanumController>();
     rclcpp::spin(node);

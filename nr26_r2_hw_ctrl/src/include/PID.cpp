@@ -1,7 +1,8 @@
 #include "PID.hpp"
 #include <algorithm>
 
-PIDController::PIDController(float Kp, float Ki, float Kd, float max_out) {
+PIDController::PIDController(float Kp, float Ki, float Kd, float max_out)
+{
     Kp_ = Kp;
     Ki_ = Ki;
     Kd_ = Kd;
@@ -14,17 +15,20 @@ PIDController::PIDController(float Kp, float Ki, float Kd, float max_out) {
     Differential_ = 0.0;
 }
 
-void PIDController::set_target(float target) {
+void PIDController::set_target(float target)
+{
     target_ = target;
 }
 
-void PIDController::set_gain(float Kp, float Ki, float Kd) {
+void PIDController::set_gain(float Kp, float Ki, float Kd)
+{
     Kp_ = Kp;
     Ki_ = Ki;
     Kd_ = Kd;
 }
 
-void PIDController::reset() {
+void PIDController::reset()
+{
     Error_ = 0.0;
     last_Error_ = 0.0;
     last_current_ = 0.0;
@@ -32,17 +36,21 @@ void PIDController::reset() {
     Differential_ = 0.0;
 }
 
-float PIDController::update(float current, float dt) {
+float PIDController::update(float current, float dt)
+{
 
     dt = std::max(dt, 0.0001f); // dtが0のときの0除算防止
 
     Error_ = target_ - current;
 
-    if (Ki_ != 0.0f) {
+    if (Ki_ != 0.0f)
+    {
         Integral_ += (Error_ + last_Error_) * dt / 2;                       // 台形積分
         float integral_limit = max_out_ / std::abs(Ki_);                    // 積分上限の逆算
         Integral_ = std::clamp(Integral_, -integral_limit, integral_limit); // 積分出力制限
-    } else {
+    }
+    else
+    {
         Integral_ = 0.0f; // Kiが0のときは積分をリセット
     }
 

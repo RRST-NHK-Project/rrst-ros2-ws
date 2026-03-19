@@ -2,7 +2,8 @@
 
 #include <algorithm>
 
-class PIDController {
+class PIDController
+{
 public:
     PIDController(float Kp, float Ki, float Kd, float max_out);
     void set_target(float target);
