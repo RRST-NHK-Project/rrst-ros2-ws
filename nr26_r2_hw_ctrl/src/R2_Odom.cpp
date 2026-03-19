@@ -51,6 +51,36 @@ public:
             std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
         RCLCPP_INFO(get_logger(), "serial_rx_%d subscriber started.", device_id_);
+
+        // SLAMが起動時にTFを即座に利用できるよう、初期位置(原点)のTFとオドメトリを発行する
+        // （シリアルデータが届く前にキューにスキャンが溜まるのを防ぐ）
+        auto now = this->get_clock()->now();
+
+        nav_msgs::msg::Odometry init_odom;
+        init_odom.header.stamp = now;
+        init_odom.header.frame_id = "odom";
+        init_odom.child_frame_id = "base_link";
+        init_odom.pose.pose.position.x = 0.0;
+        init_odom.pose.pose.position.y = 0.0;
+        init_odom.pose.pose.position.z = 0.0;
+        init_odom.pose.pose.orientation.x = 0.0;
+        init_odom.pose.pose.orientation.y = 0.0;
+        init_odom.pose.pose.orientation.z = 0.0;
+        init_odom.pose.pose.orientation.w = 1.0;
+        odom_nav_pub_->publish(init_odom);
+
+        geometry_msgs::msg::TransformStamped init_tf;
+        init_tf.header.stamp = now;
+        init_tf.header.frame_id = "odom";
+        init_tf.child_frame_id = "base_link";
+        init_tf.transform.translation.x = 0.0;
+        init_tf.transform.translation.y = 0.0;
+        init_tf.transform.translation.z = 0.0;
+        init_tf.transform.rotation.x = 0.0;
+        init_tf.transform.rotation.y = 0.0;
+        init_tf.transform.rotation.z = 0.0;
+        init_tf.transform.rotation.w = 1.0;
+        tf_broadcaster_->sendTransform(init_tf);
     }
 
 private:
