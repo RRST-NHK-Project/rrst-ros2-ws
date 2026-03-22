@@ -7,8 +7,8 @@ NHKロボコン2026 経路探索システム
 ================================
 
 [実行方法]
-cd ros2_ws/src/path_finding/path_system_latest
-python path_system_main.py
+cd ros2_ws/
+colcon build
 
 
 [フォルダ構成]
