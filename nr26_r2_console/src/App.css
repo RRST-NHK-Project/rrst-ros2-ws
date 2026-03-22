@@ -1,0 +1,238 @@
+:root {
+  --bg-base: #f7fafc;
+  --bg-soft: #d8f1ff;
+  --accent: #0f7c9e;
+  --accent-strong: #145f89;
+  --accent-warm: #f59e0b;
+  --text-main: #123047;
+  --text-sub: #44647a;
+  --panel: rgba(255, 255, 255, 0.88);
+  --line: rgba(18, 48, 71, 0.12);
+  --shadow: 0 24px 48px rgba(8, 40, 72, 0.16);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.console-page {
+  position: relative;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  overflow: hidden;
+  background: radial-gradient(circle at 20% 20%, var(--bg-soft), transparent 42%),
+    linear-gradient(135deg, #eef8ff 0%, var(--bg-base) 60%, #fff9eb 100%);
+  font-family: "Space Grotesk", "Noto Sans JP", "Segoe UI", sans-serif;
+}
+
+.console-bg-shape {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(10px);
+  z-index: 0;
+  opacity: 0.6;
+}
+
+.console-bg-shape-a {
+  width: 300px;
+  height: 300px;
+  background: #b2e6ff;
+  top: -60px;
+  right: -80px;
+  animation: floatA 7s ease-in-out infinite;
+}
+
+.console-bg-shape-b {
+  width: 260px;
+  height: 260px;
+  background: #ffd58f;
+  left: -70px;
+  bottom: -80px;
+  animation: floatB 8s ease-in-out infinite;
+}
+
+.console-card {
+  position: relative;
+  z-index: 1;
+  width: min(560px, 100%);
+  padding: 28px;
+  border-radius: 24px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+  animation: cardIn 0.45s ease-out both;
+}
+
+.console-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.console-logo {
+  width: 54px;
+  height: 54px;
+  padding: 8px;
+  border-radius: 14px;
+  background: rgba(15, 124, 158, 0.08);
+}
+
+.console-header h1 {
+  margin: 0;
+  color: var(--text-main);
+  font-size: 1.7rem;
+  letter-spacing: 0.02em;
+}
+
+.console-header p {
+  margin: 3px 0 0;
+  color: var(--text-sub);
+  font-size: 0.95rem;
+}
+
+.status-row {
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 14px;
+  border: 1px solid var(--line);
+}
+
+.status-label {
+  font-size: 0.95rem;
+  color: var(--text-sub);
+}
+
+.status-pill {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.status-ok {
+  color: #156c46;
+  background: #d5f5e4;
+}
+
+.status-pending {
+  color: #8a5a07;
+  background: #ffe7b2;
+}
+
+.status-bad {
+  color: #952626;
+  background: #ffd3d3;
+}
+
+.control-group {
+  margin-top: 16px;
+}
+
+.control-turn-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.control-button {
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 18px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.control-button:hover {
+  filter: brightness(1.03);
+}
+
+.control-button:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.control-button-forward {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #f8fdff;
+  box-shadow: 0 10px 20px rgba(20, 95, 137, 0.24);
+}
+
+.control-button-turn {
+  background: #eff6fb;
+  color: var(--text-main);
+  border: 1px solid #c8dbe9;
+}
+
+.control-button-stop {
+  background: linear-gradient(135deg, #ffb443, var(--accent-warm));
+  color: #402503;
+  box-shadow: 0 10px 20px rgba(245, 158, 11, 0.24);
+}
+
+.velocity-readout {
+  margin: 14px 2px 0;
+  text-align: right;
+  color: var(--text-sub);
+  font-size: 0.9rem;
+}
+
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.99);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes floatA {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(10px);
+  }
+}
+
+@keyframes floatB {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+@media (max-width: 560px) {
+  .console-card {
+    padding: 20px;
+    border-radius: 18px;
+  }
+
+  .console-header h1 {
+    font-size: 1.45rem;
+  }
+
+  .control-button {
+    padding: 13px 14px;
+  }
+}
