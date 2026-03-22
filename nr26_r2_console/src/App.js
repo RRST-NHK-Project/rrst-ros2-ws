@@ -4,12 +4,11 @@ import "./App.css";
 
 function App() {
   const rosRef = useRef(null);
-  const cmdVelRef = useRef(null);
+  const commandRef = useRef(null);
   const joyRef = useRef(null);
   const defaultRosHost = window.location.hostname || "localhost";
   const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
-  const linearRef = useRef(0);
-  const angularRef = useRef(0);
+  const commandValueRef = useRef(0);
   const buttonsRef = useRef(Array(14).fill(0));
   const axesRef = useRef(Array(8).fill(0));
 
@@ -20,10 +19,11 @@ function App() {
     host: defaultRosHost,
     port: "9090",
   });
-  const [linear, setLinear] = useState(0);
-  const [angular, setAngular] = useState(0);
+  const [commandValue, setCommandValue] = useState(0);
   const [buttons, setButtons] = useState(Array(14).fill(0));
   const [axes, setAxes] = useState(Array(8).fill(0));
+  const [controllerEnabled, setControllerEnabled] = useState(true);
+  const [controllerFullscreen, setControllerFullscreen] = useState(false);
 
   const rosUrl = `${wsScheme}://${rosEndpoint.host}:${rosEndpoint.port}`;
 
@@ -34,19 +34,13 @@ function App() {
     setRosEndpoint({ host: nextHost, port: nextPort });
   };
 
-  const updateLinear = (value) => {
-    linearRef.current = value;
-    setLinear(value);
-  };
-
-  const updateAngular = (value) => {
-    angularRef.current = value;
-    setAngular(value);
+  const updateCommand = (value) => {
+    commandValueRef.current = value;
+    setCommandValue(value);
   };
 
   const resetAllControls = () => {
-    updateLinear(0);
-    updateAngular(0);
+    updateCommand(0);
 
     const nextButtons = Array(14).fill(0);
     const nextAxes = Array(8).fill(0);
@@ -59,15 +53,31 @@ function App() {
 
   const getHoldHandlers = (onPress, onRelease) => ({
     onPointerDown: (event) => {
+      console.log("Pointer DOWN:", event.pointerId);
       event.preventDefault();
+      event.stopPropagation();
       if (event.currentTarget.setPointerCapture) {
         event.currentTarget.setPointerCapture(event.pointerId);
       }
       onPress();
     },
-    onPointerUp: onRelease,
-    onPointerCancel: onRelease,
-    onLostPointerCapture: onRelease,
+    onPointerUp: (event) => {
+      console.log("Pointer UP:", event.pointerId);
+      event.preventDefault();
+      event.stopPropagation();
+      onRelease();
+    },
+    onPointerCancel: (event) => {
+      console.log("Pointer CANCEL:", event.pointerId);
+      event.preventDefault();
+      event.stopPropagation();
+      onRelease();
+    },
+    onLostPointerCapture: (event) => {
+      console.log("Lost Pointer Capture:", event.pointerId);
+      event.preventDefault();
+      onRelease();
+    },
     onContextMenu: (event) => event.preventDefault(),
   });
 
@@ -141,10 +151,10 @@ function App() {
     });
 
     // Topic定義
-    cmdVelRef.current = new ROSLIB.Topic({
+    commandRef.current = new ROSLIB.Topic({
       ros: rosRef.current,
-      name: "/cmd_vel",
-      messageType: "geometry_msgs/msg/Twist",
+      name: "/command",
+      messageType: "std_msgs/msg/Int32MultiArray",
     });
 
     joyRef.current = new ROSLIB.Topic({
@@ -155,10 +165,11 @@ function App() {
 
     // 10Hzで送信
     const interval = setInterval(() => {
-      if (cmdVelRef.current) {
-        cmdVelRef.current.publish({
-          linear: { x: linearRef.current, y: 0, z: 0 },
-          angular: { x: 0, y: 0, z: angularRef.current },
+      if (!controllerEnabled) return;
+
+      if (commandRef.current) {
+        commandRef.current.publish({
+          data: [commandValueRef.current],
         });
       }
 
@@ -174,7 +185,96 @@ function App() {
       clearInterval(interval);
       if (rosRef.current) rosRef.current.close();
     };
-  }, [rosUrl]);
+  }, [rosUrl, controllerEnabled]);
+
+  if (controllerFullscreen) {
+    return (
+      <div className="console-page console-page-fullscreen">
+        <main className="console-card console-card-fullscreen-controller">
+          <button
+            className="fullscreen-close-button-top"
+            onClick={() => setControllerFullscreen(false)}
+          >
+            ✕ Back to Normal
+          </button>
+
+          <div className="ps4-panel-fullscreen">
+            <div className="ps-shoulder-row">
+              <div className="ps-shoulder-side">
+                <button className={`ps-button ps-shoulder ${buttons[6] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(6)}>
+                  L2
+                </button>
+                <button className={`ps-button ps-shoulder ${buttons[4] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(4)}>
+                  L1
+                </button>
+              </div>
+              <div className="ps-shoulder-side ps-shoulder-side-right">
+                <button className={`ps-button ps-shoulder ${buttons[5] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(5)}>
+                  R1
+                </button>
+                <button className={`ps-button ps-shoulder ${buttons[7] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(7)}>
+                  R2
+                </button>
+              </div>
+            </div>
+
+            <div className="ps-main-row-fullscreen">
+              <div className="dpad-grid-fullscreen">
+                <button className={`dpad-button ${axes[7] === 1 ? "ps-active" : ""}`} {...getAxisPressProps(7, 1)}>
+                  ↑
+                </button>
+                <button className={`dpad-button ${axes[6] === -1 ? "ps-active" : ""}`} {...getAxisPressProps(6, -1)}>
+                  ←
+                </button>
+                <button className={`dpad-button ${axes[6] === 1 ? "ps-active" : ""}`} {...getAxisPressProps(6, 1)}>
+                  →
+                </button>
+                <button className={`dpad-button ${axes[7] === -1 ? "ps-active" : ""}`} {...getAxisPressProps(7, -1)}>
+                  ↓
+                </button>
+              </div>
+
+              <div className="face-grid-fullscreen">
+                <button className={`ps-button ps-face ps-triangle ${buttons[2] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(2)}>
+                  △
+                </button>
+                <button className={`ps-button ps-face ps-square ${buttons[3] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(3)}>
+                  □
+                </button>
+                <button className={`ps-button ps-face ps-circle ${buttons[1] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(1)}>
+                  ○
+                </button>
+                <button className={`ps-button ps-face ps-cross ${buttons[0] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(0)}>
+                  ×
+                </button>
+              </div>
+            </div>
+
+            <div className="ps-system-row-fullscreen">
+              <button className={`ps-button ps-system ${buttons[8] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(8)}>
+                SHARE
+              </button>
+              <button className={`ps-button ps-system ps-home ${buttons[12] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(12)}>
+                PS
+              </button>
+              <button className={`ps-button ps-system ${buttons[9] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(9)}>
+                OPTIONS
+              </button>
+            </div>
+
+            <div className="ps-stick-row-fullscreen">
+              <button className={`ps-button ps-stick ${buttons[10] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(10)}>
+                L3
+              </button>
+              <button className={`ps-button ps-stick ${buttons[11] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(11)}>
+                R3
+              </button>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="console-page">
@@ -230,134 +330,148 @@ function App() {
           </span>
         </section>
 
-        {/* 前進 */}
-        <div className="control-group">
+        <section className="control-toggle-row">
           <button
-            className="control-button control-button-forward"
-            {...getHoldHandlers(
-              () => updateLinear(0.5),
-              () => updateLinear(0)
-            )}
+            className={`toggle-button ${controllerEnabled ? "toggle-on" : "toggle-off"}`}
+            onClick={() => setControllerEnabled(!controllerEnabled)}
           >
-            前進
+            {controllerEnabled ? "コントローラー: ON" : "コントローラー: OFF"}
           </button>
-        </div>
-
-        {/* 旋回 */}
-        <div className="control-group control-turn-group">
           <button
-            className="control-button control-button-turn"
-            {...getHoldHandlers(
-              () => updateAngular(1.0),
-              () => updateAngular(0)
-            )}
+            className="fullscreen-toggle-button"
+            onClick={() => setControllerFullscreen(true)}
           >
-            左旋回
+            全画面操作
           </button>
-
-          <button
-            className="control-button control-button-turn"
-            {...getHoldHandlers(
-              () => updateAngular(-1.0),
-              () => updateAngular(0)
-            )}
-          >
-            右旋回
-          </button>
-        </div>
-
-        {/* 停止 */}
-        <div className="control-group">
-          <button
-            className="control-button control-button-stop"
-            onClick={() => {
-              updateLinear(0);
-              updateAngular(0);
-            }}
-          >
-            停止
-          </button>
-        </div>
-
-        <section className="ps4-panel">
-          <h2>PS4 Controller Buttons</h2>
-
-          <div className="ps-shoulder-row">
-            <div className="ps-shoulder-side">
-              <button className={`ps-button ps-shoulder ${buttons[6] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(6)}>
-                L2
-              </button>
-              <button className={`ps-button ps-shoulder ${buttons[4] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(4)}>
-                L1
-              </button>
-            </div>
-            <div className="ps-shoulder-side ps-shoulder-side-right">
-              <button className={`ps-button ps-shoulder ${buttons[5] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(5)}>
-                R1
-              </button>
-              <button className={`ps-button ps-shoulder ${buttons[7] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(7)}>
-                R2
-              </button>
-            </div>
-          </div>
-
-          <div className="ps-main-row">
-            <div className="dpad-grid">
-              <button className={`dpad-button ${axes[7] === 1 ? "ps-active" : ""}`} {...getAxisPressProps(7, 1)}>
-                ↑
-              </button>
-              <button className={`dpad-button ${axes[6] === -1 ? "ps-active" : ""}`} {...getAxisPressProps(6, -1)}>
-                ←
-              </button>
-              <button className={`dpad-button ${axes[6] === 1 ? "ps-active" : ""}`} {...getAxisPressProps(6, 1)}>
-                →
-              </button>
-              <button className={`dpad-button ${axes[7] === -1 ? "ps-active" : ""}`} {...getAxisPressProps(7, -1)}>
-                ↓
-              </button>
-            </div>
-
-            <div className="ps-system-row">
-              <button className={`ps-button ps-system ${buttons[8] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(8)}>
-                SHARE
-              </button>
-              <button className={`ps-button ps-system ps-home ${buttons[12] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(12)}>
-                PS
-              </button>
-              <button className={`ps-button ps-system ${buttons[9] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(9)}>
-                OPTIONS
-              </button>
-            </div>
-
-            <div className="face-grid">
-              <button className={`ps-button ps-face ps-triangle ${buttons[2] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(2)}>
-                △
-              </button>
-              <button className={`ps-button ps-face ps-square ${buttons[3] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(3)}>
-                □
-              </button>
-              <button className={`ps-button ps-face ps-circle ${buttons[1] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(1)}>
-                ○
-              </button>
-              <button className={`ps-button ps-face ps-cross ${buttons[0] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(0)}>
-                ×
-              </button>
-            </div>
-          </div>
-
-          <div className="ps-stick-row">
-            <button className={`ps-button ps-stick ${buttons[10] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(10)}>
-              L3
-            </button>
-            <button className={`ps-button ps-stick ${buttons[11] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(11)}>
-              R3
-            </button>
-          </div>
         </section>
 
-        <p className="velocity-readout">
-          linear: {linear.toFixed(1)} | angular: {angular.toFixed(1)}
-        </p>
+        {controllerEnabled && (
+          <>
+            {/* 前進 */}
+            <div className="control-group">
+              <button
+                className="control-button control-button-step-up"
+                {...getHoldHandlers(
+                  () => updateCommand(1),
+                  () => updateCommand(0)
+                )}
+              >
+                段差上り
+              </button>
+            </div>
+
+            {/* 段差下り */}
+            <div className="control-group">
+              <button
+                className="control-button control-button-step-down"
+                {...getHoldHandlers(
+                  () => updateCommand(-1),
+                  () => updateCommand(0)
+                )}
+              >
+                段差下り
+              </button>
+            </div>
+
+            {/* 緊急停止 */}
+            <div className="control-group">
+              <button
+                className="control-button control-button-emergency"
+                onClick={() => {
+                  updateCommand(0);
+                }}
+              >
+                緊急停止
+              </button>
+            </div>
+
+            <section className="ps4-panel">
+              <h2>PS4 Controller Buttons</h2>
+
+              <div className="ps-shoulder-row">
+                <div className="ps-shoulder-side">
+                  <button className={`ps-button ps-shoulder ${buttons[6] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(6)}>
+                    L2
+                  </button>
+                  <button className={`ps-button ps-shoulder ${buttons[4] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(4)}>
+                    L1
+                  </button>
+                </div>
+                <div className="ps-shoulder-side ps-shoulder-side-right">
+                  <button className={`ps-button ps-shoulder ${buttons[5] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(5)}>
+                    R1
+                  </button>
+                  <button className={`ps-button ps-shoulder ${buttons[7] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(7)}>
+                    R2
+                  </button>
+                </div>
+              </div>
+
+              <div className="ps-main-row">
+                <div className="dpad-grid">
+                  <button className={`dpad-button ${axes[7] === 1 ? "ps-active" : ""}`} {...getAxisPressProps(7, 1)}>
+                    ↑
+                  </button>
+                  <button className={`dpad-button ${axes[6] === -1 ? "ps-active" : ""}`} {...getAxisPressProps(6, -1)}>
+                    ←
+                  </button>
+                  <button className={`dpad-button ${axes[6] === 1 ? "ps-active" : ""}`} {...getAxisPressProps(6, 1)}>
+                    →
+                  </button>
+                  <button className={`dpad-button ${axes[7] === -1 ? "ps-active" : ""}`} {...getAxisPressProps(7, -1)}>
+                    ↓
+                  </button>
+                </div>
+
+                <div className="ps-system-row">
+                  <button className={`ps-button ps-system ${buttons[8] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(8)}>
+                    SHARE
+                  </button>
+                  <button className={`ps-button ps-system ps-home ${buttons[12] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(12)}>
+                    PS
+                  </button>
+                  <button className={`ps-button ps-system ${buttons[9] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(9)}>
+                    OPTIONS
+                  </button>
+                </div>
+
+                <div className="face-grid">
+                  <button className={`ps-button ps-face ps-triangle ${buttons[2] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(2)}>
+                    △
+                  </button>
+                  <button className={`ps-button ps-face ps-square ${buttons[3] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(3)}>
+                    □
+                  </button>
+                  <button className={`ps-button ps-face ps-circle ${buttons[1] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(1)}>
+                    ○
+                  </button>
+                  <button className={`ps-button ps-face ps-cross ${buttons[0] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(0)}>
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              <div className="ps-stick-row">
+                <button className={`ps-button ps-stick ${buttons[10] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(10)}>
+                  L3
+                </button>
+                <button className={`ps-button ps-stick ${buttons[11] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(11)}>
+                  R3
+                </button>
+              </div>
+            </section>
+
+            <p className="velocity-readout">
+              command: {commandValue}
+            </p>
+          </>
+        )}
+
+        {!controllerEnabled && (
+          <div className="disabled-notice">
+            コントローラーは無効化されています
+          </div>
+        )}
       </main>
     </div>
   );
