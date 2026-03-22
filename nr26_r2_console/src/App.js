@@ -24,6 +24,8 @@ function App() {
   const [axes, setAxes] = useState(Array(8).fill(0));
   const [controllerEnabled, setControllerEnabled] = useState(true);
   const [controllerFullscreen, setControllerFullscreen] = useState(false);
+  const [joyTopicName, setJoyTopicName] = useState("/joy_9");
+  const [joyTopicInput, setJoyTopicInput] = useState("/joy_9");
 
   const rosUrl = `${wsScheme}://${rosEndpoint.host}:${rosEndpoint.port}`;
 
@@ -32,6 +34,12 @@ function App() {
     const nextPort = rosPortInput.trim() || "9090";
 
     setRosEndpoint({ host: nextHost, port: nextPort });
+  };
+
+  const applyJoyTopicName = () => {
+    const nextTopic = joyTopicInput.trim() || "/joy_9";
+    setJoyTopicName(nextTopic);
+    console.log("Joy topic name updated to:", nextTopic);
   };
 
   const updateCommand = (value) => {
@@ -150,6 +158,16 @@ function App() {
       console.log("Connection closed");
     });
 
+    // 古いjoyトピックをクリーンアップ
+    if (joyRef.current) {
+      try {
+        joyRef.current.unsubscribe?.();
+        console.log("Old joy topic unsubscribed");
+      } catch (error) {
+        console.warn("Error unsubscribing old joy topic:", error);
+      }
+    }
+
     // Topic定義
     commandRef.current = new ROSLIB.Topic({
       ros: rosRef.current,
@@ -159,9 +177,10 @@ function App() {
 
     joyRef.current = new ROSLIB.Topic({
       ros: rosRef.current,
-      name: "/joy",
+      name: joyTopicName,
       messageType: "sensor_msgs/msg/Joy",
     });
+    console.log("Joy topic created:", joyTopicName);
 
     // 10Hzで送信
     const interval = setInterval(() => {
@@ -183,9 +202,17 @@ function App() {
 
     return () => {
       clearInterval(interval);
+      // Cleanup joy topic explicitly before closing ROS
+      if (joyRef.current) {
+        try {
+          joyRef.current.unsubscribe?.();
+        } catch (error) {
+          console.warn("Error unsubscribing joy topic:", error);
+        }
+      }
       if (rosRef.current) rosRef.current.close();
     };
-  }, [rosUrl, controllerEnabled]);
+  }, [rosUrl, joyTopicName]);
 
   if (controllerFullscreen) {
     return (
@@ -329,6 +356,23 @@ function App() {
             {status}
           </span>
         </section>
+
+        <section className="joy-topic-row">
+          <input
+            className="connection-input"
+            value={joyTopicInput}
+            onChange={(e) => setJoyTopicInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") applyJoyTopicName();
+            }}
+            placeholder="Joy Topic Name (例: /joy_9)"
+          />
+          <button className="connection-button" onClick={applyJoyTopicName}>
+            更新
+          </button>
+        </section>
+
+        <p className="connection-hint">現在のJoyトピック: {joyTopicName}</p>
 
         <section className="control-toggle-row">
           <button
