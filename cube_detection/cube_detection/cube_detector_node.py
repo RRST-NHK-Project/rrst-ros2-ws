@@ -28,6 +28,11 @@ from rclpy.qos import (
 from sensor_msgs.msg import CameraInfo, Image
 from std_msgs.msg import Float32
 
+try:
+    from ultralytics import YOLO
+except ImportError:
+    YOLO = None
+
 
 class CubeDetectorNode(Node):
     """深度カメラを使って立方体を検知し位置・姿勢・距離をPublishするノード.
@@ -75,6 +80,15 @@ class CubeDetectorNode(Node):
         # RealSense 深度スケール（uint16 値→メートル変換）
         self.declare_parameter('depth_scale', 0.001)
 
+        # YOLO 併用設定
+        self.declare_parameter('use_yolo', False)
+        self.declare_parameter('yolo_model_path', 'yolov8n.pt')
+        self.declare_parameter('yolo_conf', 0.25)
+        self.declare_parameter('yolo_iou', 0.45)
+        self.declare_parameter('yolo_imgsz', 640)
+        self.declare_parameter('yolo_infer_interval', 3)
+        self.declare_parameter('yolo_min_iou_with_contour', 0.10)
+
         # ---- QoS ----
         qos = QoSProfile(
             history=QoSHistoryPolicy.KEEP_LAST,
@@ -115,6 +129,25 @@ class CubeDetectorNode(Node):
         self._frame_count = 0
         self._warned_no_camera_info = False
 
+        # ---- YOLO 初期化 ----
+        self._use_yolo = bool(self.get_parameter('use_yolo').value)
+        self._yolo_model = None
+        self._cached_yolo_boxes: list[tuple[int, int, int, int]] = []
+        if self._use_yolo:
+            if YOLO is None:
+                self.get_logger().error(
+                    'use_yolo=True ですが ultralytics が未インストールです。'
+                )
+                self._use_yolo = False
+            else:
+                model_path = str(self.get_parameter('yolo_model_path').value)
+                try:
+                    self._yolo_model = YOLO(model_path)
+                    self.get_logger().info(f'YOLO有効: model={model_path}')
+                except Exception as exc:
+                    self.get_logger().error(f'YOLOモデル読み込み失敗: {exc}')
+                    self._use_yolo = False
+
     # ------------------------------------------------------------------
     # コールバック
     # ------------------------------------------------------------------
@@ -137,9 +170,23 @@ class CubeDetectorNode(Node):
             return
 
         mask = self._build_color_mask(frame)
-        best_cnt = self._find_best_contour(mask)
+        yolo_boxes = self._infer_yolo_boxes(frame)
+        best_cnt = self._find_best_contour(mask, yolo_boxes)
 
         vis = frame.copy()
+        for x1, y1, x2, y2 in yolo_boxes:
+            cv2.rectangle(vis, (x1, y1), (x2, y2), (255, 128, 0), 2)
+            cv2.putText(
+                vis,
+                'YOLO',
+                (x1, max(20, y1 - 8)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (255, 128, 0),
+                2,
+                cv2.LINE_AA,
+            )
+
         if best_cnt is not None:
             self._process_detection(best_cnt, vis, depth, img_msg)
         elif self._frame_count % 100 == 0:
@@ -176,14 +223,20 @@ class CubeDetectorNode(Node):
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
         return mask
 
-    def _find_best_contour(self, mask: np.ndarray):
+    def _find_best_contour(
+        self,
+        mask: np.ndarray,
+        yolo_boxes: list[tuple[int, int, int, int]] | None = None,
+    ):
         """最大の正方形状輪郭を返す（見つからなければ None）."""
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         min_area = int(self.get_parameter('min_contour_area').value)
         max_area = int(self.get_parameter('max_contour_area').value)
+        min_iou = float(self.get_parameter('yolo_min_iou_with_contour').value)
+        yolo_boxes = yolo_boxes or []
 
         best_cnt = None
-        best_area = 0.0
+        best_score = -1.0
         for cnt in contours:
             area = cv2.contourArea(cnt)
             if area < min_area or area > max_area:
@@ -195,10 +248,73 @@ class CubeDetectorNode(Node):
             aspect = max(w, h) / min(w, h)
             if aspect > 2.5:
                 continue
-            if area > best_area:
-                best_area = area
+
+            iou_score = 0.0
+            if self._use_yolo and yolo_boxes:
+                iou_score = max(self._contour_box_iou(cnt, box) for box in yolo_boxes)
+                if iou_score < min_iou:
+                    continue
+
+            score = area + 50000.0 * iou_score
+            if score > best_score:
+                best_score = score
                 best_cnt = cnt
         return best_cnt
+
+    def _infer_yolo_boxes(self, frame: np.ndarray) -> list[tuple[int, int, int, int]]:
+        """YOLO推論で検出ボックスを返す。無効時は空配列。"""
+        if not self._use_yolo or self._yolo_model is None:
+            return []
+
+        interval = max(1, int(self.get_parameter('yolo_infer_interval').value))
+        if self._frame_count % interval != 0:
+            return self._cached_yolo_boxes
+
+        try:
+            results = self._yolo_model.predict(
+                source=frame,
+                conf=float(self.get_parameter('yolo_conf').value),
+                iou=float(self.get_parameter('yolo_iou').value),
+                imgsz=int(self.get_parameter('yolo_imgsz').value),
+                verbose=False,
+            )
+        except Exception as exc:
+            if self._frame_count % 100 == 0:
+                self.get_logger().warn(f'YOLO推論失敗: {exc}')
+            return self._cached_yolo_boxes
+
+        boxes: list[tuple[int, int, int, int]] = []
+        if results:
+            result = results[0]
+            if result.boxes is not None and result.boxes.xyxy is not None:
+                for box in result.boxes.xyxy.cpu().numpy().astype(int):
+                    x1, y1, x2, y2 = box[:4]
+                    boxes.append((x1, y1, x2, y2))
+
+        self._cached_yolo_boxes = boxes
+        return boxes
+
+    @staticmethod
+    def _contour_box_iou(cnt: np.ndarray, box: tuple[int, int, int, int]) -> float:
+        """輪郭外接矩形とYOLO矩形のIoUを計算する."""
+        x, y, w, h = cv2.boundingRect(cnt)
+        ax1, ay1, ax2, ay2 = x, y, x + w, y + h
+        bx1, by1, bx2, by2 = box
+
+        ix1, iy1 = max(ax1, bx1), max(ay1, by1)
+        ix2, iy2 = min(ax2, bx2), min(ay2, by2)
+        iw = max(0, ix2 - ix1)
+        ih = max(0, iy2 - iy1)
+        inter = float(iw * ih)
+        if inter <= 0:
+            return 0.0
+
+        area_a = float(max(0, ax2 - ax1) * max(0, ay2 - ay1))
+        area_b = float(max(0, bx2 - bx1) * max(0, by2 - by1))
+        union = area_a + area_b - inter
+        if union <= 0:
+            return 0.0
+        return inter / union
 
     @staticmethod
     def _rotation_matrix_to_quaternion(R: np.ndarray):

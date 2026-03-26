@@ -47,6 +47,14 @@ def generate_launch_description():
                 'min_contour_area': 500,
                 'max_contour_area': 100000,
                 'depth_scale': 0.001,
+                # YOLO併用（必要時のみ有効化）
+                'use_yolo': False,
+                'yolo_model_path': 'yolov8n.pt',
+                'yolo_conf': 0.25,
+                'yolo_iou': 0.45,
+                'yolo_imgsz': 640,
+                'yolo_infer_interval': 3,
+                'yolo_min_iou_with_contour': 0.10,
             }],
         ),
         Node(
