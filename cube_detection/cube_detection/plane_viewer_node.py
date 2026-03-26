@@ -28,26 +28,22 @@ from sensor_msgs.msg import Image
 from std_msgs.msg import Float32
 
 
-class CubeViewerNode(Node):
-    """立方体検知の可視化画像を表示するビューアノード.
-
-    cube_detector_node が出力する可視化済み画像と
-    位置・距離トピックを受け取り、ウィンドウに表示する。
-    """
+class PlaneViewerNode(Node):
+    """平面検知の可視化画像を表示するビューアノード."""
 
     def __init__(self):
-        super().__init__('cube_viewer')
+        super().__init__('plane_viewer')
         self._bridge = CvBridge()
 
-        self.declare_parameter('image_topic', '/cube_detection/image')
+        self.declare_parameter('image_topic', '/plane_detection/image')
         image_topic = str(self.get_parameter('image_topic').value)
 
         self._last_frame_time = None
-        self._window_name = 'Cube Detection'
+        self._window_name = 'Plane Detection'
         cv2.namedWindow(self._window_name, cv2.WINDOW_NORMAL)
 
-        self._cube_pos = None
-        self._cube_distance = None
+        self._plane_pos = None
+        self._plane_distance = None
 
         qos = QoSProfile(
             history=QoSHistoryPolicy.KEEP_LAST,
@@ -58,24 +54,24 @@ class CubeViewerNode(Node):
 
         self.create_subscription(Image, image_topic, self._image_callback, qos)
         self.create_subscription(
-            PoseStamped, '/cube_detection/pose', self._pose_callback, qos
+            PoseStamped, '/plane_detection/pose', self._pose_callback, qos
         )
         self.create_subscription(
-            Float32, '/cube_detection/distance', self._distance_callback, qos
+            Float32, '/plane_detection/distance', self._distance_callback, qos
         )
 
         self.create_timer(2.0, self._health_check)
-        self.get_logger().info(f'CubeViewer起動: {image_topic} を購読中')
+        self.get_logger().info(f'PlaneViewer起動: {image_topic} を購読中')
 
     def _pose_callback(self, msg: PoseStamped):
-        self._cube_pos = (
+        self._plane_pos = (
             msg.pose.position.x,
             msg.pose.position.y,
             msg.pose.position.z,
         )
 
     def _distance_callback(self, msg: Float32):
-        self._cube_distance = msg.data
+        self._plane_distance = msg.data
 
     def _image_callback(self, msg: Image):
         try:
@@ -84,18 +80,19 @@ class CubeViewerNode(Node):
             self.get_logger().warn(f'cv_bridge 変換失敗: {exc}')
             return
 
-        # 位置・距離情報をオーバーレイ（可視化画像には既に描画済みだが
-        # 最新値として左上にも常時表示する）
-        if self._cube_pos is not None:
-            x, y, z = self._cube_pos
-            dist = self._cube_distance if self._cube_distance is not None else 0.0
+        # 左上に平面情報を常時表示
+        if self._plane_pos is not None:
+            x, y, z = self._plane_pos
+            dist = self._plane_distance if self._plane_distance is not None else 0.0
             font = cv2.FONT_HERSHEY_SIMPLEX
-            color = (0, 200, 255)
-            cv2.putText(frame, f'X: {x:.3f}m', (10, 30), font, 0.6, color, 2, cv2.LINE_AA)
-            cv2.putText(frame, f'Y: {y:.3f}m', (10, 55), font, 0.6, color, 2, cv2.LINE_AA)
-            cv2.putText(frame, f'Z: {z:.3f}m', (10, 80), font, 0.6, color, 2, cv2.LINE_AA)
+            color = (0, 255, 255)
+            cv2.rectangle(frame, (6, 6), (360, 120), (20, 20, 20), -1)
+            cv2.putText(frame, 'PLANE TRACKING', (14, 30), font, 0.7, color, 2, cv2.LINE_AA)
+            cv2.putText(frame, f'X: {x:.3f}m', (14, 55), font, 0.6, color, 2, cv2.LINE_AA)
+            cv2.putText(frame, f'Y: {y:.3f}m', (14, 80), font, 0.6, color, 2, cv2.LINE_AA)
+            cv2.putText(frame, f'Z: {z:.3f}m', (190, 55), font, 0.6, color, 2, cv2.LINE_AA)
             cv2.putText(
-                frame, f'Dist: {dist:.3f}m', (10, 105), font, 0.6, color, 2, cv2.LINE_AA
+                frame, f'Dist: {dist:.3f}m', (190, 80), font, 0.6, color, 2, cv2.LINE_AA
             )
 
         self._last_frame_time = self.get_clock().now()
@@ -115,7 +112,7 @@ class CubeViewerNode(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = CubeViewerNode()
+    node = PlaneViewerNode()
     try:
         rclpy.spin(node)
     finally:

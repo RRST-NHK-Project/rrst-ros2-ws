@@ -34,17 +34,11 @@ except ImportError:
     YOLO = None
 
 
-class CubeDetectorNode(Node):
-    """深度カメラを使って立方体を検知し位置・姿勢・距離をPublishするノード.
-
-    RealSense 等の深度カメラからRGB画像と深度画像を受け取り、
-    HSVカラーセグメンテーションと輪郭検出で立方体の正面を検知する。
-    検知した立方体の3D位置・姿勢（クォータニオン）・距離をPublishし、
-    可視化画像も出力する。
-    """
+class PlaneDetectorNode(Node):
+    """深度カメラを使って平面領域を検知し位置・姿勢・距離をPublishするノード."""
 
     def __init__(self):
-        super().__init__('cube_detector')
+        super().__init__('plane_detector')
 
         # ---- パラメータ宣言 ----
         self.declare_parameter('image_topic', '/camera/camera/color/image_raw')
@@ -52,13 +46,10 @@ class CubeDetectorNode(Node):
             'depth_topic', '/camera/camera/aligned_depth_to_color/image_raw'
         )
         self.declare_parameter('camera_info_topic', '/camera/camera/color/camera_info')
-        self.declare_parameter('output_image_topic', '/cube_detection/image')
+        self.declare_parameter('output_image_topic', '/plane_detection/image')
         self.declare_parameter('frame_id', 'camera_color_optical_frame')
 
-        # 立方体の一辺の長さ [m]（solvePnP 用）
-        self.declare_parameter('cube_size', 0.065)
-
-        # HSVカラー範囲（デフォルト: 赤立方体）
+        # HSVカラー範囲（デフォルト: 赤い平面マーカー）
         # 赤はH=0付近と180付近の2範囲を OR 結合する
         self.declare_parameter('hsv_h_low1', 0)
         self.declare_parameter('hsv_s_low1', 100)
@@ -76,6 +67,7 @@ class CubeDetectorNode(Node):
         # 輪郭面積フィルタ [px^2]
         self.declare_parameter('min_contour_area', 500)
         self.declare_parameter('max_contour_area', 100000)
+        self.declare_parameter('max_aspect_ratio', 5.0)
 
         # RealSense 深度スケール（uint16 値→メートル変換）
         self.declare_parameter('depth_scale', 0.001)
@@ -98,8 +90,8 @@ class CubeDetectorNode(Node):
         )
 
         # ---- Publisher ----
-        self._pose_pub = self.create_publisher(PoseStamped, 'cube_detection/pose', qos)
-        self._dist_pub = self.create_publisher(Float32, 'cube_detection/distance', qos)
+        self._pose_pub = self.create_publisher(PoseStamped, 'plane_detection/pose', qos)
+        self._dist_pub = self.create_publisher(Float32, 'plane_detection/distance', qos)
         output_image_topic = str(self.get_parameter('output_image_topic').value)
         self._image_pub = self.create_publisher(Image, output_image_topic, qos)
 
@@ -124,7 +116,7 @@ class CubeDetectorNode(Node):
         self._sync.registerCallback(self._image_callback)
 
         self.get_logger().info(
-            f'CubeDetector起動: image={image_topic}, depth={depth_topic}'
+            f'PlaneDetector起動: image={image_topic}, depth={depth_topic}'
         )
         self._frame_count = 0
         self._warned_no_camera_info = False
@@ -190,7 +182,7 @@ class CubeDetectorNode(Node):
         if best_cnt is not None:
             self._process_detection(best_cnt, vis, depth, img_msg)
         elif self._frame_count % 100 == 0:
-            self.get_logger().info('立方体未検知')
+            self.get_logger().info('平面未検知')
 
         out_msg = self._bridge.cv2_to_imgmsg(vis, encoding='bgr8')
         out_msg.header = img_msg.header
@@ -228,7 +220,7 @@ class CubeDetectorNode(Node):
         mask: np.ndarray,
         yolo_boxes: list[tuple[int, int, int, int]] | None = None,
     ):
-        """最大の正方形状輪郭を返す（見つからなければ None）."""
+        """最大の平面候補輪郭を返す（見つからなければ None）."""
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         min_area = int(self.get_parameter('min_contour_area').value)
         max_area = int(self.get_parameter('max_contour_area').value)
@@ -246,7 +238,7 @@ class CubeDetectorNode(Node):
             if w == 0 or h == 0:
                 continue
             aspect = max(w, h) / min(w, h)
-            if aspect > 2.5:
+            if aspect > float(self.get_parameter('max_aspect_ratio').value):
                 continue
 
             iou_score = 0.0
@@ -316,74 +308,6 @@ class CubeDetectorNode(Node):
             return 0.0
         return inter / union
 
-    @staticmethod
-    def _rotation_matrix_to_quaternion(R: np.ndarray):
-        """回転行列をクォータニオン (x, y, z, w) に変換する (Shepperd法)."""
-        trace = R[0, 0] + R[1, 1] + R[2, 2]
-        if trace > 0:
-            s = 0.5 / np.sqrt(trace + 1.0)
-            qw = 0.25 / s
-            qx = (R[2, 1] - R[1, 2]) * s
-            qy = (R[0, 2] - R[2, 0]) * s
-            qz = (R[1, 0] - R[0, 1]) * s
-        elif R[0, 0] > R[1, 1] and R[0, 0] > R[2, 2]:
-            s = 2.0 * np.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2])
-            qw = (R[2, 1] - R[1, 2]) / s
-            qx = 0.25 * s
-            qy = (R[0, 1] + R[1, 0]) / s
-            qz = (R[0, 2] + R[2, 0]) / s
-        elif R[1, 1] > R[2, 2]:
-            s = 2.0 * np.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2])
-            qw = (R[0, 2] - R[2, 0]) / s
-            qx = (R[0, 1] + R[1, 0]) / s
-            qy = 0.25 * s
-            qz = (R[1, 2] + R[2, 1]) / s
-        else:
-            s = 2.0 * np.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1])
-            qw = (R[1, 0] - R[0, 1]) / s
-            qx = (R[0, 2] + R[2, 0]) / s
-            qy = (R[1, 2] + R[2, 1]) / s
-            qz = 0.25 * s
-        return float(qx), float(qy), float(qz), float(qw)
-
-    def _estimate_pose_pnp(self, rect, cube_size: float):
-        """solvePnP で立方体正面の 6DOF 姿勢を推定する.
-
-        Returns:
-            rvec, tvec (np.ndarray) または (None, None)
-        """
-        if not self._camera_ready:
-            return None, None
-
-        box = cv2.boxPoints(rect).astype(np.float32)
-
-        # 立方体正面の物体点（Z=0平面）
-        half = cube_size / 2.0
-        obj_pts = np.array(
-            [
-                [-half, -half, 0.0],
-                [half, -half, 0.0],
-                [half, half, 0.0],
-                [-half, half, 0.0],
-            ],
-            dtype=np.float32,
-        )
-
-        try:
-            ok, rvec, tvec = cv2.solvePnP(
-                obj_pts,
-                box,
-                self._camera_matrix,
-                self._dist_coeffs,
-                flags=cv2.SOLVEPNP_IPPE_SQUARE,
-            )
-        except cv2.error:
-            return None, None
-
-        if not ok:
-            return None, None
-        return rvec.flatten(), tvec.flatten()
-
     def _process_detection(
         self,
         cnt,
@@ -391,15 +315,25 @@ class CubeDetectorNode(Node):
         depth: np.ndarray,
         img_msg: Image,
     ):
-        """検知した輪郭から3D位置・姿勢を推定し Publish する."""
+        """検知した平面輪郭から3D位置・姿勢を推定し Publish する."""
         rect = cv2.minAreaRect(cnt)
         box = np.int32(cv2.boxPoints(rect))
         cx, cy = int(rect[0][0]), int(rect[0][1])
         angle_deg = float(rect[2])
+        area = float(cv2.contourArea(cnt))
 
-        # ---- 可視化: バウンディングボックスと中心点 ----
-        cv2.drawContours(vis, [box], 0, (0, 255, 0), 2)
+        # ---- 可視化: 平面を分かりやすく塗りつぶし＋輪郭 ----
+        overlay = vis.copy()
+        cv2.fillPoly(overlay, [box], (0, 180, 255))
+        cv2.addWeighted(overlay, 0.28, vis, 0.72, 0.0, vis)
+        cv2.drawContours(vis, [box], 0, (0, 255, 255), 3)
         cv2.circle(vis, (cx, cy), 5, (0, 0, 255), -1)
+
+        # 面の向き（画像平面内）を矢印で表示
+        yaw = float(np.deg2rad(angle_deg))
+        dx = int(60 * np.cos(yaw))
+        dy = int(60 * np.sin(yaw))
+        cv2.arrowedLine(vis, (cx, cy), (cx + dx, cy + dy), (255, 255, 255), 2, tipLength=0.25)
 
         # ---- 深度取得 (中心付近の中央値) ----
         h_img, w_img = depth.shape[:2]
@@ -416,34 +350,26 @@ class CubeDetectorNode(Node):
 
         dist_m = float(np.median(valid)) * depth_scale
 
-        # ---- solvePnP で 6DOF 姿勢推定 ----
-        cube_size = float(self.get_parameter('cube_size').value)
-        rvec, tvec = self._estimate_pose_pnp(rect, cube_size)
+        # カメラ内部パラメータが未取得の場合は位置推定を保留
+        if not self._camera_ready:
+            if not self._warned_no_camera_info:
+                self.get_logger().warn('CameraInfo 未受信のため位置推定を保留中')
+                self._warned_no_camera_info = True
+            return
 
-        if rvec is not None and tvec is not None:
-            # solvePnP の結果を使用
-            X, Y, Z = float(tvec[0]), float(tvec[1]), float(tvec[2])
-            R, _ = cv2.Rodrigues(rvec)
-            qx, qy, qz, qw = self._rotation_matrix_to_quaternion(R)
-        else:
-            # カメラ内部パラメータが未取得の場合は逆投影で位置のみ推定
-            if not self._camera_ready:
-                if not self._warned_no_camera_info:
-                    self.get_logger().warn('CameraInfo 未受信のため位置推定を保留中')
-                    self._warned_no_camera_info = True
-                return
-            fx = self._camera_matrix[0, 0]
-            fy = self._camera_matrix[1, 1]
-            ppx = self._camera_matrix[0, 2]
-            ppy = self._camera_matrix[1, 2]
-            X = (cx - ppx) * dist_m / fx
-            Y = (cy - ppy) * dist_m / fy
-            Z = dist_m
-            # 姿勢は minAreaRect の角度から Z 軸回転で近似
-            yaw = float(np.deg2rad(angle_deg))
-            qz = float(np.sin(yaw / 2.0))
-            qw = float(np.cos(yaw / 2.0))
-            qx, qy = 0.0, 0.0
+        # 中心画素の深度から逆投影して平面中心位置を推定
+        fx = self._camera_matrix[0, 0]
+        fy = self._camera_matrix[1, 1]
+        ppx = self._camera_matrix[0, 2]
+        ppy = self._camera_matrix[1, 2]
+        X = (cx - ppx) * dist_m / fx
+        Y = (cy - ppy) * dist_m / fy
+        Z = dist_m
+
+        # 姿勢は画像平面上の角度を Z 軸回転として近似
+        qz = float(np.sin(yaw / 2.0))
+        qw = float(np.cos(yaw / 2.0))
+        qx, qy = 0.0, 0.0
 
         # ---- PoseStamped Publish ----
         pose_msg = PoseStamped()
@@ -466,27 +392,45 @@ class CubeDetectorNode(Node):
         # ---- 可視化テキスト ----
         cv2.putText(
             vis,
-            f'X:{X:.3f}m  Y:{Y:.3f}m  Z:{Z:.3f}m',
-            (cx + 12, cy - 12),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0), 2, cv2.LINE_AA,
+            'PLANE DETECTED',
+            (cx + 12, cy - 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.60,
+            (0, 255, 255),
+            2,
+            cv2.LINE_AA,
         )
         cv2.putText(
             vis,
-            f'Dist:{dist_m:.3f}m  Ang:{angle_deg:.1f}deg',
-            (cx + 12, cy + 14),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0), 2, cv2.LINE_AA,
+            f'Center XYZ=({X:.3f}, {Y:.3f}, {Z:.3f}) m',
+            (cx + 12, cy - 8),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.52,
+            (0, 255, 0),
+            2,
+            cv2.LINE_AA,
+        )
+        cv2.putText(
+            vis,
+            f'Dist:{dist_m:.3f}m  Angle:{angle_deg:.1f}deg  Area:{int(area)}px',
+            (cx + 12, cy + 16),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.52,
+            (0, 255, 0),
+            2,
+            cv2.LINE_AA,
         )
 
         if self._frame_count % 30 == 0:
             self.get_logger().info(
-                f'立方体検知: Pos=({X:.3f}, {Y:.3f}, {Z:.3f}) '
-                f'Dist={dist_m:.3f}m Ang={angle_deg:.1f}deg'
+                f'平面検知: Pos=({X:.3f}, {Y:.3f}, {Z:.3f}) '
+                f'Dist={dist_m:.3f}m Ang={angle_deg:.1f}deg Area={int(area)}px'
             )
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = CubeDetectorNode()
+    node = PlaneDetectorNode()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()

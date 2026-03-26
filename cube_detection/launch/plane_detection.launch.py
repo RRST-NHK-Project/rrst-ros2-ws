@@ -17,21 +17,20 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    """立方体検知ノードとビューアノードを同時に起動するlaunchファイル."""
+    """平面検知ノードとビューアノードを同時に起動するlaunchファイル."""
     return LaunchDescription([
         Node(
             package='cube_detection',
-            executable='cube_detector',
-            name='cube_detector',
+            executable='plane_detector',
+            name='plane_detector',
             output='screen',
             parameters=[{
                 'image_topic': '/camera/camera/color/image_raw',
                 'depth_topic': '/camera/camera/aligned_depth_to_color/image_raw',
                 'camera_info_topic': '/camera/camera/color/camera_info',
-                'output_image_topic': '/cube_detection/image',
+                'output_image_topic': '/plane_detection/image',
                 'frame_id': 'camera_color_optical_frame',
-                'cube_size': 0.065,
-                # HSVカラー範囲（赤立方体）
+                # HSVカラー範囲（赤い平面マーカー）
                 'hsv_h_low1': 0,
                 'hsv_s_low1': 100,
                 'hsv_v_low1': 80,
@@ -46,6 +45,7 @@ def generate_launch_description():
                 'hsv_v_high2': 255,
                 'min_contour_area': 500,
                 'max_contour_area': 100000,
+                'max_aspect_ratio': 5.0,
                 'depth_scale': 0.001,
                 # YOLO併用（必要時のみ有効化）
                 'use_yolo': False,
@@ -59,11 +59,11 @@ def generate_launch_description():
         ),
         Node(
             package='cube_detection',
-            executable='cube_viewer',
-            name='cube_viewer',
+            executable='plane_viewer',
+            name='plane_viewer',
             output='screen',
             parameters=[{
-                'image_topic': '/cube_detection/image',
+                'image_topic': '/plane_detection/image',
             }],
         ),
     ])

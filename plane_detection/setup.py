@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'cube_detection'
+package_name = 'plane_detection'
 
 setup(
     name=package_name,
@@ -25,8 +25,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'plane_detector = cube_detection.plane_detector_node:main',
-            'plane_viewer = cube_detection.plane_viewer_node:main',
+            'plane_detector = plane_detection.plane_detector_node:main',
+            'plane_viewer = plane_detection.plane_viewer_node:main',
         ],
     },
 )
