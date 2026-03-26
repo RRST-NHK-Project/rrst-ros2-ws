@@ -5,7 +5,7 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Float32, Int32
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge
 
 
@@ -13,18 +13,27 @@ class ArucoPosePublisher(Node):
     def __init__(self):
         super().__init__("aruco_pose_publisher")
 
+        # Camera topics (assume RealSense D456 node is already running)
+        self.declare_parameter("image_topic", "/camera/color/image_raw")
+        self.declare_parameter("camera_info_topic", "/camera/color/camera_info")
+        self.declare_parameter("output_image_topic", "/camera/image_raw")
+        self.declare_parameter("frame_id", "camera_color_optical_frame")
+
         # Publishers
         self.pose_pub = self.create_publisher(PoseStamped, "aruco_pose", 10)
         self.id_pub = self.create_publisher(Int32, "aruco_id", 10)
         self.distance_pub = self.create_publisher(Float32, "aruco_distance", 10)
         self.bridge = CvBridge()
-        self.image_pub = self.create_publisher(Image, "/camera/image_raw", 10)
+        output_image_topic = str(self.get_parameter("output_image_topic").value)
+        self.image_pub = self.create_publisher(Image, output_image_topic, 10)
 
-        # Camera
-        self.cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
-        if not self.cap.isOpened():
-            self.get_logger().error("カメラが開けません")
-            exit()
+        image_topic = str(self.get_parameter("image_topic").value)
+        camera_info_topic = str(self.get_parameter("camera_info_topic").value)
+        self.create_subscription(Image, image_topic, self.image_callback, 10)
+        self.create_subscription(CameraInfo, camera_info_topic, self.camera_info_callback, 10)
+        self.get_logger().info(
+            f"Subscribed image_topic={image_topic}, camera_info_topic={camera_info_topic}"
+        )
 
         # ArUco dictionary
         self.aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
@@ -38,15 +47,13 @@ class ArucoPosePublisher(Node):
             self.parameters = aruco.DetectorParameters_create()  # type: ignore[attr-defined]
             self._use_new_api = False
 
-        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self.parameters.cornerRefinementMethod = aruco.CORNER_REFINE_NONE
 
-        # Camera params (placeholder – load from calibration file when available)
-        self.camera_matrix = np.array(
-            [[600, 0, 320], [0, 600, 240], [0, 0, 1]], dtype=np.float32
-        )
-
-        self.dist_coeffs = np.zeros((5, 1))
+        # Camera params are taken from CameraInfo topic
+        self.camera_matrix = None
+        self.dist_coeffs = None
+        self._camera_ready = False
+        self._warned_camera_info = False
         self.marker_length = 0.05  # マーカーの一辺の長さ [m]
 
         # Marker object points for solvePnP (used when estimatePoseSingleMarkers unavailable)
@@ -61,8 +68,12 @@ class ArucoPosePublisher(Node):
             dtype=np.float32,
         )
 
-        # Timer (30 FPS)
-        self.timer = self.create_timer(1.0 / 30.0, self.timer_callback)
+    def camera_info_callback(self, msg: CameraInfo):
+        self.camera_matrix = np.array(msg.k, dtype=np.float32).reshape(3, 3)
+        self.dist_coeffs = np.array(msg.d, dtype=np.float32).reshape(-1, 1)
+        if not self._camera_ready:
+            self._camera_ready = True
+            self.get_logger().info("CameraInfo received. Pose estimation is enabled.")
 
     def _detect_markers(self, gray):
         if self._use_new_api:
@@ -73,6 +84,8 @@ class ArucoPosePublisher(Node):
 
     def _estimate_pose(self, corners):
         """ポーズ推定 – estimatePoseSingleMarkers が利用できない場合は solvePnP を使用."""
+        if self.camera_matrix is None or self.dist_coeffs is None:
+            raise RuntimeError("Camera intrinsics are not initialized")
         try:
             rvecs, tvecs, _ = aruco.estimatePoseSingleMarkers(  # type: ignore[attr-defined]
                 corners, self.marker_length, self.camera_matrix, self.dist_coeffs
@@ -118,17 +131,25 @@ class ArucoPosePublisher(Node):
             qz = 0.25 * s
         return float(qx), float(qy), float(qz), float(qw)
 
-    def timer_callback(self):
-        ret, frame = self.cap.read()
-        if not ret:
-            self.get_logger().warn("フレーム取得失敗")
+    def image_callback(self, msg: Image):
+        try:
+            frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+        except Exception as exc:
+            self.get_logger().warn(f"画像変換失敗: {exc}")
             return
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         corners, ids, _ = self._detect_markers(gray)
 
         img_msg = self.bridge.cv2_to_imgmsg(frame, encoding="bgr8")
+        img_msg.header = msg.header
         self.image_pub.publish(img_msg)
+
+        if not self._camera_ready:
+            if not self._warned_camera_info:
+                self.get_logger().warn("CameraInfo未受信のため姿勢推定を保留中")
+                self._warned_camera_info = True
+            return
 
         if ids is not None:
             r, t = self._estimate_pose(corners)
@@ -142,7 +163,8 @@ class ArucoPosePublisher(Node):
             # PoseStamped
             pose_msg = PoseStamped()
             pose_msg.header.stamp = self.get_clock().now().to_msg()
-            pose_msg.header.frame_id = "camera"
+            frame_id = str(self.get_parameter("frame_id").value)
+            pose_msg.header.frame_id = msg.header.frame_id if not frame_id else frame_id
 
             pose_msg.pose.position.x = float(t[0])
             pose_msg.pose.position.y = float(t[1])

@@ -25,10 +25,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-        'aruco_test = aruco_tracker.aruco_test:main',
-        'aruco_generator = aruco_tracker.aruco_generator:main',
-        'camera = aruco_tracker.camera:main',
-        'camera_calibration = aruco_tracker.camera_calibration:main',
+        'aruco_pose_publisher = aruco_tracker.aruco_pose_publisher:main',
         'aruco_viewer = aruco_tracker.aruco_viewer:main'
         ],
     },
