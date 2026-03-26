@@ -14,8 +14,8 @@ class ArucoPosePublisher(Node):
         super().__init__("aruco_pose_publisher")
 
         # Camera topics (assume RealSense D456 node is already running)
-        self.declare_parameter("image_topic", "/camera/color/image_raw")
-        self.declare_parameter("camera_info_topic", "/camera/color/camera_info")
+        self.declare_parameter("image_topic", "/camera/camera/color/image_raw")
+        self.declare_parameter("camera_info_topic", "/camera/camera/color/camera_info")
         self.declare_parameter("output_image_topic", "/camera/image_raw")
         self.declare_parameter("frame_id", "camera_color_optical_frame")
 
