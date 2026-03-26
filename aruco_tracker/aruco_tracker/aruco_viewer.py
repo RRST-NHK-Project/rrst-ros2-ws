@@ -2,6 +2,7 @@
 
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, QoSHistoryPolicy, QoSDurabilityPolicy, QoSReliabilityPolicy
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Float32, Int32
@@ -25,13 +26,21 @@ class ArucoViewer(Node):
         self._marker_pos = None  # (x, y, z)
         self._marker_distance = None
 
-        self.sub_image = self.create_subscription(Image, image_topic, self.image_callback, 10)
-        self.sub_pose = self.create_subscription(PoseStamped, '/aruco_pose', self.pose_callback, 10)
-        self.sub_distance = self.create_subscription(Float32, '/aruco_distance', self.distance_callback, 10)
-        self.sub_id = self.create_subscription(Int32, '/aruco_id', self.id_callback, 10)
+        # QoS matching publisher: BEST_EFFORT, depth=1, no wait
+        qos_profile = QoSProfile(
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=1,
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            durability=QoSDurabilityPolicy.VOLATILE,
+        )
+
+        self.sub_image = self.create_subscription(Image, image_topic, self.image_callback, qos_profile)
+        self.sub_pose = self.create_subscription(PoseStamped, '/aruco_pose', self.pose_callback, qos_profile)
+        self.sub_distance = self.create_subscription(Float32, '/aruco_distance', self.distance_callback, qos_profile)
+        self.sub_id = self.create_subscription(Int32, '/aruco_id', self.id_callback, qos_profile)
         
         self.timer = self.create_timer(2.0, self.health_check)
-        self.get_logger().info(f'Viewer subscribed to: {image_topic}')
+        self.get_logger().info(f'Viewer subscribed to: {image_topic} (BEST_EFFORT, depth=1)')
 
     def id_callback(self, msg):
         self._marker_id = msg.data
@@ -85,7 +94,7 @@ class ArucoViewer(Node):
 
     def health_check(self):
         if self._last_frame_time is None:
-            self.get_logger().warn('まだ画像を受信していません。トピック名と配信状態を確認してください。')
+            self.get_logger().warn('画像受信待機中... トピック配信状態を確認してください。')
             return
 
         elapsed = self.get_clock().now() - self._last_frame_time
