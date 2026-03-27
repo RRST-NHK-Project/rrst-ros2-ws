@@ -1139,7 +1139,7 @@ function App() {
           <img src="/logo.svg" alt="NR26 Logo" className="console-logo" />
           <div>
             <h1>R2 Console</h1>
-            <p>{tr("ROS2 テレオペレーションパネル", "ROS2 Teleoperation Panel")}</p>
+            <p>{tr("R2 テレオペレーションパネル", "ROS2 Teleoperation Panel")}</p>
           </div>
           <div className="header-tools">
             <button
