@@ -1,0 +1,16 @@
+# Keep Docker build context clean for ROS workspace builds
+.git
+.github
+.venv
+
+# ROS/colcon artifacts
+build
+install
+log
+
+# Python caches
+**/__pycache__
+**/*.pyc
+
+# Node artifacts
+**/node_modules

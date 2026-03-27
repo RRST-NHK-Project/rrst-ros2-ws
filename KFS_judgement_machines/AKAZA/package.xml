@@ -7,7 +7,7 @@
   <maintainer email="your_email@example.com">user</maintainer>
   <license>Apache License 2.0</license>
 
-  <buildtool_depend>ament_python</buildtool_depend>
+  <buildtool_depend>ament_cmake</buildtool_depend>
 
   <exec_depend>rclpy</exec_depend>
   <exec_depend>std_msgs</exec_depend>
