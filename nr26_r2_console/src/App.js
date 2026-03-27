@@ -78,6 +78,14 @@ function App() {
   const [topicEchoInfo, setTopicEchoInfo] = useState("未開始");
   const [topicEchoMessages, setTopicEchoMessages] = useState([]);
   const [topicEchoRunning, setTopicEchoRunning] = useState(false);
+  const [serialBridgePorts, setSerialBridgePorts] = useState([]);
+  const [serialBridgeIds, setSerialBridgeIds] = useState([]);
+  const [serialBridgeRunning, setSerialBridgeRunning] = useState(false);
+  const [serialBridgePid, setSerialBridgePid] = useState("");
+  const [serialBridgeInfo, setSerialBridgeInfo] = useState("未取得");
+  const [serialBridgeLoading, setSerialBridgeLoading] = useState(false);
+
+  const backendBaseUrl = `${window.location.protocol}//${window.location.hostname}:3031`;
 
   const rosUrl = `${wsScheme}://${rosEndpoint.host}:${rosEndpoint.port}`;
 
@@ -122,10 +130,23 @@ function App() {
     setTopicEchoRunning(false);
   };
 
+  const extractSerialBridgeIds = (topics) => {
+    const idSet = new Set();
+    topics.forEach((item) => {
+      const name = item?.name || "";
+      const match = name.match(/^serial_(?:rx|tx)_(\d+)$/);
+      if (match) {
+        idSet.add(Number.parseInt(match[1], 10));
+      }
+    });
+
+    return Array.from(idSet).sort((a, b) => a - b);
+  };
+
   const refreshTopicList = async () => {
     if (!rosRef.current || !rosTopicsServiceRef.current) {
       setTopicListError("ROS未接続のため取得できません");
-      return;
+      return [];
     }
 
     setTopicListLoading(true);
@@ -141,15 +162,64 @@ function App() {
 
       mapped.sort((a, b) => a.name.localeCompare(b.name));
       setTopicList(mapped);
+      setSerialBridgeIds(extractSerialBridgeIds(mapped));
 
       if (mapped.length === 0) {
         setTopicListError("トピックが見つかりません");
       }
+      return mapped;
     } catch (error) {
       console.error("Failed to fetch topic list:", error);
       setTopicListError("トピック一覧の取得に失敗しました");
+      return [];
     } finally {
       setTopicListLoading(false);
+    }
+  };
+
+  const refreshSerialBridgeStatus = async () => {
+    setSerialBridgeLoading(true);
+    try {
+      const response = await fetch(`${backendBaseUrl}/api/serial-bridge/status`);
+      if (!response.ok) {
+        throw new Error(`status ${response.status}`);
+      }
+      const data = await response.json();
+      setSerialBridgePorts(Array.isArray(data?.ports) ? data.ports : []);
+      setSerialBridgeRunning(Boolean(data?.running));
+      setSerialBridgePid(data?.pid ? String(data.pid) : "");
+      setSerialBridgeInfo("状態を更新しました");
+    } catch (error) {
+      console.error("Failed to fetch serial bridge status:", error);
+      setSerialBridgeInfo("状態取得に失敗しました (backend未起動の可能性)");
+      setSerialBridgeRunning(false);
+      setSerialBridgePid("");
+      setSerialBridgePorts([]);
+    } finally {
+      setSerialBridgeLoading(false);
+    }
+  };
+
+  const startSerialBridgeFromConsole = async () => {
+    setSerialBridgeLoading(true);
+    try {
+      const response = await fetch(`${backendBaseUrl}/api/serial-bridge/start`, {
+        method: "POST",
+      });
+      if (!response.ok) {
+        throw new Error(`status ${response.status}`);
+      }
+      const data = await response.json();
+      setSerialBridgeRunning(Boolean(data?.running));
+      setSerialBridgePid(data?.pid ? String(data.pid) : "");
+      setSerialBridgeInfo(data?.message || "serial_bridge を起動しました");
+      await refreshSerialBridgeStatus();
+      await refreshTopicList();
+    } catch (error) {
+      console.error("Failed to start serial bridge:", error);
+      setSerialBridgeInfo("serial_bridge の起動に失敗しました");
+    } finally {
+      setSerialBridgeLoading(false);
     }
   };
 
@@ -535,6 +605,7 @@ function App() {
       setStatus("接続OK");
       console.log("Connected to ROS:", rosUrl);
       refreshTopicList();
+      refreshSerialBridgeStatus();
     });
 
     rosRef.current.on("error", (error) => {
@@ -820,6 +891,16 @@ function App() {
             onClick={() => setActivePage("topic")}
           >
             トピック監視
+          </button>
+          <button
+            className={`page-switch-button ${activePage === "serial-bridge" ? "page-switch-active" : ""}`}
+            onClick={() => {
+              setActivePage("serial-bridge");
+              refreshSerialBridgeStatus();
+              refreshTopicList();
+            }}
+          >
+            Serial Bridge
           </button>
         </section>
 
@@ -1336,6 +1417,53 @@ function App() {
                   <pre className="topic-echo-pre">{row.payload}</pre>
                 </article>
               ))}
+            </div>
+          </section>
+        )}
+
+        {activePage === "serial-bridge" && (
+          <section className="serial-bridge-panel">
+            <h2 className="serial-packet-title">Serial Bridge 管理</h2>
+            <p className="serial-packet-hint">
+              検出ポート、トピック由来のDevice ID、実行状態を確認し、ここから serial_bridge を起動できます。
+            </p>
+
+            <div className="serial-bridge-toolbar">
+              <button className="connection-button btn-connect" onClick={refreshSerialBridgeStatus}>
+                状態更新
+              </button>
+              <button className="connection-button btn-send" onClick={startSerialBridgeFromConsole}>
+                serial_bridge 起動
+              </button>
+              <span className="connection-hint">{serialBridgeLoading ? "処理中..." : serialBridgeInfo}</span>
+            </div>
+
+            <div className="serial-bridge-grid">
+              <section className="serial-bridge-card">
+                <h3 className="serial-bridge-title">実行状態</h3>
+                <p className="connection-hint">running: {serialBridgeRunning ? "ON" : "OFF"}</p>
+                <p className="connection-hint">pid: {serialBridgePid || "-"}</p>
+              </section>
+
+              <section className="serial-bridge-card">
+                <h3 className="serial-bridge-title">検出ポート</h3>
+                <div className="serial-bridge-list">
+                  {serialBridgePorts.length === 0 && <p className="connection-hint">ポート未検出</p>}
+                  {serialBridgePorts.map((port) => (
+                    <div className="serial-bridge-list-row" key={port}>{port}</div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="serial-bridge-card">
+                <h3 className="serial-bridge-title">検出ID (serial_rx/tx)</h3>
+                <div className="serial-bridge-list">
+                  {serialBridgeIds.length === 0 && <p className="connection-hint">ID未検出</p>}
+                  {serialBridgeIds.map((id) => (
+                    <div className="serial-bridge-list-row" key={`id-${id}`}>ID: {id}</div>
+                  ))}
+                </div>
+              </section>
             </div>
           </section>
         )}

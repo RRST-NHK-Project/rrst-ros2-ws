@@ -433,8 +433,61 @@
 .page-switch-row {
   margin-top: 10px;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
+}
+
+.serial-bridge-panel {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.serial-bridge-toolbar {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.serial-bridge-grid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.serial-bridge-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.serial-bridge-title {
+  margin: 0;
+  color: var(--text-main);
+  font-size: 0.9rem;
+}
+
+.serial-bridge-list {
+  margin-top: 8px;
+  display: grid;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.serial-bridge-list-row {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 0.82rem;
+  color: var(--text-main);
+  background: #ffffff;
 }
 
 .topic-panel {
@@ -603,6 +656,10 @@
   }
 
   .topic-select-row {
+    grid-template-columns: 1fr;
+  }
+
+  .serial-bridge-grid {
     grid-template-columns: 1fr;
   }
 }
