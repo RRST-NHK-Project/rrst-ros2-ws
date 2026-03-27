@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # R2 Console - 起動スクリプト
-# npm startでGUIを起動します
+# rosbridge と GUI を起動します
 
 set -e
 
@@ -10,6 +10,39 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 CONSOLE_DIR="${SCRIPT_DIR}"
 
 cd "${CONSOLE_DIR}"
+
+BRIDGE_PORT="${BRIDGE_PORT:-9090}"
+BRIDGE_PID=""
+
+cleanup() {
+  if [ -n "${BRIDGE_PID}" ] && kill -0 "${BRIDGE_PID}" >/dev/null 2>&1; then
+    echo ""
+    echo "rosbridge を停止しています..."
+    kill "${BRIDGE_PID}" >/dev/null 2>&1 || true
+    wait "${BRIDGE_PID}" 2>/dev/null || true
+  fi
+}
+
+trap cleanup EXIT INT TERM
+
+if command -v ros2 >/dev/null 2>&1; then
+  if command -v ss >/dev/null 2>&1 && ss -ltn "sport = :${BRIDGE_PORT}" | grep -q ":${BRIDGE_PORT}"; then
+    echo "rosbridge は既にポート ${BRIDGE_PORT} で起動中です"
+  else
+    echo "rosbridge を起動中... (port: ${BRIDGE_PORT})"
+    ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=${BRIDGE_PORT} >/tmp/r2_console_rosbridge.log 2>&1 &
+    BRIDGE_PID=$!
+    sleep 1
+
+    if ! kill -0 "${BRIDGE_PID}" >/dev/null 2>&1; then
+      echo "rosbridge の起動に失敗しました。ログ: /tmp/r2_console_rosbridge.log"
+      exit 1
+    fi
+  fi
+else
+  echo "ros2 コマンドが見つかりません。先に ROS2 環境を有効化してください。"
+  exit 1
+fi
 
 # node_modulesが存在しない場合はインストール
 if [ ! -d "node_modules" ]; then
@@ -22,6 +55,7 @@ echo "=================================="
 echo "R2 Console を起動しています..."
 echo "=================================="
 echo ""
+echo "rosbridge: ws://localhost:${BRIDGE_PORT}"
 echo "ブラウザで http://localhost:3000 を開いてください"
 echo "終了するには Ctrl+C を押してください"
 echo ""
