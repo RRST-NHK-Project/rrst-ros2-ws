@@ -1127,7 +1127,7 @@ function App() {
             className={`page-switch-button ${activePage === "actuator" ? "page-switch-active" : ""}`}
             onClick={() => setActivePage("actuator")}
           >
-            アクチュエータ送信
+            ダイレクト送信
           </button>
           <button
             className={`page-switch-button ${activePage === "topic" ? "page-switch-active" : ""}`}
@@ -1482,7 +1482,7 @@ function App() {
 
         {activePage === "actuator" && (
           <section className="serial-packet-section">
-            <h2 className="serial-packet-title">アクチュエータ送信 (Int16MultiArray)</h2>
+            <h2 className="serial-packet-title">ダイレクト送信 (Int16MultiArray)</h2>
             <p className="serial-packet-hint">
               IDで送信先を切替えることができます。トピック名: <strong>{serialTopicName}</strong>
               <br />
