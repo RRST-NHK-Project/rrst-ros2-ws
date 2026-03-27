@@ -63,6 +63,8 @@ function App() {
   const [targetXStep, setTargetXStep] = useState("0.1");
   const [targetYStep, setTargetYStep] = useState("0.1");
   const [targetYawStep, setTargetYawStep] = useState("5");
+  const [savedPose, setSavedPose] = useState(null);
+  const [savedPosesList, setSavedPosesList] = useState([]);
   const [autoDriveCmdInfo, setAutoDriveCmdInfo] = useState("未送信");
 
   const rosUrl = `${wsScheme}://${rosEndpoint.host}:${rosEndpoint.port}`;
@@ -187,6 +189,52 @@ function App() {
     setTargetXInput(poseX.toFixed(3));
     setTargetYInput(poseY.toFixed(3));
     setTargetYawInput((poseYaw * 180 / Math.PI).toFixed(1));
+  };
+
+  const saveTargetPose = () => {
+    const x = parseFloatSafe(targetXInput);
+    const y = parseFloatSafe(targetYInput);
+    const yawDeg = parseFloatSafe(targetYawInput);
+    const yawRad = yawDeg * Math.PI / 180;
+
+    const newPose = {
+      id: Date.now(),
+      x: x,
+      y: y,
+      yaw: yawRad,
+      yawDeg: yawDeg,
+      timestamp: new Date().toLocaleTimeString('ja-JP'),
+      label: `目標${savedPosesList.length + 1}`,
+    };
+
+    setSavedPosesList([newPose, ...savedPosesList]);
+    setAutoDriveCmdInfo(`目標値を保存しました: (${x.toFixed(3)}, ${y.toFixed(3)}, ${yawDeg.toFixed(1)}°)`);
+  };
+
+  const applySavedTargetPose = (pose) => {
+    if (!autoDriveCmdRef.current) {
+      setAutoDriveCmdInfo("ROS未接続のため送信できません");
+      return;
+    }
+
+    setTargetXInput(pose.x.toFixed(3));
+    setTargetYInput(pose.y.toFixed(3));
+    setTargetYawInput(pose.yawDeg.toFixed(1));
+
+    autoDriveCmdRef.current.publish({
+      data: [pose.x, pose.y, pose.yaw],
+    });
+
+    setAutoDriveCmdInfo(`保存値 "${pose.label}" を送信しました`);
+  };
+
+  const deleteSavedPose = (id) => {
+    setSavedPosesList(savedPosesList.filter((pose) => pose.id !== id));
+  };
+
+  const clearAllSavedPoses = () => {
+    setSavedPosesList([]);
+    setAutoDriveCmdInfo("すべての保存目標値をクリアしました");
   };
 
   const incrementTarget = (setter, currentValue, step) => {
@@ -812,6 +860,50 @@ function App() {
                 <strong>{(poseYaw * 180 / Math.PI).toFixed(1)}</strong>
               </div>
             </div>
+
+            <div className="pose-target-save-panel">
+              <button className="connection-button serial-send-button" onClick={saveTargetPose}>
+                目標値を保存
+              </button>
+              {savedPosesList.length > 0 && (
+                <button className="serial-clear-button" onClick={clearAllSavedPoses}>
+                  すべてクリア
+                </button>
+              )}
+            </div>
+
+            {savedPosesList.length > 0 && (
+              <div className="pose-saved-list-panel">
+                <h3 className="pose-saved-list-title">保存済み目標値 ({savedPosesList.length})</h3>
+                <div className="pose-saved-list">
+                  {savedPosesList.map((pose) => (
+                    <div key={pose.id} className="pose-saved-item">
+                      <div className="pose-saved-item-info">
+                        <span className="pose-saved-item-label">{pose.label}</span>
+                        <span className="pose-saved-item-values">
+                          X: {pose.x.toFixed(3)}, Y: {pose.y.toFixed(3)}, Yaw: {pose.yawDeg.toFixed(1)}°
+                        </span>
+                        <span className="pose-saved-item-time">{pose.timestamp}</span>
+                      </div>
+                      <div className="pose-saved-item-actions">
+                        <button
+                          className="connection-button pose-item-button"
+                          onClick={() => applySavedTargetPose(pose)}
+                        >
+                          復元
+                        </button>
+                        <button
+                          className="serial-clear-button pose-item-button"
+                          onClick={() => deleteSavedPose(pose.id)}
+                        >
+                          削除
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="pose-step-grid">
               <label className="serial-packet-label">

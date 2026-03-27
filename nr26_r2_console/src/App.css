@@ -554,6 +554,120 @@
   gap: 8px;
 }
 
+.pose-save-panel {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(203, 28, 20, 0.08);
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.pose-saved-display {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 8px;
+  border: 1px solid var(--line);
+}
+
+.pose-saved-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.pose-saved-values {
+  font-size: 0.8rem;
+  color: var(--text-sub);
+  font-family: 'Courier New', monospace;
+}
+
+.pose-target-save-panel {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(203, 28, 20, 0.08);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.pose-saved-list-panel {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.pose-saved-list-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin: 0 0 8px 0;
+}
+
+.pose-saved-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.pose-saved-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.85);
+  align-items: center;
+}
+
+.pose-saved-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pose-saved-item-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.pose-saved-item-values {
+  font-size: 0.75rem;
+  color: var(--text-main);
+  font-family: 'Courier New', monospace;
+}
+
+.pose-saved-item-time {
+  font-size: 0.65rem;
+  color: var(--text-sub);
+}
+
+.pose-saved-item-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.pose-item-button {
+  padding: 4px 8px;
+  font-size: 0.75rem;
+}
+
 .pose-input-item {
   display: flex;
   flex-direction: column;
@@ -932,6 +1046,22 @@
   .pose-input-grid,
   .pose-actions-row {
     grid-template-columns: 1fr;
+  }
+
+  .pose-save-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .pose-target-save-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .pose-saved-item {
+    grid-template-columns: 1fr;
+  }
+
+  .pose-saved-item-actions {
+    grid-template-columns: 1fr 1fr;
   }
 
   .serial-packet-controls {
