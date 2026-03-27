@@ -12,12 +12,20 @@ const PACKET_INDEX_LABELS = [
 const DEFAULT_PACKET_COUNT = 24;
 const SERIAL_BRIDGE_MIN_ELEMENTS = 24;
 
-const describeActuator = (label) => {
+const describeActuatorJa = (label) => {
   if (label === "DEBUG") return "デバッグ (0/1)";
   if (label.startsWith("MD")) return "モータ出力 (-255〜255)";
   if (label.startsWith("SERVO")) return "サーボ角度 (0〜270)";
   if (label.startsWith("TR")) return "デジタル出力 (0/1)";
   return "予備";
+};
+
+const describeActuatorEn = (label) => {
+  if (label === "DEBUG") return "Debug (0/1)";
+  if (label.startsWith("MD")) return "Motor output (-255 to 255)";
+  if (label.startsWith("SERVO")) return "Servo angle (0 to 270)";
+  if (label.startsWith("TR")) return "Digital output (0/1)";
+  return "Reserved";
 };
 
 function App() {
@@ -48,6 +56,7 @@ function App() {
   const [commandValue, setCommandValue] = useState(0);
   const [buttons, setButtons] = useState(Array(14).fill(0));
   const [axes, setAxes] = useState(Array(8).fill(0));
+  const [language, setLanguage] = useState("ja");
   const [operationArmed, setOperationArmed] = useState(false);
   const [frontendForceStopped, setFrontendForceStopped] = useState(false);
   const [controllerEnabled, setControllerEnabled] = useState(false);
@@ -95,6 +104,90 @@ function App() {
   const backendBaseUrl = `${window.location.protocol}//${window.location.hostname}:3031`;
 
   const rosUrl = `${wsScheme}://${rosEndpoint.host}:${rosEndpoint.port}`;
+  const tr = (jaText, enText) => (language === "ja" ? jaText : enText);
+  const localizedStatusText =
+    status === "接続OK"
+      ? tr("接続OK", "Connected")
+      : status === "接続中..."
+        ? tr("接続中...", "Connecting...")
+        : status === "切断"
+          ? tr("切断", "Disconnected")
+          : status === "エラー"
+            ? tr("エラー", "Error")
+            : status;
+
+  const translateRuntimeText = (text) => {
+    if (language === "ja" || !text) {
+      return text;
+    }
+
+    const monitorMatch = text.match(/^(.+) \((.+)\) を監視中$/);
+    if (monitorMatch) {
+      return `Monitoring ${monitorMatch[1]} (${monitorMatch[2]})`;
+    }
+
+    const serialTxMatch = text.match(/^(.+) に (\d+) 要素を送信 \(入力 (\d+) 要素\)$/);
+    if (serialTxMatch) {
+      return `Sent ${serialTxMatch[2]} elements to ${serialTxMatch[1]} (input ${serialTxMatch[3]})`;
+    }
+
+    const periodicMatch = text.match(/^定期送信中: (.+) Hz$/);
+    if (periodicMatch) {
+      return `Periodic sending: ${periodicMatch[1]} Hz`;
+    }
+
+    const savePoseMatch = text.match(/^目標値を保存しました: \((.+)\)$/);
+    if (savePoseMatch) {
+      return `Saved target pose: (${savePoseMatch[1]})`;
+    }
+
+    const savedSendMatch = text.match(/^保存値 "(.+)" を送信しました$/);
+    if (savedSendMatch) {
+      return `Sent saved target "${savedSendMatch[1]}"`;
+    }
+
+    const map = {
+      "未送信": "Not sent",
+      "未開始": "Not started",
+      "未取得": "Not fetched",
+      "処理中...": "Processing...",
+      "取得中...": "Loading...",
+      "ログ取得中...": "Loading logs...",
+      "まだ受信していません": "No messages yet",
+      "ポート未検出": "No ports detected",
+      "ID未検出": "No IDs detected",
+      "ログはまだありません": "No logs yet",
+      "型不明": "Unknown type",
+      "(受信中)": "(Receiving)",
+      "状態を更新しました": "Status updated",
+      "設定を適用しました": "Settings applied",
+      "状態取得に失敗しました (backend未起動の可能性)": "Failed to get status (backend may be down)",
+      "ログ取得に失敗しました": "Failed to fetch logs",
+      "serial_bridge を起動しました": "serial_bridge started",
+      "serial_bridge の起動に失敗しました": "Failed to start serial_bridge",
+      "serial_bridge を停止しました": "serial_bridge stopped",
+      "serial_bridge の停止に失敗しました": "Failed to stop serial_bridge",
+      "console backend を強制シャットダウンしました": "Console backend force-stopped",
+      "console backend の強制シャットダウンに失敗しました": "Failed to force-stop console backend",
+      "トピック一覧の取得に失敗しました": "Failed to fetch topic list",
+      "トピックが見つかりません": "No topics found",
+      "ROS未接続のため取得できません": "Cannot fetch while ROS is disconnected",
+      "トピック名を選択してください": "Please select a topic",
+      "ROS未接続のため開始できません": "Cannot start while ROS is disconnected",
+      "トピック型の取得に失敗しました": "Failed to resolve topic type",
+      "操作許可がOFFのため送信できません": "Cannot send while safety lock is ON",
+      "ROS未接続のため送信できません": "Cannot send while ROS is disconnected",
+      "配列をクリアしました": "Array cleared",
+      "操作許可がOFFのためオドメトリリセット送信できません": "Cannot send odometry reset while safety lock is ON",
+      "ROS未接続のためオドメトリリセット送信できません": "Cannot send odometry reset while ROS is disconnected",
+      "odom_reset にリセット要求を送信しました": "Sent reset request to odom_reset",
+      "すべての保存目標値をクリアしました": "Cleared all saved targets",
+      "r2_autodrive_cmd に目標座標を送信しました": "Sent target pose to r2_autodrive_cmd",
+      "操作許可がOFFのため定期送信を停止しました": "Periodic sending stopped because safety lock is ON",
+    };
+
+    return map[text] || text;
+  };
 
   const applyRosEndpoint = () => {
     const nextHost = rosHostInput.trim() || defaultRosHost;
@@ -151,7 +244,7 @@ function App() {
   };
 
   const addTimestampToLogLines = (lines) => {
-    const fetchedAt = new Date().toLocaleTimeString("ja-JP");
+    const fetchedAt = new Date().toLocaleTimeString(language === "ja" ? "ja-JP" : "en-US");
     return lines.map((line) => {
       if (/^\[\d{1,2}:\d{2}:\d{2}\]/.test(line)) {
         return line;
@@ -296,7 +389,10 @@ function App() {
 
   const forceShutdownBackendFromConsole = async () => {
     const confirmed = window.confirm(
-      "console backend を強制シャットダウンします。\nこの後、状態取得や起動/停止機能は再起動まで使えません。続行しますか？"
+      tr(
+        "console backend を強制シャットダウンします。\nこの後、状態取得や起動/停止機能は再起動まで使えません。続行しますか？",
+        "Force shutdown console backend?\nStatus/start/stop features will be unavailable until restart. Continue?"
+      )
     );
     if (!confirmed) {
       return;
@@ -325,7 +421,10 @@ function App() {
 
   const forceShutdownFrontendFromConsole = () => {
     const confirmed = window.confirm(
-      "フロントエンドを強制シャットダウンします。\n画面操作は停止し、再読み込みまで復帰できません。続行しますか？"
+      tr(
+        "フロントエンドを強制シャットダウンします。\n画面操作は停止し、再読み込みまで復帰できません。続行しますか？",
+        "Force shutdown frontend?\nUI will stop and cannot recover until reload. Continue?"
+      )
     );
     if (!confirmed) {
       return;
@@ -432,7 +531,7 @@ function App() {
       const payload = JSON.stringify(msg, null, 2);
       const row = {
         id: Date.now() + Math.random(),
-        at: new Date().toLocaleTimeString("ja-JP"),
+        at: new Date().toLocaleTimeString(language === "ja" ? "ja-JP" : "en-US"),
         payload,
       };
       setTopicEchoMessages((prev) => [row, ...prev].slice(0, 30));
@@ -488,7 +587,7 @@ function App() {
     return (
       <label className="serial-item" key={`${label}-${index}`}>
         <span className="serial-item-name">[{index}] {label}</span>
-        <span className="serial-item-desc">{describeActuator(label)}</span>
+        <span className="serial-item-desc">{tr(describeActuatorJa(label), describeActuatorEn(label))}</span>
         <input
           className="connection-input"
           type="number"
@@ -588,7 +687,7 @@ function App() {
       y: y,
       yaw: yawRad,
       yawDeg: yawDeg,
-      timestamp: new Date().toLocaleTimeString('ja-JP'),
+      timestamp: new Date().toLocaleTimeString(language === "ja" ? "ja-JP" : "en-US"),
       label: `目標${savedPosesList.length + 1}`,
     };
 
@@ -923,17 +1022,17 @@ function App() {
             <img src="/logo.svg" alt="NR26 Logo" className="console-logo" />
             <div>
               <h1>R2 Console</h1>
-              <p>Frontend Forced Shutdown</p>
+              <p>{tr("フロントエンド強制停止", "Frontend Forced Shutdown")}</p>
             </div>
           </header>
 
           <section className="disabled-notice">
-            フロントエンドを強制停止しました。復帰するには再読み込みしてください。
+            {tr("フロントエンドを強制停止しました。復帰するには再読み込みしてください。", "Frontend is force-stopped. Reload to resume.")}
           </section>
 
           <section className="control-toggle-row">
             <button className="connection-button btn-connect" onClick={() => window.location.reload()}>
-              再読み込み
+              {tr("再読み込み", "Reload")}
             </button>
           </section>
         </main>
@@ -949,7 +1048,7 @@ function App() {
             className="fullscreen-close-button-top"
             onClick={() => setControllerFullscreen(false)}
           >
-            ✕ Back to Normal
+            {tr("✕ 通常表示に戻る", "✕ Back to Normal")}
           </button>
 
           <div className="ps4-panel-fullscreen">
@@ -1040,7 +1139,21 @@ function App() {
           <img src="/logo.svg" alt="NR26 Logo" className="console-logo" />
           <div>
             <h1>R2 Console</h1>
-            <p>ROS2 Teleoperation Panel</p>
+            <p>{tr("ROS2 テレオペレーションパネル", "ROS2 Teleoperation Panel")}</p>
+          </div>
+          <div className="header-tools">
+            <button
+              className={`lang-chip ${language === "ja" ? "lang-chip-active" : ""}`}
+              onClick={() => setLanguage("ja")}
+            >
+              日本語
+            </button>
+            <button
+              className={`lang-chip ${language === "en" ? "lang-chip-active" : ""}`}
+              onClick={() => setLanguage("en")}
+            >
+              English
+            </button>
           </div>
         </header>
 
@@ -1054,7 +1167,7 @@ function App() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") applyRosEndpoint();
                 }}
-                placeholder="ROS IP (例: 192.168.1.10)"
+                placeholder={tr("ROS IP (例: 192.168.1.10)", "ROS Host (e.g. 192.168.1.10)")}
               />
               <input
                 className="connection-input connection-port"
@@ -1067,7 +1180,7 @@ function App() {
               />
             </div>
             <button className="connection-button btn-connect" onClick={applyRosEndpoint}>
-              接続更新
+              {tr("接続更新", "Apply")}
             </button>
           </div>
 
@@ -1081,7 +1194,7 @@ function App() {
                   : "status-bad"
                 }`}
             >
-              {status}
+              {localizedStatusText}
             </span>
           </div>
         </section>
@@ -1097,12 +1210,12 @@ function App() {
               }
             }}
           >
-            {operationArmed ? "操作ロック: OFF" : "操作ロック: ON"}
+            {operationArmed ? tr("操作ロック: OFF", "Safety Lock: OFF") : tr("操作ロック: ON", "Safety Lock: ON")}
           </button>
           <span className="connection-hint">
             {operationArmed
-              ? "送信系機能が有効です。注意して操作してください。"
-              : "ロック中: 送信系機能は無効化されています"}
+              ? tr("送信系機能が有効です。注意して操作してください。", "Sending features are enabled. Operate carefully.")
+              : tr("ロック中: 送信系機能は無効化されています", "Locked: sending features are disabled")}
           </span>
         </section>
 
@@ -1111,31 +1224,31 @@ function App() {
             className={`page-switch-button ${activePage === "controller" ? "page-switch-active" : ""}`}
             onClick={() => setActivePage("controller")}
           >
-            コントローラ操作
+            {tr("コントローラ操作", "Controller")}
           </button>
           <button
             className={`page-switch-button ${activePage === "sequence" ? "page-switch-active" : ""}`}
             onClick={() => setActivePage("sequence")}
           >
-            シーケンス操作
+            {tr("シーケンス操作", "Sequence")}
           </button>
           <button
             className={`page-switch-button ${activePage === "pose" ? "page-switch-active" : ""}`}
             onClick={() => setActivePage("pose")}
           >
-            座標・姿勢管理
+            {tr("座標・姿勢管理", "Pose")}
           </button>
           <button
             className={`page-switch-button ${activePage === "actuator" ? "page-switch-active" : ""}`}
             onClick={() => setActivePage("actuator")}
           >
-            ダイレクト送信
+            {tr("ダイレクト送信", "Actuator TX")}
           </button>
           <button
             className={`page-switch-button ${activePage === "topic" ? "page-switch-active" : ""}`}
             onClick={() => setActivePage("topic")}
           >
-            トピック監視
+            {tr("トピック監視", "Topics")}
           </button>
           <button
             className={`page-switch-button ${activePage === "serial-bridge" ? "page-switch-active" : ""}`}
@@ -1152,13 +1265,13 @@ function App() {
             className={`page-switch-button ${activePage === "shutdown" ? "page-switch-active" : ""}`}
             onClick={() => setActivePage("shutdown")}
           >
-            強制停止
+            {tr("強制停止", "Shutdown")}
           </button>
           <button
             className={`page-switch-button ${activePage === "settings" ? "page-switch-active" : ""}`}
             onClick={() => setActivePage("settings")}
           >
-            設定
+            {tr("設定", "Settings")}
           </button>
         </section>
 
@@ -1172,27 +1285,27 @@ function App() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") applyJoyTopicName();
                 }}
-                placeholder="Joy Topic Name (例: /joy_9)"
+                placeholder={tr("Joy Topic Name (例: /joy_9)", "Joy Topic Name (e.g. /joy_9)")}
               />
               <button className="connection-button btn-connect" onClick={applyJoyTopicName}>
-                更新
+                {tr("更新", "Apply")}
               </button>
             </section>
 
-            <p className="connection-hint">現在のJoyトピック: {joyTopicName}</p>
+            <p className="connection-hint">{tr("現在のJoyトピック:", "Current Joy topic:")} {joyTopicName}</p>
 
             <section className="control-toggle-row">
               <button
                 className={`toggle-button ${controllerEnabled ? "toggle-on" : "toggle-off"}`}
                 onClick={() => setControllerEnabled(!controllerEnabled)}
               >
-                {controllerEnabled ? "コントローラー: ON" : "コントローラー: OFF"}
+                {controllerEnabled ? tr("コントローラー: ON", "Controller: ON") : tr("コントローラー: OFF", "Controller: OFF")}
               </button>
               <button
                 className="fullscreen-toggle-button"
                 onClick={() => setControllerFullscreen(true)}
               >
-                全画面操作
+                {tr("全画面操作", "Fullscreen")}
               </button>
             </section>
 
@@ -1207,7 +1320,7 @@ function App() {
                           updateCommand(0);
                         }}
                       >
-                        緊急停止
+                        {tr("緊急停止", "Emergency Stop")}
                       </button>
                     </div>
                   </div>
@@ -1218,7 +1331,7 @@ function App() {
                 </section>
 
                 <section className="ps4-panel">
-                  <h2>PS4 Controller Buttons</h2>
+                  <h2>{tr("PS4 コントローラーボタン", "PS4 Controller Buttons")}</h2>
 
                   <div className="ps-shoulder-row">
                     <div className="ps-shoulder-side">
@@ -1297,7 +1410,7 @@ function App() {
 
             {!controllerEnabled && (
               <div className="disabled-notice">
-                コントローラーは無効化されています
+                {tr("コントローラーは無効化されています", "Controller is disabled")}
               </div>
             )}
           </>
@@ -1305,7 +1418,7 @@ function App() {
 
         {activePage === "sequence" && (
           <section className="quick-controls-panel">
-            <h2 className="serial-packet-title">シーケンス操作</h2>
+            <h2 className="serial-packet-title">{tr("シーケンス操作", "Sequence")}</h2>
             <div className="quick-controls-row sequence-controls-row">
               <div className="control-group">
                 <button
@@ -1315,7 +1428,7 @@ function App() {
                     () => updateCommand(0)
                   )}
                 >
-                  段差上り
+                  {tr("段差上り", "Step Up")}
                 </button>
               </div>
 
@@ -1327,7 +1440,7 @@ function App() {
                     () => updateCommand(0)
                   )}
                 >
-                  段差下り
+                  {tr("段差下り", "Step Down")}
                 </button>
               </div>
             </div>
@@ -1340,29 +1453,29 @@ function App() {
 
         {activePage === "pose" && (
           <section className="pose-panel">
-            <h2 className="serial-packet-title">座標・姿勢管理</h2>
+            <h2 className="serial-packet-title">{tr("座標・姿勢管理", "Pose Management")}</h2>
             <p className="serial-packet-hint">
-              現在座標と目標座標を管理します。（Yaw: 度数法）
+              {tr("現在座標と目標座標を管理します。（Yaw: 度数法）", "Manage current pose and target pose. (Yaw in degrees)")}
             </p>
 
             <div className="pose-current-grid">
               <div className="pose-current-item">
-                <span>現在X</span>
+                <span>{tr("現在X", "Current X")}</span>
                 <strong>{poseX.toFixed(3)}</strong>
               </div>
               <div className="pose-current-item">
-                <span>現在Y</span>
+                <span>{tr("現在Y", "Current Y")}</span>
                 <strong>{poseY.toFixed(3)}</strong>
               </div>
               <div className="pose-current-item">
-                <span>現在Yaw (°)</span>
+                <span>{tr("現在Yaw (°)", "Current Yaw (°)")}</span>
                 <strong>{(poseYaw * 180 / Math.PI).toFixed(1)}</strong>
               </div>
             </div>
 
             <div className="pose-step-grid">
               <label className="serial-packet-label">
-                X ステップ
+                {tr("X ステップ", "X Step")}
                 <input
                   className="connection-input"
                   type="number"
@@ -1372,7 +1485,7 @@ function App() {
                 />
               </label>
               <label className="serial-packet-label">
-                Y ステップ
+                {tr("Y ステップ", "Y Step")}
                 <input
                   className="connection-input"
                   type="number"
@@ -1382,7 +1495,7 @@ function App() {
                 />
               </label>
               <label className="serial-packet-label">
-                Yaw ステップ (°)
+                {tr("Yaw ステップ (°)", "Yaw Step (°)")}
                 <input
                   className="connection-input"
                   type="number"
@@ -1396,7 +1509,7 @@ function App() {
             <div className="pose-input-grid">
               <div className="pose-input-item">
                 <label className="serial-packet-label">
-                  目標X
+                  {tr("目標X", "Target X")}
                   <input className="connection-input" value={targetXInput} onChange={(e) => setTargetXInput(e.target.value)} />
                 </label>
                 <div className="pose-button-group">
@@ -1407,7 +1520,7 @@ function App() {
 
               <div className="pose-input-item">
                 <label className="serial-packet-label">
-                  目標Y
+                  {tr("目標Y", "Target Y")}
                   <input className="connection-input" value={targetYInput} onChange={(e) => setTargetYInput(e.target.value)} />
                 </label>
                 <div className="pose-button-group">
@@ -1418,7 +1531,7 @@ function App() {
 
               <div className="pose-input-item">
                 <label className="serial-packet-label">
-                  目標Yaw (°)
+                  {tr("目標Yaw (°)", "Target Yaw (°)")}
                   <input className="connection-input" value={targetYawInput} onChange={(e) => setTargetYawInput(e.target.value)} />
                 </label>
                 <div className="pose-button-group">
@@ -1429,27 +1542,27 @@ function App() {
             </div>
 
             <div className="pose-actions-row">
-              <button className="connection-button btn-neutral" onClick={applyAutoDriveFromCurrentPose}>現在値を目標へ</button>
-              <button className="connection-button btn-neutral" onClick={publishOdomReset} disabled={!operationArmed}>オドメトリをリセット</button>
-              <button className="connection-button serial-send-button btn-send" onClick={publishAutoDriveCommand} disabled={!operationArmed}>目標座標を送信</button>
+              <button className="connection-button btn-neutral" onClick={applyAutoDriveFromCurrentPose}>{tr("現在値を目標へ", "Use Current as Target")}</button>
+              <button className="connection-button btn-neutral" onClick={publishOdomReset} disabled={!operationArmed}>{tr("オドメトリをリセット", "Reset Odometry")}</button>
+              <button className="connection-button serial-send-button btn-send" onClick={publishAutoDriveCommand} disabled={!operationArmed}>{tr("目標座標を送信", "Send Target Pose")}</button>
             </div>
 
-            <p className="connection-hint">{autoDriveCmdInfo}</p>
+            <p className="connection-hint">{translateRuntimeText(autoDriveCmdInfo)}</p>
 
             <div className="pose-target-save-panel">
               <button className="connection-button serial-send-button btn-save" onClick={saveTargetPose}>
-                目標値を保存
+                {tr("目標値を保存", "Save Target")}
               </button>
               {savedPosesList.length > 0 && (
                 <button className="serial-clear-button" onClick={clearAllSavedPoses}>
-                  すべてクリア
+                  {tr("すべてクリア", "Clear All")}
                 </button>
               )}
             </div>
 
             {savedPosesList.length > 0 && (
               <div className="pose-saved-list-panel">
-                <h3 className="pose-saved-list-title">保存済み目標値 ({savedPosesList.length})</h3>
+                <h3 className="pose-saved-list-title">{tr("保存済み目標値", "Saved Targets")} ({savedPosesList.length})</h3>
                 <div className="pose-saved-list">
                   {savedPosesList.map((pose) => (
                     <div key={pose.id} className="pose-saved-item">
@@ -1465,13 +1578,13 @@ function App() {
                           className="connection-button pose-item-button btn-restore"
                           onClick={() => applySavedTargetPose(pose)}
                         >
-                          復元&送信
+                          {tr("復元&送信", "Restore & Send")}
                         </button>
                         <button
                           className="serial-clear-button pose-item-button"
                           onClick={() => deleteSavedPose(pose.id)}
                         >
-                          削除
+                          {tr("削除", "Delete")}
                         </button>
                       </div>
                     </div>
@@ -1484,11 +1597,11 @@ function App() {
 
         {activePage === "actuator" && (
           <section className="serial-packet-section">
-            <h2 className="serial-packet-title">ダイレクト送信 (Int16MultiArray)</h2>
+            <h2 className="serial-packet-title">{tr("ダイレクト送信", "Direct Transmission")} (Int16MultiArray)</h2>
             <p className="serial-packet-hint">
-              IDで送信先を切替えることができます。トピック名: <strong>{serialTopicName}</strong>
+              {tr("IDで送信先を切替えることができます。トピック名:", "Switch destination by ID. Topic:")} <strong>{serialTopicName}</strong>
               <br />
-              入力値のチェックは行っていません。注意して入力してください。
+              {tr("入力値のチェックは行っていません。注意して入力してください。", "Input values are not validated. Use carefully.")}
             </p>
 
             <div className="serial-packet-controls">
@@ -1504,7 +1617,7 @@ function App() {
                 />
               </label>
               <label className="serial-packet-label">
-                要素数
+                {tr("要素数", "Length")}
                 <input
                   className="connection-input"
                   type="number"
@@ -1529,7 +1642,7 @@ function App() {
 
             <div className="actuator-groups">
               <section className="actuator-group">
-                <h3 className="actuator-group-title">モータ (MD1 - MD8)</h3>
+                <h3 className="actuator-group-title">{tr("モータ", "Motors")} (MD1 - MD8)</h3>
                 <div className="serial-packet-grid">
                   {Array.from({ length: 8 }, (_, i) => i + 1)
                     .filter((index) => index < serialElementCount)
@@ -1538,7 +1651,7 @@ function App() {
               </section>
 
               <section className="actuator-group">
-                <h3 className="actuator-group-title">サーボ (SERVO1 - SERVO8)</h3>
+                <h3 className="actuator-group-title">{tr("サーボ", "Servos")} (SERVO1 - SERVO8)</h3>
                 <div className="serial-packet-grid">
                   {Array.from({ length: 8 }, (_, i) => i + 9)
                     .filter((index) => index < serialElementCount)
@@ -1547,7 +1660,7 @@ function App() {
               </section>
 
               <section className="actuator-group">
-                <h3 className="actuator-group-title">TR出力 (TR1 - TR7)</h3>
+                <h3 className="actuator-group-title">{tr("TR出力", "TR Outputs")} (TR1 - TR7)</h3>
                 <div className="serial-packet-grid">
                   {Array.from({ length: 7 }, (_, i) => i + 17)
                     .filter((index) => index < serialElementCount)
@@ -1556,17 +1669,17 @@ function App() {
               </section>
 
               <section className="actuator-group actuator-actions-group">
-                <h3 className="actuator-group-title">配列操作</h3>
+                <h3 className="actuator-group-title">{tr("配列操作", "Array Operations")}</h3>
                 <div className="serial-packet-actions">
                   <button className="connection-button serial-send-button btn-send" onClick={() => publishSerialPacket(true)} disabled={!operationArmed}>
-                    配列送信
+                    {tr("配列送信", "Send Array")}
                   </button>
                   <button className="serial-clear-button" onClick={clearSerialPacket}>
-                    配列クリア
+                    {tr("配列クリア", "Clear Array")}
                   </button>
 
                   <label className="serial-packet-label">
-                    定期送信 Hz
+                    {tr("定期送信 Hz", "Periodic Hz")}
                     <select
                       className="connection-input"
                       value={serialPeriodicHz}
@@ -1587,14 +1700,14 @@ function App() {
                     disabled={!operationArmed}
                     onClick={() => setSerialPeriodicEnabled((prev) => !prev)}
                   >
-                    {serialPeriodicEnabled ? "定期送信: ON" : "定期送信: OFF"}
+                    {serialPeriodicEnabled ? tr("定期送信: ON", "Periodic: ON") : tr("定期送信: OFF", "Periodic: OFF")}
                   </button>
                 </div>
               </section>
 
               {serialElementCount > 24 && (
                 <section className="actuator-group">
-                  <h3 className="actuator-group-title">追加チャネル (CH24+)</h3>
+                  <h3 className="actuator-group-title">{tr("追加チャネル", "Extra Channels")} (CH24+)</h3>
                   <div className="serial-packet-grid">
                     {Array.from({ length: serialElementCount - 24 }, (_, i) => i + 24)
                       .map((index) => renderSerialInputItem(index))}
@@ -1603,27 +1716,27 @@ function App() {
               )}
             </div>
 
-            <p className="connection-hint">{serialPublishInfo}</p>
+            <p className="connection-hint">{translateRuntimeText(serialPublishInfo)}</p>
           </section>
         )}
 
         {activePage === "topic" && (
           <section className="topic-panel">
-            <h2 className="serial-packet-title">ROS2 トピック監視</h2>
+            <h2 className="serial-packet-title">{tr("ROS2 トピック監視", "ROS2 Topic Monitor")}</h2>
             <p className="serial-packet-hint">
-              トピック一覧を取得し、選択したトピックを subscribe して内容を確認できます。
+              {tr("トピック一覧を取得し、選択したトピックを subscribe して内容を確認できます。", "Fetch topic list and subscribe selected topic to inspect messages.")}
             </p>
 
             <div className="topic-toolbar">
               <button className="connection-button btn-connect" onClick={refreshTopicList}>
-                トピック一覧を更新
+                {tr("トピック一覧を更新", "Refresh Topic List")}
               </button>
               <span className="connection-hint">
-                {topicListLoading ? "取得中..." : `件数: ${topicList.length}`}
+                {topicListLoading ? tr("取得中...", "Loading...") : `${tr("件数", "Count")}: ${topicList.length}`}
               </span>
             </div>
 
-            {topicListError && <p className="connection-hint topic-error">{topicListError}</p>}
+            {topicListError && <p className="connection-hint topic-error">{translateRuntimeText(topicListError)}</p>}
 
             <div className="topic-select-row">
               <select
@@ -1636,7 +1749,7 @@ function App() {
                   setSelectedEchoType(matched?.type || "");
                 }}
               >
-                <option value="">監視するトピックを選択</option>
+                <option value="">{tr("監視するトピックを選択", "Select topic to monitor")}</option>
                 {topicList.map((item) => (
                   <option key={item.name} value={item.name}>
                     {item.name} {item.type ? `(${item.type})` : ""}
@@ -1645,30 +1758,30 @@ function App() {
               </select>
 
               <button className="connection-button btn-send" onClick={startTopicEcho}>
-                Echo開始
+                {tr("Echo開始", "Start Echo")}
               </button>
               <button className="serial-clear-button" onClick={stopTopicEcho}>
-                Echo停止
+                {tr("Echo停止", "Stop Echo")}
               </button>
             </div>
 
             <p className="connection-hint">
-              {topicEchoInfo} {topicEchoRunning ? "(受信中)" : ""}
+              {translateRuntimeText(topicEchoInfo)} {topicEchoRunning ? translateRuntimeText("(受信中)") : ""}
             </p>
 
             <div className="topic-list-box">
               {topicList.map((item) => (
                 <div key={item.name} className="topic-list-row">
                   <span className="topic-list-name">{item.name}</span>
-                  <span className="topic-list-type">{item.type || "型不明"}</span>
+                  <span className="topic-list-type">{item.type || translateRuntimeText("型不明")}</span>
                 </div>
               ))}
             </div>
 
-            <h3 className="topic-echo-title">Echoログ (最新30件)</h3>
+            <h3 className="topic-echo-title">{tr("Echoログ (最新30件)", "Echo Log (latest 30)")}</h3>
             <div className="topic-echo-box">
               {topicEchoMessages.length === 0 && (
-                <p className="connection-hint">まだ受信していません</p>
+                <p className="connection-hint">{translateRuntimeText("まだ受信していません")}</p>
               )}
               {topicEchoMessages.map((row) => (
                 <article key={row.id} className="topic-echo-item">
@@ -1682,46 +1795,46 @@ function App() {
 
         {activePage === "serial-bridge" && (
           <section className="serial-bridge-panel">
-            <h2 className="serial-packet-title">Serial Bridge 管理</h2>
+            <h2 className="serial-packet-title">{tr("Serial Bridge 管理", "Serial Bridge")}</h2>
             <p className="serial-packet-hint">
-              検出ポート、トピック由来のDevice ID、実行状態を確認し、ここから serial_bridge を手動起動できます。
+              {tr("検出ポート、トピック由来のDevice ID、実行状態を確認し、ここから serial_bridge を手動起動できます。", "Check detected ports, topic-derived IDs, runtime status, and start serial_bridge manually.")}
               <br />
-              serial_bridge はコンソール起動時には自動起動しません。
+              {tr("serial_bridge はコンソール起動時には自動起動しません。", "serial_bridge does not auto-start with the console.")}
             </p>
 
             <div className="serial-bridge-toolbar">
               <button className="connection-button btn-connect" onClick={refreshSerialBridgeStatus}>
-                状態更新
+                {tr("状態更新", "Refresh Status")}
               </button>
               <button className="connection-button btn-send" onClick={startSerialBridgeFromConsole}>
-                serial_bridge 起動
+                {tr("serial_bridge 起動", "Start serial_bridge")}
               </button>
               <button className="connection-button btn-neutral" onClick={stopSerialBridgeFromConsole}>
-                serial_bridge 停止
+                {tr("serial_bridge 停止", "Stop serial_bridge")}
               </button>
               <button className="connection-button btn-connect" onClick={refreshSerialBridgeLogs}>
-                ログ更新
+                {tr("ログ更新", "Refresh Logs")}
               </button>
               <button
                 className={`serial-periodic-button ${serialBridgeLogRealtimeEnabled ? "serial-periodic-on" : ""}`}
                 onClick={() => setSerialBridgeLogRealtimeEnabled((prev) => !prev)}
               >
-                {serialBridgeLogRealtimeEnabled ? "ログ自動更新: ON" : "ログ自動更新: OFF"}
+                {serialBridgeLogRealtimeEnabled ? tr("ログ自動更新: ON", "Auto Log: ON") : tr("ログ自動更新: OFF", "Auto Log: OFF")}
               </button>
-              <span className="connection-hint">{serialBridgeLoading ? "処理中..." : serialBridgeInfo}</span>
+              <span className="connection-hint">{serialBridgeLoading ? translateRuntimeText("処理中...") : translateRuntimeText(serialBridgeInfo)}</span>
             </div>
 
             <div className="serial-bridge-grid">
               <section className="serial-bridge-card">
-                <h3 className="serial-bridge-title">実行状態</h3>
+                <h3 className="serial-bridge-title">{tr("実行状態", "Runtime")}</h3>
                 <p className="connection-hint">running: {serialBridgeRunning ? "ON" : "OFF"}</p>
                 <p className="connection-hint">pid: {serialBridgePid || "-"}</p>
               </section>
 
               <section className="serial-bridge-card">
-                <h3 className="serial-bridge-title">検出ポート</h3>
+                <h3 className="serial-bridge-title">{tr("検出ポート", "Detected Ports")}</h3>
                 <div className="serial-bridge-list">
-                  {serialBridgePorts.length === 0 && <p className="connection-hint">ポート未検出</p>}
+                  {serialBridgePorts.length === 0 && <p className="connection-hint">{translateRuntimeText("ポート未検出")}</p>}
                   {serialBridgePorts.map((port) => (
                     <div className="serial-bridge-list-row" key={port}>{port}</div>
                   ))}
@@ -1729,21 +1842,21 @@ function App() {
               </section>
 
               <section className="serial-bridge-card">
-                <h3 className="serial-bridge-title">検出ID (serial_rx/tx)</h3>
+                <h3 className="serial-bridge-title">{tr("検出ID (serial_rx/tx)", "Detected IDs (serial_rx/tx)")}</h3>
                 <div className="serial-bridge-list">
-                  {serialBridgeIds.length === 0 && <p className="connection-hint">ID未検出</p>}
+                  {serialBridgeIds.length === 0 && <p className="connection-hint">{translateRuntimeText("ID未検出")}</p>}
                   {serialBridgeIds.map((id) => (
-                    <div className="serial-bridge-list-row" key={`id-${id}`}>ID: {id}</div>
+                    <div className="serial-bridge-list-row" key={`id-${id}`}>{tr("ID", "ID")}: {id}</div>
                   ))}
                 </div>
               </section>
 
               <section className="serial-bridge-card serial-bridge-card-log">
-                <h3 className="serial-bridge-title">serial_bridge ログ </h3>
+                <h3 className="serial-bridge-title">{tr("serial_bridge ログ", "serial_bridge Logs")}</h3>
                 <div className="serial-bridge-log-box" ref={serialBridgeLogBoxRef}>
-                  {serialBridgeLogLoading && <p className="connection-hint">ログ取得中...</p>}
+                  {serialBridgeLogLoading && <p className="connection-hint">{translateRuntimeText("ログ取得中...")}</p>}
                   {!serialBridgeLogLoading && serialBridgeLogs.length === 0 && (
-                    <p className="connection-hint">ログはまだありません</p>
+                    <p className="connection-hint">{translateRuntimeText("ログはまだありません")}</p>
                   )}
                   {!serialBridgeLogLoading && serialBridgeLogs.length > 0 && (
                     <pre className="serial-bridge-log-pre">{serialBridgeLogs.join("\n")}</pre>
@@ -1756,33 +1869,33 @@ function App() {
 
         {activePage === "shutdown" && (
           <section className="serial-bridge-panel">
-            <h2 className="serial-packet-title">強制停止</h2>
+            <h2 className="serial-packet-title">{tr("強制停止", "Shutdown")}</h2>
             <p className="serial-packet-hint">
-              フロントエンドとバックエンドの強制停止操作を行います。実行すると復帰に再起動/再読み込みが必要です。強制停止後の機体の動作は保証できません。
+              {tr("フロントエンドとバックエンドの強制停止操作を行います。実行すると復帰に再起動/再読み込みが必要です。強制停止後の機体の動作は保証できません。", "Force-stop frontend/backend processes. Recovery requires reload/restart. Robot behavior is not guaranteed after force shutdown.")}
             </p>
 
             <div className="serial-bridge-toolbar">
               <button className="connection-button btn-neutral" onClick={forceShutdownFrontendFromConsole}>
-                frontend 強制停止
+                {tr("frontend 強制停止", "Force Stop Frontend")}
               </button>
               <button className="connection-button btn-neutral" onClick={forceShutdownBackendFromConsole}>
-                backend 強制停止
+                {tr("backend 強制停止", "Force Stop Backend")}
               </button>
-              <span className="connection-hint">{serialBridgeLoading ? "処理中..." : serialBridgeInfo}</span>
+              <span className="connection-hint">{serialBridgeLoading ? translateRuntimeText("処理中...") : translateRuntimeText(serialBridgeInfo)}</span>
             </div>
           </section>
         )}
 
         {activePage === "settings" && (
           <section className="serial-bridge-panel">
-            <h2 className="serial-packet-title">設定</h2>
+            <h2 className="serial-packet-title">{tr("設定", "Settings")}</h2>
             <p className="serial-packet-hint">
-              接続先、操作ロック、送信設定、ログ設定を一括管理します。
+              {tr("接続先、操作ロック、送信設定、ログ設定を一括管理します。", "Manage connection, safety lock, transmission, and log settings.")}
             </p>
 
             <div className="serial-bridge-grid">
               <section className="serial-bridge-card">
-                <h3 className="serial-bridge-title">接続設定</h3>
+                <h3 className="serial-bridge-title">{tr("接続設定", "Connection")}</h3>
                 <div className="serial-bridge-list">
                   <label className="serial-packet-label">
                     ROS Host
@@ -1812,8 +1925,22 @@ function App() {
               </section>
 
               <section className="serial-bridge-card">
-                <h3 className="serial-bridge-title">操作設定</h3>
+                <h3 className="serial-bridge-title">{tr("操作設定", "Operation")}</h3>
                 <div className="serial-bridge-list">
+                  <div className="lang-switch-row">
+                    <button
+                      className={`lang-chip ${language === "ja" ? "lang-chip-active" : ""}`}
+                      onClick={() => setLanguage("ja")}
+                    >
+                      日本語
+                    </button>
+                    <button
+                      className={`lang-chip ${language === "en" ? "lang-chip-active" : ""}`}
+                      onClick={() => setLanguage("en")}
+                    >
+                      English
+                    </button>
+                  </div>
                   <button
                     className={`toggle-button ${operationArmed ? "toggle-on" : "toggle-off"}`}
                     onClick={() => {
@@ -1824,25 +1951,25 @@ function App() {
                       }
                     }}
                   >
-                    {operationArmed ? "操作ロック: OFF" : "操作ロック: ON"}
+                    {operationArmed ? tr("操作ロック: OFF", "Safety Lock: OFF") : tr("操作ロック: ON", "Safety Lock: ON")}
                   </button>
                   <button
                     className={`toggle-button ${controllerEnabled ? "toggle-on" : "toggle-off"}`}
                     onClick={() => setControllerEnabled((prev) => !prev)}
                   >
-                    {controllerEnabled ? "コントローラー: ON" : "コントローラー: OFF"}
+                    {controllerEnabled ? tr("コントローラー: ON", "Controller: ON") : tr("コントローラー: OFF", "Controller: OFF")}
                   </button>
                   <button
                     className={`serial-periodic-button ${serialBridgeLogRealtimeEnabled ? "serial-periodic-on" : ""}`}
                     onClick={() => setSerialBridgeLogRealtimeEnabled((prev) => !prev)}
                   >
-                    {serialBridgeLogRealtimeEnabled ? "ログ自動更新: ON" : "ログ自動更新: OFF"}
+                    {serialBridgeLogRealtimeEnabled ? tr("ログ自動更新: ON", "Auto Log: ON") : tr("ログ自動更新: OFF", "Auto Log: OFF")}
                   </button>
                 </div>
               </section>
 
               <section className="serial-bridge-card">
-                <h3 className="serial-bridge-title">送信設定</h3>
+                <h3 className="serial-bridge-title">{tr("送信設定", "Transmission")}</h3>
                 <div className="serial-bridge-list">
                   <label className="serial-packet-label">
                     Serial Target ID
@@ -1856,7 +1983,7 @@ function App() {
                     />
                   </label>
                   <label className="serial-packet-label">
-                    配列要素数
+                    {tr("配列要素数", "Array Length")}
                     <input
                       className="connection-input"
                       type="number"
@@ -1867,7 +1994,7 @@ function App() {
                     />
                   </label>
                   <label className="serial-packet-label">
-                    定期送信Hz
+                    {tr("定期送信Hz", "Periodic Hz")}
                     <select
                       className="connection-input"
                       value={serialPeriodicHz}
@@ -1886,10 +2013,10 @@ function App() {
               </section>
 
               <section className="serial-bridge-card">
-                <h3 className="serial-bridge-title">ログ設定</h3>
+                <h3 className="serial-bridge-title">{tr("ログ設定", "Logs")}</h3>
                 <div className="serial-bridge-list">
                   <label className="serial-packet-label">
-                    取得行数 (10-1000)
+                    {tr("取得行数 (10-1000)", "Lines (10-1000)")}
                     <input
                       className="connection-input"
                       type="number"
@@ -1899,19 +2026,19 @@ function App() {
                       onChange={(e) => setSerialBridgeLogLinesInput(e.target.value)}
                     />
                   </label>
-                  <p className="connection-hint">現在の取得行数: {serialBridgeLogLineLimit} 行</p>
+                  <p className="connection-hint">{tr("現在の取得行数:", "Current lines:")} {serialBridgeLogLineLimit}</p>
                 </div>
               </section>
             </div>
 
             <div className="serial-bridge-toolbar">
               <button className="connection-button btn-connect" onClick={applySettingsValues}>
-                設定を適用
+                {tr("設定を適用", "Apply Settings")}
               </button>
               <button className="connection-button btn-neutral" onClick={refreshSerialBridgeStatus}>
-                状態を再取得
+                {tr("状態を再取得", "Refresh Status")}
               </button>
-              <span className="connection-hint">{serialBridgeLoading ? "処理中..." : serialBridgeInfo}</span>
+              <span className="connection-hint">{serialBridgeLoading ? translateRuntimeText("処理中...") : translateRuntimeText(serialBridgeInfo)}</span>
             </div>
           </section>
         )}
