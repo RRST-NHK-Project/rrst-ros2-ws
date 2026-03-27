@@ -88,6 +88,7 @@ function App() {
   const [serialBridgeInfo, setSerialBridgeInfo] = useState("未取得");
   const [serialBridgeLoading, setSerialBridgeLoading] = useState(false);
   const [serialBridgeLogs, setSerialBridgeLogs] = useState([]);
+  const [serialBridgeLogLinesInput, setSerialBridgeLogLinesInput] = useState("200");
   const [serialBridgeLogLoading, setSerialBridgeLogLoading] = useState(false);
   const [serialBridgeLogRealtimeEnabled, setSerialBridgeLogRealtimeEnabled] = useState(false);
 
@@ -159,6 +160,11 @@ function App() {
     });
   };
 
+  const parsedLogLineLimit = Number.parseInt(serialBridgeLogLinesInput, 10);
+  const serialBridgeLogLineLimit = Number.isFinite(parsedLogLineLimit)
+    ? Math.max(10, Math.min(1000, parsedLogLineLimit))
+    : 200;
+
   const refreshTopicList = async () => {
     if (!rosRef.current || !rosTopicsServiceRef.current) {
       setTopicListError("ROS未接続のため取得できません");
@@ -219,7 +225,7 @@ function App() {
   const refreshSerialBridgeLogs = async () => {
     setSerialBridgeLogLoading(true);
     try {
-      const response = await fetch(`${backendBaseUrl}/api/serial-bridge/logs?lines=200`);
+      const response = await fetch(`${backendBaseUrl}/api/serial-bridge/logs?lines=${serialBridgeLogLineLimit}`);
       if (!response.ok) {
         throw new Error(`status ${response.status}`);
       }
@@ -256,6 +262,13 @@ function App() {
     } finally {
       setSerialBridgeLoading(false);
     }
+  };
+
+  const applySettingsValues = async () => {
+    applyRosEndpoint();
+    applyJoyTopicName();
+    await refreshSerialBridgeLogs();
+    setSerialBridgeInfo("設定を適用しました");
   };
 
   const stopSerialBridgeFromConsole = async () => {
@@ -340,7 +353,7 @@ function App() {
     const pollLogs = async () => {
       setSerialBridgeLogLoading(true);
       try {
-        const response = await fetch(`${backendBaseUrl}/api/serial-bridge/logs?lines=200`);
+        const response = await fetch(`${backendBaseUrl}/api/serial-bridge/logs?lines=${serialBridgeLogLineLimit}`);
         if (!response.ok) {
           throw new Error(`status ${response.status}`);
         }
@@ -364,7 +377,7 @@ function App() {
     return () => {
       clearInterval(timer);
     };
-  }, [serialBridgeLogRealtimeEnabled, activePage, backendBaseUrl]);
+  }, [serialBridgeLogRealtimeEnabled, activePage, backendBaseUrl, serialBridgeLogLineLimit]);
 
   useEffect(() => {
     if (activePage !== "serial-bridge") {
@@ -1139,6 +1152,12 @@ function App() {
           >
             強制停止
           </button>
+          <button
+            className={`page-switch-button ${activePage === "settings" ? "page-switch-active" : ""}`}
+            onClick={() => setActivePage("settings")}
+          >
+            設定
+          </button>
         </section>
 
         {activePage === "controller" && (
@@ -1746,6 +1765,149 @@ function App() {
               </button>
               <button className="connection-button btn-neutral" onClick={forceShutdownBackendFromConsole}>
                 backend 強制停止
+              </button>
+              <span className="connection-hint">{serialBridgeLoading ? "処理中..." : serialBridgeInfo}</span>
+            </div>
+          </section>
+        )}
+
+        {activePage === "settings" && (
+          <section className="serial-bridge-panel">
+            <h2 className="serial-packet-title">設定</h2>
+            <p className="serial-packet-hint">
+              接続先、操作ロック、送信設定、ログ設定を一括管理します。
+            </p>
+
+            <div className="serial-bridge-grid">
+              <section className="serial-bridge-card">
+                <h3 className="serial-bridge-title">接続設定</h3>
+                <div className="serial-bridge-list">
+                  <label className="serial-packet-label">
+                    ROS Host
+                    <input
+                      className="connection-input"
+                      value={rosHostInput}
+                      onChange={(e) => setRosHostInput(e.target.value)}
+                    />
+                  </label>
+                  <label className="serial-packet-label">
+                    ROS Port
+                    <input
+                      className="connection-input"
+                      value={rosPortInput}
+                      onChange={(e) => setRosPortInput(e.target.value)}
+                    />
+                  </label>
+                  <label className="serial-packet-label">
+                    Joy Topic
+                    <input
+                      className="connection-input"
+                      value={joyTopicInput}
+                      onChange={(e) => setJoyTopicInput(e.target.value)}
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <section className="serial-bridge-card">
+                <h3 className="serial-bridge-title">操作設定</h3>
+                <div className="serial-bridge-list">
+                  <button
+                    className={`toggle-button ${operationArmed ? "toggle-on" : "toggle-off"}`}
+                    onClick={() => {
+                      const next = !operationArmed;
+                      setOperationArmed(next);
+                      if (!next) {
+                        resetAllControls();
+                      }
+                    }}
+                  >
+                    {operationArmed ? "操作ロック: OFF" : "操作ロック: ON"}
+                  </button>
+                  <button
+                    className={`toggle-button ${controllerEnabled ? "toggle-on" : "toggle-off"}`}
+                    onClick={() => setControllerEnabled((prev) => !prev)}
+                  >
+                    {controllerEnabled ? "コントローラー: ON" : "コントローラー: OFF"}
+                  </button>
+                  <button
+                    className={`serial-periodic-button ${serialBridgeLogRealtimeEnabled ? "serial-periodic-on" : ""}`}
+                    onClick={() => setSerialBridgeLogRealtimeEnabled((prev) => !prev)}
+                  >
+                    {serialBridgeLogRealtimeEnabled ? "ログ自動更新: ON" : "ログ自動更新: OFF"}
+                  </button>
+                </div>
+              </section>
+
+              <section className="serial-bridge-card">
+                <h3 className="serial-bridge-title">送信設定</h3>
+                <div className="serial-bridge-list">
+                  <label className="serial-packet-label">
+                    Serial Target ID
+                    <input
+                      className="connection-input"
+                      type="number"
+                      min="0"
+                      max="255"
+                      value={serialTargetIdInput}
+                      onChange={(e) => setSerialTargetIdInput(e.target.value)}
+                    />
+                  </label>
+                  <label className="serial-packet-label">
+                    配列要素数
+                    <input
+                      className="connection-input"
+                      type="number"
+                      min="1"
+                      max="64"
+                      value={serialElementCount}
+                      onChange={(e) => updateSerialElementCount(e.target.value)}
+                    />
+                  </label>
+                  <label className="serial-packet-label">
+                    定期送信Hz
+                    <select
+                      className="connection-input"
+                      value={serialPeriodicHz}
+                      onChange={(e) => setSerialPeriodicHz(e.target.value)}
+                    >
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="5">5</option>
+                      <option value="10">10</option>
+                      <option value="20">20</option>
+                      <option value="30">30</option>
+                      <option value="50">50</option>
+                    </select>
+                  </label>
+                </div>
+              </section>
+
+              <section className="serial-bridge-card">
+                <h3 className="serial-bridge-title">ログ設定</h3>
+                <div className="serial-bridge-list">
+                  <label className="serial-packet-label">
+                    取得行数 (10-1000)
+                    <input
+                      className="connection-input"
+                      type="number"
+                      min="10"
+                      max="1000"
+                      value={serialBridgeLogLinesInput}
+                      onChange={(e) => setSerialBridgeLogLinesInput(e.target.value)}
+                    />
+                  </label>
+                  <p className="connection-hint">現在の取得行数: {serialBridgeLogLineLimit} 行</p>
+                </div>
+              </section>
+            </div>
+
+            <div className="serial-bridge-toolbar">
+              <button className="connection-button btn-connect" onClick={applySettingsValues}>
+                設定を適用
+              </button>
+              <button className="connection-button btn-neutral" onClick={refreshSerialBridgeStatus}>
+                状態を再取得
               </button>
               <span className="connection-hint">{serialBridgeLoading ? "処理中..." : serialBridgeInfo}</span>
             </div>
