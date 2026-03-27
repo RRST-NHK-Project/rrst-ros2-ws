@@ -1737,7 +1737,7 @@ function App() {
           <section className="serial-bridge-panel">
             <h2 className="serial-packet-title">強制停止</h2>
             <p className="serial-packet-hint">
-              フロントエンドとバックエンドの強制停止操作を行います。実行すると復帰に再起動/再読み込みが必要です。
+              フロントエンドとバックエンドの強制停止操作を行います。実行すると復帰に再起動/再読み込みが必要です。強制停止後の機体の動作は保証できません。
             </p>
 
             <div className="serial-bridge-toolbar">
