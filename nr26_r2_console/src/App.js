@@ -147,6 +147,16 @@ function App() {
     return Array.from(idSet).sort((a, b) => a - b);
   };
 
+  const addTimestampToLogLines = (lines) => {
+    const fetchedAt = new Date().toLocaleTimeString("ja-JP");
+    return lines.map((line) => {
+      if (/^\[\d{1,2}:\d{2}:\d{2}\]/.test(line)) {
+        return line;
+      }
+      return `[${fetchedAt}] ${line}`;
+    });
+  };
+
   const refreshTopicList = async () => {
     if (!rosRef.current || !rosTopicsServiceRef.current) {
       setTopicListError("ROS未接続のため取得できません");
@@ -212,7 +222,8 @@ function App() {
         throw new Error(`status ${response.status}`);
       }
       const data = await response.json();
-      setSerialBridgeLogs(Array.isArray(data?.lines) ? data.lines : []);
+      const lines = Array.isArray(data?.lines) ? data.lines : [];
+      setSerialBridgeLogs(addTimestampToLogLines(lines));
     } catch (error) {
       console.error("Failed to fetch serial bridge logs:", error);
       setSerialBridgeLogs(["ログ取得に失敗しました"]);
@@ -281,7 +292,8 @@ function App() {
           throw new Error(`status ${response.status}`);
         }
         const data = await response.json();
-        setSerialBridgeLogs(Array.isArray(data?.lines) ? data.lines : []);
+        const lines = Array.isArray(data?.lines) ? data.lines : [];
+        setSerialBridgeLogs(addTimestampToLogLines(lines));
       } catch (error) {
         console.error("Failed to fetch serial bridge logs:", error);
         setSerialBridgeLogs(["ログ取得に失敗しました"]);
@@ -1573,7 +1585,7 @@ function App() {
               </section>
 
               <section className="serial-bridge-card serial-bridge-card-log">
-                <h3 className="serial-bridge-title">serial_bridge ログ (末尾200行)</h3>
+                <h3 className="serial-bridge-title">serial_bridge ログ </h3>
                 <div className="serial-bridge-log-box" ref={serialBridgeLogBoxRef}>
                   {serialBridgeLogLoading && <p className="connection-hint">ログ取得中...</p>}
                   {!serialBridgeLogLoading && serialBridgeLogs.length === 0 && (

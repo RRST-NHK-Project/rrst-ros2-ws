@@ -19,6 +19,55 @@ const jsonResponse = (res, statusCode, payload) => {
     res.end(JSON.stringify(payload));
 };
 
+const sleepMs = (ms) => {
+    const start = Date.now();
+    while (Date.now() - start < ms) {
+        // short blocking wait used only for shutdown confirmation loops.
+    }
+};
+
+const findSerialBridgeProcesses = () => {
+    try {
+        const output = execSync("ps -eo pid=,pgid=,args=", {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "ignore"],
+        });
+
+        const rows = output
+            .split("\n")
+            .map((row) => row.trim())
+            .filter((row) => row.length > 0);
+
+        return rows
+            .map((row) => {
+                const match = row.match(/^(\d+)\s+(\d+)\s+(.+)$/);
+                if (!match) {
+                    return null;
+                }
+                return {
+                    pid: Number.parseInt(match[1], 10),
+                    pgid: Number.parseInt(match[2], 10),
+                    command: match[3],
+                };
+            })
+            .filter((item) => {
+                if (!item) {
+                    return false;
+                }
+                if (!item.command.includes("serial_bridge_node")) {
+                    return false;
+                }
+                if (item.command.includes("console_backend.js")) {
+                    return false;
+                }
+                return Number.isInteger(item.pid) && item.pid > 0;
+            })
+            .sort((a, b) => b.pid - a.pid);
+    } catch (error) {
+        return [];
+    }
+};
+
 const listPortsUsedByProcess = (pid) => {
     if (!Number.isInteger(pid) || pid <= 0) {
         return [];
@@ -48,36 +97,17 @@ const listPortsUsedByProcess = (pid) => {
 };
 
 const getRunningInfo = () => {
-    try {
-        const output = execSync("ps -eo pid,args | grep -E '[s]erial_bridge_node' || true", {
-            encoding: "utf8",
-            stdio: ["ignore", "pipe", "ignore"],
-        }).trim();
-
-        if (!output) {
-            return { running: false, pid: null, command: "" };
-        }
-
-        const line = output
-            .split("\n")
-            .map((row) => row.trim())
-            .filter((row) => row && !row.includes("console_backend.js"))[0];
-
-        if (!line) {
-            return { running: false, pid: null, command: "" };
-        }
-
-        const firstSpace = line.indexOf(" ");
-        const pid = firstSpace > 0 ? Number.parseInt(line.slice(0, firstSpace), 10) : null;
-        const command = firstSpace > 0 ? line.slice(firstSpace + 1) : line;
-        return {
-            running: Number.isInteger(pid),
-            pid: Number.isInteger(pid) ? pid : null,
-            command,
-        };
-    } catch (error) {
+    const processes = findSerialBridgeProcesses();
+    if (processes.length === 0) {
         return { running: false, pid: null, command: "" };
     }
+
+    const primary = processes[0];
+    return {
+        running: true,
+        pid: primary.pid,
+        command: primary.command,
+    };
 };
 
 const startSerialBridge = () => {
@@ -114,8 +144,8 @@ const startSerialBridge = () => {
 };
 
 const stopSerialBridge = () => {
-    const runningInfo = getRunningInfo();
-    if (!runningInfo.running || !Number.isInteger(runningInfo.pid)) {
+    const processes = findSerialBridgeProcesses();
+    if (processes.length === 0) {
         return {
             stopped: false,
             running: false,
@@ -124,19 +154,92 @@ const stopSerialBridge = () => {
         };
     }
 
+    const pids = Array.from(new Set(processes.map((item) => item.pid)));
+    const pgids = Array.from(new Set(processes.map((item) => item.pgid)));
+
     try {
-        process.kill(runningInfo.pid, "SIGTERM");
+        // Kill process groups only for detached leaders to avoid affecting terminal sessions.
+        pgids.forEach((pgid) => {
+            if (!Number.isInteger(pgid) || pgid <= 0) {
+                return;
+            }
+            const hasGroupLeader = processes.some((item) => item.pid === pgid);
+            if (!hasGroupLeader) {
+                return;
+            }
+            try {
+                process.kill(-pgid, "SIGTERM");
+            } catch (error) {
+                // Group may already be gone or inaccessible; individual pid kill follows.
+            }
+        });
+
+        pids.forEach((pid) => {
+            try {
+                process.kill(pid, "SIGTERM");
+            } catch (error) {
+                // Process may have already exited.
+            }
+        });
+
+        let remaining = findSerialBridgeProcesses();
+        for (let i = 0; i < 30 && remaining.length > 0; i += 1) {
+            sleepMs(100);
+            remaining = findSerialBridgeProcesses();
+        }
+
+        if (remaining.length > 0) {
+            const remainPids = Array.from(new Set(remaining.map((item) => item.pid)));
+            const remainPgids = Array.from(new Set(remaining.map((item) => item.pgid)));
+
+            remainPgids.forEach((pgid) => {
+                if (!Number.isInteger(pgid) || pgid <= 0) {
+                    return;
+                }
+                const hasGroupLeader = remaining.some((item) => item.pid === pgid);
+                if (!hasGroupLeader) {
+                    return;
+                }
+                try {
+                    process.kill(-pgid, "SIGKILL");
+                } catch (error) {
+                    // Best effort.
+                }
+            });
+
+            remainPids.forEach((pid) => {
+                try {
+                    process.kill(pid, "SIGKILL");
+                } catch (error) {
+                    // Best effort.
+                }
+            });
+
+            sleepMs(300);
+            remaining = findSerialBridgeProcesses();
+        }
+
+        if (remaining.length > 0) {
+            const remainingPids = remaining.map((item) => item.pid).join(", ");
+            return {
+                stopped: false,
+                running: true,
+                pid: remaining[0]?.pid || null,
+                message: `serial_bridge の停止に失敗しました (残存PID: ${remainingPids})`,
+            };
+        }
+
         return {
             stopped: true,
             running: false,
-            pid: runningInfo.pid,
+            pid: pids[0] || null,
             message: "serial_bridge を停止しました",
         };
     } catch (error) {
         return {
             stopped: false,
             running: true,
-            pid: runningInfo.pid,
+            pid: pids[0] || null,
             message: `serial_bridge の停止に失敗しました: ${error.message}`,
         };
     }
