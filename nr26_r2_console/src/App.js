@@ -13,9 +13,9 @@ const DEFAULT_PACKET_COUNT = 24;
 const SERIAL_BRIDGE_MIN_ELEMENTS = 24;
 
 const describeActuator = (label) => {
-  if (label === "DEBUG") return "デバッグフラグ (0/1)";
-  if (label.startsWith("MD")) return "モータ出力 (-255〜255 推奨)";
-  if (label.startsWith("SERVO")) return "サーボ角度 (0〜270 推奨)";
+  if (label === "DEBUG") return "デバッグ (0/1)";
+  if (label.startsWith("MD")) return "モータ出力 (-255〜255)";
+  if (label.startsWith("SERVO")) return "サーボ角度 (0〜270)";
   if (label.startsWith("TR")) return "デジタル出力 (0/1)";
   return "予備";
 };
@@ -26,6 +26,7 @@ function App() {
   const joyRef = useRef(null);
   const odomRef = useRef(null);
   const autoDriveCmdRef = useRef(null);
+  const odomResetCmdRef = useRef(null);
   const serialPeriodicTimerRef = useRef(null);
   const defaultRosHost = window.location.hostname || "localhost";
   const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
@@ -189,6 +190,18 @@ function App() {
     setTargetXInput(poseX.toFixed(3));
     setTargetYInput(poseY.toFixed(3));
     setTargetYawInput((poseYaw * 180 / Math.PI).toFixed(1));
+  };
+
+  const publishOdomReset = () => {
+    if (!odomResetCmdRef.current) {
+      setAutoDriveCmdInfo("ROS未接続のためオドメトリリセット送信できません");
+      return;
+    }
+
+    odomResetCmdRef.current.publish({
+      data: true,
+    });
+    setAutoDriveCmdInfo("odom_reset にリセット要求を送信しました");
   };
 
   const saveTargetPose = () => {
@@ -452,6 +465,12 @@ function App() {
       ros: rosRef.current,
       name: "r2_autodrive_cmd",
       messageType: "std_msgs/msg/Float32MultiArray",
+    });
+
+    odomResetCmdRef.current = new ROSLIB.Topic({
+      ros: rosRef.current,
+      name: "odom_reset",
+      messageType: "std_msgs/msg/Bool",
     });
 
     // 10Hzで送信
@@ -931,6 +950,7 @@ function App() {
 
             <div className="pose-actions-row">
               <button className="connection-button btn-neutral" onClick={applyAutoDriveFromCurrentPose}>現在値を目標へ</button>
+              <button className="connection-button btn-neutral" onClick={publishOdomReset}>オドメトリをリセット</button>
               <button className="connection-button serial-send-button btn-send" onClick={publishAutoDriveCommand}>目標座標を送信</button>
             </div>
 
@@ -986,8 +1006,9 @@ function App() {
           <section className="serial-packet-section">
             <h2 className="serial-packet-title">アクチュエータ送信 (Int16MultiArray)</h2>
             <p className="serial-packet-hint">
-              IDで送信先を切替え、トピック名は <strong>{serialTopicName}</strong> になります。
-              serial_bridge都合で24未満は0埋めして送信します。
+              IDで送信先を切替えることができます。トピック名: <strong>{serialTopicName}</strong>
+              <br />
+              入力値のチェックは行っていません。注意して入力してください。
             </p>
 
             <div className="serial-packet-controls">
