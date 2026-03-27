@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as ROSLIB from "roslib";
 import "./App.css";
+import { getLocalizedText, translateRuntimeText as translateRuntimeByLanguage } from "./i18n";
+import { LANGUAGE_OPTIONS } from "./i18n";
 
 const PACKET_INDEX_LABELS = [
   "DEBUG",
@@ -123,7 +125,7 @@ function App() {
   const backendBaseUrl = `${window.location.protocol}//${window.location.hostname}:3031`;
 
   const rosUrl = `${wsScheme}://${rosEndpoint.host}:${rosEndpoint.port}`;
-  const tr = (jaText, enText) => (language === "ja" ? jaText : enText);
+  const tr = (jaText, enText) => getLocalizedText(language, jaText, enText);
   const localizedStatusText =
     status === "接続OK"
       ? tr("接続OK", "Connected")
@@ -135,78 +137,24 @@ function App() {
             ? tr("エラー", "Error")
             : status;
 
-  const translateRuntimeText = (text) => {
-    if (language === "ja" || !text) {
-      return text;
-    }
+  const translateRuntimeText = (text) => translateRuntimeByLanguage(language, text);
 
-    const monitorMatch = text.match(/^(.+) \((.+)\) を監視中$/);
-    if (monitorMatch) {
-      return `Monitoring ${monitorMatch[1]} (${monitorMatch[2]})`;
-    }
-
-    const serialTxMatch = text.match(/^(.+) に (\d+) 要素を送信 \(入力 (\d+) 要素\)$/);
-    if (serialTxMatch) {
-      return `Sent ${serialTxMatch[2]} elements to ${serialTxMatch[1]} (input ${serialTxMatch[3]})`;
-    }
-
-    const periodicMatch = text.match(/^定期送信中: (.+) Hz$/);
-    if (periodicMatch) {
-      return `Periodic sending: ${periodicMatch[1]} Hz`;
-    }
-
-    const savePoseMatch = text.match(/^目標値を保存しました: \((.+)\)$/);
-    if (savePoseMatch) {
-      return `Saved target pose: (${savePoseMatch[1]})`;
-    }
-
-    const savedSendMatch = text.match(/^保存値 "(.+)" を送信しました$/);
-    if (savedSendMatch) {
-      return `Sent saved target "${savedSendMatch[1]}"`;
-    }
-
-    const map = {
-      "未送信": "Not sent",
-      "未開始": "Not started",
-      "未取得": "Not fetched",
-      "処理中...": "Processing...",
-      "取得中...": "Loading...",
-      "ログ取得中...": "Loading logs...",
-      "まだ受信していません": "No messages yet",
-      "ポート未検出": "No ports detected",
-      "ID未検出": "No IDs detected",
-      "ログはまだありません": "No logs yet",
-      "型不明": "Unknown type",
-      "(受信中)": "(Receiving)",
-      "状態を更新しました": "Status updated",
-      "設定を適用しました": "Settings applied",
-      "状態取得に失敗しました (backend未起動の可能性)": "Failed to get status (backend may be down)",
-      "ログ取得に失敗しました": "Failed to fetch logs",
-      "serial_bridge を起動しました": "serial_bridge started",
-      "serial_bridge の起動に失敗しました": "Failed to start serial_bridge",
-      "serial_bridge を停止しました": "serial_bridge stopped",
-      "serial_bridge の停止に失敗しました": "Failed to stop serial_bridge",
-      "console backend を強制シャットダウンしました": "Console backend force-stopped",
-      "console backend の強制シャットダウンに失敗しました": "Failed to force-stop console backend",
-      "トピック一覧の取得に失敗しました": "Failed to fetch topic list",
-      "トピックが見つかりません": "No topics found",
-      "ROS未接続のため取得できません": "Cannot fetch while ROS is disconnected",
-      "トピック名を選択してください": "Please select a topic",
-      "ROS未接続のため開始できません": "Cannot start while ROS is disconnected",
-      "トピック型の取得に失敗しました": "Failed to resolve topic type",
-      "操作許可がOFFのため送信できません": "Cannot send while safety lock is ON",
-      "ROS未接続のため送信できません": "Cannot send while ROS is disconnected",
-      "配列をクリアしました": "Array cleared",
-      "操作許可がOFFのためオドメトリリセット送信できません": "Cannot send odometry reset while safety lock is ON",
-      "ROS未接続のためオドメトリリセット送信できません": "Cannot send odometry reset while ROS is disconnected",
-      "odom_reset にリセット要求を送信しました": "Sent reset request to odom_reset",
-      "すべての保存目標値をクリアしました": "Cleared all saved targets",
-      "r2_autodrive_cmd に目標座標を送信しました": "Sent target pose to r2_autodrive_cmd",
-      "操作許可がOFFのため定期送信を停止しました": "Periodic sending stopped because safety lock is ON",
-    };
-
-    return map[text] || text;
-  };
+  const renderLanguageSelect = (className, idPrefix) => (
+    <label className={className}>
+      <select
+        className="lang-select-control"
+        value={language}
+        onChange={(e) => setLanguage(e.target.value)}
+        aria-label={tr("言語選択", "Language")}
+      >
+        {LANGUAGE_OPTIONS.map((option) => (
+          <option key={`${idPrefix}-${option.code}`} value={option.code}>
+            {option.flag} {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 
   const applyRosEndpoint = () => {
     const nextHost = rosHostInput.trim() || defaultRosHost;
@@ -1223,18 +1171,7 @@ function App() {
             <p>{tr("R2 テレオペレーションパネル", "ROS2 Teleoperation Panel")}</p>
           </div>
           <div className="header-tools">
-            <button
-              className={`lang-chip ${language === "ja" ? "lang-chip-active" : ""}`}
-              onClick={() => setLanguage("ja")}
-            >
-              日本語
-            </button>
-            <button
-              className={`lang-chip ${language === "en" ? "lang-chip-active" : ""}`}
-              onClick={() => setLanguage("en")}
-            >
-              English
-            </button>
+            {renderLanguageSelect("lang-select", "lang-header")}
           </div>
         </header>
 
@@ -2107,18 +2044,7 @@ function App() {
                 <h3 className="serial-bridge-title">{tr("操作設定", "Operation")}</h3>
                 <div className="serial-bridge-list">
                   <div className="lang-switch-row">
-                    <button
-                      className={`lang-chip ${language === "ja" ? "lang-chip-active" : ""}`}
-                      onClick={() => setLanguage("ja")}
-                    >
-                      日本語
-                    </button>
-                    <button
-                      className={`lang-chip ${language === "en" ? "lang-chip-active" : ""}`}
-                      onClick={() => setLanguage("en")}
-                    >
-                      English
-                    </button>
+                    {renderLanguageSelect("lang-select lang-select-wide", "lang-settings")}
                   </div>
                   <button
                     className={`toggle-button ${operationArmed ? "toggle-on" : "toggle-off"}`}
