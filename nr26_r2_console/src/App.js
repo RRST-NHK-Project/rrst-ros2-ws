@@ -49,6 +49,7 @@ function App() {
   const [buttons, setButtons] = useState(Array(14).fill(0));
   const [axes, setAxes] = useState(Array(8).fill(0));
   const [operationArmed, setOperationArmed] = useState(false);
+  const [frontendForceStopped, setFrontendForceStopped] = useState(false);
   const [controllerEnabled, setControllerEnabled] = useState(false);
   const [controllerFullscreen, setControllerFullscreen] = useState(false);
   const [activePage, setActivePage] = useState("controller");
@@ -278,6 +279,57 @@ function App() {
     } finally {
       setSerialBridgeLoading(false);
     }
+  };
+
+  const forceShutdownBackendFromConsole = async () => {
+    const confirmed = window.confirm(
+      "console backend を強制シャットダウンします。\nこの後、状態取得や起動/停止機能は再起動まで使えません。続行しますか？"
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setSerialBridgeLoading(true);
+    try {
+      const response = await fetch(`${backendBaseUrl}/api/backend/force-shutdown`, {
+        method: "POST",
+      });
+      if (!response.ok) {
+        throw new Error(`status ${response.status}`);
+      }
+      const data = await response.json();
+      setSerialBridgeInfo(data?.message || "console backend を強制シャットダウンしました");
+      setSerialBridgeRunning(false);
+      setSerialBridgePid("");
+      setSerialBridgePorts([]);
+    } catch (error) {
+      console.error("Failed to force shutdown backend:", error);
+      setSerialBridgeInfo("console backend の強制シャットダウンに失敗しました");
+    } finally {
+      setSerialBridgeLoading(false);
+    }
+  };
+
+  const forceShutdownFrontendFromConsole = () => {
+    const confirmed = window.confirm(
+      "フロントエンドを強制シャットダウンします。\n画面操作は停止し、再読み込みまで復帰できません。続行しますか？"
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setOperationArmed(false);
+    setControllerEnabled(false);
+    setSerialPeriodicEnabled(false);
+    setSerialBridgeLogRealtimeEnabled(false);
+    setActivePage("shutdown");
+    resetAllControls();
+    stopTopicEcho();
+    if (rosRef.current) {
+      rosRef.current.close();
+    }
+    setStatus("切断");
+    setFrontendForceStopped(true);
   };
 
   useEffect(() => {
@@ -847,6 +899,35 @@ function App() {
     };
   }, [rosUrl, joyTopicName]);
 
+  if (frontendForceStopped) {
+    return (
+      <div className="console-page">
+        <div className="console-bg-shape console-bg-shape-a" />
+        <div className="console-bg-shape console-bg-shape-b" />
+
+        <main className="console-card">
+          <header className="console-header">
+            <img src="/logo.svg" alt="NR26 Logo" className="console-logo" />
+            <div>
+              <h1>R2 Console</h1>
+              <p>Frontend Forced Shutdown</p>
+            </div>
+          </header>
+
+          <section className="disabled-notice">
+            フロントエンドを強制停止しました。復帰するには再読み込みしてください。
+          </section>
+
+          <section className="control-toggle-row">
+            <button className="connection-button btn-connect" onClick={() => window.location.reload()}>
+              再読み込み
+            </button>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
   if (controllerFullscreen) {
     return (
       <div className="console-page console-page-fullscreen">
@@ -1005,7 +1086,7 @@ function App() {
           </button>
           <span className="connection-hint">
             {operationArmed
-              ? "送信系機能が有効です"
+              ? "送信系機能が有効です。注意して操作してください。"
               : "ロック中: 送信系機能は無効化されています"}
           </span>
         </section>
@@ -1027,7 +1108,7 @@ function App() {
             className={`page-switch-button ${activePage === "pose" ? "page-switch-active" : ""}`}
             onClick={() => setActivePage("pose")}
           >
-            座標・姿勢速度管理
+            座標・姿勢管理
           </button>
           <button
             className={`page-switch-button ${activePage === "actuator" ? "page-switch-active" : ""}`}
@@ -1051,6 +1132,12 @@ function App() {
             }}
           >
             Serial Bridge
+          </button>
+          <button
+            className={`page-switch-button ${activePage === "shutdown" ? "page-switch-active" : ""}`}
+            onClick={() => setActivePage("shutdown")}
+          >
+            強制停止
           </button>
         </section>
 
@@ -1642,6 +1729,25 @@ function App() {
                   )}
                 </div>
               </section>
+            </div>
+          </section>
+        )}
+
+        {activePage === "shutdown" && (
+          <section className="serial-bridge-panel">
+            <h2 className="serial-packet-title">強制停止</h2>
+            <p className="serial-packet-hint">
+              フロントエンドとバックエンドの強制停止操作を行います。実行すると復帰に再起動/再読み込みが必要です。
+            </p>
+
+            <div className="serial-bridge-toolbar">
+              <button className="connection-button btn-neutral" onClick={forceShutdownFrontendFromConsole}>
+                frontend 強制停止
+              </button>
+              <button className="connection-button btn-neutral" onClick={forceShutdownBackendFromConsole}>
+                backend 強制停止
+              </button>
+              <span className="connection-hint">{serialBridgeLoading ? "処理中..." : serialBridgeInfo}</span>
             </div>
           </section>
         )}

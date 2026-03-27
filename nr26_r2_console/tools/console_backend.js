@@ -263,6 +263,18 @@ const readLogTail = (lineLimit = 200) => {
     return lines.slice(-lineLimit);
 };
 
+const forceShutdownBackend = () => {
+    try {
+        stopSerialBridge();
+    } catch (error) {
+        // Best effort: backend shutdown continues even if serial bridge stop fails.
+    }
+
+    setTimeout(() => {
+        process.exit(0);
+    }, 200);
+};
+
 const server = http.createServer((req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -317,6 +329,15 @@ const server = http.createServer((req, res) => {
                 error: String(error?.message || error),
             });
         }
+        return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/backend/force-shutdown") {
+        jsonResponse(res, 200, {
+            shuttingDown: true,
+            message: "console backend を強制シャットダウンします",
+        });
+        forceShutdownBackend();
         return;
     }
 
