@@ -547,6 +547,57 @@
   gap: 8px;
 }
 
+.pose-step-grid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pose-input-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.pose-input-item label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pose-button-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.pose-pm-button {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg-soft);
+  color: var(--text-main);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pose-pm-button:hover {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent-strong);
+}
+
+.pose-pm-button:active {
+  opacity: 0.8;
+}
+
 .control-button {
   width: 100%;
   border: none;
@@ -877,6 +928,7 @@
   }
 
   .pose-current-grid,
+  .pose-step-grid,
   .pose-input-grid,
   .pose-actions-row {
     grid-template-columns: 1fr;

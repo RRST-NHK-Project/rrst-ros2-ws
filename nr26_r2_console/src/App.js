@@ -60,6 +60,9 @@ function App() {
   const [targetXInput, setTargetXInput] = useState("0.0");
   const [targetYInput, setTargetYInput] = useState("0.0");
   const [targetYawInput, setTargetYawInput] = useState("0.0");
+  const [targetXStep, setTargetXStep] = useState("0.1");
+  const [targetYStep, setTargetYStep] = useState("0.1");
+  const [targetYawStep, setTargetYawStep] = useState("5");
   const [autoDriveCmdInfo, setAutoDriveCmdInfo] = useState("未送信");
 
   const rosUrl = `${wsScheme}://${rosEndpoint.host}:${rosEndpoint.port}`;
@@ -183,7 +186,19 @@ function App() {
   const applyAutoDriveFromCurrentPose = () => {
     setTargetXInput(poseX.toFixed(3));
     setTargetYInput(poseY.toFixed(3));
-    setTargetYawInput(poseYaw.toFixed(3));
+    setTargetYawInput((poseYaw * 180 / Math.PI).toFixed(1));
+  };
+
+  const incrementTarget = (setter, currentValue, step) => {
+    const current = parseFloatSafe(currentValue);
+    const stepValue = parseFloatSafe(step);
+    setter((current + stepValue).toFixed(1));
+  };
+
+  const decrementTarget = (setter, currentValue, step) => {
+    const current = parseFloatSafe(currentValue);
+    const stepValue = parseFloatSafe(step);
+    setter((current - stepValue).toFixed(1));
   };
 
   const publishAutoDriveCommand = () => {
@@ -194,10 +209,11 @@ function App() {
 
     const tx = parseFloatSafe(targetXInput);
     const ty = parseFloatSafe(targetYInput);
-    const tyaw = parseFloatSafe(targetYawInput);
+    const tyawDeg = parseFloatSafe(targetYawInput);
+    const tyawRad = tyawDeg * Math.PI / 180;
 
     autoDriveCmdRef.current.publish({
-      data: [tx, ty, tyaw],
+      data: [tx, ty, tyawRad],
     });
 
     setAutoDriveCmdInfo("r2_autodrive_cmd に目標座標を送信しました");
@@ -779,7 +795,7 @@ function App() {
           <section className="pose-panel">
             <h2 className="serial-packet-title">座標・姿勢管理</h2>
             <p className="serial-packet-hint">
-              現在座標と目標座標を管理します。
+              現在座標と目標座標を管理します。（Yaw: 度数法）
             </p>
 
             <div className="pose-current-grid">
@@ -792,24 +808,77 @@ function App() {
                 <strong>{poseY.toFixed(3)}</strong>
               </div>
               <div className="pose-current-item">
-                <span>現在Yaw</span>
-                <strong>{poseYaw.toFixed(3)}</strong>
+                <span>現在Yaw (°)</span>
+                <strong>{(poseYaw * 180 / Math.PI).toFixed(1)}</strong>
               </div>
             </div>
 
+            <div className="pose-step-grid">
+              <label className="serial-packet-label">
+                X ステップ
+                <input
+                  className="connection-input"
+                  type="number"
+                  step="0.1"
+                  value={targetXStep}
+                  onChange={(e) => setTargetXStep(e.target.value)}
+                />
+              </label>
+              <label className="serial-packet-label">
+                Y ステップ
+                <input
+                  className="connection-input"
+                  type="number"
+                  step="0.1"
+                  value={targetYStep}
+                  onChange={(e) => setTargetYStep(e.target.value)}
+                />
+              </label>
+              <label className="serial-packet-label">
+                Yaw ステップ (°)
+                <input
+                  className="connection-input"
+                  type="number"
+                  step="1"
+                  value={targetYawStep}
+                  onChange={(e) => setTargetYawStep(e.target.value)}
+                />
+              </label>
+            </div>
+
             <div className="pose-input-grid">
-              <label className="serial-packet-label">
-                目標X
-                <input className="connection-input" value={targetXInput} onChange={(e) => setTargetXInput(e.target.value)} />
-              </label>
-              <label className="serial-packet-label">
-                目標Y
-                <input className="connection-input" value={targetYInput} onChange={(e) => setTargetYInput(e.target.value)} />
-              </label>
-              <label className="serial-packet-label">
-                目標Yaw
-                <input className="connection-input" value={targetYawInput} onChange={(e) => setTargetYawInput(e.target.value)} />
-              </label>
+              <div className="pose-input-item">
+                <label className="serial-packet-label">
+                  目標X
+                  <input className="connection-input" value={targetXInput} onChange={(e) => setTargetXInput(e.target.value)} />
+                </label>
+                <div className="pose-button-group">
+                  <button className="pose-pm-button" onClick={() => decrementTarget(setTargetXInput, targetXInput, targetXStep)}>−</button>
+                  <button className="pose-pm-button" onClick={() => incrementTarget(setTargetXInput, targetXInput, targetXStep)}>+</button>
+                </div>
+              </div>
+
+              <div className="pose-input-item">
+                <label className="serial-packet-label">
+                  目標Y
+                  <input className="connection-input" value={targetYInput} onChange={(e) => setTargetYInput(e.target.value)} />
+                </label>
+                <div className="pose-button-group">
+                  <button className="pose-pm-button" onClick={() => decrementTarget(setTargetYInput, targetYInput, targetYStep)}>−</button>
+                  <button className="pose-pm-button" onClick={() => incrementTarget(setTargetYInput, targetYInput, targetYStep)}>+</button>
+                </div>
+              </div>
+
+              <div className="pose-input-item">
+                <label className="serial-packet-label">
+                  目標Yaw (°)
+                  <input className="connection-input" value={targetYawInput} onChange={(e) => setTargetYawInput(e.target.value)} />
+                </label>
+                <div className="pose-button-group">
+                  <button className="pose-pm-button" onClick={() => decrementTarget(setTargetYawInput, targetYawInput, targetYawStep)}>−</button>
+                  <button className="pose-pm-button" onClick={() => incrementTarget(setTargetYawInput, targetYawInput, targetYawStep)}>+</button>
+                </div>
+              </div>
             </div>
 
             <div className="pose-actions-row">
