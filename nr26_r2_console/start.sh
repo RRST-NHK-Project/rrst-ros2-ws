@@ -14,6 +14,28 @@ cd "${CONSOLE_DIR}"
 BRIDGE_PORT="${BRIDGE_PORT:-9090}"
 BRIDGE_PID=""
 
+start_rosbridge() {
+  if [ -n "${VIRTUAL_ENV:-}" ]; then
+    echo "Python仮想環境を検出: ${VIRTUAL_ENV}"
+    echo "rosbridge はシステムPython環境で起動します"
+
+    local CLEAN_PATH="${PATH}"
+    CLEAN_PATH="${CLEAN_PATH#"${VIRTUAL_ENV}/bin:"}"
+
+    (
+      unset VIRTUAL_ENV
+      unset PYTHONHOME
+      unset PYTHONPATH
+      export PATH="${CLEAN_PATH}"
+      exec ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=${BRIDGE_PORT}
+    ) >/tmp/r2_console_rosbridge.log 2>&1 &
+  else
+    ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=${BRIDGE_PORT} >/tmp/r2_console_rosbridge.log 2>&1 &
+  fi
+
+  BRIDGE_PID=$!
+}
+
 cleanup() {
   if [ -n "${BRIDGE_PID}" ] && kill -0 "${BRIDGE_PID}" >/dev/null 2>&1; then
     echo ""
@@ -30,8 +52,7 @@ if command -v ros2 >/dev/null 2>&1; then
     echo "rosbridge は既にポート ${BRIDGE_PORT} で起動中です"
   else
     echo "rosbridge を起動中... (port: ${BRIDGE_PORT})"
-    ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=${BRIDGE_PORT} >/tmp/r2_console_rosbridge.log 2>&1 &
-    BRIDGE_PID=$!
+    start_rosbridge
     sleep 1
 
     if ! kill -0 "${BRIDGE_PID}" >/dev/null 2>&1; then
