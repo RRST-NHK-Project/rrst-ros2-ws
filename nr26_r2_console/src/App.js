@@ -27,6 +27,9 @@ function App() {
   const odomRef = useRef(null);
   const autoDriveCmdRef = useRef(null);
   const odomResetCmdRef = useRef(null);
+  const rosTopicsServiceRef = useRef(null);
+  const rosTopicTypeServiceRef = useRef(null);
+  const topicEchoSubRef = useRef(null);
   const serialPeriodicTimerRef = useRef(null);
   const defaultRosHost = window.location.hostname || "localhost";
   const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
@@ -67,6 +70,14 @@ function App() {
   const [savedPose, setSavedPose] = useState(null);
   const [savedPosesList, setSavedPosesList] = useState([]);
   const [autoDriveCmdInfo, setAutoDriveCmdInfo] = useState("未送信");
+  const [topicList, setTopicList] = useState([]);
+  const [topicListLoading, setTopicListLoading] = useState(false);
+  const [topicListError, setTopicListError] = useState("");
+  const [selectedEchoTopic, setSelectedEchoTopic] = useState("");
+  const [selectedEchoType, setSelectedEchoType] = useState("");
+  const [topicEchoInfo, setTopicEchoInfo] = useState("未開始");
+  const [topicEchoMessages, setTopicEchoMessages] = useState([]);
+  const [topicEchoRunning, setTopicEchoRunning] = useState(false);
 
   const rosUrl = `${wsScheme}://${rosEndpoint.host}:${rosEndpoint.port}`;
 
@@ -81,6 +92,116 @@ function App() {
     const nextTopic = joyTopicInput.trim() || "/joy_9";
     setJoyTopicName(nextTopic);
     console.log("Joy topic name updated to:", nextTopic);
+  };
+
+  const callRosService = (serviceRef, requestData) =>
+    new Promise((resolve, reject) => {
+      if (!serviceRef.current) {
+        reject(new Error("サービスが初期化されていません"));
+        return;
+      }
+
+      const request = requestData || {};
+      serviceRef.current.callService(
+        request,
+        (response) => resolve(response),
+        (error) => reject(error || new Error("サービス呼び出しに失敗しました"))
+      );
+    });
+
+  const stopTopicEcho = () => {
+    if (topicEchoSubRef.current) {
+      try {
+        topicEchoSubRef.current.unsubscribe();
+      } catch (error) {
+        console.warn("Error unsubscribing topic echo:", error);
+      }
+      topicEchoSubRef.current = null;
+    }
+
+    setTopicEchoRunning(false);
+  };
+
+  const refreshTopicList = async () => {
+    if (!rosRef.current || !rosTopicsServiceRef.current) {
+      setTopicListError("ROS未接続のため取得できません");
+      return;
+    }
+
+    setTopicListLoading(true);
+    setTopicListError("");
+    try {
+      const response = await callRosService(rosTopicsServiceRef, {});
+      const topics = Array.isArray(response?.topics) ? response.topics : [];
+      const types = Array.isArray(response?.types) ? response.types : [];
+      const mapped = topics.map((name, index) => ({
+        name,
+        type: types[index] || "",
+      }));
+
+      mapped.sort((a, b) => a.name.localeCompare(b.name));
+      setTopicList(mapped);
+
+      if (mapped.length === 0) {
+        setTopicListError("トピックが見つかりません");
+      }
+    } catch (error) {
+      console.error("Failed to fetch topic list:", error);
+      setTopicListError("トピック一覧の取得に失敗しました");
+    } finally {
+      setTopicListLoading(false);
+    }
+  };
+
+  const startTopicEcho = async () => {
+    const topicName = selectedEchoTopic.trim();
+    if (!topicName) {
+      setTopicEchoInfo("トピック名を選択してください");
+      return;
+    }
+
+    if (!rosRef.current) {
+      setTopicEchoInfo("ROS未接続のため開始できません");
+      return;
+    }
+
+    let topicType = selectedEchoType;
+    try {
+      if (!topicType) {
+        const response = await callRosService(rosTopicTypeServiceRef, { topic: topicName });
+        topicType = response?.type || "";
+      }
+    } catch (error) {
+      console.error("Failed to resolve topic type:", error);
+    }
+
+    if (!topicType) {
+      setTopicEchoInfo("トピック型の取得に失敗しました");
+      return;
+    }
+
+    stopTopicEcho();
+    setTopicEchoMessages([]);
+
+    const echoTopic = new ROSLIB.Topic({
+      ros: rosRef.current,
+      name: topicName,
+      messageType: topicType,
+    });
+
+    echoTopic.subscribe((msg) => {
+      const payload = JSON.stringify(msg, null, 2);
+      const row = {
+        id: Date.now() + Math.random(),
+        at: new Date().toLocaleTimeString("ja-JP"),
+        payload,
+      };
+      setTopicEchoMessages((prev) => [row, ...prev].slice(0, 30));
+    });
+
+    topicEchoSubRef.current = echoTopic;
+    setTopicEchoRunning(true);
+    setTopicEchoInfo(`${topicName} (${topicType}) を監視中`);
   };
 
   const serialTopicName = `serial_tx_${Math.max(0, Number.parseInt(serialTargetIdInput, 10) || 0)}`;
@@ -413,6 +534,7 @@ function App() {
     rosRef.current.on("connection", () => {
       setStatus("接続OK");
       console.log("Connected to ROS:", rosUrl);
+      refreshTopicList();
     });
 
     rosRef.current.on("error", (error) => {
@@ -473,6 +595,18 @@ function App() {
       messageType: "std_msgs/msg/Bool",
     });
 
+    rosTopicsServiceRef.current = new ROSLIB.Service({
+      ros: rosRef.current,
+      name: "/rosapi/topics",
+      serviceType: "rosapi_msgs/srv/Topics",
+    });
+
+    rosTopicTypeServiceRef.current = new ROSLIB.Service({
+      ros: rosRef.current,
+      name: "/rosapi/topic_type",
+      serviceType: "rosapi_msgs/srv/TopicType",
+    });
+
     // 10Hzで送信
     const interval = setInterval(() => {
       if (!controllerEnabled) return;
@@ -508,6 +642,7 @@ function App() {
           console.warn("Error unsubscribing odom topic:", error);
         }
       }
+      stopTopicEcho();
       if (rosRef.current) rosRef.current.close();
     };
   }, [rosUrl, joyTopicName]);
@@ -679,6 +814,12 @@ function App() {
             onClick={() => setActivePage("actuator")}
           >
             アクチュエータ送信
+          </button>
+          <button
+            className={`page-switch-button ${activePage === "topic" ? "page-switch-active" : ""}`}
+            onClick={() => setActivePage("topic")}
+          >
+            トピック監視
           </button>
         </section>
 
@@ -1123,6 +1264,79 @@ function App() {
             </div>
 
             <p className="connection-hint">{serialPublishInfo}</p>
+          </section>
+        )}
+
+        {activePage === "topic" && (
+          <section className="topic-panel">
+            <h2 className="serial-packet-title">ROS2 トピック監視</h2>
+            <p className="serial-packet-hint">
+              トピック一覧を取得し、選択したトピックを subscribe して内容を確認できます。
+            </p>
+
+            <div className="topic-toolbar">
+              <button className="connection-button btn-connect" onClick={refreshTopicList}>
+                トピック一覧を更新
+              </button>
+              <span className="connection-hint">
+                {topicListLoading ? "取得中..." : `件数: ${topicList.length}`}
+              </span>
+            </div>
+
+            {topicListError && <p className="connection-hint topic-error">{topicListError}</p>}
+
+            <div className="topic-select-row">
+              <select
+                className="connection-input"
+                value={selectedEchoTopic}
+                onChange={(e) => {
+                  const topicName = e.target.value;
+                  setSelectedEchoTopic(topicName);
+                  const matched = topicList.find((item) => item.name === topicName);
+                  setSelectedEchoType(matched?.type || "");
+                }}
+              >
+                <option value="">監視するトピックを選択</option>
+                {topicList.map((item) => (
+                  <option key={item.name} value={item.name}>
+                    {item.name} {item.type ? `(${item.type})` : ""}
+                  </option>
+                ))}
+              </select>
+
+              <button className="connection-button btn-send" onClick={startTopicEcho}>
+                Echo開始
+              </button>
+              <button className="serial-clear-button" onClick={stopTopicEcho}>
+                Echo停止
+              </button>
+            </div>
+
+            <p className="connection-hint">
+              {topicEchoInfo} {topicEchoRunning ? "(受信中)" : ""}
+            </p>
+
+            <div className="topic-list-box">
+              {topicList.map((item) => (
+                <div key={item.name} className="topic-list-row">
+                  <span className="topic-list-name">{item.name}</span>
+                  <span className="topic-list-type">{item.type || "型不明"}</span>
+                </div>
+              ))}
+            </div>
+
+            <h3 className="topic-echo-title">Echoログ (最新30件)</h3>
+            <div className="topic-echo-box">
+              {topicEchoMessages.length === 0 && (
+                <p className="connection-hint">まだ受信していません</p>
+              )}
+              {topicEchoMessages.map((row) => (
+                <article key={row.id} className="topic-echo-item">
+                  <header className="topic-echo-meta">{row.at}</header>
+                  <pre className="topic-echo-pre">{row.payload}</pre>
+                </article>
+              ))}
+            </div>
           </section>
         )}
       </main>
