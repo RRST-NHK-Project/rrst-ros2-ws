@@ -9,9 +9,13 @@ COPY . src
 
 # 依存関係をインストール
 RUN apt-get update && \
-    rosdep update && \
-    rosdep install --from-paths src --ignore-src -y && \
-    apt-get install figlet -y 
+    apt-get install -y --no-install-recommends \
+    python3-rosdep \
+    figlet && \
+    rm -rf /var/lib/apt/lists/* && \
+    (rosdep init || true) && \
+    rosdep update --rosdistro jazzy && \
+    rosdep install --from-paths src --ignore-src -y
 
 # ビルド（事前ビルド）
 RUN . /opt/ros/jazzy/setup.sh && \

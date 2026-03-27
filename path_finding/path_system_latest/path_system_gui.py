@@ -174,8 +174,8 @@ class PathfindingGUI:
                 # Movement可視化
                 movement = Movement(path, self.height_map)
                 moves = movement.generate_moves()
-                print("(方向、 上り下り):", moves)  # （方向, 上下り）を表示
-        
+                print("経路情報:", moves)  # （方向, 上下り）を表示
+                #print(type(moves[0]))
                 plot_3d_maze_path(self.height_map, self.maze, path,self.start_pos, self.goal_pos)
 
                  

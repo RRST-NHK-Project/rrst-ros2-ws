@@ -24,5 +24,9 @@ sudo apt-get install -y ros-jazzy-nav2-util
 # 以下ArUco用
 sudo apt install libopencv-dev python3-opencv
 
+# 以下Realsense用
+sudo apt install ros-jazzy-librealsense2*
+sudo apt install ros-jazzy-realsense2-*
+
 # 他のスクリプトに一括で実行権限を渡す
 sudo chmod +x "${HOME}/ros2_ws/src/setup/"*.sh || true #エラーが出ても無視

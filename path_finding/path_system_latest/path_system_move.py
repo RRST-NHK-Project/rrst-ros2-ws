@@ -1,6 +1,6 @@
 # NHK2026ロボコン
 # 経路探索システム
-# 2026/03/12
+# 2026/03/19(intに変更)
 
 '''
  MAIN
@@ -35,24 +35,26 @@ class Movement:
             # (方向、上り下り)
             ## 方向
             if dr == -1 and dc == 0:    
-                direction = "front"   #前
+                direction = 1   #前
             elif dr == 1 and dc == 0:
-                direction = "back"    #後
+                direction = 2    #後
             elif dr == 0 and dc == -1:    
-                direction = "right"   #右
+                direction = 3   #右
             elif dr == 0 and dc == 1:
-                direction = "left"    #左
+                direction = 4    #左
             else:
-                direction = "stop"
+                direction = 0 #止まる
 
             ##上り下り
             if dh > 0:
-                status = "up"   #上
+                status = 1   #上
             elif dh < 0:
-                status = "down"  #下
+                status = 2  #下
             else:
-                status = "none"
+                status = 0   #水平
             
-            self.moves.append((direction, status))     
+
+            move = direction + status * 10 #(前->1,前方にのぼる->11) 
+            self.moves.append(move)  
         
         return self.moves

@@ -32,4 +32,25 @@ path_system_latest/
 ・ mpl_toolkits.mplot3d (3D図用)
 
     ※ インストール
+    
        pip install numpy matplotlib
+
+
+[Moves]
+1 前
+2 後ろ
+3 右
+4 左
+
+11 前方に上がる
+12 後ろに上がる
+13 右に上がる
+14 左に上がる
+
+21 前方に下がる
+22 後ろに下がる
+23 右に下がる
+24 左に下がる
+
+
+

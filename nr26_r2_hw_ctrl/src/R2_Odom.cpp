@@ -16,6 +16,7 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
+#include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int16_multi_array.hpp"
 #include "tf2_ros/transform_broadcaster.h"
@@ -42,6 +43,11 @@ public:
             "serial_rx_" + std::to_string(device_id_),
             10,
             std::bind(&HardWareControl::sensor_callback, this, std::placeholders::_1));
+
+        odom_reset_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+            "odom_reset",
+            10,
+            std::bind(&HardWareControl::odom_reset_callback, this, std::placeholders::_1));
 
         odom_pub_ = this->create_publisher<std_msgs::msg::Float32MultiArray>("odom_xy_yaw", 10);
 
@@ -96,8 +102,12 @@ private:
         float vx, vy, wz;
         {
             std::lock_guard<std::mutex> lock(pose_mutex_);
-            x = X; y = Y; yaw = yaw_;
-            vx = vx_; vy = vy_; wz = wz_;
+            x = X;
+            y = Y;
+            yaw = yaw_;
+            vx = vx_;
+            vy = vy_;
+            wz = wz_;
         }
 
         auto now = this->get_clock()->now();
@@ -217,9 +227,26 @@ private:
         //             X, Y, yaw_ * 180.0 / M_PI);
     }
 
+    void odom_reset_callback(const std_msgs::msg::Bool::SharedPtr msg) {
+        if (!msg->data) {
+            return;
+        }
+
+        std::lock_guard<std::mutex> lock(pose_mutex_);
+        X = 0.0;
+        Y = 0.0;
+        yaw_ = 0.0;
+        vx_ = 0.0f;
+        vy_ = 0.0f;
+        wz_ = 0.0f;
+        enc_init_ = false;
+        RCLCPP_INFO(get_logger(), "Odometry reset requested: pose set to zero.");
+    }
+
     uint8_t device_id_;
     rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr odom_pub_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sensor_sub_;
+    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr odom_reset_sub_;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_nav_pub_;
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
     rclcpp::TimerBase::SharedPtr tf_timer_;
