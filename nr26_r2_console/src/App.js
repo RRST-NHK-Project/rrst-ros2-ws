@@ -48,7 +48,8 @@ function App() {
   const [commandValue, setCommandValue] = useState(0);
   const [buttons, setButtons] = useState(Array(14).fill(0));
   const [axes, setAxes] = useState(Array(8).fill(0));
-  const [controllerEnabled, setControllerEnabled] = useState(true);
+  const [operationArmed, setOperationArmed] = useState(false);
+  const [controllerEnabled, setControllerEnabled] = useState(false);
   const [controllerFullscreen, setControllerFullscreen] = useState(false);
   const [activePage, setActivePage] = useState("controller");
   const [joyTopicName, setJoyTopicName] = useState("/joy_9");
@@ -448,6 +449,13 @@ function App() {
   };
 
   const publishSerialPacket = (showStatus = true) => {
+    if (!operationArmed) {
+      if (showStatus) {
+        setSerialPublishInfo("操作許可がOFFのため送信できません");
+      }
+      return false;
+    }
+
     if (!rosRef.current) {
       if (showStatus) {
         setSerialPublishInfo("ROS未接続のため送信できません");
@@ -487,6 +495,11 @@ function App() {
   };
 
   const publishOdomReset = () => {
+    if (!operationArmed) {
+      setAutoDriveCmdInfo("操作許可がOFFのためオドメトリリセット送信できません");
+      return;
+    }
+
     if (!odomResetCmdRef.current) {
       setAutoDriveCmdInfo("ROS未接続のためオドメトリリセット送信できません");
       return;
@@ -557,6 +570,11 @@ function App() {
   };
 
   const publishAutoDriveCommand = () => {
+    if (!operationArmed) {
+      setAutoDriveCmdInfo("操作許可がOFFのため送信できません");
+      return;
+    }
+
     if (!autoDriveCmdRef.current) {
       setAutoDriveCmdInfo("ROS未接続のため送信できません");
       return;
@@ -575,12 +593,19 @@ function App() {
   };
 
   useEffect(() => {
+    if (!operationArmed && serialPeriodicEnabled) {
+      setSerialPeriodicEnabled(false);
+      setSerialPublishInfo("操作許可がOFFのため定期送信を停止しました");
+    }
+  }, [operationArmed, serialPeriodicEnabled]);
+
+  useEffect(() => {
     if (serialPeriodicTimerRef.current) {
       clearInterval(serialPeriodicTimerRef.current);
       serialPeriodicTimerRef.current = null;
     }
 
-    if (!serialPeriodicEnabled) {
+    if (!serialPeriodicEnabled || !operationArmed) {
       return;
     }
 
@@ -601,7 +626,7 @@ function App() {
         serialPeriodicTimerRef.current = null;
       }
     };
-  }, [serialPeriodicEnabled, serialPeriodicHz, serialTargetIdInput, serialElementCount, serialValues]);
+  }, [serialPeriodicEnabled, serialPeriodicHz, serialTargetIdInput, serialElementCount, serialValues, operationArmed]);
 
   const updateCommand = (value) => {
     commandValueRef.current = value;
@@ -784,7 +809,7 @@ function App() {
 
     // 10Hzで送信
     const interval = setInterval(() => {
-      if (!controllerEnabled) return;
+      if (!controllerEnabled || !operationArmed) return;
 
       if (commandRef.current) {
         commandRef.current.publish({
@@ -962,6 +987,26 @@ function App() {
               }`}
           >
             {status}
+          </span>
+        </section>
+
+        <section className="control-toggle-row">
+          <button
+            className={`toggle-button ${operationArmed ? "toggle-on" : "toggle-off"}`}
+            onClick={() => {
+              const next = !operationArmed;
+              setOperationArmed(next);
+              if (!next) {
+                resetAllControls();
+              }
+            }}
+          >
+            {operationArmed ? "操作ロック: OFF" : "操作ロック: ON"}
+          </button>
+          <span className="connection-hint">
+            {operationArmed
+              ? "送信系機能が有効です"
+              : "ロック中: 送信系機能は無効化されています"}
           </span>
         </section>
 
@@ -1277,8 +1322,8 @@ function App() {
 
             <div className="pose-actions-row">
               <button className="connection-button btn-neutral" onClick={applyAutoDriveFromCurrentPose}>現在値を目標へ</button>
-              <button className="connection-button btn-neutral" onClick={publishOdomReset}>オドメトリをリセット</button>
-              <button className="connection-button serial-send-button btn-send" onClick={publishAutoDriveCommand}>目標座標を送信</button>
+              <button className="connection-button btn-neutral" onClick={publishOdomReset} disabled={!operationArmed}>オドメトリをリセット</button>
+              <button className="connection-button serial-send-button btn-send" onClick={publishAutoDriveCommand} disabled={!operationArmed}>目標座標を送信</button>
             </div>
 
             <p className="connection-hint">{autoDriveCmdInfo}</p>
@@ -1405,7 +1450,7 @@ function App() {
               <section className="actuator-group actuator-actions-group">
                 <h3 className="actuator-group-title">配列操作</h3>
                 <div className="serial-packet-actions">
-                  <button className="connection-button serial-send-button btn-send" onClick={() => publishSerialPacket(true)}>
+                  <button className="connection-button serial-send-button btn-send" onClick={() => publishSerialPacket(true)} disabled={!operationArmed}>
                     配列送信
                   </button>
                   <button className="serial-clear-button" onClick={clearSerialPacket}>
@@ -1431,6 +1476,7 @@ function App() {
 
                   <button
                     className={`serial-periodic-button ${serialPeriodicEnabled ? "serial-periodic-on" : ""}`}
+                    disabled={!operationArmed}
                     onClick={() => setSerialPeriodicEnabled((prev) => !prev)}
                   >
                     {serialPeriodicEnabled ? "定期送信: ON" : "定期送信: OFF"}
