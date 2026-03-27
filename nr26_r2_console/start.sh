@@ -24,8 +24,6 @@ start_rosbridge() {
 
     (
       unset VIRTUAL_ENV
-      unset PYTHONHOME
-      unset PYTHONPATH
       export PATH="${CLEAN_PATH}"
       exec ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=${BRIDGE_PORT}
     ) >/tmp/r2_console_rosbridge.log 2>&1 &
