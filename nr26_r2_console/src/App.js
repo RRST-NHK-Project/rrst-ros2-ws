@@ -861,50 +861,6 @@ function App() {
               </div>
             </div>
 
-            <div className="pose-target-save-panel">
-              <button className="connection-button serial-send-button" onClick={saveTargetPose}>
-                目標値を保存
-              </button>
-              {savedPosesList.length > 0 && (
-                <button className="serial-clear-button" onClick={clearAllSavedPoses}>
-                  すべてクリア
-                </button>
-              )}
-            </div>
-
-            {savedPosesList.length > 0 && (
-              <div className="pose-saved-list-panel">
-                <h3 className="pose-saved-list-title">保存済み目標値 ({savedPosesList.length})</h3>
-                <div className="pose-saved-list">
-                  {savedPosesList.map((pose) => (
-                    <div key={pose.id} className="pose-saved-item">
-                      <div className="pose-saved-item-info">
-                        <span className="pose-saved-item-label">{pose.label}</span>
-                        <span className="pose-saved-item-values">
-                          X: {pose.x.toFixed(3)}, Y: {pose.y.toFixed(3)}, Yaw: {pose.yawDeg.toFixed(1)}°
-                        </span>
-                        <span className="pose-saved-item-time">{pose.timestamp}</span>
-                      </div>
-                      <div className="pose-saved-item-actions">
-                        <button
-                          className="connection-button pose-item-button"
-                          onClick={() => applySavedTargetPose(pose)}
-                        >
-                          復元
-                        </button>
-                        <button
-                          className="serial-clear-button pose-item-button"
-                          onClick={() => deleteSavedPose(pose.id)}
-                        >
-                          削除
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <div className="pose-step-grid">
               <label className="serial-packet-label">
                 X ステップ
@@ -979,6 +935,50 @@ function App() {
             </div>
 
             <p className="connection-hint">{autoDriveCmdInfo}</p>
+
+            <div className="pose-target-save-panel">
+              <button className="connection-button serial-send-button" onClick={saveTargetPose}>
+                目標値を保存
+              </button>
+              {savedPosesList.length > 0 && (
+                <button className="serial-clear-button" onClick={clearAllSavedPoses}>
+                  すべてクリア
+                </button>
+              )}
+            </div>
+
+            {savedPosesList.length > 0 && (
+              <div className="pose-saved-list-panel">
+                <h3 className="pose-saved-list-title">保存済み目標値 ({savedPosesList.length})</h3>
+                <div className="pose-saved-list">
+                  {savedPosesList.map((pose) => (
+                    <div key={pose.id} className="pose-saved-item">
+                      <div className="pose-saved-item-info">
+                        <span className="pose-saved-item-label">{pose.label}</span>
+                        <span className="pose-saved-item-values">
+                          X: {pose.x.toFixed(3)}, Y: {pose.y.toFixed(3)}, Yaw: {pose.yawDeg.toFixed(1)}°
+                        </span>
+                        <span className="pose-saved-item-time">{pose.timestamp}</span>
+                      </div>
+                      <div className="pose-saved-item-actions">
+                        <button
+                          className="connection-button pose-item-button"
+                          onClick={() => applySavedTargetPose(pose)}
+                        >
+                          復元
+                        </button>
+                        <button
+                          className="serial-clear-button pose-item-button"
+                          onClick={() => deleteSavedPose(pose.id)}
+                        >
+                          削除
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         )}
 
