@@ -799,6 +799,7 @@
   }
 
   .pose-current-grid,
+  .pose-overview-grid,
   .pose-input-grid,
   .pose-actions-row,
   .pose-step-grid,
@@ -812,6 +813,11 @@
 
   .serial-bridge-grid {
     grid-template-columns: 1fr;
+  }
+
+  .pose-graph-title-row {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 
@@ -853,11 +859,140 @@
   background: rgba(255, 255, 255, 0.72);
 }
 
+.pose-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) minmax(200px, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
 .pose-current-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 8px;
+  margin-top: 0;
+}
+
+.pose-graph-card {
   margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.pose-graph-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pose-graph-title {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-main);
+}
+
+.pose-graph-scale {
+  font-size: 0.78rem;
+  color: var(--text-sub);
+}
+
+.pose-graph {
+  width: 100%;
+  height: auto;
+  max-width: 360px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 247, 247, 0.96));
+}
+
+.pose-graph-frame {
+  fill: rgba(250, 250, 250, 0.9);
+  stroke: rgba(0, 0, 0, 0.16);
+  stroke-width: 1;
+}
+
+.pose-graph-grid {
+  stroke: rgba(0, 0, 0, 0.08);
+  stroke-width: 1;
+}
+
+.pose-graph-axis {
+  stroke: rgba(0, 0, 0, 0.46);
+  stroke-width: 1.5;
+}
+
+.pose-graph-link {
+  stroke: rgba(84, 110, 122, 0.8);
+  stroke-width: 2;
+  stroke-dasharray: 6 5;
+}
+
+.pose-graph-arrow-current {
+  stroke: #2e7d32;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.pose-graph-arrow-target {
+  stroke: #1565c0;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.pose-graph-point-current {
+  fill: #2e7d32;
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+.pose-graph-point-target {
+  fill: #1565c0;
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+.pose-graph-label {
+  fill: var(--text-main);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.pose-graph-corner-label {
+  fill: var(--text-sub);
+  font-size: 10px;
+}
+
+.pose-graph-legend {
+  margin-top: 8px;
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.pose-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-sub);
+  font-size: 0.8rem;
+}
+
+.pose-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.pose-legend-current {
+  background: #2e7d32;
+}
+
+.pose-legend-target {
+  background: #1565c0;
 }
 
 .pose-current-item {
@@ -1424,6 +1559,10 @@
 
   .pose-target-save-panel {
     grid-template-columns: 1fr;
+  }
+
+  .pose-graph-legend {
+    gap: 8px;
   }
 
   .pose-saved-item {

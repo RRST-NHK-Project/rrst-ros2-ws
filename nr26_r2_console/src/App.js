@@ -28,6 +28,25 @@ const describeActuatorEn = (label) => {
   return "Reserved";
 };
 
+const normalizeYawRad = (yawRad) => {
+  if (!Number.isFinite(yawRad)) {
+    return 0;
+  }
+  const wrapped = ((yawRad + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+  return wrapped - Math.PI;
+};
+
+const chooseGridStep = (span) => {
+  const candidates = [0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10];
+  const target = Math.max(span / 6, 0.05);
+  for (const step of candidates) {
+    if (step >= target) {
+      return step;
+    }
+  }
+  return 20;
+};
+
 function App() {
   const rosRef = useRef(null);
   const commandRef = useRef(null);
@@ -756,6 +775,68 @@ function App() {
     setAutoDriveCmdInfo("r2_autodrive_cmd に目標座標を送信しました");
   };
 
+  const targetXValue = parseFloatSafe(targetXInput);
+  const targetYValue = parseFloatSafe(targetYInput);
+  const targetYawRadValue = parseFloatSafe(targetYawInput) * Math.PI / 180;
+
+  const graphWidth = 360;
+  const graphHeight = 250;
+  const graphPadding = 28;
+  const graphPoints = [
+    { x: poseX, y: poseY },
+    { x: targetXValue, y: targetYValue },
+  ];
+
+  const graphMinXRaw = Math.min(...graphPoints.map((p) => p.x));
+  const graphMaxXRaw = Math.max(...graphPoints.map((p) => p.x));
+  const graphMinYRaw = Math.min(...graphPoints.map((p) => p.y));
+  const graphMaxYRaw = Math.max(...graphPoints.map((p) => p.y));
+  const graphSpan = Math.max(graphMaxXRaw - graphMinXRaw, graphMaxYRaw - graphMinYRaw, 1);
+  const graphMargin = Math.max(graphSpan * 0.2, 0.3);
+
+  const graphMinX = graphMinXRaw - graphMargin;
+  const graphMaxX = graphMaxXRaw + graphMargin;
+  const graphMinY = graphMinYRaw - graphMargin;
+  const graphMaxY = graphMaxYRaw + graphMargin;
+
+  const graphInnerWidth = graphWidth - graphPadding * 2;
+  const graphInnerHeight = graphHeight - graphPadding * 2;
+
+  const toGraphX = (x) =>
+    graphPadding + ((x - graphMinX) / Math.max(graphMaxX - graphMinX, 1e-6)) * graphInnerWidth;
+  const toGraphY = (y) =>
+    graphHeight - graphPadding - ((y - graphMinY) / Math.max(graphMaxY - graphMinY, 1e-6)) * graphInnerHeight;
+
+  const currentX = toGraphX(poseX);
+  const currentY = toGraphY(poseY);
+  const targetX = toGraphX(targetXValue);
+  const targetY = toGraphY(targetYValue);
+  const arrowLength = 20;
+
+  const currentYaw = normalizeYawRad(poseYaw);
+  const targetYaw = normalizeYawRad(targetYawRadValue);
+
+  const currentArrowX = currentX + Math.cos(currentYaw) * arrowLength;
+  const currentArrowY = currentY - Math.sin(currentYaw) * arrowLength;
+  const targetArrowX = targetX + Math.cos(targetYaw) * arrowLength;
+  const targetArrowY = targetY - Math.sin(targetYaw) * arrowLength;
+
+  const axisXVisible = graphMinX <= 0 && graphMaxX >= 0;
+  const axisYVisible = graphMinY <= 0 && graphMaxY >= 0;
+  const gridStep = chooseGridStep(Math.max(graphMaxX - graphMinX, graphMaxY - graphMinY));
+
+  const gridXValues = [];
+  const startGridX = Math.ceil(graphMinX / gridStep) * gridStep;
+  for (let value = startGridX; value <= graphMaxX + 1e-9; value += gridStep) {
+    gridXValues.push(Number(value.toFixed(6)));
+  }
+
+  const gridYValues = [];
+  const startGridY = Math.ceil(graphMinY / gridStep) * gridStep;
+  for (let value = startGridY; value <= graphMaxY + 1e-9; value += gridStep) {
+    gridYValues.push(Number(value.toFixed(6)));
+  }
+
   useEffect(() => {
     if (!operationArmed && serialPeriodicEnabled) {
       setSerialPeriodicEnabled(false);
@@ -1458,18 +1539,116 @@ function App() {
               {tr("現在座標と目標座標を管理します。（Yaw: 度数法）", "Manage current pose and target pose. (Yaw in degrees)")}
             </p>
 
-            <div className="pose-current-grid">
-              <div className="pose-current-item">
-                <span>{tr("現在X", "Current X")}</span>
-                <strong>{poseX.toFixed(3)}</strong>
-              </div>
-              <div className="pose-current-item">
-                <span>{tr("現在Y", "Current Y")}</span>
-                <strong>{poseY.toFixed(3)}</strong>
-              </div>
-              <div className="pose-current-item">
-                <span>{tr("現在Yaw (°)", "Current Yaw (°)")}</span>
-                <strong>{(poseYaw * 180 / Math.PI).toFixed(1)}</strong>
+            <div className="pose-overview-grid">
+              <section className="pose-graph-card">
+                <div className="pose-graph-title-row">
+                  <h3 className="pose-graph-title">{tr("位置・姿勢グラフ", "Pose Graph")}</h3>
+                  <span className="pose-graph-scale">{tr("単位: m", "Unit: m")}</span>
+                </div>
+                <svg
+                  className="pose-graph"
+                  viewBox={`0 0 ${graphWidth} ${graphHeight}`}
+                  role="img"
+                  aria-label={tr("現在位置と目標位置のグラフ", "Graph of current and target pose")}
+                >
+                  <rect
+                    x={graphPadding}
+                    y={graphPadding}
+                    width={graphInnerWidth}
+                    height={graphInnerHeight}
+                    className="pose-graph-frame"
+                  />
+
+                  {gridXValues.map((value) => (
+                    <line
+                      key={`grid-x-${value}`}
+                      x1={toGraphX(value)}
+                      y1={graphPadding}
+                      x2={toGraphX(value)}
+                      y2={graphHeight - graphPadding}
+                      className="pose-graph-grid"
+                    />
+                  ))}
+                  {gridYValues.map((value) => (
+                    <line
+                      key={`grid-y-${value}`}
+                      x1={graphPadding}
+                      y1={toGraphY(value)}
+                      x2={graphWidth - graphPadding}
+                      y2={toGraphY(value)}
+                      className="pose-graph-grid"
+                    />
+                  ))}
+
+                  {axisXVisible && (
+                    <line
+                      x1={graphPadding}
+                      y1={toGraphY(0)}
+                      x2={graphWidth - graphPadding}
+                      y2={toGraphY(0)}
+                      className="pose-graph-axis"
+                    />
+                  )}
+                  {axisYVisible && (
+                    <line
+                      x1={toGraphX(0)}
+                      y1={graphPadding}
+                      x2={toGraphX(0)}
+                      y2={graphHeight - graphPadding}
+                      className="pose-graph-axis"
+                    />
+                  )}
+
+                  <line x1={currentX} y1={currentY} x2={targetX} y2={targetY} className="pose-graph-link" />
+
+                  <line x1={currentX} y1={currentY} x2={currentArrowX} y2={currentArrowY} className="pose-graph-arrow-current" />
+                  <line x1={targetX} y1={targetY} x2={targetArrowX} y2={targetArrowY} className="pose-graph-arrow-target" />
+
+                  <circle cx={currentX} cy={currentY} r="6" className="pose-graph-point-current" />
+                  <circle cx={targetX} cy={targetY} r="6" className="pose-graph-point-target" />
+
+                  <text x={currentX + 8} y={currentY - 10} className="pose-graph-label">{tr("現在", "Current")}</text>
+                  <text x={targetX + 8} y={targetY - 10} className="pose-graph-label">{tr("目標", "Target")}</text>
+
+                  <text x={graphPadding} y={graphPadding - 8} className="pose-graph-corner-label">
+                    Y {graphMaxY.toFixed(2)}
+                  </text>
+                  <text x={graphPadding} y={graphHeight - 8} className="pose-graph-corner-label">
+                    Y {graphMinY.toFixed(2)}
+                  </text>
+                  <text x={graphPadding} y={graphHeight - graphPadding + 16} className="pose-graph-corner-label">
+                    X {graphMinX.toFixed(2)}
+                  </text>
+                  <text x={graphWidth - graphPadding - 84} y={graphHeight - graphPadding + 16} className="pose-graph-corner-label">
+                    X {graphMaxX.toFixed(2)}
+                  </text>
+                </svg>
+
+                <div className="pose-graph-legend">
+                  <span className="pose-legend-item">
+                    <i className="pose-legend-dot pose-legend-current" />
+                    {tr("現在位置 / 姿勢", "Current position / yaw")}
+                  </span>
+                  <span className="pose-legend-item">
+                    <i className="pose-legend-dot pose-legend-target" />
+                    {tr("目標位置 / 姿勢", "Target position / yaw")}
+                  </span>
+                </div>
+              </section>
+
+              <div className="pose-current-grid">
+                <div className="pose-current-item">
+                  <span>{tr("現在X", "Current X")}</span>
+                  <strong>{poseX.toFixed(3)}</strong>
+                </div>
+                <div className="pose-current-item">
+                  <span>{tr("現在Y", "Current Y")}</span>
+                  <strong>{poseY.toFixed(3)}</strong>
+                </div>
+                <div className="pose-current-item">
+                  <span>{tr("現在Yaw (°)", "Current Yaw (°)")}</span>
+                  <strong>{(poseYaw * 180 / Math.PI).toFixed(1)}</strong>
+                </div>
               </div>
             </div>
 
