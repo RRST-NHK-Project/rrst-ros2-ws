@@ -163,6 +163,34 @@
   cursor: pointer;
 }
 
+.btn-connect {
+  background: linear-gradient(135deg, #1e88e5, #1565c0);
+}
+
+.btn-send {
+  background: linear-gradient(135deg, #2e7d32, #1b5e20);
+}
+
+.btn-save {
+  background: linear-gradient(135deg, #ef6c00, #e65100);
+}
+
+.btn-restore {
+  background: linear-gradient(135deg, #00838f, #006064);
+}
+
+.btn-neutral {
+  background: linear-gradient(135deg, #546e7a, #37474f);
+}
+
+.connection-button:hover {
+  filter: brightness(1.06);
+}
+
+.connection-button:active {
+  transform: scale(0.98);
+}
+
 .connection-hint {
   margin: 8px 2px 0;
   color: var(--text-sub);
@@ -706,6 +734,30 @@
   background: var(--accent);
   color: white;
   border-color: var(--accent-strong);
+}
+
+.pose-button-group .pose-pm-button:first-child {
+  background: #fff3e0;
+  border-color: #ffcc80;
+  color: #e65100;
+}
+
+.pose-button-group .pose-pm-button:first-child:hover {
+  background: #ef6c00;
+  border-color: #e65100;
+  color: #ffffff;
+}
+
+.pose-button-group .pose-pm-button:last-child {
+  background: #e8f5e9;
+  border-color: #a5d6a7;
+  color: #1b5e20;
+}
+
+.pose-button-group .pose-pm-button:last-child:hover {
+  background: #2e7d32;
+  border-color: #1b5e20;
+  color: #ffffff;
 }
 
 .pose-pm-button:active {

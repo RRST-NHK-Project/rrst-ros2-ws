@@ -615,7 +615,7 @@ function App() {
             }}
             placeholder="9090"
           />
-          <button className="connection-button" onClick={applyRosEndpoint}>
+          <button className="connection-button btn-connect" onClick={applyRosEndpoint}>
             接続
           </button>
         </section>
@@ -675,7 +675,7 @@ function App() {
                 }}
                 placeholder="Joy Topic Name (例: /joy_9)"
               />
-              <button className="connection-button" onClick={applyJoyTopicName}>
+              <button className="connection-button btn-connect" onClick={applyJoyTopicName}>
                 更新
               </button>
             </section>
@@ -930,14 +930,14 @@ function App() {
             </div>
 
             <div className="pose-actions-row">
-              <button className="connection-button" onClick={applyAutoDriveFromCurrentPose}>現在値を目標へ</button>
-              <button className="connection-button serial-send-button" onClick={publishAutoDriveCommand}>目標座標を送信</button>
+              <button className="connection-button btn-neutral" onClick={applyAutoDriveFromCurrentPose}>現在値を目標へ</button>
+              <button className="connection-button serial-send-button btn-send" onClick={publishAutoDriveCommand}>目標座標を送信</button>
             </div>
 
             <p className="connection-hint">{autoDriveCmdInfo}</p>
 
             <div className="pose-target-save-panel">
-              <button className="connection-button serial-send-button" onClick={saveTargetPose}>
+              <button className="connection-button serial-send-button btn-save" onClick={saveTargetPose}>
                 目標値を保存
               </button>
               {savedPosesList.length > 0 && (
@@ -962,10 +962,10 @@ function App() {
                       </div>
                       <div className="pose-saved-item-actions">
                         <button
-                          className="connection-button pose-item-button"
+                          className="connection-button pose-item-button btn-restore"
                           onClick={() => applySavedTargetPose(pose)}
                         >
-                          復元
+                          復元&送信
                         </button>
                         <button
                           className="serial-clear-button pose-item-button"
@@ -1057,7 +1057,7 @@ function App() {
               <section className="actuator-group actuator-actions-group">
                 <h3 className="actuator-group-title">配列操作</h3>
                 <div className="serial-packet-actions">
-                  <button className="connection-button serial-send-button" onClick={() => publishSerialPacket(true)}>
+                  <button className="connection-button serial-send-button btn-send" onClick={() => publishSerialPacket(true)}>
                     配列送信
                   </button>
                   <button className="serial-clear-button" onClick={clearSerialPacket}>
