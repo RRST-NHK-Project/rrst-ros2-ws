@@ -1044,44 +1044,46 @@ function App() {
           </div>
         </header>
 
-        <section className="connection-row">
-          <input
-            className="connection-input"
-            value={rosHostInput}
-            onChange={(e) => setRosHostInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") applyRosEndpoint();
-            }}
-            placeholder="ROS IP (例: 192.168.1.10)"
-          />
-          <input
-            className="connection-input connection-port"
-            value={rosPortInput}
-            onChange={(e) => setRosPortInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") applyRosEndpoint();
-            }}
-            placeholder="9090"
-          />
-          <button className="connection-button btn-connect" onClick={applyRosEndpoint}>
-            接続
-          </button>
-        </section>
+        <section className="connection-status-bar">
+          <div className="connection-status-top">
+            <div className="connection-status-inputs">
+              <input
+                className="connection-input"
+                value={rosHostInput}
+                onChange={(e) => setRosHostInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") applyRosEndpoint();
+                }}
+                placeholder="ROS IP (例: 192.168.1.10)"
+              />
+              <input
+                className="connection-input connection-port"
+                value={rosPortInput}
+                onChange={(e) => setRosPortInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") applyRosEndpoint();
+                }}
+                placeholder="9090"
+              />
+            </div>
+            <button className="connection-button btn-connect" onClick={applyRosEndpoint}>
+              接続更新
+            </button>
+          </div>
 
-        <p className="connection-hint">現在の接続先: {rosUrl}</p>
-
-        <section className="status-row">
-          <span className="status-label">状態</span>
-          <span
-            className={`status-pill ${status === "接続OK"
-              ? "status-ok"
-              : status === "接続中..."
-                ? "status-pending"
-                : "status-bad"
-              }`}
-          >
-            {status}
-          </span>
+          <div className="connection-status-meta">
+            <span className="connection-compact-url">{rosUrl}</span>
+            <span
+              className={`status-pill ${status === "接続OK"
+                ? "status-ok"
+                : status === "接続中..."
+                  ? "status-pending"
+                  : "status-bad"
+                }`}
+            >
+              {status}
+            </span>
+          </div>
         </section>
 
         <section className="control-toggle-row">
