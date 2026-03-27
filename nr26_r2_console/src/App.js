@@ -31,6 +31,7 @@ function App() {
   const rosTopicTypeServiceRef = useRef(null);
   const topicEchoSubRef = useRef(null);
   const serialPeriodicTimerRef = useRef(null);
+  const serialBridgeLogBoxRef = useRef(null);
   const defaultRosHost = window.location.hostname || "localhost";
   const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
   const commandValueRef = useRef(0);
@@ -84,6 +85,9 @@ function App() {
   const [serialBridgePid, setSerialBridgePid] = useState("");
   const [serialBridgeInfo, setSerialBridgeInfo] = useState("未取得");
   const [serialBridgeLoading, setSerialBridgeLoading] = useState(false);
+  const [serialBridgeLogs, setSerialBridgeLogs] = useState([]);
+  const [serialBridgeLogLoading, setSerialBridgeLogLoading] = useState(false);
+  const [serialBridgeLogRealtimeEnabled, setSerialBridgeLogRealtimeEnabled] = useState(false);
 
   const backendBaseUrl = `${window.location.protocol}//${window.location.hostname}:3031`;
 
@@ -200,6 +204,23 @@ function App() {
     }
   };
 
+  const refreshSerialBridgeLogs = async () => {
+    setSerialBridgeLogLoading(true);
+    try {
+      const response = await fetch(`${backendBaseUrl}/api/serial-bridge/logs?lines=200`);
+      if (!response.ok) {
+        throw new Error(`status ${response.status}`);
+      }
+      const data = await response.json();
+      setSerialBridgeLogs(Array.isArray(data?.lines) ? data.lines : []);
+    } catch (error) {
+      console.error("Failed to fetch serial bridge logs:", error);
+      setSerialBridgeLogs(["ログ取得に失敗しました"]);
+    } finally {
+      setSerialBridgeLogLoading(false);
+    }
+  };
+
   const startSerialBridgeFromConsole = async () => {
     setSerialBridgeLoading(true);
     try {
@@ -215,6 +236,7 @@ function App() {
       setSerialBridgeInfo(data?.message || "serial_bridge を起動しました");
       await refreshSerialBridgeStatus();
       await refreshTopicList();
+      await refreshSerialBridgeLogs();
     } catch (error) {
       console.error("Failed to start serial bridge:", error);
       setSerialBridgeInfo("serial_bridge の起動に失敗しました");
@@ -222,6 +244,75 @@ function App() {
       setSerialBridgeLoading(false);
     }
   };
+
+  const stopSerialBridgeFromConsole = async () => {
+    setSerialBridgeLoading(true);
+    try {
+      const response = await fetch(`${backendBaseUrl}/api/serial-bridge/stop`, {
+        method: "POST",
+      });
+      if (!response.ok) {
+        throw new Error(`status ${response.status}`);
+      }
+      const data = await response.json();
+      setSerialBridgeRunning(Boolean(data?.running));
+      setSerialBridgeInfo(data?.message || "serial_bridge を停止しました");
+      await refreshSerialBridgeStatus();
+      await refreshTopicList();
+      await refreshSerialBridgeLogs();
+    } catch (error) {
+      console.error("Failed to stop serial bridge:", error);
+      setSerialBridgeInfo("serial_bridge の停止に失敗しました");
+    } finally {
+      setSerialBridgeLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!serialBridgeLogRealtimeEnabled || activePage !== "serial-bridge") {
+      return undefined;
+    }
+
+    const pollLogs = async () => {
+      setSerialBridgeLogLoading(true);
+      try {
+        const response = await fetch(`${backendBaseUrl}/api/serial-bridge/logs?lines=200`);
+        if (!response.ok) {
+          throw new Error(`status ${response.status}`);
+        }
+        const data = await response.json();
+        setSerialBridgeLogs(Array.isArray(data?.lines) ? data.lines : []);
+      } catch (error) {
+        console.error("Failed to fetch serial bridge logs:", error);
+        setSerialBridgeLogs(["ログ取得に失敗しました"]);
+      } finally {
+        setSerialBridgeLogLoading(false);
+      }
+    };
+
+    const timer = setInterval(() => {
+      pollLogs();
+    }, 1000);
+
+    pollLogs();
+
+    return () => {
+      clearInterval(timer);
+    };
+  }, [serialBridgeLogRealtimeEnabled, activePage, backendBaseUrl]);
+
+  useEffect(() => {
+    if (activePage !== "serial-bridge") {
+      return;
+    }
+
+    const logBox = serialBridgeLogBoxRef.current;
+    if (!logBox) {
+      return;
+    }
+
+    logBox.scrollTop = logBox.scrollHeight;
+  }, [serialBridgeLogs, serialBridgeLogLoading, activePage]);
 
   const startTopicEcho = async () => {
     const topicName = selectedEchoTopic.trim();
@@ -606,6 +697,7 @@ function App() {
       console.log("Connected to ROS:", rosUrl);
       refreshTopicList();
       refreshSerialBridgeStatus();
+      refreshSerialBridgeLogs();
     });
 
     rosRef.current.on("error", (error) => {
@@ -898,6 +990,7 @@ function App() {
               setActivePage("serial-bridge");
               refreshSerialBridgeStatus();
               refreshTopicList();
+              refreshSerialBridgeLogs();
             }}
           >
             Serial Bridge
@@ -1425,7 +1518,9 @@ function App() {
           <section className="serial-bridge-panel">
             <h2 className="serial-packet-title">Serial Bridge 管理</h2>
             <p className="serial-packet-hint">
-              検出ポート、トピック由来のDevice ID、実行状態を確認し、ここから serial_bridge を起動できます。
+              検出ポート、トピック由来のDevice ID、実行状態を確認し、ここから serial_bridge を手動起動できます。
+              <br />
+              serial_bridge はコンソール起動時には自動起動しません。
             </p>
 
             <div className="serial-bridge-toolbar">
@@ -1434,6 +1529,18 @@ function App() {
               </button>
               <button className="connection-button btn-send" onClick={startSerialBridgeFromConsole}>
                 serial_bridge 起動
+              </button>
+              <button className="connection-button btn-neutral" onClick={stopSerialBridgeFromConsole}>
+                serial_bridge 停止
+              </button>
+              <button className="connection-button btn-connect" onClick={refreshSerialBridgeLogs}>
+                ログ更新
+              </button>
+              <button
+                className={`serial-periodic-button ${serialBridgeLogRealtimeEnabled ? "serial-periodic-on" : ""}`}
+                onClick={() => setSerialBridgeLogRealtimeEnabled((prev) => !prev)}
+              >
+                {serialBridgeLogRealtimeEnabled ? "ログ自動更新: ON" : "ログ自動更新: OFF"}
               </button>
               <span className="connection-hint">{serialBridgeLoading ? "処理中..." : serialBridgeInfo}</span>
             </div>
@@ -1462,6 +1569,19 @@ function App() {
                   {serialBridgeIds.map((id) => (
                     <div className="serial-bridge-list-row" key={`id-${id}`}>ID: {id}</div>
                   ))}
+                </div>
+              </section>
+
+              <section className="serial-bridge-card serial-bridge-card-log">
+                <h3 className="serial-bridge-title">serial_bridge ログ (末尾200行)</h3>
+                <div className="serial-bridge-log-box" ref={serialBridgeLogBoxRef}>
+                  {serialBridgeLogLoading && <p className="connection-hint">ログ取得中...</p>}
+                  {!serialBridgeLogLoading && serialBridgeLogs.length === 0 && (
+                    <p className="connection-hint">ログはまだありません</p>
+                  )}
+                  {!serialBridgeLogLoading && serialBridgeLogs.length > 0 && (
+                    <pre className="serial-bridge-log-pre">{serialBridgeLogs.join("\n")}</pre>
+                  )}
                 </div>
               </section>
             </div>

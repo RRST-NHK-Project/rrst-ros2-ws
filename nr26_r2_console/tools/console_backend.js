@@ -113,6 +113,53 @@ const startSerialBridge = () => {
     };
 };
 
+const stopSerialBridge = () => {
+    const runningInfo = getRunningInfo();
+    if (!runningInfo.running || !Number.isInteger(runningInfo.pid)) {
+        return {
+            stopped: false,
+            running: false,
+            pid: null,
+            message: "serial_bridge は起動していません",
+        };
+    }
+
+    try {
+        process.kill(runningInfo.pid, "SIGTERM");
+        return {
+            stopped: true,
+            running: false,
+            pid: runningInfo.pid,
+            message: "serial_bridge を停止しました",
+        };
+    } catch (error) {
+        return {
+            stopped: false,
+            running: true,
+            pid: runningInfo.pid,
+            message: `serial_bridge の停止に失敗しました: ${error.message}`,
+        };
+    }
+};
+
+const readLogTail = (lineLimit = 200) => {
+    let fileText = "";
+    try {
+        fileText = fs.readFileSync(SERIAL_LOG_PATH, "utf8");
+    } catch (error) {
+        if (error && error.code === "ENOENT") {
+            return [];
+        }
+        throw error;
+    }
+
+    const lines = fileText.split(/\r?\n/);
+    if (lines.length > 0 && lines[lines.length - 1] === "") {
+        lines.pop();
+    }
+    return lines.slice(-lineLimit);
+};
+
 const server = http.createServer((req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -138,6 +185,35 @@ const server = http.createServer((req, res) => {
     if (req.method === "POST" && url.pathname === "/api/serial-bridge/start") {
         const startInfo = startSerialBridge();
         jsonResponse(res, 200, startInfo);
+        return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/serial-bridge/stop") {
+        const stopInfo = stopSerialBridge();
+        jsonResponse(res, 200, stopInfo);
+        return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/serial-bridge/logs") {
+        const rawLines = url.searchParams.get("lines");
+        const parsedLines = Number.parseInt(rawLines || "200", 10);
+        const lineLimit = Number.isFinite(parsedLines)
+            ? Math.max(10, Math.min(1000, parsedLines))
+            : 200;
+
+        try {
+            const lines = readLogTail(lineLimit);
+            jsonResponse(res, 200, {
+                logPath: SERIAL_LOG_PATH,
+                lines,
+                lineCount: lines.length,
+            });
+        } catch (error) {
+            jsonResponse(res, 500, {
+                message: "ログ取得に失敗しました",
+                error: String(error?.message || error),
+            });
+        }
         return;
     }
 

@@ -456,7 +456,7 @@
 .serial-bridge-grid {
   margin-top: 10px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -488,6 +488,30 @@
   font-size: 0.82rem;
   color: var(--text-main);
   background: #ffffff;
+}
+
+.serial-bridge-card-log {
+  grid-column: 1 / -1;
+}
+
+.serial-bridge-log-box {
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 8px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.serial-bridge-log-pre {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.35;
+  color: var(--text-main);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: "JetBrains Mono", "Consolas", monospace;
 }
 
 .topic-panel {
