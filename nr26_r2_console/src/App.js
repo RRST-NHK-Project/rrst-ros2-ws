@@ -60,9 +60,6 @@ function App() {
   const [targetXInput, setTargetXInput] = useState("0.0");
   const [targetYInput, setTargetYInput] = useState("0.0");
   const [targetYawInput, setTargetYawInput] = useState("0.0");
-  const [vxInput, setVxInput] = useState("0.0");
-  const [vyInput, setVyInput] = useState("0.0");
-  const [wzInput, setWzInput] = useState("0.0");
   const [autoDriveCmdInfo, setAutoDriveCmdInfo] = useState("未送信");
 
   const rosUrl = `${wsScheme}://${rosEndpoint.host}:${rosEndpoint.port}`;
@@ -189,20 +186,6 @@ function App() {
     setTargetYawInput(poseYaw.toFixed(3));
   };
 
-  const estimateVelocityFromError = () => {
-    const tx = parseFloatSafe(targetXInput);
-    const ty = parseFloatSafe(targetYInput);
-    const tyaw = parseFloatSafe(targetYawInput);
-
-    const estVx = Math.max(-1.5, Math.min(1.5, (tx - poseX) * 5.0));
-    const estVy = Math.max(-1.5, Math.min(1.5, (ty - poseY) * 5.0));
-    const estWz = Math.max(-3.14, Math.min(3.14, (tyaw - poseYaw) * 3.0));
-
-    setVxInput(estVx.toFixed(3));
-    setVyInput(estVy.toFixed(3));
-    setWzInput(estWz.toFixed(3));
-  };
-
   const publishAutoDriveCommand = () => {
     if (!autoDriveCmdRef.current) {
       setAutoDriveCmdInfo("ROS未接続のため送信できません");
@@ -212,15 +195,12 @@ function App() {
     const tx = parseFloatSafe(targetXInput);
     const ty = parseFloatSafe(targetYInput);
     const tyaw = parseFloatSafe(targetYawInput);
-    const vx = parseFloatSafe(vxInput);
-    const vy = parseFloatSafe(vyInput);
-    const wz = parseFloatSafe(wzInput);
 
     autoDriveCmdRef.current.publish({
-      data: [tx, ty, tyaw, vx, vy, wz],
+      data: [tx, ty, tyaw],
     });
 
-    setAutoDriveCmdInfo("r2_autodrive_cmd に送信しました");
+    setAutoDriveCmdInfo("r2_autodrive_cmd に目標座標を送信しました");
   };
 
   useEffect(() => {
@@ -797,9 +777,9 @@ function App() {
 
         {activePage === "pose" && (
           <section className="pose-panel">
-            <h2 className="serial-packet-title">座標・姿勢速度管理</h2>
+            <h2 className="serial-packet-title">座標・姿勢管理</h2>
             <p className="serial-packet-hint">
-              R2_AutoDrive を参考に、現在座標と目標値、速度指令を管理します。
+              現在座標と目標座標を管理します。
             </p>
 
             <div className="pose-current-grid">
@@ -830,24 +810,11 @@ function App() {
                 目標Yaw
                 <input className="connection-input" value={targetYawInput} onChange={(e) => setTargetYawInput(e.target.value)} />
               </label>
-              <label className="serial-packet-label">
-                vx
-                <input className="connection-input" value={vxInput} onChange={(e) => setVxInput(e.target.value)} />
-              </label>
-              <label className="serial-packet-label">
-                vy
-                <input className="connection-input" value={vyInput} onChange={(e) => setVyInput(e.target.value)} />
-              </label>
-              <label className="serial-packet-label">
-                wz
-                <input className="connection-input" value={wzInput} onChange={(e) => setWzInput(e.target.value)} />
-              </label>
             </div>
 
             <div className="pose-actions-row">
               <button className="connection-button" onClick={applyAutoDriveFromCurrentPose}>現在値を目標へ</button>
-              <button className="serial-periodic-button" onClick={estimateVelocityFromError}>誤差から速度推定</button>
-              <button className="connection-button serial-send-button" onClick={publishAutoDriveCommand}>姿勢速度を送信</button>
+              <button className="connection-button serial-send-button" onClick={publishAutoDriveCommand}>目標座標を送信</button>
             </div>
 
             <p className="connection-hint">{autoDriveCmdInfo}</p>
