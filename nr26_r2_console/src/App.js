@@ -38,6 +38,14 @@ const normalizeYawRad = (yawRad) => {
   return wrapped - Math.PI;
 };
 
+const normalizeAngleDeg = (deg) => {
+  if (!Number.isFinite(deg)) {
+    return 0;
+  }
+  const wrapped = ((deg + 180) % 360 + 360) % 360;
+  return wrapped - 180;
+};
+
 const chooseGridStep = (span) => {
   const candidates = [0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10];
   const target = Math.max(span / 6, 0.05);
@@ -63,6 +71,13 @@ function App() {
   const cameraSubRef = useRef(null);
   const serialPeriodicTimerRef = useRef(null);
   const serialBridgeLogBoxRef = useRef(null);
+  const poseGraphRef = useRef(null);
+  const poseGraphPointerActiveRef = useRef(false);
+  const waypointGraphRef = useRef(null);
+  const traceRecordTimerRef = useRef(null);
+  const traceReplayTimerRef = useRef(null);
+  const tracePoseRef = useRef({ x: 0, y: 0, yaw: 0 });
+  const traceLanguageRef = useRef("ja");
   const defaultRosHost = window.location.hostname || "localhost";
   const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
   const commandValueRef = useRef(0);
@@ -105,6 +120,23 @@ function App() {
   const [targetYawStep, setTargetYawStep] = useState("5");
   const [savedPose, setSavedPose] = useState(null);
   const [savedPosesList, setSavedPosesList] = useState([]);
+  const [waypoints, setWaypoints] = useState([]);
+  const [activeWaypointIndex, setActiveWaypointIndex] = useState(-1);
+  const [waypointAutoAdvanceEnabled, setWaypointAutoAdvanceEnabled] = useState(false);
+  const [waypointAutoPublishEnabled, setWaypointAutoPublishEnabled] = useState(true);
+  const [waypointDistanceThresholdInput, setWaypointDistanceThresholdInput] = useState("0.20");
+  const [waypointCheckYaw, setWaypointCheckYaw] = useState(false);
+  const [waypointYawThresholdInput, setWaypointYawThresholdInput] = useState("15");
+  const [waypointInfo, setWaypointInfo] = useState("未開始");
+  const [tracePoints, setTracePoints] = useState([]);
+  const [traceRecording, setTraceRecording] = useState(false);
+  const [traceReplayRunning, setTraceReplayRunning] = useState(false);
+  const [traceReplayIndex, setTraceReplayIndex] = useState(-1);
+  const [traceSampleMsInput, setTraceSampleMsInput] = useState("250");
+  const [traceReplayMsInput, setTraceReplayMsInput] = useState("600");
+  const [traceReplayLoop, setTraceReplayLoop] = useState(false);
+  const [traceReplayAutoPublish, setTraceReplayAutoPublish] = useState(true);
+  const [traceInfo, setTraceInfo] = useState("未開始");
   const [autoDriveCmdInfo, setAutoDriveCmdInfo] = useState("未送信");
   const [topicList, setTopicList] = useState([]);
   const [topicListLoading, setTopicListLoading] = useState(false);
@@ -599,6 +631,8 @@ function App() {
     setControllerEnabled(false);
     setSerialPeriodicEnabled(false);
     setSerialBridgeLogRealtimeEnabled(false);
+    setTraceRecording(false);
+    setTraceReplayRunning(false);
     setActivePage("shutdown");
     resetAllControls();
     stopTopicEcho();
@@ -712,6 +746,149 @@ function App() {
   const parseFloatSafe = (value, fallback = 0) => {
     const parsed = Number.parseFloat(value);
     return Number.isFinite(parsed) ? parsed : fallback;
+  };
+
+  const traceSampleMs = Math.max(50, Math.min(10000, Math.round(parseFloatSafe(traceSampleMsInput, 250))));
+  const traceReplayMs = Math.max(50, Math.min(10000, Math.round(parseFloatSafe(traceReplayMsInput, 600))));
+
+  const waypointDistanceThreshold = Math.max(0.01, parseFloatSafe(waypointDistanceThresholdInput, 0.2));
+  const waypointYawThreshold = Math.max(0.5, parseFloatSafe(waypointYawThresholdInput, 15));
+
+  const publishAutoDriveTarget = (x, y, yawRad) => {
+    if (!autoDriveCmdRef.current) {
+      return false;
+    }
+    autoDriveCmdRef.current.publish({
+      data: [x, y, yawRad],
+    });
+    return true;
+  };
+
+  const applyWaypointToTarget = (index, shouldPublish = waypointAutoPublishEnabled) => {
+    if (index < 0 || index >= waypoints.length) {
+      return false;
+    }
+    const waypoint = waypoints[index];
+    const yawRad = waypoint.yawDeg * Math.PI / 180;
+
+    setTargetXInput(waypoint.x.toFixed(3));
+    setTargetYInput(waypoint.y.toFixed(3));
+    setTargetYawInput(waypoint.yawDeg.toFixed(1));
+
+    if (shouldPublish) {
+      if (!operationArmed) {
+        setWaypointInfo(tr("操作ロック中のため目標送信はスキップしました", "Safety lock is ON, skipped publishing target"));
+      } else if (!publishAutoDriveTarget(waypoint.x, waypoint.y, yawRad)) {
+        setWaypointInfo(tr("ROS未接続のため目標送信できません", "Cannot publish target because ROS is not connected"));
+      }
+    }
+
+    return true;
+  };
+
+  const applyTracePointToTarget = (index, shouldPublish = traceReplayAutoPublish) => {
+    if (index < 0 || index >= tracePoints.length) {
+      return false;
+    }
+
+    const point = tracePoints[index];
+    const yawRad = point.yawDeg * Math.PI / 180;
+    setTargetXInput(point.x.toFixed(3));
+    setTargetYInput(point.y.toFixed(3));
+    setTargetYawInput(point.yawDeg.toFixed(1));
+
+    if (shouldPublish) {
+      if (!operationArmed) {
+        setTraceInfo(tr("操作ロック中のため目標送信はスキップしました", "Safety lock is ON, skipped publishing target"));
+      } else if (!publishAutoDriveTarget(point.x, point.y, yawRad)) {
+        setTraceInfo(tr("ROS未接続のため目標送信できません", "Cannot publish target because ROS is not connected"));
+      }
+    }
+
+    return true;
+  };
+
+  const appendCurrentPoseToTrace = () => {
+    const pose = tracePoseRef.current;
+    const yawDeg = normalizeAngleDeg(pose.yaw * 180 / Math.PI);
+    let addedLabel = "";
+    let addedX = pose.x;
+    let addedY = pose.y;
+
+    setTracePoints((prev) => {
+      const label = `T${prev.length + 1}`;
+      addedLabel = label;
+      const row = {
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        x: pose.x,
+        y: pose.y,
+        yawDeg,
+        label,
+        at: new Date().toLocaleTimeString(traceLanguageRef.current === "ja" ? "ja-JP" : "en-US"),
+      };
+      addedX = row.x;
+      addedY = row.y;
+      return [...prev, row];
+    });
+
+    setTraceInfo(
+      tr(
+        `記録: ${addedLabel} (X ${addedX.toFixed(3)}, Y ${addedY.toFixed(3)})`,
+        `Recorded: ${addedLabel} (X ${addedX.toFixed(3)}, Y ${addedY.toFixed(3)})`
+      )
+    );
+  };
+
+  const startTraceRecording = () => {
+    setTraceRecording(true);
+    setTraceInfo(tr(`記録開始 (${traceSampleMs} ms 間隔)`, `Recording started (${traceSampleMs} ms interval)`));
+  };
+
+  const stopTraceRecording = () => {
+    setTraceRecording(false);
+    setTraceInfo(tr("記録停止", "Recording stopped"));
+  };
+
+  const stopTraceReplay = () => {
+    setTraceReplayRunning(false);
+    setTraceReplayIndex(-1);
+    setTraceInfo(tr("再生停止", "Replay stopped"));
+  };
+
+  const clearTracePoints = () => {
+    setTracePoints([]);
+    setTraceRecording(false);
+    setTraceReplayRunning(false);
+    setTraceReplayIndex(-1);
+    setTraceInfo(tr("記録データを削除しました", "Trace data cleared"));
+  };
+
+  const removeTracePointById = (id) => {
+    setTracePoints((prev) => {
+      const removeIndex = prev.findIndex((point) => point.id === id);
+      if (removeIndex < 0) {
+        return prev;
+      }
+      const next = prev.filter((point) => point.id !== id);
+      if (next.length === 0) {
+        setTraceReplayRunning(false);
+        setTraceReplayIndex(-1);
+      } else if (traceReplayIndex >= next.length) {
+        setTraceReplayIndex(next.length - 1);
+      }
+      return next;
+    });
+  };
+
+  const startTraceReplay = () => {
+    if (tracePoints.length === 0) {
+      setTraceInfo(tr("再生する記録がありません", "No trace points to replay"));
+      return;
+    }
+    setTraceReplayRunning(true);
+    setTraceReplayIndex(0);
+    applyTracePointToTarget(0, traceReplayAutoPublish);
+    setTraceInfo(tr("再生開始", "Replay started"));
   };
 
   const updateSerialElementCount = (nextCountRaw) => {
@@ -931,6 +1108,7 @@ function App() {
   const graphPoints = [
     { x: poseX, y: poseY },
     { x: targetXValue, y: targetYValue },
+    ...waypoints.map((waypoint) => ({ x: waypoint.x, y: waypoint.y })),
   ];
 
   const graphMinXRaw = Math.min(...graphPoints.map((p) => p.x));
@@ -952,6 +1130,183 @@ function App() {
     graphPadding + ((x - graphMinX) / Math.max(graphMaxX - graphMinX, 1e-6)) * graphInnerWidth;
   const toGraphY = (y) =>
     graphHeight - graphPadding - ((y - graphMinY) / Math.max(graphMaxY - graphMinY, 1e-6)) * graphInnerHeight;
+
+  const mapClientPointToGraph = (svg, clientX, clientY) => {
+    if (!svg) {
+      return null;
+    }
+
+    const rect = svg.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      return null;
+    }
+
+    const normalizedX = (clientX - rect.left) / rect.width;
+    const normalizedY = (clientY - rect.top) / rect.height;
+    const viewX = Math.max(graphPadding, Math.min(graphWidth - graphPadding, normalizedX * graphWidth));
+    const viewY = Math.max(graphPadding, Math.min(graphHeight - graphPadding, normalizedY * graphHeight));
+
+    const x = graphMinX + ((viewX - graphPadding) / Math.max(graphInnerWidth, 1e-6)) * (graphMaxX - graphMinX);
+    const y = graphMinY + ((graphHeight - graphPadding - viewY) / Math.max(graphInnerHeight, 1e-6)) * (graphMaxY - graphMinY);
+
+    return { x, y };
+  };
+
+  const addWaypointFromGraphClientPoint = (clientX, clientY) => {
+    const graphPoint = mapClientPointToGraph(waypointGraphRef.current, clientX, clientY);
+    if (!graphPoint) {
+      return;
+    }
+
+    const yawDeg = parseFloatSafe(targetYawInput);
+    let appendedLabel = "";
+    let appendedX = graphPoint.x;
+    let appendedY = graphPoint.y;
+
+    setWaypoints((prev) => {
+      const nextLabel = `WP${prev.length + 1}`;
+      appendedLabel = nextLabel;
+      const newWaypoint = {
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        x: graphPoint.x,
+        y: graphPoint.y,
+        yawDeg: yawDeg,
+        label: nextLabel,
+      };
+      appendedX = newWaypoint.x;
+      appendedY = newWaypoint.y;
+      return [...prev, newWaypoint];
+    });
+
+    if (activeWaypointIndex < 0) {
+      setActiveWaypointIndex(0);
+    }
+    setWaypointInfo(
+      tr(
+        `ウェイポイントを追加: ${appendedLabel} (X ${appendedX.toFixed(3)}, Y ${appendedY.toFixed(3)})`,
+        `Waypoint added: ${appendedLabel} (X ${appendedX.toFixed(3)}, Y ${appendedY.toFixed(3)})`
+      )
+    );
+  };
+
+  const updateTargetFromGraphClientPoint = (clientX, clientY) => {
+    const graphPoint = mapClientPointToGraph(poseGraphRef.current, clientX, clientY);
+    if (!graphPoint) {
+      return;
+    }
+
+    setTargetXInput(graphPoint.x.toFixed(3));
+    setTargetYInput(graphPoint.y.toFixed(3));
+    setAutoDriveCmdInfo(
+      tr(
+        `グラフで目標値を設定: X ${graphPoint.x.toFixed(3)}, Y ${graphPoint.y.toFixed(3)}`,
+        `Target set from graph: X ${graphPoint.x.toFixed(3)}, Y ${graphPoint.y.toFixed(3)}`
+      )
+    );
+  };
+
+  const startWaypointNavigation = () => {
+    if (waypoints.length === 0) {
+      setWaypointInfo(tr("ウェイポイントが未登録です", "No waypoints are registered"));
+      return;
+    }
+
+    const startIndex = activeWaypointIndex >= 0 && activeWaypointIndex < waypoints.length
+      ? activeWaypointIndex
+      : 0;
+    setActiveWaypointIndex(startIndex);
+    setWaypointAutoAdvanceEnabled(true);
+    applyWaypointToTarget(startIndex, waypointAutoPublishEnabled);
+    setWaypointInfo(
+      tr(
+        `追従開始: ${waypoints[startIndex].label}`,
+        `Waypoint navigation started: ${waypoints[startIndex].label}`
+      )
+    );
+  };
+
+  const stopWaypointNavigation = () => {
+    setWaypointAutoAdvanceEnabled(false);
+    setWaypointInfo(tr("ウェイポイント追従を停止しました", "Waypoint navigation stopped"));
+  };
+
+  const clearWaypoints = () => {
+    setWaypoints([]);
+    setActiveWaypointIndex(-1);
+    setWaypointAutoAdvanceEnabled(false);
+    setWaypointInfo(tr("ウェイポイントをクリアしました", "Waypoints cleared"));
+  };
+
+  const removeWaypointById = (id) => {
+    setWaypoints((prev) => {
+      const removeIndex = prev.findIndex((waypoint) => waypoint.id === id);
+      if (removeIndex < 0) {
+        return prev;
+      }
+
+      const next = prev.filter((waypoint) => waypoint.id !== id);
+      setActiveWaypointIndex((current) => {
+        if (next.length === 0) {
+          setWaypointAutoAdvanceEnabled(false);
+          return -1;
+        }
+        if (current === removeIndex) {
+          return Math.min(removeIndex, next.length - 1);
+        }
+        if (current > removeIndex) {
+          return current - 1;
+        }
+        return current;
+      });
+      return next;
+    });
+  };
+
+  const setWaypointAsActive = (index, publishNow = false) => {
+    if (index < 0 || index >= waypoints.length) {
+      return;
+    }
+    setActiveWaypointIndex(index);
+    applyWaypointToTarget(index, publishNow);
+    setWaypointInfo(
+      tr(
+        `アクティブウェイポイント: ${waypoints[index].label}`,
+        `Active waypoint: ${waypoints[index].label}`
+      )
+    );
+  };
+
+  const handlePoseGraphPointerDown = (event) => {
+    if (event.pointerType === "mouse" && event.button !== 0) {
+      return;
+    }
+    poseGraphPointerActiveRef.current = true;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    updateTargetFromGraphClientPoint(event.clientX, event.clientY);
+  };
+
+  const handlePoseGraphPointerMove = (event) => {
+    if (!poseGraphPointerActiveRef.current) {
+      return;
+    }
+    updateTargetFromGraphClientPoint(event.clientX, event.clientY);
+  };
+
+  const releasePoseGraphPointer = () => {
+    poseGraphPointerActiveRef.current = false;
+  };
+
+  const handleWaypointGraphPointerDown = (event) => {
+    if (event.pointerType === "mouse" && event.button !== 0) {
+      return;
+    }
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    addWaypointFromGraphClientPoint(event.clientX, event.clientY);
+  };
+
+  const waypointPolylinePoints = waypoints
+    .map((waypoint) => `${toGraphX(waypoint.x)},${toGraphY(waypoint.y)}`)
+    .join(" ");
 
   const currentX = toGraphX(poseX);
   const currentY = toGraphY(poseY);
@@ -984,11 +1339,134 @@ function App() {
   }
 
   useEffect(() => {
+    tracePoseRef.current = { x: poseX, y: poseY, yaw: poseYaw };
+  }, [poseX, poseY, poseYaw]);
+
+  useEffect(() => {
+    traceLanguageRef.current = language;
+  }, [language]);
+
+  useEffect(() => {
     if (!operationArmed && serialPeriodicEnabled) {
       setSerialPeriodicEnabled(false);
       setSerialPublishInfo("操作許可がOFFのため定期送信を停止しました");
     }
   }, [operationArmed, serialPeriodicEnabled]);
+
+  useEffect(() => {
+    if (!waypointAutoAdvanceEnabled) {
+      return;
+    }
+
+    if (activeWaypointIndex < 0 || activeWaypointIndex >= waypoints.length) {
+      return;
+    }
+
+    const activeWaypoint = waypoints[activeWaypointIndex];
+    const distanceError = Math.hypot(activeWaypoint.x - poseX, activeWaypoint.y - poseY);
+    const yawErrorDeg = Math.abs(normalizeAngleDeg(activeWaypoint.yawDeg - (poseYaw * 180 / Math.PI)));
+
+    const distanceReached = distanceError <= waypointDistanceThreshold;
+    const yawReached = !waypointCheckYaw || yawErrorDeg <= waypointYawThreshold;
+    if (!distanceReached || !yawReached) {
+      return;
+    }
+
+    if (activeWaypointIndex + 1 >= waypoints.length) {
+      setWaypointAutoAdvanceEnabled(false);
+      setWaypointInfo(
+        tr(
+          `最終ウェイポイント ${activeWaypoint.label} に到達しました`,
+          `Reached final waypoint ${activeWaypoint.label}`
+        )
+      );
+      return;
+    }
+
+    const nextIndex = activeWaypointIndex + 1;
+    setActiveWaypointIndex(nextIndex);
+    applyWaypointToTarget(nextIndex, waypointAutoPublishEnabled);
+    setWaypointInfo(
+      tr(
+        `${activeWaypoint.label} に到達。次の ${waypoints[nextIndex].label} へ切替`,
+        `${activeWaypoint.label} reached. Switched to ${waypoints[nextIndex].label}`
+      )
+    );
+  }, [
+    waypointAutoAdvanceEnabled,
+    activeWaypointIndex,
+    waypoints,
+    poseX,
+    poseY,
+    poseYaw,
+    waypointDistanceThreshold,
+    waypointCheckYaw,
+    waypointYawThreshold,
+    waypointAutoPublishEnabled,
+  ]);
+
+  useEffect(() => {
+    if (traceRecordTimerRef.current) {
+      clearInterval(traceRecordTimerRef.current);
+      traceRecordTimerRef.current = null;
+    }
+
+    if (!traceRecording) {
+      return;
+    }
+
+    appendCurrentPoseToTrace();
+    traceRecordTimerRef.current = setInterval(() => {
+      appendCurrentPoseToTrace();
+    }, traceSampleMs);
+
+    return () => {
+      if (traceRecordTimerRef.current) {
+        clearInterval(traceRecordTimerRef.current);
+        traceRecordTimerRef.current = null;
+      }
+    };
+  }, [traceRecording, traceSampleMs]);
+
+  useEffect(() => {
+    if (traceReplayTimerRef.current) {
+      clearInterval(traceReplayTimerRef.current);
+      traceReplayTimerRef.current = null;
+    }
+
+    if (!traceReplayRunning || tracePoints.length === 0) {
+      return;
+    }
+
+    traceReplayTimerRef.current = setInterval(() => {
+      setTraceReplayIndex((prev) => {
+        const currentIndex = prev < 0 ? 0 : prev;
+        const nextIndex = currentIndex + 1;
+
+        if (nextIndex >= tracePoints.length) {
+          if (traceReplayLoop) {
+            applyTracePointToTarget(0, traceReplayAutoPublish);
+            setTraceInfo(tr("再生ループ: 先頭に戻りました", "Replay loop: back to start"));
+            return 0;
+          }
+
+          setTraceReplayRunning(false);
+          setTraceInfo(tr("再生完了", "Replay completed"));
+          return tracePoints.length - 1;
+        }
+
+        applyTracePointToTarget(nextIndex, traceReplayAutoPublish);
+        return nextIndex;
+      });
+    }, traceReplayMs);
+
+    return () => {
+      if (traceReplayTimerRef.current) {
+        clearInterval(traceReplayTimerRef.current);
+        traceReplayTimerRef.current = null;
+      }
+    };
+  }, [traceReplayRunning, traceReplayMs, tracePoints, traceReplayLoop, traceReplayAutoPublish]);
 
   useEffect(() => {
     if (serialPeriodicTimerRef.current) {
@@ -1475,6 +1953,18 @@ function App() {
             {tr("座標・姿勢管理", "Pose")}
           </button>
           <button
+            className={`page-switch-button ${activePage === "waypoint" ? "page-switch-active" : ""}`}
+            onClick={() => setActivePage("waypoint")}
+          >
+            {tr("ウェイポイント", "Waypoints")}
+          </button>
+          <button
+            className={`page-switch-button ${activePage === "teaching" ? "page-switch-active" : ""}`}
+            onClick={() => setActivePage("teaching")}
+          >
+            {tr("ティーチング", "Teaching")}
+          </button>
+          <button
             className={`page-switch-button ${activePage === "actuator" ? "page-switch-active" : ""}`}
             onClick={() => setActivePage("actuator")}
           >
@@ -1708,9 +2198,15 @@ function App() {
                 </div>
                 <svg
                   className="pose-graph"
+                  ref={poseGraphRef}
                   viewBox={`0 0 ${graphWidth} ${graphHeight}`}
                   role="img"
                   aria-label={tr("現在位置と目標位置のグラフ", "Graph of current and target pose")}
+                  onPointerDown={handlePoseGraphPointerDown}
+                  onPointerMove={handlePoseGraphPointerMove}
+                  onPointerUp={releasePoseGraphPointer}
+                  onPointerCancel={releasePoseGraphPointer}
+                  onLostPointerCapture={releasePoseGraphPointer}
                 >
                   <rect
                     x={graphPadding}
@@ -1795,6 +2291,9 @@ function App() {
                     {tr("目標位置 / 姿勢", "Target position / yaw")}
                   </span>
                 </div>
+                <p className="pose-graph-interaction-hint">
+                  {tr("グラフをクリック/ドラッグして目標座標を直接プロットできます。", "Click or drag on the graph to plot the target directly.")}
+                </p>
               </section>
 
               <div className="pose-current-grid">
@@ -1936,6 +2435,348 @@ function App() {
                 </div>
               </div>
             )}
+          </section>
+        )}
+
+        {activePage === "waypoint" && (
+          <section className="waypoint-panel">
+            <h2 className="serial-packet-title">{tr("ウェイポイント指定", "Waypoint Planner")}</h2>
+            <p className="serial-packet-hint">
+              {tr(
+                "グラフをクリックしてウェイポイントを追加します。到達判定しきい値を満たすと、次のウェイポイントへ自動で目標値を切り替えます。",
+                "Click the graph to add waypoints. When reach thresholds are satisfied, target values switch to the next waypoint automatically."
+              )}
+            </p>
+
+            <div className="waypoint-toolbar">
+              <button className="connection-button btn-connect" onClick={startWaypointNavigation}>
+                {tr("追従開始", "Start")}
+              </button>
+              <button className="connection-button btn-neutral" onClick={stopWaypointNavigation}>
+                {tr("追従停止", "Stop")}
+              </button>
+              <button className="serial-clear-button" onClick={clearWaypoints}>
+                {tr("全削除", "Clear All")}
+              </button>
+              <button
+                className={`toggle-button ${waypointAutoAdvanceEnabled ? "toggle-on" : "toggle-off"}`}
+                onClick={() => setWaypointAutoAdvanceEnabled((prev) => !prev)}
+              >
+                {waypointAutoAdvanceEnabled ? tr("自動切替: ON", "Auto Advance: ON") : tr("自動切替: OFF", "Auto Advance: OFF")}
+              </button>
+              <button
+                className={`toggle-button ${waypointAutoPublishEnabled ? "toggle-on" : "toggle-off"}`}
+                onClick={() => setWaypointAutoPublishEnabled((prev) => !prev)}
+              >
+                {waypointAutoPublishEnabled ? tr("切替時送信: ON", "Publish on Switch: ON") : tr("切替時送信: OFF", "Publish on Switch: OFF")}
+              </button>
+            </div>
+
+            <div className="waypoint-settings-grid">
+              <label className="serial-packet-label">
+                {tr("到達距離しきい値 [m]", "Distance Threshold [m]")}
+                <input
+                  className="connection-input"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={waypointDistanceThresholdInput}
+                  onChange={(e) => setWaypointDistanceThresholdInput(e.target.value)}
+                />
+              </label>
+
+              <button
+                className={`toggle-button ${waypointCheckYaw ? "toggle-on" : "toggle-off"}`}
+                onClick={() => setWaypointCheckYaw((prev) => !prev)}
+              >
+                {waypointCheckYaw ? tr("Yaw判定: ON", "Yaw Check: ON") : tr("Yaw判定: OFF", "Yaw Check: OFF")}
+              </button>
+
+              <label className="serial-packet-label">
+                {tr("Yawしきい値 [deg]", "Yaw Threshold [deg]")}
+                <input
+                  className="connection-input"
+                  type="number"
+                  step="0.5"
+                  min="0.5"
+                  value={waypointYawThresholdInput}
+                  onChange={(e) => setWaypointYawThresholdInput(e.target.value)}
+                  disabled={!waypointCheckYaw}
+                />
+              </label>
+            </div>
+
+            <div className="waypoint-overview-grid">
+              <section className="pose-graph-card">
+                <div className="pose-graph-title-row">
+                  <h3 className="pose-graph-title">{tr("ウェイポイントグラフ", "Waypoint Graph")}</h3>
+                  <span className="pose-graph-scale">{tr("単位: m", "Unit: m")}</span>
+                </div>
+
+                <svg
+                  className="pose-graph waypoint-graph"
+                  ref={waypointGraphRef}
+                  viewBox={`0 0 ${graphWidth} ${graphHeight}`}
+                  role="img"
+                  aria-label={tr("ウェイポイント指定グラフ", "Waypoint plot graph")}
+                  onPointerDown={handleWaypointGraphPointerDown}
+                >
+                  <rect
+                    x={graphPadding}
+                    y={graphPadding}
+                    width={graphInnerWidth}
+                    height={graphInnerHeight}
+                    className="pose-graph-frame"
+                  />
+
+                  {gridXValues.map((value) => (
+                    <line
+                      key={`wp-grid-x-${value}`}
+                      x1={toGraphX(value)}
+                      y1={graphPadding}
+                      x2={toGraphX(value)}
+                      y2={graphHeight - graphPadding}
+                      className="pose-graph-grid"
+                    />
+                  ))}
+                  {gridYValues.map((value) => (
+                    <line
+                      key={`wp-grid-y-${value}`}
+                      x1={graphPadding}
+                      y1={toGraphY(value)}
+                      x2={graphWidth - graphPadding}
+                      y2={toGraphY(value)}
+                      className="pose-graph-grid"
+                    />
+                  ))}
+
+                  {axisXVisible && (
+                    <line
+                      x1={graphPadding}
+                      y1={toGraphY(0)}
+                      x2={graphWidth - graphPadding}
+                      y2={toGraphY(0)}
+                      className="pose-graph-axis"
+                    />
+                  )}
+                  {axisYVisible && (
+                    <line
+                      x1={toGraphX(0)}
+                      y1={graphPadding}
+                      x2={toGraphX(0)}
+                      y2={graphHeight - graphPadding}
+                      className="pose-graph-axis"
+                    />
+                  )}
+
+                  {waypointPolylinePoints && (
+                    <polyline points={waypointPolylinePoints} className="waypoint-path-line" />
+                  )}
+
+                  <circle cx={currentX} cy={currentY} r="6" className="pose-graph-point-current" />
+
+                  {waypoints.map((waypoint, index) => (
+                    <g key={waypoint.id}>
+                      <circle
+                        cx={toGraphX(waypoint.x)}
+                        cy={toGraphY(waypoint.y)}
+                        r={index === activeWaypointIndex ? "6" : "5"}
+                        className={index === activeWaypointIndex ? "waypoint-point-active" : "waypoint-point"}
+                      />
+                      <text
+                        x={toGraphX(waypoint.x) + 7}
+                        y={toGraphY(waypoint.y) - 8}
+                        className="waypoint-point-label"
+                      >
+                        {index + 1}
+                      </text>
+                    </g>
+                  ))}
+                </svg>
+
+                <p className="pose-graph-interaction-hint">
+                  {tr(
+                    "左クリックでウェイポイント追加。現在のTarget Yaw値が各ウェイポイントのYawとして保存されます。",
+                    "Left click to add a waypoint. The current Target Yaw value is stored for each waypoint."
+                  )}
+                </p>
+              </section>
+
+              <section className="waypoint-list-card">
+                <div className="waypoint-summary-row">
+                  <span>{tr("登録数", "Count")}: {waypoints.length}</span>
+                  <span>{tr("アクティブ", "Active")}: {activeWaypointIndex >= 0 ? activeWaypointIndex + 1 : "-"}</span>
+                </div>
+
+                <div className="waypoint-list-box">
+                  {waypoints.length === 0 && (
+                    <p className="connection-hint">{tr("ウェイポイント未登録", "No waypoints")}</p>
+                  )}
+
+                  {waypoints.map((waypoint, index) => (
+                    <div
+                      key={waypoint.id}
+                      className={`waypoint-row ${index === activeWaypointIndex ? "waypoint-row-active" : ""}`}
+                    >
+                      <div className="waypoint-row-text">
+                        <strong>{waypoint.label}</strong>
+                        <span>
+                          X: {waypoint.x.toFixed(3)}, Y: {waypoint.y.toFixed(3)}, Yaw: {waypoint.yawDeg.toFixed(1)}
+                        </span>
+                      </div>
+                      <div className="waypoint-row-actions">
+                        <button
+                          className="connection-button btn-send waypoint-row-button"
+                          onClick={() => setWaypointAsActive(index, true)}
+                          disabled={!operationArmed}
+                        >
+                          {tr("適用&送信", "Apply & Send")}
+                        </button>
+                        <button
+                          className="connection-button btn-neutral waypoint-row-button"
+                          onClick={() => setWaypointAsActive(index, false)}
+                        >
+                          {tr("適用", "Apply")}
+                        </button>
+                        <button
+                          className="serial-clear-button waypoint-row-button"
+                          onClick={() => removeWaypointById(waypoint.id)}
+                        >
+                          {tr("削除", "Delete")}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </div>
+
+            <p className="connection-hint">{translateRuntimeText(waypointInfo)}</p>
+          </section>
+        )}
+
+        {activePage === "teaching" && (
+          <section className="teaching-panel">
+            <h2 className="serial-packet-title">{tr("ティーチング / トレース再生", "Teaching / Trace Replay")}</h2>
+            <p className="serial-packet-hint">
+              {tr(
+                "手動操作で機体を動かしながら現在姿勢を記録し、あとで同じ順序で目標値として再生します。",
+                "Record current poses while manually driving, then replay them as sequential target values."
+              )}
+            </p>
+
+            <div className="teaching-toolbar">
+              <button className="connection-button btn-connect" onClick={startTraceRecording} disabled={traceRecording}>
+                {tr("記録開始", "Start Rec")}
+              </button>
+              <button className="connection-button btn-neutral" onClick={stopTraceRecording} disabled={!traceRecording}>
+                {tr("記録停止", "Stop Rec")}
+              </button>
+              <button className="connection-button btn-send" onClick={appendCurrentPoseToTrace}>
+                {tr("現在姿勢を1点記録", "Record Current Pose")}
+              </button>
+              <button className="connection-button btn-connect" onClick={startTraceReplay} disabled={traceReplayRunning || tracePoints.length === 0}>
+                {tr("再生開始", "Start Replay")}
+              </button>
+              <button className="connection-button btn-neutral" onClick={stopTraceReplay} disabled={!traceReplayRunning}>
+                {tr("再生停止", "Stop Replay")}
+              </button>
+              <button className="serial-clear-button" onClick={clearTracePoints}>
+                {tr("記録全削除", "Clear All")}
+              </button>
+            </div>
+
+            <div className="teaching-settings-grid">
+              <label className="serial-packet-label">
+                {tr("記録周期 [ms]", "Record Interval [ms]")}
+                <input
+                  className="connection-input"
+                  type="number"
+                  min="50"
+                  max="10000"
+                  step="10"
+                  value={traceSampleMsInput}
+                  onChange={(e) => setTraceSampleMsInput(e.target.value)}
+                />
+              </label>
+
+              <label className="serial-packet-label">
+                {tr("再生周期 [ms]", "Replay Interval [ms]")}
+                <input
+                  className="connection-input"
+                  type="number"
+                  min="50"
+                  max="10000"
+                  step="10"
+                  value={traceReplayMsInput}
+                  onChange={(e) => setTraceReplayMsInput(e.target.value)}
+                />
+              </label>
+
+              <button
+                className={`toggle-button ${traceReplayLoop ? "toggle-on" : "toggle-off"}`}
+                onClick={() => setTraceReplayLoop((prev) => !prev)}
+              >
+                {traceReplayLoop ? tr("再生ループ: ON", "Replay Loop: ON") : tr("再生ループ: OFF", "Replay Loop: OFF")}
+              </button>
+
+              <button
+                className={`toggle-button ${traceReplayAutoPublish ? "toggle-on" : "toggle-off"}`}
+                onClick={() => setTraceReplayAutoPublish((prev) => !prev)}
+              >
+                {traceReplayAutoPublish ? tr("再生時送信: ON", "Publish on Replay: ON") : tr("再生時送信: OFF", "Publish on Replay: OFF")}
+              </button>
+            </div>
+
+            <div className="teaching-status-row">
+              <span>{tr("記録", "Recording")}: {traceRecording ? "ON" : "OFF"}</span>
+              <span>{tr("再生", "Replay")}: {traceReplayRunning ? "ON" : "OFF"}</span>
+              <span>{tr("点数", "Points")}: {tracePoints.length}</span>
+              <span>{tr("再生インデックス", "Replay Index")}: {traceReplayIndex >= 0 ? traceReplayIndex + 1 : "-"}</span>
+            </div>
+
+            <div className="teaching-list-box">
+              {tracePoints.length === 0 && (
+                <p className="connection-hint">{tr("記録データはまだありません", "No trace points recorded yet")}</p>
+              )}
+
+              {tracePoints.map((point, index) => (
+                <div
+                  key={point.id}
+                  className={`teaching-row ${index === traceReplayIndex ? "teaching-row-active" : ""}`}
+                >
+                  <div className="teaching-row-text">
+                    <strong>{point.label}</strong>
+                    <span>
+                      X: {point.x.toFixed(3)}, Y: {point.y.toFixed(3)}, Yaw: {point.yawDeg.toFixed(1)} ({point.at})
+                    </span>
+                  </div>
+                  <div className="teaching-row-actions">
+                    <button
+                      className="connection-button btn-neutral teaching-row-button"
+                      onClick={() => applyTracePointToTarget(index, false)}
+                    >
+                      {tr("適用", "Apply")}
+                    </button>
+                    <button
+                      className="connection-button btn-send teaching-row-button"
+                      onClick={() => applyTracePointToTarget(index, true)}
+                      disabled={!operationArmed}
+                    >
+                      {tr("適用&送信", "Apply & Send")}
+                    </button>
+                    <button
+                      className="serial-clear-button teaching-row-button"
+                      onClick={() => removeTracePointById(point.id)}
+                    >
+                      {tr("削除", "Delete")}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <p className="connection-hint">{translateRuntimeText(traceInfo)}</p>
           </section>
         )}
 

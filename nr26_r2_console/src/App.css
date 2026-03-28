@@ -537,7 +537,7 @@
 .page-switch-row {
   margin-top: 10px;
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(11, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -836,6 +836,7 @@
 
   .pose-current-grid,
   .pose-overview-grid,
+  .waypoint-overview-grid,
   .pose-input-grid,
   .pose-actions-row,
   .pose-step-grid,
@@ -854,6 +855,13 @@
   .pose-graph-title-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .waypoint-settings-grid,
+  .waypoint-row-actions,
+  .teaching-settings-grid,
+  .teaching-row-actions {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -893,6 +901,213 @@
   border-radius: 12px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.72);
+}
+
+.waypoint-panel {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.waypoint-toolbar {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.waypoint-settings-grid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+
+.waypoint-overview-grid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: minmax(280px, 420px) minmax(240px, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.waypoint-graph {
+  cursor: copy;
+}
+
+.waypoint-path-line {
+  fill: none;
+  stroke: #ef6c00;
+  stroke-width: 2.5;
+  stroke-dasharray: 7 5;
+}
+
+.waypoint-point {
+  fill: #ef6c00;
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+.waypoint-point-active {
+  fill: #c62828;
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+.waypoint-point-label {
+  fill: var(--text-main);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.waypoint-list-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.waypoint-summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--text-sub);
+}
+
+.waypoint-list-box {
+  margin-top: 10px;
+  max-height: 420px;
+  overflow-y: auto;
+  display: grid;
+  gap: 8px;
+}
+
+.waypoint-row {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 8px;
+}
+
+.waypoint-row-active {
+  border-color: #ef6c00;
+  box-shadow: 0 0 0 2px rgba(239, 108, 0, 0.18);
+}
+
+.waypoint-row-text {
+  display: grid;
+  gap: 2px;
+}
+
+.waypoint-row-text strong {
+  color: var(--text-main);
+  font-size: 0.85rem;
+}
+
+.waypoint-row-text span {
+  color: var(--text-sub);
+  font-size: 0.76rem;
+  font-family: "JetBrains Mono", "Consolas", monospace;
+}
+
+.waypoint-row-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.waypoint-row-button {
+  min-height: 36px;
+  font-size: 0.78rem;
+  padding: 6px 8px;
+}
+
+.teaching-panel {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.teaching-toolbar {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.teaching-settings-grid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+
+.teaching-status-row {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--text-sub);
+  font-size: 0.82rem;
+}
+
+.teaching-list-box {
+  margin-top: 10px;
+  max-height: 420px;
+  overflow-y: auto;
+  display: grid;
+  gap: 8px;
+}
+
+.teaching-row {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 8px;
+}
+
+.teaching-row-active {
+  border-color: #1565c0;
+  box-shadow: 0 0 0 2px rgba(21, 101, 192, 0.16);
+}
+
+.teaching-row-text {
+  display: grid;
+  gap: 2px;
+}
+
+.teaching-row-text strong {
+  color: var(--text-main);
+  font-size: 0.85rem;
+}
+
+.teaching-row-text span {
+  color: var(--text-sub);
+  font-size: 0.76rem;
+  font-family: "JetBrains Mono", "Consolas", monospace;
+}
+
+.teaching-row-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.teaching-row-button {
+  min-height: 36px;
+  font-size: 0.78rem;
+  padding: 6px 8px;
 }
 
 .pose-overview-grid {
@@ -942,6 +1157,8 @@
   max-width: 360px;
   border-radius: 8px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 247, 247, 0.96));
+  cursor: crosshair;
+  touch-action: none;
 }
 
 .pose-graph-frame {
@@ -1006,6 +1223,12 @@
   display: flex;
   gap: 14px;
   flex-wrap: wrap;
+}
+
+.pose-graph-interaction-hint {
+  margin: 8px 0 0;
+  color: var(--text-sub);
+  font-size: 0.78rem;
 }
 
 .pose-legend-item {
