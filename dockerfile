@@ -12,10 +12,10 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     python3-rosdep \
     figlet && \
-    rm -rf /var/lib/apt/lists/* && \
     (rosdep init || true) && \
     rosdep update --rosdistro jazzy && \
-    rosdep install --from-paths src --ignore-src -y
+    rosdep install --from-paths src --ignore-src -y && \
+    rm -rf /var/lib/apt/lists/*
 
 # ビルド（事前ビルド）
 RUN . /opt/ros/jazzy/setup.sh && \
