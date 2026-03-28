@@ -54,6 +54,7 @@ function App() {
   const commandRef = useRef(null);
   const joyRef = useRef(null);
   const odomRef = useRef(null);
+  const driveModeRef = useRef(null);
   const autoDriveCmdRef = useRef(null);
   const odomResetCmdRef = useRef(null);
   const rosTopicsServiceRef = useRef(null);
@@ -94,6 +95,7 @@ function App() {
   const [poseX, setPoseX] = useState(0);
   const [poseY, setPoseY] = useState(0);
   const [poseYaw, setPoseYaw] = useState(0);
+  const [driveMode, setDriveMode] = useState("MANUAL");
   const [targetXInput, setTargetXInput] = useState("0.0");
   const [targetYInput, setTargetYInput] = useState("0.0");
   const [targetYawInput, setTargetYawInput] = useState("0.0");
@@ -976,6 +978,18 @@ function App() {
       setPoseYaw(Number(msg.data[2]) || 0);
     });
 
+    driveModeRef.current = new ROSLIB.Topic({
+      ros: rosRef.current,
+      name: "r2_drive_mode",
+      messageType: "std_msgs/msg/String",
+    });
+    driveModeRef.current.subscribe((msg) => {
+      const nextMode = (msg?.data || "").toUpperCase();
+      if (nextMode === "AUTO" || nextMode === "MANUAL") {
+        setDriveMode(nextMode);
+      }
+    });
+
     autoDriveCmdRef.current = new ROSLIB.Topic({
       ros: rosRef.current,
       name: "r2_autodrive_cmd",
@@ -1033,6 +1047,13 @@ function App() {
           odomRef.current.unsubscribe?.();
         } catch (error) {
           console.warn("Error unsubscribing odom topic:", error);
+        }
+      }
+      if (driveModeRef.current) {
+        try {
+          driveModeRef.current.unsubscribe?.();
+        } catch (error) {
+          console.warn("Error unsubscribing drive mode topic:", error);
         }
       }
       stopTopicEcho();
@@ -1585,6 +1606,10 @@ function App() {
                 <div className="pose-current-item">
                   <span>{tr("現在Yaw (°)", "Current Yaw (°)")}</span>
                   <strong>{(poseYaw * 180 / Math.PI).toFixed(1)}</strong>
+                </div>
+                <div className="pose-current-item">
+                  <span>{tr("現在モード", "Current Mode")}</span>
+                  <strong>{driveMode}</strong>
                 </div>
               </div>
             </div>
