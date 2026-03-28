@@ -60,6 +60,7 @@ function App() {
   const rosTopicsServiceRef = useRef(null);
   const rosTopicTypeServiceRef = useRef(null);
   const topicEchoSubRef = useRef(null);
+  const cameraSubRef = useRef(null);
   const serialPeriodicTimerRef = useRef(null);
   const serialBridgeLogBoxRef = useRef(null);
   const defaultRosHost = window.location.hostname || "localhost";
@@ -113,6 +114,17 @@ function App() {
   const [topicEchoInfo, setTopicEchoInfo] = useState("未開始");
   const [topicEchoMessages, setTopicEchoMessages] = useState([]);
   const [topicEchoRunning, setTopicEchoRunning] = useState(false);
+  const [cameraTopicInput, setCameraTopicInput] = useState("/camera/camera/depth/image_rect_raw");
+  const [cameraTopicName, setCameraTopicName] = useState("/camera/camera/depth/image_rect_raw");
+  const [cameraStreamRunning, setCameraStreamRunning] = useState(false);
+  const [cameraStreamInfo, setCameraStreamInfo] = useState("未開始");
+  const [cameraFrameUrl, setCameraFrameUrl] = useState("");
+  const [cameraFrameMeta, setCameraFrameMeta] = useState({
+    width: 0,
+    height: 0,
+    encoding: "",
+    fps: 0,
+  });
   const [serialBridgePorts, setSerialBridgePorts] = useState([]);
   const [serialBridgeIds, setSerialBridgeIds] = useState([]);
   const [serialBridgeRunning, setSerialBridgeRunning] = useState(false);
@@ -197,6 +209,190 @@ function App() {
     }
 
     setTopicEchoRunning(false);
+  };
+
+  const stopCameraStream = () => {
+    if (cameraSubRef.current) {
+      try {
+        cameraSubRef.current.unsubscribe?.();
+      } catch (error) {
+        console.warn("Error unsubscribing camera topic:", error);
+      }
+      cameraSubRef.current = null;
+    }
+    setCameraStreamRunning(false);
+  };
+
+  const decodeRosUint8Array = (dataField) => {
+    if (Array.isArray(dataField)) {
+      return Uint8Array.from(dataField.map((v) => Number(v) & 0xff));
+    }
+    if (typeof dataField === "string") {
+      try {
+        const bin = atob(dataField);
+        const out = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i += 1) {
+          out[i] = bin.charCodeAt(i);
+        }
+        return out;
+      } catch (error) {
+        console.warn("Failed to decode base64 image data:", error);
+      }
+    }
+    return null;
+  };
+
+  const toImageDataFromRosImage = (msg) => {
+    const width = Number(msg?.width) || 0;
+    const height = Number(msg?.height) || 0;
+    const encoding = (msg?.encoding || "").toLowerCase();
+    const raw = decodeRosUint8Array(msg?.data);
+    if (!width || !height || !raw) {
+      return null;
+    }
+
+    const rgba = new Uint8ClampedArray(width * height * 4);
+
+    if (encoding === "mono8") {
+      const pixels = Math.min(width * height, raw.length);
+      for (let i = 0; i < pixels; i += 1) {
+        const v = raw[i];
+        const j = i * 4;
+        rgba[j] = v;
+        rgba[j + 1] = v;
+        rgba[j + 2] = v;
+        rgba[j + 3] = 255;
+      }
+      return { width, height, encoding, imageData: new ImageData(rgba, width, height) };
+    }
+
+    if (encoding === "16uc1") {
+      const pixels = Math.min(width * height, Math.floor(raw.length / 2));
+      for (let i = 0; i < pixels; i += 1) {
+        const depthMm = raw[i * 2] | (raw[i * 2 + 1] << 8);
+        const normalized = Math.max(0, Math.min(255, Math.round((Math.min(depthMm, 4000) / 4000) * 255)));
+        const j = i * 4;
+        rgba[j] = normalized;
+        rgba[j + 1] = normalized;
+        rgba[j + 2] = normalized;
+        rgba[j + 3] = 255;
+      }
+      return { width, height, encoding, imageData: new ImageData(rgba, width, height) };
+    }
+
+    if (encoding === "rgb8" || encoding === "bgr8") {
+      const pixels = Math.min(width * height, Math.floor(raw.length / 3));
+      const isBgr = encoding === "bgr8";
+      for (let i = 0; i < pixels; i += 1) {
+        const src = i * 3;
+        const j = i * 4;
+        const r = isBgr ? raw[src + 2] : raw[src];
+        const g = raw[src + 1];
+        const b = isBgr ? raw[src] : raw[src + 2];
+        rgba[j] = r;
+        rgba[j + 1] = g;
+        rgba[j + 2] = b;
+        rgba[j + 3] = 255;
+      }
+      return { width, height, encoding, imageData: new ImageData(rgba, width, height) };
+    }
+
+    if (encoding === "rgba8" || encoding === "bgra8") {
+      const pixels = Math.min(width * height, Math.floor(raw.length / 4));
+      const isBgra = encoding === "bgra8";
+      for (let i = 0; i < pixels; i += 1) {
+        const src = i * 4;
+        const j = i * 4;
+        const r = isBgra ? raw[src + 2] : raw[src];
+        const g = raw[src + 1];
+        const b = isBgra ? raw[src] : raw[src + 2];
+        const a = raw[src + 3];
+        rgba[j] = r;
+        rgba[j + 1] = g;
+        rgba[j + 2] = b;
+        rgba[j + 3] = a;
+      }
+      return { width, height, encoding, imageData: new ImageData(rgba, width, height) };
+    }
+
+    return { width, height, encoding, imageData: null };
+  };
+
+  const startCameraStream = () => {
+    const topicName = cameraTopicInput.trim();
+    if (!topicName) {
+      setCameraStreamInfo("トピック名を入力してください");
+      return;
+    }
+    if (!rosRef.current) {
+      setCameraStreamInfo("ROS未接続のため開始できません");
+      return;
+    }
+
+    stopCameraStream();
+    setCameraTopicName(topicName);
+
+    const cameraTopic = new ROSLIB.Topic({
+      ros: rosRef.current,
+      name: topicName,
+      messageType: "sensor_msgs/msg/Image",
+    });
+
+    let frameCount = 0;
+    let lastFpsAt = performance.now();
+    let fps = 0;
+
+    cameraTopic.subscribe((msg) => {
+      const converted = toImageDataFromRosImage(msg);
+      if (!converted) {
+        setCameraStreamInfo("画像データのデコードに失敗しました");
+        return;
+      }
+
+      if (!converted.imageData) {
+        setCameraFrameMeta((prev) => ({
+          ...prev,
+          width: converted.width,
+          height: converted.height,
+          encoding: converted.encoding,
+        }));
+        setCameraStreamInfo(`未対応エンコーディング: ${converted.encoding || "unknown"}`);
+        return;
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = converted.width;
+      canvas.height = converted.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        setCameraStreamInfo("Canvas初期化に失敗しました");
+        return;
+      }
+
+      ctx.putImageData(converted.imageData, 0, 0);
+      const url = canvas.toDataURL("image/png");
+      setCameraFrameUrl(url);
+
+      frameCount += 1;
+      const now = performance.now();
+      if (now - lastFpsAt >= 1000) {
+        fps = Math.round((frameCount * 1000) / (now - lastFpsAt));
+        frameCount = 0;
+        lastFpsAt = now;
+      }
+
+      setCameraFrameMeta({
+        width: converted.width,
+        height: converted.height,
+        encoding: converted.encoding,
+        fps,
+      });
+      setCameraStreamInfo("ストリーミング中");
+    });
+
+    cameraSubRef.current = cameraTopic;
+    setCameraStreamRunning(true);
+    setCameraStreamInfo(`購読開始: ${topicName}`);
   };
 
   const extractSerialBridgeIds = (topics) => {
@@ -1056,6 +1252,7 @@ function App() {
           console.warn("Error unsubscribing drive mode topic:", error);
         }
       }
+      stopCameraStream();
       stopTopicEcho();
       if (rosRef.current) rosRef.current.close();
     };
@@ -1288,6 +1485,12 @@ function App() {
             onClick={() => setActivePage("topic")}
           >
             {tr("トピック監視", "Topics")}
+          </button>
+          <button
+            className={`page-switch-button ${activePage === "camera" ? "page-switch-active" : ""}`}
+            onClick={() => setActivePage("camera")}
+          >
+            {tr("カメラ映像", "Camera")}
           </button>
           <button
             className={`page-switch-button ${activePage === "serial-bridge" ? "page-switch-active" : ""}`}
@@ -1930,6 +2133,52 @@ function App() {
                   <pre className="topic-echo-pre">{row.payload}</pre>
                 </article>
               ))}
+            </div>
+          </section>
+        )}
+
+        {activePage === "camera" && (
+          <section className="topic-panel">
+            <h2 className="serial-packet-title">{tr("Realsense 映像ストリーミング", "Realsense Camera Streaming")}</h2>
+            <p className="serial-packet-hint">
+              {tr("sensor_msgs/msg/Image を購読して映像を表示します。depth(16UC1) は擬似グレースケール表示します。", "Subscribe to sensor_msgs/msg/Image and render frames. depth (16UC1) is shown as pseudo grayscale.")}
+            </p>
+
+            <div className="topic-select-row">
+              <input
+                className="connection-input"
+                value={cameraTopicInput}
+                onChange={(e) => setCameraTopicInput(e.target.value)}
+                placeholder="/camera/camera/depth/image_rect_raw"
+              />
+              <button className="connection-button btn-send" onClick={startCameraStream}>
+                {tr("開始", "Start")}
+              </button>
+              <button className="serial-clear-button" onClick={stopCameraStream}>
+                {tr("停止", "Stop")}
+              </button>
+            </div>
+
+            <p className="connection-hint">
+              {translateRuntimeText(cameraStreamInfo)}
+              {cameraStreamRunning ? ` | topic: ${cameraTopicName}` : ""}
+            </p>
+
+            <div className="serial-bridge-card serial-bridge-card-log" style={{ minHeight: 320 }}>
+              {cameraFrameUrl ? (
+                <>
+                  <img
+                    src={cameraFrameUrl}
+                    alt="camera stream"
+                    style={{ width: "100%", maxHeight: 520, objectFit: "contain", borderRadius: 10 }}
+                  />
+                  <p className="connection-hint" style={{ marginTop: 8 }}>
+                    {cameraFrameMeta.width} x {cameraFrameMeta.height} | {cameraFrameMeta.encoding || "unknown"} | {cameraFrameMeta.fps} fps
+                  </p>
+                </>
+              ) : (
+                <p className="connection-hint">{tr("映像未受信です。開始を押してください。", "No frame received yet. Press Start.")}</p>
+              )}
             </div>
           </section>
         )}
