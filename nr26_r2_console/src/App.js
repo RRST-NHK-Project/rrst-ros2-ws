@@ -103,7 +103,8 @@ function App() {
   const [controllerEnabled, setControllerEnabled] = useState(false);
   const [controllerFullscreen, setControllerFullscreen] = useState(false);
   const [activePages, setActivePages] = useState(["controller"]);
-  const [pageOrder, setPageOrder] = useState([
+  const [multiTabMode, setMultiTabMode] = useState(false);
+  const pageOrder = [
     "controller",
     "sequence",
     "pose",
@@ -116,8 +117,7 @@ function App() {
     "serial-bridge",
     "shutdown",
     "settings",
-  ]);
-  const [draggingPage, setDraggingPage] = useState("");
+  ];
   const [joyTopicName, setJoyTopicName] = useState("/joy_9");
   const [joyTopicInput, setJoyTopicInput] = useState("/joy_9");
   const [virtualOdomTopicInput, setVirtualOdomTopicInput] = useState("odom_xy_yaw");
@@ -209,6 +209,10 @@ function App() {
 
   const translateRuntimeText = (text) => translateRuntimeByLanguage(language, text);
 
+  const lockNoticeText = operationArmed
+    ? tr("送信系機能が有効です。注意して操作してください。", "Sending features are enabled. Operate carefully.")
+    : tr("ロック中: 送信系機能は無効化されています", "Locked: sending features are disabled");
+
   const renderLanguageSelect = (className, idPrefix) => (
     <label className={className}>
       <select
@@ -245,12 +249,15 @@ function App() {
     console.log("Virtual odometry topic updated to:", nextTopic);
   };
 
-  const MAX_ACTIVE_PAGES = 2;
+  const MAX_ACTIVE_PAGES = multiTabMode ? 2 : 1;
 
   const isPageActive = (page) => activePages.includes(page);
 
   const togglePage = (page) => {
     setActivePages((prev) => {
+      if (!multiTabMode) {
+        return prev[0] === page ? prev : [page];
+      }
       if (prev.includes(page)) {
         return prev.length > 1 ? prev.filter((item) => item !== page) : prev;
       }
@@ -264,6 +271,12 @@ function App() {
   const openOnlyPage = (page) => {
     setActivePages([page]);
   };
+
+  useEffect(() => {
+    if (!multiTabMode) {
+      setActivePages((prev) => (prev.length > 0 ? [prev[0]] : ["controller"]));
+    }
+  }, [multiTabMode]);
 
   const getPageLabel = (page) => {
     if (page === "controller") return tr("コントローラ操作", "Controller");
@@ -289,19 +302,6 @@ function App() {
       refreshTopicList();
       refreshSerialBridgeLogs();
     }
-  };
-
-  const movePageInOrder = (fromPage, toPage) => {
-    if (!fromPage || !toPage || fromPage === toPage) return;
-    setPageOrder((prev) => {
-      const fromIndex = prev.indexOf(fromPage);
-      const toIndex = prev.indexOf(toPage);
-      if (fromIndex < 0 || toIndex < 0) return prev;
-      const next = [...prev];
-      next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, fromPage);
-      return next;
-    });
   };
 
   const publishVirtualOdomNow = () => {
@@ -2335,40 +2335,35 @@ function App() {
           >
             {operationArmed ? tr("操作ロック: OFF", "Safety Lock: OFF") : tr("操作ロック: ON", "Safety Lock: ON")}
           </button>
-          <span className="connection-hint">
-            {operationArmed
-              ? tr("送信系機能が有効です。注意して操作してください。", "Sending features are enabled. Operate carefully.")
-              : tr("ロック中: 送信系機能は無効化されています", "Locked: sending features are disabled")}
-          </span>
+          <button
+            className={`toggle-button page-mode-toggle-button ${multiTabMode ? "toggle-on" : "toggle-off"}`}
+            onClick={() => setMultiTabMode((prev) => !prev)}
+          >
+            {multiTabMode ? tr("タブモード: 複数", "Tab Mode: Multi") : tr("タブモード: 単一", "Tab Mode: Single")}
+          </button>
         </section>
+        <p className={`lock-notice ${operationArmed ? "lock-notice-on" : "lock-notice-off"}`}>
+          {lockNoticeText}
+        </p>
+        <p className="connection-hint page-mode-hint">
+          {multiTabMode
+            ? tr("複数タブモードでは最大2タブを同時表示します", "Multi-tab mode shows up to 2 tabs at once")
+            : tr("単一タブモードでは常に1タブのみ表示します", "Single-tab mode always shows one tab")}
+        </p>
 
         <section className="page-switch-row">
           {pageOrder.map((page) => (
             <button
               key={`page-tab-${page}`}
-              className={`page-switch-button ${isPageActive(page) ? "page-switch-active" : ""} ${draggingPage === page ? "page-switch-dragging" : ""}`}
+              className={`page-switch-button ${isPageActive(page) ? "page-switch-active" : ""}`}
               onClick={() => handlePageButtonClick(page)}
-              disabled={!isPageActive(page) && activePages.length >= MAX_ACTIVE_PAGES}
-              draggable
-              onDragStart={() => setDraggingPage(page)}
-              onDragEnd={() => setDraggingPage("")}
-              onDragOver={(event) => {
-                event.preventDefault();
-                if (draggingPage && draggingPage !== page) {
-                  movePageInOrder(draggingPage, page);
-                }
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                if (draggingPage && draggingPage !== page) {
-                  movePageInOrder(draggingPage, page);
-                }
-                setDraggingPage("");
-              }}
+              disabled={multiTabMode && !isPageActive(page) && activePages.length >= MAX_ACTIVE_PAGES}
               title={
-                !isPageActive(page) && activePages.length >= MAX_ACTIVE_PAGES
+                multiTabMode && !isPageActive(page) && activePages.length >= MAX_ACTIVE_PAGES
                   ? tr("同時表示は2タブまでです", "Up to 2 tabs can be shown at once")
-                  : tr("ドラッグで並び替えできます", "Drag to reorder")
+                  : multiTabMode
+                    ? tr("複数タブモード: 最大2タブまで同時表示", "Multi-tab mode: up to 2 tabs at once")
+                    : tr("単一タブモード: クリックしたタブに切替", "Single-tab mode: click to switch tabs")
               }
             >
               {getPageLabel(page)}
@@ -2376,7 +2371,9 @@ function App() {
           ))}
         </section>
         <p className="connection-hint page-switch-hint">
-          {tr("同時に表示できるタブは最大2つです", "You can show up to 2 tabs at the same time")}
+          {multiTabMode
+            ? tr("同時に表示できるタブは最大2つです", "You can show up to 2 tabs at the same time")
+            : tr("単一タブモードでは複数同時表示はできません", "In single-tab mode, multiple tabs cannot be shown")}
         </p>
 
         <section className="active-pages-grid">
@@ -2522,65 +2519,34 @@ function App() {
             </section>
           )}
 
-          {isPageActive("sequence") && (
-            <section className="quick-controls-panel">
-              <h2 className="serial-packet-title">{tr("シーケンス操作", "Sequence")}</h2>
-              <div className="quick-controls-row sequence-controls-row">
-                <div className="control-group">
-                  <button
-                    className="control-button control-button-step-up"
-                    {...getHoldHandlers(
-                      () => updateCommand(1),
-                      () => updateCommand(0)
-                    )}
-                  >
-                    {tr("段差上り", "Step Up")}
-                  </button>
-                </div>
-
-                <div className="control-group">
-                  <button
-                    className="control-button control-button-step-down"
-                    {...getHoldHandlers(
-                      () => updateCommand(-1),
-                      () => updateCommand(0)
-                    )}
-                  >
-                    {tr("段差下り", "Step Down")}
-                  </button>
-                </div>
-              </div>
-
-              <p className="velocity-readout">
-                command: {commandValue}
-              </p>
-            </section>
-          )}
-
           {isPageActive("pose") && (
             <section className="pose-panel">
-              <h2 className="serial-packet-title">{tr("座標・姿勢管理", "Pose Management")}</h2>
+              <h2 className="serial-packet-title">{tr("座標・姿勢管理", "Pose Manager")}</h2>
               <p className="serial-packet-hint">
-                {tr("現在座標と目標座標を管理します。（Yaw: 度数法）", "Manage current pose and target pose. (Yaw in degrees)")}
+                {tr(
+                  "現在位置と目標値を確認し、必要に応じて目標値を送信します。",
+                  "Check current pose and target values, then publish targets when needed."
+                )}
               </p>
 
               <div className="pose-overview-grid">
                 <section className="pose-graph-card">
                   <div className="pose-graph-title-row">
-                    <h3 className="pose-graph-title">{tr("位置・姿勢グラフ", "Pose Graph")}</h3>
+                    <h3 className="pose-graph-title">{tr("座標グラフ", "Pose Graph")}</h3>
                     <span className="pose-graph-scale">{tr("単位: m", "Unit: m")}</span>
                   </div>
+
                   <svg
                     className="pose-graph"
                     ref={poseGraphRef}
                     viewBox={`0 0 ${graphWidth} ${graphHeight}`}
                     role="img"
-                    aria-label={tr("現在位置と目標位置のグラフ", "Graph of current and target pose")}
+                    aria-label={tr("座標・姿勢管理グラフ", "Pose management graph")}
                     onPointerDown={handlePoseGraphPointerDown}
                     onPointerMove={handlePoseGraphPointerMove}
                     onPointerUp={releasePoseGraphPointer}
                     onPointerCancel={releasePoseGraphPointer}
-                    onLostPointerCapture={releasePoseGraphPointer}
+                    onPointerLeave={releasePoseGraphPointer}
                   >
                     <rect
                       x={graphPadding}
@@ -2592,7 +2558,7 @@ function App() {
 
                     {gridXValues.map((value) => (
                       <line
-                        key={`grid-x-${value}`}
+                        key={`pose-grid-x-${value}`}
                         x1={toGraphX(value)}
                         y1={graphPadding}
                         x2={toGraphX(value)}
@@ -2602,7 +2568,7 @@ function App() {
                     ))}
                     {gridYValues.map((value) => (
                       <line
-                        key={`grid-y-${value}`}
+                        key={`pose-grid-y-${value}`}
                         x1={graphPadding}
                         y1={toGraphY(value)}
                         x2={graphWidth - graphPadding}
@@ -2631,15 +2597,14 @@ function App() {
                     )}
 
                     <line x1={currentX} y1={currentY} x2={targetX} y2={targetY} className="pose-graph-link" />
-
                     <line x1={currentX} y1={currentY} x2={currentArrowX} y2={currentArrowY} className="pose-graph-arrow-current" />
                     <line x1={targetX} y1={targetY} x2={targetArrowX} y2={targetArrowY} className="pose-graph-arrow-target" />
 
                     <circle cx={currentX} cy={currentY} r="6" className="pose-graph-point-current" />
                     <circle cx={targetX} cy={targetY} r="6" className="pose-graph-point-target" />
 
-                    <text x={currentX + 8} y={currentY - 10} className="pose-graph-label">{tr("現在", "Current")}</text>
-                    <text x={targetX + 8} y={targetY - 10} className="pose-graph-label">{tr("目標", "Target")}</text>
+                    <text x={currentX + 8} y={currentY - 8} className="pose-graph-label">{tr("現在", "Current")}</text>
+                    <text x={targetX + 8} y={targetY - 8} className="pose-graph-label">{tr("目標", "Target")}</text>
 
                     <text x={graphPadding} y={graphPadding - 8} className="pose-graph-corner-label">
                       Y {graphMaxY.toFixed(2)}
@@ -2658,15 +2623,19 @@ function App() {
                   <div className="pose-graph-legend">
                     <span className="pose-legend-item">
                       <i className="pose-legend-dot pose-legend-current" />
-                      {tr("現在位置 / 姿勢", "Current position / yaw")}
+                      {tr("現在位置", "Current position")}
                     </span>
                     <span className="pose-legend-item">
                       <i className="pose-legend-dot pose-legend-target" />
-                      {tr("目標位置 / 姿勢", "Target position / yaw")}
+                      {tr("目標位置", "Target position")}
                     </span>
                   </div>
+
                   <p className="pose-graph-interaction-hint">
-                    {tr("グラフをクリック/ドラッグして目標座標を直接プロットできます。", "Click or drag on the graph to plot the target directly.")}
+                    {tr(
+                      "グラフをドラッグして目標X/Yを更新できます。Yawは入力欄で調整してください。",
+                      "Drag on the graph to update target X/Y. Adjust yaw using the input field."
+                    )}
                   </p>
                 </section>
 
@@ -3125,194 +3094,190 @@ function App() {
                 <span>{tr("再生インデックス", "Replay Index")}: {traceReplayIndex >= 0 ? traceReplayIndex + 1 : "-"}</span>
               </div>
 
-              {tracePoints.length > 0 && (
-                <div className="teaching-overview-grid">
-                  <section className="pose-graph-card">
-                    <div className="pose-graph-title-row">
-                      <h3 className="pose-graph-title">{tr("記録点グラフ", "Trace Points Graph")}</h3>
-                      <span className="pose-graph-scale">{tr("単位: m", "Unit: m")}</span>
-                    </div>
+              <div className="teaching-overview-grid">
+                <section className="pose-graph-card">
+                  <div className="pose-graph-title-row">
+                    <h3 className="pose-graph-title">{tr("記録点グラフ", "Trace Points Graph")}</h3>
+                    <span className="pose-graph-scale">{tr("単位: m", "Unit: m")}</span>
+                  </div>
 
-                    <svg
-                      className="pose-graph teaching-graph"
-                      viewBox={`0 0 ${graphWidth} ${graphHeight}`}
-                      role="img"
-                      aria-label={tr("ティーチング記録点グラフ", "Teaching trace points graph")}
-                    >
-                      <rect
-                        x={graphPadding}
-                        y={graphPadding}
-                        width={graphInnerWidth}
-                        height={graphInnerHeight}
-                        className="pose-graph-frame"
+                  <svg
+                    className="pose-graph teaching-graph"
+                    viewBox={`0 0 ${graphWidth} ${graphHeight}`}
+                    role="img"
+                    aria-label={tr("ティーチング記録点グラフ", "Teaching trace points graph")}
+                  >
+                    <rect
+                      x={graphPadding}
+                      y={graphPadding}
+                      width={graphInnerWidth}
+                      height={graphInnerHeight}
+                      className="pose-graph-frame"
+                    />
+
+                    {traceGridXValues.map((value) => (
+                      <line
+                        key={`trace-grid-x-${value}`}
+                        x1={toTraceGraphX(value)}
+                        y1={graphPadding}
+                        x2={toTraceGraphX(value)}
+                        y2={graphHeight - graphPadding}
+                        className="pose-graph-grid"
                       />
+                    ))}
+                    {traceGridYValues.map((value) => (
+                      <line
+                        key={`trace-grid-y-${value}`}
+                        x1={graphPadding}
+                        y1={toTraceGraphY(value)}
+                        x2={graphWidth - graphPadding}
+                        y2={toTraceGraphY(value)}
+                        className="pose-graph-grid"
+                      />
+                    ))}
 
-                      {traceGridXValues.map((value) => (
+                    {traceAxisXVisible && (
+                      <line
+                        x1={graphPadding}
+                        y1={toTraceGraphY(0)}
+                        x2={graphWidth - graphPadding}
+                        y2={toTraceGraphY(0)}
+                        className="pose-graph-axis"
+                      />
+                    )}
+                    {traceAxisYVisible && (
+                      <line
+                        x1={toTraceGraphX(0)}
+                        y1={graphPadding}
+                        x2={toTraceGraphX(0)}
+                        y2={graphHeight - graphPadding}
+                        className="pose-graph-axis"
+                      />
+                    )}
+
+                    {tracePoints.length > 1 && (
+                      <polyline
+                        points={tracePoints
+                          .map((point) => `${toTraceGraphX(point.x)},${toTraceGraphY(point.y)}`)
+                          .join(" ")}
+                        className="trace-point-path-line"
+                      />
+                    )}
+
+                    {tracePoints.map((point, index) => {
+                      const pointX = toTraceGraphX(point.x);
+                      const pointY = toTraceGraphY(point.y);
+                      const pointYaw = normalizeYawRad(point.yawRad + yawOffsetRad);
+                      const arrowLength = 15;
+                      const arrowEndX = pointX + Math.cos(pointYaw) * arrowLength;
+                      const arrowEndY = pointY - Math.sin(pointYaw) * arrowLength;
+                      return (
                         <line
-                          key={`trace-grid-x-${value}`}
-                          x1={toTraceGraphX(value)}
-                          y1={graphPadding}
-                          x2={toTraceGraphX(value)}
-                          y2={graphHeight - graphPadding}
-                          className="pose-graph-grid"
+                          key={`trace-arrow-${point.id}`}
+                          x1={pointX}
+                          y1={pointY}
+                          x2={arrowEndX}
+                          y2={arrowEndY}
+                          className={index === traceReplayIndex ? "pose-graph-arrow-current" : "pose-graph-arrow-target"}
+                          style={{ opacity: index === traceReplayIndex ? 1 : 0.6 }}
                         />
-                      ))}
-                      {traceGridYValues.map((value) => (
-                        <line
-                          key={`trace-grid-y-${value}`}
-                          x1={graphPadding}
-                          y1={toTraceGraphY(value)}
-                          x2={graphWidth - graphPadding}
-                          y2={toTraceGraphY(value)}
-                          className="pose-graph-grid"
+                      );
+                    })}
+
+                    <circle cx={toTraceGraphX(poseX)} cy={toTraceGraphY(poseY)} r="6" className="pose-graph-point-current" />
+
+                    {tracePoints.map((point, index) => (
+                      <g key={`trace-${point.id}`}>
+                        <circle
+                          cx={toTraceGraphX(point.x)}
+                          cy={toTraceGraphY(point.y)}
+                          r={index === traceReplayIndex ? "6" : "5"}
+                          className={index === traceReplayIndex ? "trace-point-active" : "trace-point"}
                         />
-                      ))}
-
-                      {traceAxisXVisible && (
-                        <line
-                          x1={graphPadding}
-                          y1={toTraceGraphY(0)}
-                          x2={graphWidth - graphPadding}
-                          y2={toTraceGraphY(0)}
-                          className="pose-graph-axis"
-                        />
-                      )}
-                      {traceAxisYVisible && (
-                        <line
-                          x1={toTraceGraphX(0)}
-                          y1={graphPadding}
-                          x2={toTraceGraphX(0)}
-                          y2={graphHeight - graphPadding}
-                          className="pose-graph-axis"
-                        />
-                      )}
-
-                      {tracePoints.length > 1 && (
-                        <polyline
-                          points={tracePoints
-                            .map((point) => `${toTraceGraphX(point.x)},${toTraceGraphY(point.y)}`)
-                            .join(" ")}
-                          className="trace-point-path-line"
-                        />
-                      )}
-
-                      {tracePoints.map((point, index) => {
-                        const pointX = toTraceGraphX(point.x);
-                        const pointY = toTraceGraphY(point.y);
-                        const pointYaw = normalizeYawRad(point.yawRad + yawOffsetRad);
-                        const arrowLength = 15;
-                        const arrowEndX = pointX + Math.cos(pointYaw) * arrowLength;
-                        const arrowEndY = pointY - Math.sin(pointYaw) * arrowLength;
-                        return (
-                          <line
-                            key={`trace-arrow-${point.id}`}
-                            x1={pointX}
-                            y1={pointY}
-                            x2={arrowEndX}
-                            y2={arrowEndY}
-                            className={index === traceReplayIndex ? "pose-graph-arrow-current" : "pose-graph-arrow-target"}
-                            style={{ opacity: index === traceReplayIndex ? 1 : 0.6 }}
-                          />
-                        );
-                      })}
-
-                      <circle cx={toTraceGraphX(poseX)} cy={toTraceGraphY(poseY)} r="6" className="pose-graph-point-current" />
-
-                      {tracePoints.map((point, index) => (
-                        <g key={`trace-${point.id}`}>
-                          <circle
-                            cx={toTraceGraphX(point.x)}
-                            cy={toTraceGraphY(point.y)}
-                            r={index === traceReplayIndex ? "6" : "5"}
-                            className={index === traceReplayIndex ? "trace-point-active" : "trace-point"}
-                          />
-                          <text
-                            x={toTraceGraphX(point.x) + 7}
-                            y={toTraceGraphY(point.y) - 8}
-                            className={index === traceReplayIndex ? "trace-point-label trace-point-label-active" : "trace-point-label"}
-                          >
-                            {index + 1}
-                          </text>
-                        </g>
-                      ))}
-
-                      <text x={graphPadding} y={graphPadding - 8} className="pose-graph-corner-label">
-                        Y {traceGraphMaxY.toFixed(2)}
-                      </text>
-                      <text x={graphPadding} y={graphHeight - 8} className="pose-graph-corner-label">
-                        Y {traceGraphMinY.toFixed(2)}
-                      </text>
-                      <text x={graphPadding} y={graphHeight - graphPadding + 16} className="pose-graph-corner-label">
-                        X {traceGraphMinX.toFixed(2)}
-                      </text>
-                      <text x={graphWidth - graphPadding - 84} y={graphHeight - graphPadding + 16} className="pose-graph-corner-label">
-                        X {traceGraphMaxX.toFixed(2)}
-                      </text>
-                    </svg>
-
-                    <div className="pose-graph-legend">
-                      <span className="pose-legend-item">
-                        <i className="pose-legend-dot pose-legend-current" />
-                        {tr("現在位置", "Current position")}
-                      </span>
-                      <span className="pose-legend-item">
-                        <i className="pose-legend-dot pose-legend-target" />
-                        {tr("記録点", "Trace points")}
-                      </span>
-                    </div>
-                  </section>
-
-                  <section className="trace-list-card">
-                    <div className="waypoint-summary-row">
-                      <span>{tr("登録数", "Count")}: {tracePoints.length}</span>
-                      <span>{tr("再生中", "Playing")}: {traceReplayIndex >= 0 ? traceReplayIndex + 1 : "-"}</span>
-                    </div>
-
-                    <div className="teaching-list-box">
-                      {tracePoints.map((point, index) => (
-                        <div
-                          key={point.id}
-                          className={`teaching-row ${index === traceReplayIndex ? "teaching-row-active" : ""}`}
+                        <text
+                          x={toTraceGraphX(point.x) + 7}
+                          y={toTraceGraphY(point.y) - 8}
+                          className={index === traceReplayIndex ? "trace-point-label trace-point-label-active" : "trace-point-label"}
                         >
-                          <div className="teaching-row-text">
-                            <strong>{point.label}</strong>
-                            <span>
-                              X: {point.x.toFixed(3)}, Y: {point.y.toFixed(3)}, Yaw: {point.yawDeg.toFixed(1)} ({point.at})
-                            </span>
-                          </div>
-                          <div className="teaching-row-actions">
-                            <button
-                              className="connection-button btn-neutral teaching-row-button"
-                              onClick={() => applyTracePointToTarget(index, false)}
-                            >
-                              {tr("適用", "Apply")}
-                            </button>
-                            <button
-                              className="connection-button btn-send teaching-row-button"
-                              onClick={() => applyTracePointToTarget(index, true)}
-                              disabled={!operationArmed}
-                            >
-                              {tr("適用&送信", "Apply & Send")}
-                            </button>
-                            <button
-                              className="serial-clear-button teaching-row-button"
-                              onClick={() => removeTracePointById(point.id)}
-                            >
-                              {tr("削除", "Delete")}
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                </div>
-              )}
+                          {index + 1}
+                        </text>
+                      </g>
+                    ))}
 
-              {tracePoints.length === 0 && (
-                <div className="teaching-list-box">
-                  <p className="connection-hint">{tr("記録データはまだありません", "No trace points recorded yet")}</p>
-                </div>
-              )}
+                    <text x={graphPadding} y={graphPadding - 8} className="pose-graph-corner-label">
+                      Y {traceGraphMaxY.toFixed(2)}
+                    </text>
+                    <text x={graphPadding} y={graphHeight - 8} className="pose-graph-corner-label">
+                      Y {traceGraphMinY.toFixed(2)}
+                    </text>
+                    <text x={graphPadding} y={graphHeight - graphPadding + 16} className="pose-graph-corner-label">
+                      X {traceGraphMinX.toFixed(2)}
+                    </text>
+                    <text x={graphWidth - graphPadding - 84} y={graphHeight - graphPadding + 16} className="pose-graph-corner-label">
+                      X {traceGraphMaxX.toFixed(2)}
+                    </text>
+                  </svg>
+
+                  <div className="pose-graph-legend">
+                    <span className="pose-legend-item">
+                      <i className="pose-legend-dot pose-legend-current" />
+                      {tr("現在位置", "Current position")}
+                    </span>
+                    <span className="pose-legend-item">
+                      <i className="pose-legend-dot pose-legend-target" />
+                      {tr("記録点", "Trace points")}
+                    </span>
+                  </div>
+                </section>
+
+                <section className="trace-list-card">
+                  <div className="waypoint-summary-row">
+                    <span>{tr("登録数", "Count")}: {tracePoints.length}</span>
+                    <span>{tr("再生中", "Playing")}: {traceReplayIndex >= 0 ? traceReplayIndex + 1 : "-"}</span>
+                  </div>
+
+                  <div className="teaching-list-box">
+                    {tracePoints.length === 0 && (
+                      <p className="connection-hint">{tr("記録データはまだありません", "No trace points recorded yet")}</p>
+                    )}
+
+                    {tracePoints.map((point, index) => (
+                      <div
+                        key={point.id}
+                        className={`teaching-row ${index === traceReplayIndex ? "teaching-row-active" : ""}`}
+                      >
+                        <div className="teaching-row-text">
+                          <strong>{point.label}</strong>
+                          <span>
+                            X: {point.x.toFixed(3)}, Y: {point.y.toFixed(3)}, Yaw: {point.yawDeg.toFixed(1)} ({point.at})
+                          </span>
+                        </div>
+                        <div className="teaching-row-actions">
+                          <button
+                            className="connection-button btn-neutral teaching-row-button"
+                            onClick={() => applyTracePointToTarget(index, false)}
+                          >
+                            {tr("適用", "Apply")}
+                          </button>
+                          <button
+                            className="connection-button btn-send teaching-row-button"
+                            onClick={() => applyTracePointToTarget(index, true)}
+                            disabled={!operationArmed}
+                          >
+                            {tr("適用&送信", "Apply & Send")}
+                          </button>
+                          <button
+                            className="serial-clear-button teaching-row-button"
+                            onClick={() => removeTracePointById(point.id)}
+                          >
+                            {tr("削除", "Delete")}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </div>
 
               <p className="connection-hint">{translateRuntimeText(traceInfo)}</p>
             </section>

@@ -765,13 +765,39 @@
   border-color: transparent;
 }
 
-.page-switch-dragging {
-  opacity: 0.62;
-  transform: scale(0.98);
-}
-
 .page-switch-hint {
   margin-top: 6px;
+}
+
+.lock-notice {
+  margin: 8px 0 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.lock-notice-on {
+  color: #1f6b39;
+  background: #eaf8ee;
+  border-color: #94d3aa;
+}
+
+.lock-notice-off {
+  color: #a12622;
+  background: #fff0ef;
+  border-color: #e7a5a2;
+}
+
+.page-mode-toggle-button {
+  justify-self: end;
+  min-width: 190px;
+}
+
+.page-mode-hint {
+  margin-top: 4px;
+  font-size: 0.8rem;
 }
 
 .virtual-odom-list {
