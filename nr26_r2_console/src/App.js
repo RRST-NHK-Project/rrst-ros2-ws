@@ -61,6 +61,8 @@ function App() {
   const rosRef = useRef(null);
   const commandRef = useRef(null);
   const joyRef = useRef(null);
+  const virtualOdomPubRef = useRef(null);
+  const virtualOdomTimerRef = useRef(null);
   const odomRef = useRef(null);
   const driveModeRef = useRef(null);
   const autoDriveCmdRef = useRef(null);
@@ -76,6 +78,7 @@ function App() {
   const waypointGraphRef = useRef(null);
   const traceRecordTimerRef = useRef(null);
   const traceReplayTimerRef = useRef(null);
+  const traceImportInputRef = useRef(null);
   const tracePoseRef = useRef({ x: 0, y: 0, yaw: 0 });
   const traceLanguageRef = useRef("ja");
   const defaultRosHost = window.location.hostname || "localhost";
@@ -99,9 +102,26 @@ function App() {
   const [frontendForceStopped, setFrontendForceStopped] = useState(false);
   const [controllerEnabled, setControllerEnabled] = useState(false);
   const [controllerFullscreen, setControllerFullscreen] = useState(false);
-  const [activePage, setActivePage] = useState("controller");
+  const [activePages, setActivePages] = useState(["controller"]);
+  const [pageOrder, setPageOrder] = useState([
+    "controller",
+    "sequence",
+    "pose",
+    "waypoint",
+    "teaching",
+    "simulator",
+    "actuator",
+    "topic",
+    "camera",
+    "serial-bridge",
+    "shutdown",
+    "settings",
+  ]);
+  const [draggingPage, setDraggingPage] = useState("");
   const [joyTopicName, setJoyTopicName] = useState("/joy_9");
   const [joyTopicInput, setJoyTopicInput] = useState("/joy_9");
+  const [virtualOdomTopicInput, setVirtualOdomTopicInput] = useState("odom_xy_yaw");
+  const [virtualOdomTopicName, setVirtualOdomTopicName] = useState("odom_xy_yaw");
   const [serialTargetIdInput, setSerialTargetIdInput] = useState("1");
   const [serialElementCount, setSerialElementCount] = useState(DEFAULT_PACKET_COUNT);
   const [serialValues, setSerialValues] = useState(Array(DEFAULT_PACKET_COUNT).fill(0));
@@ -132,8 +152,8 @@ function App() {
   const [traceRecording, setTraceRecording] = useState(false);
   const [traceReplayRunning, setTraceReplayRunning] = useState(false);
   const [traceReplayIndex, setTraceReplayIndex] = useState(-1);
-  const [traceSampleMsInput, setTraceSampleMsInput] = useState("250");
-  const [traceReplayMsInput, setTraceReplayMsInput] = useState("600");
+  const [traceSampleMsInput, setTraceSampleMsInput] = useState("100");
+  const [traceReplayMsInput, setTraceReplayMsInput] = useState("200");
   const [traceReplayLoop, setTraceReplayLoop] = useState(false);
   const [traceReplayAutoPublish, setTraceReplayAutoPublish] = useState(true);
   const [traceInfo, setTraceInfo] = useState("未開始");
@@ -167,6 +187,10 @@ function App() {
   const [serialBridgeLogLinesInput, setSerialBridgeLogLinesInput] = useState("200");
   const [serialBridgeLogLoading, setSerialBridgeLogLoading] = useState(false);
   const [serialBridgeLogRealtimeEnabled, setSerialBridgeLogRealtimeEnabled] = useState(false);
+  const [yawOffsetDegInput, setYawOffsetDegInput] = useState("90");
+  const [virtualOdomEnabled, setVirtualOdomEnabled] = useState(false);
+  const [virtualOdomHzInput, setVirtualOdomHzInput] = useState("10");
+  const virtualOdomEnabledRef = useRef(false);
 
   const backendBaseUrl = `${window.location.protocol}//${window.location.hostname}:3031`;
 
@@ -214,6 +238,200 @@ function App() {
     setJoyTopicName(nextTopic);
     console.log("Joy topic name updated to:", nextTopic);
   };
+
+  const applyVirtualOdomTopicName = () => {
+    const nextTopic = virtualOdomTopicInput.trim() || "odom_xy_yaw";
+    setVirtualOdomTopicName(nextTopic);
+    console.log("Virtual odometry topic updated to:", nextTopic);
+  };
+
+  const MAX_ACTIVE_PAGES = 2;
+
+  const isPageActive = (page) => activePages.includes(page);
+
+  const togglePage = (page) => {
+    setActivePages((prev) => {
+      if (prev.includes(page)) {
+        return prev.length > 1 ? prev.filter((item) => item !== page) : prev;
+      }
+      if (prev.length >= MAX_ACTIVE_PAGES) {
+        return prev;
+      }
+      return [...prev, page];
+    });
+  };
+
+  const openOnlyPage = (page) => {
+    setActivePages([page]);
+  };
+
+  const getPageLabel = (page) => {
+    if (page === "controller") return tr("コントローラ操作", "Controller");
+    if (page === "sequence") return tr("シーケンス操作", "Sequence");
+    if (page === "pose") return tr("座標・姿勢管理", "Pose");
+    if (page === "waypoint") return tr("ウェイポイント", "Waypoints");
+    if (page === "teaching") return tr("ティーチング", "Teaching");
+    if (page === "simulator") return tr("仮想オドメトリ", "Virtual Odom");
+    if (page === "actuator") return tr("ダイレクト送信", "Actuator TX");
+    if (page === "topic") return tr("トピック監視", "Topics");
+    if (page === "camera") return tr("カメラ映像", "Camera");
+    if (page === "serial-bridge") return "Serial Bridge";
+    if (page === "shutdown") return tr("強制停止", "Shutdown");
+    if (page === "settings") return tr("設定", "Settings");
+    return page;
+  };
+
+  const handlePageButtonClick = (page) => {
+    const wasActive = isPageActive(page);
+    togglePage(page);
+    if (!wasActive && page === "serial-bridge") {
+      refreshSerialBridgeStatus();
+      refreshTopicList();
+      refreshSerialBridgeLogs();
+    }
+  };
+
+  const movePageInOrder = (fromPage, toPage) => {
+    if (!fromPage || !toPage || fromPage === toPage) return;
+    setPageOrder((prev) => {
+      const fromIndex = prev.indexOf(fromPage);
+      const toIndex = prev.indexOf(toPage);
+      if (fromIndex < 0 || toIndex < 0) return prev;
+      const next = [...prev];
+      next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, fromPage);
+      return next;
+    });
+  };
+
+  const publishVirtualOdomNow = () => {
+    if (!virtualOdomPubRef.current) return;
+    virtualOdomPubRef.current.publish({
+      data: [poseX, poseY, poseYaw],
+    });
+  };
+
+  const resetVirtualOdomPose = () => {
+    setPoseX(0);
+    setPoseY(0);
+    setPoseYaw(0);
+  };
+
+  const nudgeVirtualOdomPose = (dx = 0, dy = 0, dyawDeg = 0) => {
+    setPoseX((prev) => Number((prev + dx).toFixed(3)));
+    setPoseY((prev) => Number((prev + dy).toFixed(3)));
+    setPoseYaw((prev) => normalizeYawRad(prev + (dyawDeg * Math.PI) / 180));
+  };
+
+  const renderVirtualOdomPanel = (panelId) => (
+    <section className="serial-bridge-card" style={{ marginTop: 10 }}>
+      <h3 className="serial-bridge-title">{tr("仮想オドメトリ発行", "Virtual Odometry Publisher")}</h3>
+      <div className="serial-bridge-list virtual-odom-list">
+        <button
+          className={`toggle-button ${virtualOdomEnabled ? "toggle-on" : "toggle-off"}`}
+          onClick={() => setVirtualOdomEnabled((prev) => !prev)}
+        >
+          {virtualOdomEnabled ? tr("定期発行: ON", "Periodic Publish: ON") : tr("定期発行: OFF", "Periodic Publish: OFF")}
+        </button>
+
+        <label className="serial-packet-label">
+          {tr("オドメトリトピック", "Odometry Topic")}
+          <input
+            className="connection-input"
+            value={virtualOdomTopicInput}
+            onChange={(e) => setVirtualOdomTopicInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") applyVirtualOdomTopicName();
+            }}
+            aria-label={`${panelId}-virtual-odom-topic`}
+          />
+        </label>
+        <button className="connection-button btn-connect" onClick={applyVirtualOdomTopicName}>
+          {tr("トピック適用", "Apply Topic")}
+        </button>
+
+        <label className="serial-packet-label">
+          {tr("発行Hz", "Publish Hz")}
+          <input
+            className="connection-input"
+            type="number"
+            step="1"
+            min="1"
+            max="50"
+            value={virtualOdomHzInput}
+            onChange={(e) => setVirtualOdomHzInput(e.target.value)}
+            disabled={!virtualOdomEnabled}
+          />
+        </label>
+
+        <label className="serial-packet-label">
+          {tr("発行X", "Publish X")}
+          <input
+            className="connection-input"
+            type="number"
+            step="0.1"
+            value={poseX}
+            onChange={(e) => setPoseX(parseFloatSafe(e.target.value, 0))}
+          />
+        </label>
+        <label className="serial-packet-label">
+          {tr("発行Y", "Publish Y")}
+          <input
+            className="connection-input"
+            type="number"
+            step="0.1"
+            value={poseY}
+            onChange={(e) => setPoseY(parseFloatSafe(e.target.value, 0))}
+          />
+        </label>
+        <label className="serial-packet-label">
+          {tr("発行Yaw (deg)", "Publish Yaw (deg)")}
+          <input
+            className="connection-input"
+            type="number"
+            step="1"
+            value={(poseYaw * 180 / Math.PI).toFixed(1)}
+            onChange={(e) => setPoseYaw(normalizeYawRad(parseFloatSafe(e.target.value, 0) * Math.PI / 180))}
+          />
+        </label>
+
+        <button className="connection-button btn-send" onClick={publishVirtualOdomNow}>
+          {tr("1回発行", "Publish Once")}
+        </button>
+        <button className="serial-clear-button" onClick={resetVirtualOdomPose}>
+          {tr("座標姿勢リセット", "Reset Pose")}
+        </button>
+
+        <div className="virtual-odom-nudge-grid">
+          <button className="connection-button btn-connect" onClick={() => nudgeVirtualOdomPose(0.1, 0, 0)}>
+            {tr("X +0.1", "X +0.1")}
+          </button>
+          <button className="connection-button btn-connect" onClick={() => nudgeVirtualOdomPose(0, 0.1, 0)}>
+            {tr("Y +0.1", "Y +0.1")}
+          </button>
+          <button className="connection-button btn-connect" onClick={() => nudgeVirtualOdomPose(0, 0, 5)}>
+            {tr("Yaw +5°", "Yaw +5deg")}
+          </button>
+          <button className="connection-button btn-connect" onClick={() => nudgeVirtualOdomPose(-0.1, 0, 0)}>
+            {tr("X -0.1", "X -0.1")}
+          </button>
+          <button className="connection-button btn-connect" onClick={() => nudgeVirtualOdomPose(0, -0.1, 0)}>
+            {tr("Y -0.1", "Y -0.1")}
+          </button>
+          <button className="connection-button btn-connect" onClick={() => nudgeVirtualOdomPose(0, 0, -5)}>
+            {tr("Yaw -5°", "Yaw -5deg")}
+          </button>
+        </div>
+
+        <p className="connection-hint">
+          {tr("発行先トピック", "Publish topic")}: {virtualOdomTopicName}
+        </p>
+        <p className="connection-hint">
+          {tr("発行値", "Publish values")}: X={poseX.toFixed(3)}, Y={poseY.toFixed(3)}, Yaw={(poseYaw * 180 / Math.PI).toFixed(1)}°
+        </p>
+      </div>
+    </section>
+  );
 
   const callRosService = (serviceRef, requestData) =>
     new Promise((resolve, reject) => {
@@ -633,7 +851,7 @@ function App() {
     setSerialBridgeLogRealtimeEnabled(false);
     setTraceRecording(false);
     setTraceReplayRunning(false);
-    setActivePage("shutdown");
+    openOnlyPage("shutdown");
     resetAllControls();
     stopTopicEcho();
     if (rosRef.current) {
@@ -644,7 +862,7 @@ function App() {
   };
 
   useEffect(() => {
-    if (!serialBridgeLogRealtimeEnabled || activePage !== "serial-bridge") {
+    if (!serialBridgeLogRealtimeEnabled || !isPageActive("serial-bridge")) {
       return undefined;
     }
 
@@ -675,10 +893,10 @@ function App() {
     return () => {
       clearInterval(timer);
     };
-  }, [serialBridgeLogRealtimeEnabled, activePage, backendBaseUrl, serialBridgeLogLineLimit]);
+  }, [serialBridgeLogRealtimeEnabled, activePages, backendBaseUrl, serialBridgeLogLineLimit]);
 
   useEffect(() => {
-    if (activePage !== "serial-bridge") {
+    if (!isPageActive("serial-bridge")) {
       return;
     }
 
@@ -688,7 +906,7 @@ function App() {
     }
 
     logBox.scrollTop = logBox.scrollHeight;
-  }, [serialBridgeLogs, serialBridgeLogLoading, activePage]);
+  }, [serialBridgeLogs, serialBridgeLogLoading, activePages]);
 
   const startTopicEcho = async () => {
     const topicName = selectedEchoTopic.trim();
@@ -889,6 +1107,118 @@ function App() {
     setTraceReplayIndex(0);
     applyTracePointToTarget(0, traceReplayAutoPublish);
     setTraceInfo(tr("再生開始", "Replay started"));
+  };
+
+  const exportTracePoints = () => {
+    if (tracePoints.length === 0) {
+      setTraceInfo(tr("エクスポートする記録がありません", "No trace points to export"));
+      return;
+    }
+
+    const exportData = {
+      format: "nr26-trace-points",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      points: tracePoints.map((point, index) => ({
+        x: Number(point.x),
+        y: Number(point.y),
+        yawDeg: Number(point.yawDeg),
+        label: point.label || `T${index + 1}`,
+        at: point.at || "",
+      })),
+    };
+
+    const json = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    link.href = url;
+    link.download = `teaching_trace_${stamp}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    setTraceInfo(
+      tr(
+        `記録をエクスポートしました (${tracePoints.length} 点)`,
+        `Trace exported (${tracePoints.length} points)`
+      )
+    );
+  };
+
+  const normalizeImportedTracePoint = (rawPoint, index) => {
+    const x = Number(rawPoint?.x);
+    const y = Number(rawPoint?.y);
+
+    let yawDeg = Number(rawPoint?.yawDeg);
+    if (!Number.isFinite(yawDeg) && Number.isFinite(Number(rawPoint?.yawRad))) {
+      yawDeg = Number(rawPoint.yawRad) * 180 / Math.PI;
+    }
+    if (!Number.isFinite(yawDeg) && Number.isFinite(Number(rawPoint?.yaw))) {
+      yawDeg = Number(rawPoint.yaw) * 180 / Math.PI;
+    }
+
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(yawDeg)) {
+      return null;
+    }
+
+    return {
+      id: `${Date.now()}-${index}-${Math.random().toString(16).slice(2)}`,
+      x,
+      y,
+      yawDeg: normalizeAngleDeg(yawDeg),
+      label: typeof rawPoint?.label === "string" && rawPoint.label.trim() ? rawPoint.label.trim() : `T${index + 1}`,
+      at: typeof rawPoint?.at === "string" ? rawPoint.at : "",
+    };
+  };
+
+  const importTracePointsFromFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const rawPoints = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(parsed?.points)
+          ? parsed.points
+          : null;
+
+      if (!rawPoints) {
+        setTraceInfo(tr("JSON形式が不正です (points配列が必要)", "Invalid JSON format (points array is required)"));
+        return;
+      }
+
+      const normalizedPoints = rawPoints
+        .map((point, index) => normalizeImportedTracePoint(point, index))
+        .filter(Boolean);
+
+      if (normalizedPoints.length === 0) {
+        setTraceInfo(tr("有効な記録点が見つかりません", "No valid trace points found"));
+        return;
+      }
+
+      setTraceRecording(false);
+      setTraceReplayRunning(false);
+      setTraceReplayIndex(-1);
+      setTracePoints(normalizedPoints);
+      setTraceInfo(
+        tr(
+          `記録をインポートしました (${normalizedPoints.length} 点)`,
+          `Trace imported (${normalizedPoints.length} points)`
+        )
+      );
+    } catch (error) {
+      console.error("Failed to import trace points:", error);
+      setTraceInfo(tr("インポートに失敗しました (JSONを確認してください)", "Import failed (check JSON file)"));
+    }
   };
 
   const updateSerialElementCount = (nextCountRaw) => {
@@ -1308,19 +1638,60 @@ function App() {
     .map((waypoint) => `${toGraphX(waypoint.x)},${toGraphY(waypoint.y)}`)
     .join(" ");
 
+  const yawOffsetRad = (parseFloatSafe(yawOffsetDegInput, 0) * Math.PI) / 180;
+
   const currentX = toGraphX(poseX);
   const currentY = toGraphY(poseY);
   const targetX = toGraphX(targetXValue);
   const targetY = toGraphY(targetYValue);
   const arrowLength = 20;
 
-  const currentYaw = normalizeYawRad(poseYaw);
-  const targetYaw = normalizeYawRad(targetYawRadValue);
+  const currentYaw = normalizeYawRad(poseYaw + yawOffsetRad);
+  const targetYaw = normalizeYawRad(targetYawRadValue + yawOffsetRad);
 
   const currentArrowX = currentX + Math.cos(currentYaw) * arrowLength;
   const currentArrowY = currentY - Math.sin(currentYaw) * arrowLength;
   const targetArrowX = targetX + Math.cos(targetYaw) * arrowLength;
   const targetArrowY = targetY - Math.sin(targetYaw) * arrowLength;
+
+  // Trace points graph calculation
+  const traceGraphPoints = [
+    { x: poseX, y: poseY },
+    ...tracePoints.map((point) => ({ x: point.x, y: point.y })),
+  ];
+
+  const traceGraphMinXRaw = Math.min(...traceGraphPoints.map((p) => p.x));
+  const traceGraphMaxXRaw = Math.max(...traceGraphPoints.map((p) => p.x));
+  const traceGraphMinYRaw = Math.min(...traceGraphPoints.map((p) => p.y));
+  const traceGraphMaxYRaw = Math.max(...traceGraphPoints.map((p) => p.y));
+  const traceGraphSpan = Math.max(traceGraphMaxXRaw - traceGraphMinXRaw, traceGraphMaxYRaw - traceGraphMinYRaw, 1);
+  const traceGraphMargin = Math.max(traceGraphSpan * 0.2, 0.3);
+
+  const traceGraphMinX = traceGraphMinXRaw - traceGraphMargin;
+  const traceGraphMaxX = traceGraphMaxXRaw + traceGraphMargin;
+  const traceGraphMinY = traceGraphMinYRaw - traceGraphMargin;
+  const traceGraphMaxY = traceGraphMaxYRaw + traceGraphMargin;
+
+  const toTraceGraphX = (x) =>
+    graphPadding + ((x - traceGraphMinX) / Math.max(traceGraphMaxX - traceGraphMinX, 1e-6)) * graphInnerWidth;
+  const toTraceGraphY = (y) =>
+    graphHeight - graphPadding - ((y - traceGraphMinY) / Math.max(traceGraphMaxY - traceGraphMinY, 1e-6)) * graphInnerHeight;
+
+  const traceAxisXVisible = traceGraphMinX <= 0 && traceGraphMaxX >= 0;
+  const traceAxisYVisible = traceGraphMinY <= 0 && traceGraphMaxY >= 0;
+  const traceGridStep = chooseGridStep(Math.max(traceGraphMaxX - traceGraphMinX, traceGraphMaxY - traceGraphMinY));
+
+  const traceGridXValues = [];
+  const traceStartGridX = Math.ceil(traceGraphMinX / traceGridStep) * traceGridStep;
+  for (let value = traceStartGridX; value <= traceGraphMaxX + 1e-9; value += traceGridStep) {
+    traceGridXValues.push(Number(value.toFixed(6)));
+  }
+
+  const traceGridYValues = [];
+  const traceStartGridY = Math.ceil(traceGraphMinY / traceGridStep) * traceGridStep;
+  for (let value = traceStartGridY; value <= traceGraphMaxY + 1e-9; value += traceGridStep) {
+    traceGridYValues.push(Number(value.toFixed(6)));
+  }
 
   const axisXVisible = graphMinX <= 0 && graphMaxX >= 0;
   const axisYVisible = graphMinY <= 0 && graphMaxY >= 0;
@@ -1591,6 +1962,10 @@ function App() {
   }, []);
 
   useEffect(() => {
+    virtualOdomEnabledRef.current = virtualOdomEnabled;
+  }, [virtualOdomEnabled]);
+
+  useEffect(() => {
     setStatus("接続中...");
 
     // ROS接続
@@ -1640,12 +2015,20 @@ function App() {
     });
     console.log("Joy topic created:", joyTopicName);
 
+    virtualOdomPubRef.current = new ROSLIB.Topic({
+      ros: rosRef.current,
+      name: virtualOdomTopicName,
+      messageType: "std_msgs/msg/Float32MultiArray",
+    });
+    console.log("Virtual odometry topic created:", virtualOdomTopicName);
+
     odomRef.current = new ROSLIB.Topic({
       ros: rosRef.current,
       name: "odom_xy_yaw",
       messageType: "std_msgs/msg/Float32MultiArray",
     });
     odomRef.current.subscribe((msg) => {
+      if (virtualOdomEnabledRef.current) return;
       if (!msg?.data || msg.data.length < 3) return;
       setPoseX(Number(msg.data[0]) || 0);
       setPoseY(Number(msg.data[1]) || 0);
@@ -1716,6 +2099,7 @@ function App() {
           console.warn("Error unsubscribing joy topic:", error);
         }
       }
+      virtualOdomPubRef.current = null;
       if (odomRef.current) {
         try {
           odomRef.current.unsubscribe?.();
@@ -1734,7 +2118,32 @@ function App() {
       stopTopicEcho();
       if (rosRef.current) rosRef.current.close();
     };
-  }, [rosUrl, joyTopicName]);
+  }, [rosUrl, joyTopicName, virtualOdomTopicName]);
+
+  useEffect(() => {
+    if (!virtualOdomEnabled || !virtualOdomPubRef.current) {
+      if (virtualOdomTimerRef.current) {
+        clearInterval(virtualOdomTimerRef.current);
+        virtualOdomTimerRef.current = null;
+      }
+      return;
+    }
+
+    const hz = Math.max(1, Math.min(50, parseInt(virtualOdomHzInput, 10) || 10));
+    const intervalMs = Math.max(20, Math.round(1000 / hz));
+    const timer = setInterval(() => {
+      if (!virtualOdomPubRef.current) return;
+      virtualOdomPubRef.current.publish({
+        data: [poseX, poseY, poseYaw],
+      });
+    }, intervalMs);
+
+    virtualOdomTimerRef.current = timer;
+    return () => {
+      clearInterval(timer);
+      virtualOdomTimerRef.current = null;
+    };
+  }, [virtualOdomEnabled, virtualOdomHzInput, poseX, poseY, poseYaw]);
 
   if (frontendForceStopped) {
     return (
@@ -1934,1334 +2343,1491 @@ function App() {
         </section>
 
         <section className="page-switch-row">
-          <button
-            className={`page-switch-button ${activePage === "controller" ? "page-switch-active" : ""}`}
-            onClick={() => setActivePage("controller")}
-          >
-            {tr("コントローラ操作", "Controller")}
-          </button>
-          <button
-            className={`page-switch-button ${activePage === "sequence" ? "page-switch-active" : ""}`}
-            onClick={() => setActivePage("sequence")}
-          >
-            {tr("シーケンス操作", "Sequence")}
-          </button>
-          <button
-            className={`page-switch-button ${activePage === "pose" ? "page-switch-active" : ""}`}
-            onClick={() => setActivePage("pose")}
-          >
-            {tr("座標・姿勢管理", "Pose")}
-          </button>
-          <button
-            className={`page-switch-button ${activePage === "waypoint" ? "page-switch-active" : ""}`}
-            onClick={() => setActivePage("waypoint")}
-          >
-            {tr("ウェイポイント", "Waypoints")}
-          </button>
-          <button
-            className={`page-switch-button ${activePage === "teaching" ? "page-switch-active" : ""}`}
-            onClick={() => setActivePage("teaching")}
-          >
-            {tr("ティーチング", "Teaching")}
-          </button>
-          <button
-            className={`page-switch-button ${activePage === "actuator" ? "page-switch-active" : ""}`}
-            onClick={() => setActivePage("actuator")}
-          >
-            {tr("ダイレクト送信", "Actuator TX")}
-          </button>
-          <button
-            className={`page-switch-button ${activePage === "topic" ? "page-switch-active" : ""}`}
-            onClick={() => setActivePage("topic")}
-          >
-            {tr("トピック監視", "Topics")}
-          </button>
-          <button
-            className={`page-switch-button ${activePage === "camera" ? "page-switch-active" : ""}`}
-            onClick={() => setActivePage("camera")}
-          >
-            {tr("カメラ映像", "Camera")}
-          </button>
-          <button
-            className={`page-switch-button ${activePage === "serial-bridge" ? "page-switch-active" : ""}`}
-            onClick={() => {
-              setActivePage("serial-bridge");
-              refreshSerialBridgeStatus();
-              refreshTopicList();
-              refreshSerialBridgeLogs();
-            }}
-          >
-            Serial Bridge
-          </button>
-          <button
-            className={`page-switch-button ${activePage === "shutdown" ? "page-switch-active" : ""}`}
-            onClick={() => setActivePage("shutdown")}
-          >
-            {tr("強制停止", "Shutdown")}
-          </button>
-          <button
-            className={`page-switch-button ${activePage === "settings" ? "page-switch-active" : ""}`}
-            onClick={() => setActivePage("settings")}
-          >
-            {tr("設定", "Settings")}
-          </button>
+          {pageOrder.map((page) => (
+            <button
+              key={`page-tab-${page}`}
+              className={`page-switch-button ${isPageActive(page) ? "page-switch-active" : ""} ${draggingPage === page ? "page-switch-dragging" : ""}`}
+              onClick={() => handlePageButtonClick(page)}
+              disabled={!isPageActive(page) && activePages.length >= MAX_ACTIVE_PAGES}
+              draggable
+              onDragStart={() => setDraggingPage(page)}
+              onDragEnd={() => setDraggingPage("")}
+              onDragOver={(event) => {
+                event.preventDefault();
+                if (draggingPage && draggingPage !== page) {
+                  movePageInOrder(draggingPage, page);
+                }
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                if (draggingPage && draggingPage !== page) {
+                  movePageInOrder(draggingPage, page);
+                }
+                setDraggingPage("");
+              }}
+              title={
+                !isPageActive(page) && activePages.length >= MAX_ACTIVE_PAGES
+                  ? tr("同時表示は2タブまでです", "Up to 2 tabs can be shown at once")
+                  : tr("ドラッグで並び替えできます", "Drag to reorder")
+              }
+            >
+              {getPageLabel(page)}
+            </button>
+          ))}
         </section>
+        <p className="connection-hint page-switch-hint">
+          {tr("同時に表示できるタブは最大2つです", "You can show up to 2 tabs at the same time")}
+        </p>
 
-        {activePage === "controller" && (
-          <>
-            <section className="joy-topic-row">
-              <input
-                className="connection-input"
-                value={joyTopicInput}
-                onChange={(e) => setJoyTopicInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") applyJoyTopicName();
-                }}
-                placeholder={tr("Joy Topic Name (例: /joy_9)", "Joy Topic Name (e.g. /joy_9)")}
-              />
-              <button className="connection-button btn-connect" onClick={applyJoyTopicName}>
-                {tr("更新", "Apply")}
-              </button>
-            </section>
+        <section className="active-pages-grid">
 
-            <p className="connection-hint">{tr("現在のJoyトピック:", "Current Joy topic:")} {joyTopicName}</p>
+          {isPageActive("controller") && (
+            <section className="serial-bridge-panel">
+              <section className="joy-topic-row">
+                <input
+                  className="connection-input"
+                  value={joyTopicInput}
+                  onChange={(e) => setJoyTopicInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") applyJoyTopicName();
+                  }}
+                  placeholder={tr("Joy Topic Name (例: /joy_9)", "Joy Topic Name (e.g. /joy_9)")}
+                />
+                <button className="connection-button btn-connect" onClick={applyJoyTopicName}>
+                  {tr("更新", "Apply")}
+                </button>
+              </section>
 
-            <section className="control-toggle-row">
-              <button
-                className={`toggle-button ${controllerEnabled ? "toggle-on" : "toggle-off"}`}
-                onClick={() => setControllerEnabled(!controllerEnabled)}
-              >
-                {controllerEnabled ? tr("コントローラー: ON", "Controller: ON") : tr("コントローラー: OFF", "Controller: OFF")}
-              </button>
-              <button
-                className="fullscreen-toggle-button"
-                onClick={() => setControllerFullscreen(true)}
-              >
-                {tr("全画面操作", "Fullscreen")}
-              </button>
-            </section>
+              <p className="connection-hint">{tr("現在のJoyトピック:", "Current Joy topic:")} {joyTopicName}</p>
 
-            {controllerEnabled && (
-              <div className="controller-layout">
-                <section className="quick-controls-panel">
-                  <div className="quick-controls-row">
-                    <div className="control-group">
-                      <button
-                        className="control-button control-button-emergency emergency-stop-shape"
-                        onClick={() => {
-                          updateCommand(0);
-                        }}
-                      >
-                        {tr("緊急停止", "Emergency Stop")}
+              <section className="control-toggle-row">
+                <button
+                  className={`toggle-button ${controllerEnabled ? "toggle-on" : "toggle-off"}`}
+                  onClick={() => setControllerEnabled(!controllerEnabled)}
+                >
+                  {controllerEnabled ? tr("コントローラー: ON", "Controller: ON") : tr("コントローラー: OFF", "Controller: OFF")}
+                </button>
+                <button
+                  className="fullscreen-toggle-button"
+                  onClick={() => setControllerFullscreen(true)}
+                >
+                  {tr("全画面操作", "Fullscreen")}
+                </button>
+              </section>
+
+              {controllerEnabled && (
+                <div className="controller-layout">
+                  <section className="quick-controls-panel">
+                    <div className="quick-controls-row">
+                      <div className="control-group">
+                        <button
+                          className="control-button control-button-emergency emergency-stop-shape"
+                          onClick={() => {
+                            updateCommand(0);
+                          }}
+                        >
+                          {tr("緊急停止", "Emergency Stop")}
+                        </button>
+                      </div>
+                    </div>
+
+                    <p className="velocity-readout">
+                      command: {commandValue}
+                    </p>
+                  </section>
+
+                  <section className="ps4-panel">
+                    <h2>{tr("PS4 コントローラーボタン", "PS4 Controller Buttons")}</h2>
+
+                    <div className="ps-shoulder-row">
+                      <div className="ps-shoulder-side">
+                        <button className={`ps-button ps-shoulder ${buttons[6] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(6)}>
+                          L2
+                        </button>
+                        <button className={`ps-button ps-shoulder ${buttons[4] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(4)}>
+                          L1
+                        </button>
+                      </div>
+                      <div className="ps-shoulder-side ps-shoulder-side-right">
+                        <button className={`ps-button ps-shoulder ${buttons[5] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(5)}>
+                          R1
+                        </button>
+                        <button className={`ps-button ps-shoulder ${buttons[7] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(7)}>
+                          R2
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="ps-main-row">
+                      <div className="dpad-grid">
+                        <button className={`dpad-button ${axes[7] === 1 ? "ps-active" : ""}`} {...getAxisPressProps(7, 1)}>
+                          ↑
+                        </button>
+                        <button className={`dpad-button ${axes[6] === -1 ? "ps-active" : ""}`} {...getAxisPressProps(6, -1)}>
+                          ←
+                        </button>
+                        <button className={`dpad-button ${axes[6] === 1 ? "ps-active" : ""}`} {...getAxisPressProps(6, 1)}>
+                          →
+                        </button>
+                        <button className={`dpad-button ${axes[7] === -1 ? "ps-active" : ""}`} {...getAxisPressProps(7, -1)}>
+                          ↓
+                        </button>
+                      </div>
+
+                      <div className="ps-system-row">
+                        <button className={`ps-button ps-system ${buttons[8] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(8)}>
+                          SHARE
+                        </button>
+                        <button className={`ps-button ps-system ps-home ${buttons[12] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(12)}>
+                          PS
+                        </button>
+                        <button className={`ps-button ps-system ${buttons[9] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(9)}>
+                          OPTIONS
+                        </button>
+                      </div>
+
+                      <div className="face-grid">
+                        <button className={`ps-button ps-face ps-triangle ${buttons[2] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(2)}>
+                          △
+                        </button>
+                        <button className={`ps-button ps-face ps-square ${buttons[3] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(3)}>
+                          □
+                        </button>
+                        <button className={`ps-button ps-face ps-circle ${buttons[1] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(1)}>
+                          ○
+                        </button>
+                        <button className={`ps-button ps-face ps-cross ${buttons[0] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(0)}>
+                          ×
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="ps-stick-row">
+                      <button className={`ps-button ps-stick ${buttons[10] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(10)}>
+                        L3
+                      </button>
+                      <button className={`ps-button ps-stick ${buttons[11] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(11)}>
+                        R3
                       </button>
                     </div>
-                  </div>
+                  </section>
+                </div>
+              )}
 
-                  <p className="velocity-readout">
-                    command: {commandValue}
+              {!controllerEnabled && (
+                <div className="disabled-notice">
+                  {tr("コントローラーは無効化されています", "Controller is disabled")}
+                </div>
+              )}
+            </section>
+          )}
+
+          {isPageActive("sequence") && (
+            <section className="quick-controls-panel">
+              <h2 className="serial-packet-title">{tr("シーケンス操作", "Sequence")}</h2>
+              <div className="quick-controls-row sequence-controls-row">
+                <div className="control-group">
+                  <button
+                    className="control-button control-button-step-up"
+                    {...getHoldHandlers(
+                      () => updateCommand(1),
+                      () => updateCommand(0)
+                    )}
+                  >
+                    {tr("段差上り", "Step Up")}
+                  </button>
+                </div>
+
+                <div className="control-group">
+                  <button
+                    className="control-button control-button-step-down"
+                    {...getHoldHandlers(
+                      () => updateCommand(-1),
+                      () => updateCommand(0)
+                    )}
+                  >
+                    {tr("段差下り", "Step Down")}
+                  </button>
+                </div>
+              </div>
+
+              <p className="velocity-readout">
+                command: {commandValue}
+              </p>
+            </section>
+          )}
+
+          {isPageActive("pose") && (
+            <section className="pose-panel">
+              <h2 className="serial-packet-title">{tr("座標・姿勢管理", "Pose Management")}</h2>
+              <p className="serial-packet-hint">
+                {tr("現在座標と目標座標を管理します。（Yaw: 度数法）", "Manage current pose and target pose. (Yaw in degrees)")}
+              </p>
+
+              <div className="pose-overview-grid">
+                <section className="pose-graph-card">
+                  <div className="pose-graph-title-row">
+                    <h3 className="pose-graph-title">{tr("位置・姿勢グラフ", "Pose Graph")}</h3>
+                    <span className="pose-graph-scale">{tr("単位: m", "Unit: m")}</span>
+                  </div>
+                  <svg
+                    className="pose-graph"
+                    ref={poseGraphRef}
+                    viewBox={`0 0 ${graphWidth} ${graphHeight}`}
+                    role="img"
+                    aria-label={tr("現在位置と目標位置のグラフ", "Graph of current and target pose")}
+                    onPointerDown={handlePoseGraphPointerDown}
+                    onPointerMove={handlePoseGraphPointerMove}
+                    onPointerUp={releasePoseGraphPointer}
+                    onPointerCancel={releasePoseGraphPointer}
+                    onLostPointerCapture={releasePoseGraphPointer}
+                  >
+                    <rect
+                      x={graphPadding}
+                      y={graphPadding}
+                      width={graphInnerWidth}
+                      height={graphInnerHeight}
+                      className="pose-graph-frame"
+                    />
+
+                    {gridXValues.map((value) => (
+                      <line
+                        key={`grid-x-${value}`}
+                        x1={toGraphX(value)}
+                        y1={graphPadding}
+                        x2={toGraphX(value)}
+                        y2={graphHeight - graphPadding}
+                        className="pose-graph-grid"
+                      />
+                    ))}
+                    {gridYValues.map((value) => (
+                      <line
+                        key={`grid-y-${value}`}
+                        x1={graphPadding}
+                        y1={toGraphY(value)}
+                        x2={graphWidth - graphPadding}
+                        y2={toGraphY(value)}
+                        className="pose-graph-grid"
+                      />
+                    ))}
+
+                    {axisXVisible && (
+                      <line
+                        x1={graphPadding}
+                        y1={toGraphY(0)}
+                        x2={graphWidth - graphPadding}
+                        y2={toGraphY(0)}
+                        className="pose-graph-axis"
+                      />
+                    )}
+                    {axisYVisible && (
+                      <line
+                        x1={toGraphX(0)}
+                        y1={graphPadding}
+                        x2={toGraphX(0)}
+                        y2={graphHeight - graphPadding}
+                        className="pose-graph-axis"
+                      />
+                    )}
+
+                    <line x1={currentX} y1={currentY} x2={targetX} y2={targetY} className="pose-graph-link" />
+
+                    <line x1={currentX} y1={currentY} x2={currentArrowX} y2={currentArrowY} className="pose-graph-arrow-current" />
+                    <line x1={targetX} y1={targetY} x2={targetArrowX} y2={targetArrowY} className="pose-graph-arrow-target" />
+
+                    <circle cx={currentX} cy={currentY} r="6" className="pose-graph-point-current" />
+                    <circle cx={targetX} cy={targetY} r="6" className="pose-graph-point-target" />
+
+                    <text x={currentX + 8} y={currentY - 10} className="pose-graph-label">{tr("現在", "Current")}</text>
+                    <text x={targetX + 8} y={targetY - 10} className="pose-graph-label">{tr("目標", "Target")}</text>
+
+                    <text x={graphPadding} y={graphPadding - 8} className="pose-graph-corner-label">
+                      Y {graphMaxY.toFixed(2)}
+                    </text>
+                    <text x={graphPadding} y={graphHeight - 8} className="pose-graph-corner-label">
+                      Y {graphMinY.toFixed(2)}
+                    </text>
+                    <text x={graphPadding} y={graphHeight - graphPadding + 16} className="pose-graph-corner-label">
+                      X {graphMinX.toFixed(2)}
+                    </text>
+                    <text x={graphWidth - graphPadding - 84} y={graphHeight - graphPadding + 16} className="pose-graph-corner-label">
+                      X {graphMaxX.toFixed(2)}
+                    </text>
+                  </svg>
+
+                  <div className="pose-graph-legend">
+                    <span className="pose-legend-item">
+                      <i className="pose-legend-dot pose-legend-current" />
+                      {tr("現在位置 / 姿勢", "Current position / yaw")}
+                    </span>
+                    <span className="pose-legend-item">
+                      <i className="pose-legend-dot pose-legend-target" />
+                      {tr("目標位置 / 姿勢", "Target position / yaw")}
+                    </span>
+                  </div>
+                  <p className="pose-graph-interaction-hint">
+                    {tr("グラフをクリック/ドラッグして目標座標を直接プロットできます。", "Click or drag on the graph to plot the target directly.")}
                   </p>
                 </section>
 
-                <section className="ps4-panel">
-                  <h2>{tr("PS4 コントローラーボタン", "PS4 Controller Buttons")}</h2>
+                <div className="pose-current-grid">
+                  <div className="pose-current-item">
+                    <span>{tr("現在X", "Current X")}</span>
+                    <strong>{poseX.toFixed(3)}</strong>
+                  </div>
+                  <div className="pose-current-item">
+                    <span>{tr("現在Y", "Current Y")}</span>
+                    <strong>{poseY.toFixed(3)}</strong>
+                  </div>
+                  <div className="pose-current-item">
+                    <span>{tr("現在Yaw (°)", "Current Yaw (°)")}</span>
+                    <strong>{(poseYaw * 180 / Math.PI).toFixed(1)}</strong>
+                  </div>
+                  <div className="pose-current-item">
+                    <span>{tr("現在モード", "Current Mode")}</span>
+                    <strong>{driveMode}</strong>
+                  </div>
+                </div>
+              </div>
 
-                  <div className="ps-shoulder-row">
-                    <div className="ps-shoulder-side">
-                      <button className={`ps-button ps-shoulder ${buttons[6] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(6)}>
-                        L2
-                      </button>
-                      <button className={`ps-button ps-shoulder ${buttons[4] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(4)}>
-                        L1
-                      </button>
-                    </div>
-                    <div className="ps-shoulder-side ps-shoulder-side-right">
-                      <button className={`ps-button ps-shoulder ${buttons[5] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(5)}>
-                        R1
-                      </button>
-                      <button className={`ps-button ps-shoulder ${buttons[7] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(7)}>
-                        R2
-                      </button>
-                    </div>
+              <div className="pose-step-grid">
+                <label className="serial-packet-label">
+                  {tr("X ステップ", "X Step")}
+                  <input
+                    className="connection-input"
+                    type="number"
+                    step="0.1"
+                    value={targetXStep}
+                    onChange={(e) => setTargetXStep(e.target.value)}
+                  />
+                </label>
+                <label className="serial-packet-label">
+                  {tr("Y ステップ", "Y Step")}
+                  <input
+                    className="connection-input"
+                    type="number"
+                    step="0.1"
+                    value={targetYStep}
+                    onChange={(e) => setTargetYStep(e.target.value)}
+                  />
+                </label>
+                <label className="serial-packet-label">
+                  {tr("Yaw ステップ (°)", "Yaw Step (°)")}
+                  <input
+                    className="connection-input"
+                    type="number"
+                    step="1"
+                    value={targetYawStep}
+                    onChange={(e) => setTargetYawStep(e.target.value)}
+                  />
+                </label>
+              </div>
+
+              <div className="pose-input-grid">
+                <div className="pose-input-item">
+                  <label className="serial-packet-label">
+                    {tr("目標X", "Target X")}
+                    <input className="connection-input" value={targetXInput} onChange={(e) => setTargetXInput(e.target.value)} />
+                  </label>
+                  <div className="pose-button-group">
+                    <button className="pose-pm-button" onClick={() => decrementTarget(setTargetXInput, targetXInput, targetXStep)}>−</button>
+                    <button className="pose-pm-button" onClick={() => incrementTarget(setTargetXInput, targetXInput, targetXStep)}>+</button>
+                  </div>
+                </div>
+
+                <div className="pose-input-item">
+                  <label className="serial-packet-label">
+                    {tr("目標Y", "Target Y")}
+                    <input className="connection-input" value={targetYInput} onChange={(e) => setTargetYInput(e.target.value)} />
+                  </label>
+                  <div className="pose-button-group">
+                    <button className="pose-pm-button" onClick={() => decrementTarget(setTargetYInput, targetYInput, targetYStep)}>−</button>
+                    <button className="pose-pm-button" onClick={() => incrementTarget(setTargetYInput, targetYInput, targetYStep)}>+</button>
+                  </div>
+                </div>
+
+                <div className="pose-input-item">
+                  <label className="serial-packet-label">
+                    {tr("目標Yaw (°)", "Target Yaw (°)")}
+                    <input className="connection-input" value={targetYawInput} onChange={(e) => setTargetYawInput(e.target.value)} />
+                  </label>
+                  <div className="pose-button-group">
+                    <button className="pose-pm-button" onClick={() => decrementTarget(setTargetYawInput, targetYawInput, targetYawStep)}>−</button>
+                    <button className="pose-pm-button" onClick={() => incrementTarget(setTargetYawInput, targetYawInput, targetYawStep)}>+</button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pose-actions-row">
+                <button className="connection-button btn-neutral" onClick={applyAutoDriveFromCurrentPose}>{tr("現在値を目標へ", "Use Current as Target")}</button>
+                <button className="connection-button btn-neutral" onClick={publishOdomReset} disabled={!operationArmed}>{tr("オドメトリをリセット", "Reset Odometry")}</button>
+                <button className="connection-button serial-send-button btn-send" onClick={publishAutoDriveCommand} disabled={!operationArmed}>{tr("目標座標を送信", "Send Target Pose")}</button>
+              </div>
+
+              <p className="connection-hint">{translateRuntimeText(autoDriveCmdInfo)}</p>
+
+              <div className="pose-target-save-panel">
+                <button className="connection-button serial-send-button btn-save" onClick={saveTargetPose}>
+                  {tr("目標値を保存", "Save Target")}
+                </button>
+                {savedPosesList.length > 0 && (
+                  <button className="serial-clear-button" onClick={clearAllSavedPoses}>
+                    {tr("すべてクリア", "Clear All")}
+                  </button>
+                )}
+              </div>
+
+              {savedPosesList.length > 0 && (
+                <div className="pose-saved-list-panel">
+                  <h3 className="pose-saved-list-title">{tr("保存済み目標値", "Saved Targets")} ({savedPosesList.length})</h3>
+                  <div className="pose-saved-list">
+                    {savedPosesList.map((pose) => (
+                      <div key={pose.id} className="pose-saved-item">
+                        <div className="pose-saved-item-info">
+                          <span className="pose-saved-item-label">{pose.label}</span>
+                          <span className="pose-saved-item-values">
+                            X: {pose.x.toFixed(3)}, Y: {pose.y.toFixed(3)}, Yaw: {pose.yawDeg.toFixed(1)}°
+                          </span>
+                          <span className="pose-saved-item-time">{pose.timestamp}</span>
+                        </div>
+                        <div className="pose-saved-item-actions">
+                          <button
+                            className="connection-button pose-item-button btn-restore"
+                            onClick={() => applySavedTargetPose(pose)}
+                          >
+                            {tr("復元&送信", "Restore & Send")}
+                          </button>
+                          <button
+                            className="serial-clear-button pose-item-button"
+                            onClick={() => deleteSavedPose(pose.id)}
+                          >
+                            {tr("削除", "Delete")}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
+          {isPageActive("waypoint") && (
+            <section className="waypoint-panel">
+              <h2 className="serial-packet-title">{tr("ウェイポイント指定", "Waypoint Planner")}</h2>
+              <p className="serial-packet-hint">
+                {tr(
+                  "グラフをクリックしてウェイポイントを追加します。到達判定しきい値を満たすと、次のウェイポイントへ自動で目標値を切り替えます。",
+                  "Click the graph to add waypoints. When reach thresholds are satisfied, target values switch to the next waypoint automatically."
+                )}
+              </p>
+
+              <div className="waypoint-toolbar">
+                <button className="connection-button btn-connect" onClick={startWaypointNavigation}>
+                  {tr("追従開始", "Start")}
+                </button>
+                <button className="connection-button btn-neutral" onClick={stopWaypointNavigation}>
+                  {tr("追従停止", "Stop")}
+                </button>
+                <button className="serial-clear-button" onClick={clearWaypoints}>
+                  {tr("全削除", "Clear All")}
+                </button>
+                <button
+                  className={`toggle-button ${waypointAutoAdvanceEnabled ? "toggle-on" : "toggle-off"}`}
+                  onClick={() => setWaypointAutoAdvanceEnabled((prev) => !prev)}
+                >
+                  {waypointAutoAdvanceEnabled ? tr("自動切替: ON", "Auto Advance: ON") : tr("自動切替: OFF", "Auto Advance: OFF")}
+                </button>
+                <button
+                  className={`toggle-button ${waypointAutoPublishEnabled ? "toggle-on" : "toggle-off"}`}
+                  onClick={() => setWaypointAutoPublishEnabled((prev) => !prev)}
+                >
+                  {waypointAutoPublishEnabled ? tr("切替時送信: ON", "Publish on Switch: ON") : tr("切替時送信: OFF", "Publish on Switch: OFF")}
+                </button>
+              </div>
+
+              <div className="waypoint-settings-grid">
+                <label className="serial-packet-label">
+                  {tr("到達距離しきい値 [m]", "Distance Threshold [m]")}
+                  <input
+                    className="connection-input"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={waypointDistanceThresholdInput}
+                    onChange={(e) => setWaypointDistanceThresholdInput(e.target.value)}
+                  />
+                </label>
+
+                <button
+                  className={`toggle-button ${waypointCheckYaw ? "toggle-on" : "toggle-off"}`}
+                  onClick={() => setWaypointCheckYaw((prev) => !prev)}
+                >
+                  {waypointCheckYaw ? tr("Yaw判定: ON", "Yaw Check: ON") : tr("Yaw判定: OFF", "Yaw Check: OFF")}
+                </button>
+
+                <label className="serial-packet-label">
+                  {tr("Yawしきい値 [deg]", "Yaw Threshold [deg]")}
+                  <input
+                    className="connection-input"
+                    type="number"
+                    step="0.5"
+                    min="0.5"
+                    value={waypointYawThresholdInput}
+                    onChange={(e) => setWaypointYawThresholdInput(e.target.value)}
+                    disabled={!waypointCheckYaw}
+                  />
+                </label>
+              </div>
+
+              <div className="waypoint-overview-grid">
+                <section className="pose-graph-card">
+                  <div className="pose-graph-title-row">
+                    <h3 className="pose-graph-title">{tr("ウェイポイントグラフ", "Waypoint Graph")}</h3>
+                    <span className="pose-graph-scale">{tr("単位: m", "Unit: m")}</span>
                   </div>
 
-                  <div className="ps-main-row">
-                    <div className="dpad-grid">
-                      <button className={`dpad-button ${axes[7] === 1 ? "ps-active" : ""}`} {...getAxisPressProps(7, 1)}>
-                        ↑
-                      </button>
-                      <button className={`dpad-button ${axes[6] === -1 ? "ps-active" : ""}`} {...getAxisPressProps(6, -1)}>
-                        ←
-                      </button>
-                      <button className={`dpad-button ${axes[6] === 1 ? "ps-active" : ""}`} {...getAxisPressProps(6, 1)}>
-                        →
-                      </button>
-                      <button className={`dpad-button ${axes[7] === -1 ? "ps-active" : ""}`} {...getAxisPressProps(7, -1)}>
-                        ↓
-                      </button>
-                    </div>
+                  <svg
+                    className="pose-graph waypoint-graph"
+                    ref={waypointGraphRef}
+                    viewBox={`0 0 ${graphWidth} ${graphHeight}`}
+                    role="img"
+                    aria-label={tr("ウェイポイント指定グラフ", "Waypoint plot graph")}
+                    onPointerDown={handleWaypointGraphPointerDown}
+                  >
+                    <rect
+                      x={graphPadding}
+                      y={graphPadding}
+                      width={graphInnerWidth}
+                      height={graphInnerHeight}
+                      className="pose-graph-frame"
+                    />
 
-                    <div className="ps-system-row">
-                      <button className={`ps-button ps-system ${buttons[8] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(8)}>
-                        SHARE
-                      </button>
-                      <button className={`ps-button ps-system ps-home ${buttons[12] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(12)}>
-                        PS
-                      </button>
-                      <button className={`ps-button ps-system ${buttons[9] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(9)}>
-                        OPTIONS
-                      </button>
-                    </div>
+                    {gridXValues.map((value) => (
+                      <line
+                        key={`wp-grid-x-${value}`}
+                        x1={toGraphX(value)}
+                        y1={graphPadding}
+                        x2={toGraphX(value)}
+                        y2={graphHeight - graphPadding}
+                        className="pose-graph-grid"
+                      />
+                    ))}
+                    {gridYValues.map((value) => (
+                      <line
+                        key={`wp-grid-y-${value}`}
+                        x1={graphPadding}
+                        y1={toGraphY(value)}
+                        x2={graphWidth - graphPadding}
+                        y2={toGraphY(value)}
+                        className="pose-graph-grid"
+                      />
+                    ))}
 
-                    <div className="face-grid">
-                      <button className={`ps-button ps-face ps-triangle ${buttons[2] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(2)}>
-                        △
-                      </button>
-                      <button className={`ps-button ps-face ps-square ${buttons[3] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(3)}>
-                        □
-                      </button>
-                      <button className={`ps-button ps-face ps-circle ${buttons[1] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(1)}>
-                        ○
-                      </button>
-                      <button className={`ps-button ps-face ps-cross ${buttons[0] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(0)}>
-                        ×
-                      </button>
-                    </div>
+                    {axisXVisible && (
+                      <line
+                        x1={graphPadding}
+                        y1={toGraphY(0)}
+                        x2={graphWidth - graphPadding}
+                        y2={toGraphY(0)}
+                        className="pose-graph-axis"
+                      />
+                    )}
+                    {axisYVisible && (
+                      <line
+                        x1={toGraphX(0)}
+                        y1={graphPadding}
+                        x2={toGraphX(0)}
+                        y2={graphHeight - graphPadding}
+                        className="pose-graph-axis"
+                      />
+                    )}
+
+                    {waypointPolylinePoints && (
+                      <polyline points={waypointPolylinePoints} className="waypoint-path-line" />
+                    )}
+
+                    <circle cx={currentX} cy={currentY} r="6" className="pose-graph-point-current" />
+
+                    {waypoints.map((waypoint, index) => (
+                      <g key={waypoint.id}>
+                        <circle
+                          cx={toGraphX(waypoint.x)}
+                          cy={toGraphY(waypoint.y)}
+                          r={index === activeWaypointIndex ? "6" : "5"}
+                          className={index === activeWaypointIndex ? "waypoint-point-active" : "waypoint-point"}
+                        />
+                        <text
+                          x={toGraphX(waypoint.x) + 7}
+                          y={toGraphY(waypoint.y) - 8}
+                          className="waypoint-point-label"
+                        >
+                          {index + 1}
+                        </text>
+                      </g>
+                    ))}
+                  </svg>
+
+                  <p className="pose-graph-interaction-hint">
+                    {tr(
+                      "左クリックでウェイポイント追加。現在のTarget Yaw値が各ウェイポイントのYawとして保存されます。",
+                      "Left click to add a waypoint. The current Target Yaw value is stored for each waypoint."
+                    )}
+                  </p>
+                </section>
+
+                <section className="waypoint-list-card">
+                  <div className="waypoint-summary-row">
+                    <span>{tr("登録数", "Count")}: {waypoints.length}</span>
+                    <span>{tr("アクティブ", "Active")}: {activeWaypointIndex >= 0 ? activeWaypointIndex + 1 : "-"}</span>
                   </div>
 
-                  <div className="ps-stick-row">
-                    <button className={`ps-button ps-stick ${buttons[10] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(10)}>
-                      L3
-                    </button>
-                    <button className={`ps-button ps-stick ${buttons[11] === 1 ? "ps-active" : ""}`} {...getButtonPressProps(11)}>
-                      R3
-                    </button>
+                  <div className="waypoint-list-box">
+                    {waypoints.length === 0 && (
+                      <p className="connection-hint">{tr("ウェイポイント未登録", "No waypoints")}</p>
+                    )}
+
+                    {waypoints.map((waypoint, index) => (
+                      <div
+                        key={waypoint.id}
+                        className={`waypoint-row ${index === activeWaypointIndex ? "waypoint-row-active" : ""}`}
+                      >
+                        <div className="waypoint-row-text">
+                          <strong>{waypoint.label}</strong>
+                          <span>
+                            X: {waypoint.x.toFixed(3)}, Y: {waypoint.y.toFixed(3)}, Yaw: {waypoint.yawDeg.toFixed(1)}
+                          </span>
+                        </div>
+                        <div className="waypoint-row-actions">
+                          <button
+                            className="connection-button btn-send waypoint-row-button"
+                            onClick={() => setWaypointAsActive(index, true)}
+                            disabled={!operationArmed}
+                          >
+                            {tr("適用&送信", "Apply & Send")}
+                          </button>
+                          <button
+                            className="connection-button btn-neutral waypoint-row-button"
+                            onClick={() => setWaypointAsActive(index, false)}
+                          >
+                            {tr("適用", "Apply")}
+                          </button>
+                          <button
+                            className="serial-clear-button waypoint-row-button"
+                            onClick={() => removeWaypointById(waypoint.id)}
+                          >
+                            {tr("削除", "Delete")}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </section>
               </div>
-            )}
 
-            {!controllerEnabled && (
-              <div className="disabled-notice">
-                {tr("コントローラーは無効化されています", "Controller is disabled")}
-              </div>
-            )}
-          </>
-        )}
+              <p className="connection-hint">{translateRuntimeText(waypointInfo)}</p>
+            </section>
+          )}
 
-        {activePage === "sequence" && (
-          <section className="quick-controls-panel">
-            <h2 className="serial-packet-title">{tr("シーケンス操作", "Sequence")}</h2>
-            <div className="quick-controls-row sequence-controls-row">
-              <div className="control-group">
-                <button
-                  className="control-button control-button-step-up"
-                  {...getHoldHandlers(
-                    () => updateCommand(1),
-                    () => updateCommand(0)
-                  )}
-                >
-                  {tr("段差上り", "Step Up")}
+          {isPageActive("teaching") && (
+            <section className="teaching-panel">
+              <h2 className="serial-packet-title">{tr("ティーチング", "Teaching / Trace Replay")}</h2>
+              <p className="serial-packet-hint">
+                {tr(
+                  "手動操作で機体を動かしながら現在姿勢を記録し、あとで同じ順序で目標値として再生します。",
+                  "Record current poses while manually driving, then replay them as sequential target values."
+                )}
+              </p>
+
+              <div className="teaching-toolbar">
+                <button className="connection-button btn-connect" onClick={startTraceRecording} disabled={traceRecording}>
+                  {tr("記録開始", "Start Rec")}
                 </button>
-              </div>
-
-              <div className="control-group">
-                <button
-                  className="control-button control-button-step-down"
-                  {...getHoldHandlers(
-                    () => updateCommand(-1),
-                    () => updateCommand(0)
-                  )}
-                >
-                  {tr("段差下り", "Step Down")}
+                <button className="connection-button btn-neutral" onClick={stopTraceRecording} disabled={!traceRecording}>
+                  {tr("記録停止", "Stop Rec")}
                 </button>
-              </div>
-            </div>
-
-            <p className="velocity-readout">
-              command: {commandValue}
-            </p>
-          </section>
-        )}
-
-        {activePage === "pose" && (
-          <section className="pose-panel">
-            <h2 className="serial-packet-title">{tr("座標・姿勢管理", "Pose Management")}</h2>
-            <p className="serial-packet-hint">
-              {tr("現在座標と目標座標を管理します。（Yaw: 度数法）", "Manage current pose and target pose. (Yaw in degrees)")}
-            </p>
-
-            <div className="pose-overview-grid">
-              <section className="pose-graph-card">
-                <div className="pose-graph-title-row">
-                  <h3 className="pose-graph-title">{tr("位置・姿勢グラフ", "Pose Graph")}</h3>
-                  <span className="pose-graph-scale">{tr("単位: m", "Unit: m")}</span>
-                </div>
-                <svg
-                  className="pose-graph"
-                  ref={poseGraphRef}
-                  viewBox={`0 0 ${graphWidth} ${graphHeight}`}
-                  role="img"
-                  aria-label={tr("現在位置と目標位置のグラフ", "Graph of current and target pose")}
-                  onPointerDown={handlePoseGraphPointerDown}
-                  onPointerMove={handlePoseGraphPointerMove}
-                  onPointerUp={releasePoseGraphPointer}
-                  onPointerCancel={releasePoseGraphPointer}
-                  onLostPointerCapture={releasePoseGraphPointer}
+                <button className="connection-button btn-send" onClick={appendCurrentPoseToTrace}>
+                  {tr("現在姿勢を1点記録", "Record Current Pose")}
+                </button>
+                <button className="connection-button btn-connect" onClick={startTraceReplay} disabled={traceReplayRunning || tracePoints.length === 0}>
+                  {tr("再生開始", "Start Replay")}
+                </button>
+                <button className="connection-button btn-neutral" onClick={stopTraceReplay} disabled={!traceReplayRunning}>
+                  {tr("再生停止", "Stop Replay")}
+                </button>
+                <button className="serial-clear-button" onClick={clearTracePoints}>
+                  {tr("記録全削除", "Clear All")}
+                </button>
+                <button className="connection-button btn-save" onClick={exportTracePoints}>
+                  {tr("エクスポート", "Export")}
+                </button>
+                <button
+                  className="connection-button btn-restore"
+                  onClick={() => traceImportInputRef.current?.click()}
                 >
-                  <rect
-                    x={graphPadding}
-                    y={graphPadding}
-                    width={graphInnerWidth}
-                    height={graphInnerHeight}
-                    className="pose-graph-frame"
+                  {tr("インポート", "Import")}
+                </button>
+                <input
+                  ref={traceImportInputRef}
+                  type="file"
+                  accept=".json,application/json"
+                  style={{ display: "none" }}
+                  onChange={importTracePointsFromFile}
+                />
+              </div>
+
+              <div className="teaching-settings-grid">
+                <label className="serial-packet-label">
+                  {tr("記録周期 [ms]", "Record Interval [ms]")}
+                  <input
+                    className="connection-input"
+                    type="number"
+                    min="50"
+                    max="10000"
+                    step="10"
+                    value={traceSampleMsInput}
+                    onChange={(e) => setTraceSampleMsInput(e.target.value)}
                   />
-
-                  {gridXValues.map((value) => (
-                    <line
-                      key={`grid-x-${value}`}
-                      x1={toGraphX(value)}
-                      y1={graphPadding}
-                      x2={toGraphX(value)}
-                      y2={graphHeight - graphPadding}
-                      className="pose-graph-grid"
-                    />
-                  ))}
-                  {gridYValues.map((value) => (
-                    <line
-                      key={`grid-y-${value}`}
-                      x1={graphPadding}
-                      y1={toGraphY(value)}
-                      x2={graphWidth - graphPadding}
-                      y2={toGraphY(value)}
-                      className="pose-graph-grid"
-                    />
-                  ))}
-
-                  {axisXVisible && (
-                    <line
-                      x1={graphPadding}
-                      y1={toGraphY(0)}
-                      x2={graphWidth - graphPadding}
-                      y2={toGraphY(0)}
-                      className="pose-graph-axis"
-                    />
-                  )}
-                  {axisYVisible && (
-                    <line
-                      x1={toGraphX(0)}
-                      y1={graphPadding}
-                      x2={toGraphX(0)}
-                      y2={graphHeight - graphPadding}
-                      className="pose-graph-axis"
-                    />
-                  )}
-
-                  <line x1={currentX} y1={currentY} x2={targetX} y2={targetY} className="pose-graph-link" />
-
-                  <line x1={currentX} y1={currentY} x2={currentArrowX} y2={currentArrowY} className="pose-graph-arrow-current" />
-                  <line x1={targetX} y1={targetY} x2={targetArrowX} y2={targetArrowY} className="pose-graph-arrow-target" />
-
-                  <circle cx={currentX} cy={currentY} r="6" className="pose-graph-point-current" />
-                  <circle cx={targetX} cy={targetY} r="6" className="pose-graph-point-target" />
-
-                  <text x={currentX + 8} y={currentY - 10} className="pose-graph-label">{tr("現在", "Current")}</text>
-                  <text x={targetX + 8} y={targetY - 10} className="pose-graph-label">{tr("目標", "Target")}</text>
-
-                  <text x={graphPadding} y={graphPadding - 8} className="pose-graph-corner-label">
-                    Y {graphMaxY.toFixed(2)}
-                  </text>
-                  <text x={graphPadding} y={graphHeight - 8} className="pose-graph-corner-label">
-                    Y {graphMinY.toFixed(2)}
-                  </text>
-                  <text x={graphPadding} y={graphHeight - graphPadding + 16} className="pose-graph-corner-label">
-                    X {graphMinX.toFixed(2)}
-                  </text>
-                  <text x={graphWidth - graphPadding - 84} y={graphHeight - graphPadding + 16} className="pose-graph-corner-label">
-                    X {graphMaxX.toFixed(2)}
-                  </text>
-                </svg>
-
-                <div className="pose-graph-legend">
-                  <span className="pose-legend-item">
-                    <i className="pose-legend-dot pose-legend-current" />
-                    {tr("現在位置 / 姿勢", "Current position / yaw")}
-                  </span>
-                  <span className="pose-legend-item">
-                    <i className="pose-legend-dot pose-legend-target" />
-                    {tr("目標位置 / 姿勢", "Target position / yaw")}
-                  </span>
-                </div>
-                <p className="pose-graph-interaction-hint">
-                  {tr("グラフをクリック/ドラッグして目標座標を直接プロットできます。", "Click or drag on the graph to plot the target directly.")}
-                </p>
-              </section>
-
-              <div className="pose-current-grid">
-                <div className="pose-current-item">
-                  <span>{tr("現在X", "Current X")}</span>
-                  <strong>{poseX.toFixed(3)}</strong>
-                </div>
-                <div className="pose-current-item">
-                  <span>{tr("現在Y", "Current Y")}</span>
-                  <strong>{poseY.toFixed(3)}</strong>
-                </div>
-                <div className="pose-current-item">
-                  <span>{tr("現在Yaw (°)", "Current Yaw (°)")}</span>
-                  <strong>{(poseYaw * 180 / Math.PI).toFixed(1)}</strong>
-                </div>
-                <div className="pose-current-item">
-                  <span>{tr("現在モード", "Current Mode")}</span>
-                  <strong>{driveMode}</strong>
-                </div>
-              </div>
-            </div>
-
-            <div className="pose-step-grid">
-              <label className="serial-packet-label">
-                {tr("X ステップ", "X Step")}
-                <input
-                  className="connection-input"
-                  type="number"
-                  step="0.1"
-                  value={targetXStep}
-                  onChange={(e) => setTargetXStep(e.target.value)}
-                />
-              </label>
-              <label className="serial-packet-label">
-                {tr("Y ステップ", "Y Step")}
-                <input
-                  className="connection-input"
-                  type="number"
-                  step="0.1"
-                  value={targetYStep}
-                  onChange={(e) => setTargetYStep(e.target.value)}
-                />
-              </label>
-              <label className="serial-packet-label">
-                {tr("Yaw ステップ (°)", "Yaw Step (°)")}
-                <input
-                  className="connection-input"
-                  type="number"
-                  step="1"
-                  value={targetYawStep}
-                  onChange={(e) => setTargetYawStep(e.target.value)}
-                />
-              </label>
-            </div>
-
-            <div className="pose-input-grid">
-              <div className="pose-input-item">
-                <label className="serial-packet-label">
-                  {tr("目標X", "Target X")}
-                  <input className="connection-input" value={targetXInput} onChange={(e) => setTargetXInput(e.target.value)} />
                 </label>
-                <div className="pose-button-group">
-                  <button className="pose-pm-button" onClick={() => decrementTarget(setTargetXInput, targetXInput, targetXStep)}>−</button>
-                  <button className="pose-pm-button" onClick={() => incrementTarget(setTargetXInput, targetXInput, targetXStep)}>+</button>
-                </div>
-              </div>
 
-              <div className="pose-input-item">
                 <label className="serial-packet-label">
-                  {tr("目標Y", "Target Y")}
-                  <input className="connection-input" value={targetYInput} onChange={(e) => setTargetYInput(e.target.value)} />
+                  {tr("再生周期 [ms]", "Replay Interval [ms]")}
+                  <input
+                    className="connection-input"
+                    type="number"
+                    min="50"
+                    max="10000"
+                    step="10"
+                    value={traceReplayMsInput}
+                    onChange={(e) => setTraceReplayMsInput(e.target.value)}
+                  />
                 </label>
-                <div className="pose-button-group">
-                  <button className="pose-pm-button" onClick={() => decrementTarget(setTargetYInput, targetYInput, targetYStep)}>−</button>
-                  <button className="pose-pm-button" onClick={() => incrementTarget(setTargetYInput, targetYInput, targetYStep)}>+</button>
-                </div>
-              </div>
 
-              <div className="pose-input-item">
-                <label className="serial-packet-label">
-                  {tr("目標Yaw (°)", "Target Yaw (°)")}
-                  <input className="connection-input" value={targetYawInput} onChange={(e) => setTargetYawInput(e.target.value)} />
-                </label>
-                <div className="pose-button-group">
-                  <button className="pose-pm-button" onClick={() => decrementTarget(setTargetYawInput, targetYawInput, targetYawStep)}>−</button>
-                  <button className="pose-pm-button" onClick={() => incrementTarget(setTargetYawInput, targetYawInput, targetYawStep)}>+</button>
-                </div>
-              </div>
-            </div>
-
-            <div className="pose-actions-row">
-              <button className="connection-button btn-neutral" onClick={applyAutoDriveFromCurrentPose}>{tr("現在値を目標へ", "Use Current as Target")}</button>
-              <button className="connection-button btn-neutral" onClick={publishOdomReset} disabled={!operationArmed}>{tr("オドメトリをリセット", "Reset Odometry")}</button>
-              <button className="connection-button serial-send-button btn-send" onClick={publishAutoDriveCommand} disabled={!operationArmed}>{tr("目標座標を送信", "Send Target Pose")}</button>
-            </div>
-
-            <p className="connection-hint">{translateRuntimeText(autoDriveCmdInfo)}</p>
-
-            <div className="pose-target-save-panel">
-              <button className="connection-button serial-send-button btn-save" onClick={saveTargetPose}>
-                {tr("目標値を保存", "Save Target")}
-              </button>
-              {savedPosesList.length > 0 && (
-                <button className="serial-clear-button" onClick={clearAllSavedPoses}>
-                  {tr("すべてクリア", "Clear All")}
+                <button
+                  className={`toggle-button ${traceReplayLoop ? "toggle-on" : "toggle-off"}`}
+                  onClick={() => setTraceReplayLoop((prev) => !prev)}
+                >
+                  {traceReplayLoop ? tr("再生ループ: ON", "Replay Loop: ON") : tr("再生ループ: OFF", "Replay Loop: OFF")}
                 </button>
-              )}
-            </div>
 
-            {savedPosesList.length > 0 && (
-              <div className="pose-saved-list-panel">
-                <h3 className="pose-saved-list-title">{tr("保存済み目標値", "Saved Targets")} ({savedPosesList.length})</h3>
-                <div className="pose-saved-list">
-                  {savedPosesList.map((pose) => (
-                    <div key={pose.id} className="pose-saved-item">
-                      <div className="pose-saved-item-info">
-                        <span className="pose-saved-item-label">{pose.label}</span>
-                        <span className="pose-saved-item-values">
-                          X: {pose.x.toFixed(3)}, Y: {pose.y.toFixed(3)}, Yaw: {pose.yawDeg.toFixed(1)}°
-                        </span>
-                        <span className="pose-saved-item-time">{pose.timestamp}</span>
-                      </div>
-                      <div className="pose-saved-item-actions">
-                        <button
-                          className="connection-button pose-item-button btn-restore"
-                          onClick={() => applySavedTargetPose(pose)}
-                        >
-                          {tr("復元&送信", "Restore & Send")}
-                        </button>
-                        <button
-                          className="serial-clear-button pose-item-button"
-                          onClick={() => deleteSavedPose(pose.id)}
-                        >
-                          {tr("削除", "Delete")}
-                        </button>
-                      </div>
+                <button
+                  className={`toggle-button ${traceReplayAutoPublish ? "toggle-on" : "toggle-off"}`}
+                  onClick={() => setTraceReplayAutoPublish((prev) => !prev)}
+                >
+                  {traceReplayAutoPublish ? tr("再生時送信: ON", "Publish on Replay: ON") : tr("再生時送信: OFF", "Publish on Replay: OFF")}
+                </button>
+              </div>
+
+              <div className="teaching-status-row">
+                <span>{tr("記録", "Recording")}: {traceRecording ? "ON" : "OFF"}</span>
+                <span>{tr("再生", "Replay")}: {traceReplayRunning ? "ON" : "OFF"}</span>
+                <span>{tr("点数", "Points")}: {tracePoints.length}</span>
+                <span>{tr("再生インデックス", "Replay Index")}: {traceReplayIndex >= 0 ? traceReplayIndex + 1 : "-"}</span>
+              </div>
+
+              {tracePoints.length > 0 && (
+                <div className="teaching-overview-grid">
+                  <section className="pose-graph-card">
+                    <div className="pose-graph-title-row">
+                      <h3 className="pose-graph-title">{tr("記録点グラフ", "Trace Points Graph")}</h3>
+                      <span className="pose-graph-scale">{tr("単位: m", "Unit: m")}</span>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </section>
-        )}
 
-        {activePage === "waypoint" && (
-          <section className="waypoint-panel">
-            <h2 className="serial-packet-title">{tr("ウェイポイント指定", "Waypoint Planner")}</h2>
-            <p className="serial-packet-hint">
-              {tr(
-                "グラフをクリックしてウェイポイントを追加します。到達判定しきい値を満たすと、次のウェイポイントへ自動で目標値を切り替えます。",
-                "Click the graph to add waypoints. When reach thresholds are satisfied, target values switch to the next waypoint automatically."
-              )}
-            </p>
-
-            <div className="waypoint-toolbar">
-              <button className="connection-button btn-connect" onClick={startWaypointNavigation}>
-                {tr("追従開始", "Start")}
-              </button>
-              <button className="connection-button btn-neutral" onClick={stopWaypointNavigation}>
-                {tr("追従停止", "Stop")}
-              </button>
-              <button className="serial-clear-button" onClick={clearWaypoints}>
-                {tr("全削除", "Clear All")}
-              </button>
-              <button
-                className={`toggle-button ${waypointAutoAdvanceEnabled ? "toggle-on" : "toggle-off"}`}
-                onClick={() => setWaypointAutoAdvanceEnabled((prev) => !prev)}
-              >
-                {waypointAutoAdvanceEnabled ? tr("自動切替: ON", "Auto Advance: ON") : tr("自動切替: OFF", "Auto Advance: OFF")}
-              </button>
-              <button
-                className={`toggle-button ${waypointAutoPublishEnabled ? "toggle-on" : "toggle-off"}`}
-                onClick={() => setWaypointAutoPublishEnabled((prev) => !prev)}
-              >
-                {waypointAutoPublishEnabled ? tr("切替時送信: ON", "Publish on Switch: ON") : tr("切替時送信: OFF", "Publish on Switch: OFF")}
-              </button>
-            </div>
-
-            <div className="waypoint-settings-grid">
-              <label className="serial-packet-label">
-                {tr("到達距離しきい値 [m]", "Distance Threshold [m]")}
-                <input
-                  className="connection-input"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  value={waypointDistanceThresholdInput}
-                  onChange={(e) => setWaypointDistanceThresholdInput(e.target.value)}
-                />
-              </label>
-
-              <button
-                className={`toggle-button ${waypointCheckYaw ? "toggle-on" : "toggle-off"}`}
-                onClick={() => setWaypointCheckYaw((prev) => !prev)}
-              >
-                {waypointCheckYaw ? tr("Yaw判定: ON", "Yaw Check: ON") : tr("Yaw判定: OFF", "Yaw Check: OFF")}
-              </button>
-
-              <label className="serial-packet-label">
-                {tr("Yawしきい値 [deg]", "Yaw Threshold [deg]")}
-                <input
-                  className="connection-input"
-                  type="number"
-                  step="0.5"
-                  min="0.5"
-                  value={waypointYawThresholdInput}
-                  onChange={(e) => setWaypointYawThresholdInput(e.target.value)}
-                  disabled={!waypointCheckYaw}
-                />
-              </label>
-            </div>
-
-            <div className="waypoint-overview-grid">
-              <section className="pose-graph-card">
-                <div className="pose-graph-title-row">
-                  <h3 className="pose-graph-title">{tr("ウェイポイントグラフ", "Waypoint Graph")}</h3>
-                  <span className="pose-graph-scale">{tr("単位: m", "Unit: m")}</span>
-                </div>
-
-                <svg
-                  className="pose-graph waypoint-graph"
-                  ref={waypointGraphRef}
-                  viewBox={`0 0 ${graphWidth} ${graphHeight}`}
-                  role="img"
-                  aria-label={tr("ウェイポイント指定グラフ", "Waypoint plot graph")}
-                  onPointerDown={handleWaypointGraphPointerDown}
-                >
-                  <rect
-                    x={graphPadding}
-                    y={graphPadding}
-                    width={graphInnerWidth}
-                    height={graphInnerHeight}
-                    className="pose-graph-frame"
-                  />
-
-                  {gridXValues.map((value) => (
-                    <line
-                      key={`wp-grid-x-${value}`}
-                      x1={toGraphX(value)}
-                      y1={graphPadding}
-                      x2={toGraphX(value)}
-                      y2={graphHeight - graphPadding}
-                      className="pose-graph-grid"
-                    />
-                  ))}
-                  {gridYValues.map((value) => (
-                    <line
-                      key={`wp-grid-y-${value}`}
-                      x1={graphPadding}
-                      y1={toGraphY(value)}
-                      x2={graphWidth - graphPadding}
-                      y2={toGraphY(value)}
-                      className="pose-graph-grid"
-                    />
-                  ))}
-
-                  {axisXVisible && (
-                    <line
-                      x1={graphPadding}
-                      y1={toGraphY(0)}
-                      x2={graphWidth - graphPadding}
-                      y2={toGraphY(0)}
-                      className="pose-graph-axis"
-                    />
-                  )}
-                  {axisYVisible && (
-                    <line
-                      x1={toGraphX(0)}
-                      y1={graphPadding}
-                      x2={toGraphX(0)}
-                      y2={graphHeight - graphPadding}
-                      className="pose-graph-axis"
-                    />
-                  )}
-
-                  {waypointPolylinePoints && (
-                    <polyline points={waypointPolylinePoints} className="waypoint-path-line" />
-                  )}
-
-                  <circle cx={currentX} cy={currentY} r="6" className="pose-graph-point-current" />
-
-                  {waypoints.map((waypoint, index) => (
-                    <g key={waypoint.id}>
-                      <circle
-                        cx={toGraphX(waypoint.x)}
-                        cy={toGraphY(waypoint.y)}
-                        r={index === activeWaypointIndex ? "6" : "5"}
-                        className={index === activeWaypointIndex ? "waypoint-point-active" : "waypoint-point"}
+                    <svg
+                      className="pose-graph teaching-graph"
+                      viewBox={`0 0 ${graphWidth} ${graphHeight}`}
+                      role="img"
+                      aria-label={tr("ティーチング記録点グラフ", "Teaching trace points graph")}
+                    >
+                      <rect
+                        x={graphPadding}
+                        y={graphPadding}
+                        width={graphInnerWidth}
+                        height={graphInnerHeight}
+                        className="pose-graph-frame"
                       />
-                      <text
-                        x={toGraphX(waypoint.x) + 7}
-                        y={toGraphY(waypoint.y) - 8}
-                        className="waypoint-point-label"
-                      >
-                        {index + 1}
+
+                      {traceGridXValues.map((value) => (
+                        <line
+                          key={`trace-grid-x-${value}`}
+                          x1={toTraceGraphX(value)}
+                          y1={graphPadding}
+                          x2={toTraceGraphX(value)}
+                          y2={graphHeight - graphPadding}
+                          className="pose-graph-grid"
+                        />
+                      ))}
+                      {traceGridYValues.map((value) => (
+                        <line
+                          key={`trace-grid-y-${value}`}
+                          x1={graphPadding}
+                          y1={toTraceGraphY(value)}
+                          x2={graphWidth - graphPadding}
+                          y2={toTraceGraphY(value)}
+                          className="pose-graph-grid"
+                        />
+                      ))}
+
+                      {traceAxisXVisible && (
+                        <line
+                          x1={graphPadding}
+                          y1={toTraceGraphY(0)}
+                          x2={graphWidth - graphPadding}
+                          y2={toTraceGraphY(0)}
+                          className="pose-graph-axis"
+                        />
+                      )}
+                      {traceAxisYVisible && (
+                        <line
+                          x1={toTraceGraphX(0)}
+                          y1={graphPadding}
+                          x2={toTraceGraphX(0)}
+                          y2={graphHeight - graphPadding}
+                          className="pose-graph-axis"
+                        />
+                      )}
+
+                      {tracePoints.length > 1 && (
+                        <polyline
+                          points={tracePoints
+                            .map((point) => `${toTraceGraphX(point.x)},${toTraceGraphY(point.y)}`)
+                            .join(" ")}
+                          className="trace-point-path-line"
+                        />
+                      )}
+
+                      {tracePoints.map((point, index) => {
+                        const pointX = toTraceGraphX(point.x);
+                        const pointY = toTraceGraphY(point.y);
+                        const pointYaw = normalizeYawRad(point.yawRad + yawOffsetRad);
+                        const arrowLength = 15;
+                        const arrowEndX = pointX + Math.cos(pointYaw) * arrowLength;
+                        const arrowEndY = pointY - Math.sin(pointYaw) * arrowLength;
+                        return (
+                          <line
+                            key={`trace-arrow-${point.id}`}
+                            x1={pointX}
+                            y1={pointY}
+                            x2={arrowEndX}
+                            y2={arrowEndY}
+                            className={index === traceReplayIndex ? "pose-graph-arrow-current" : "pose-graph-arrow-target"}
+                            style={{ opacity: index === traceReplayIndex ? 1 : 0.6 }}
+                          />
+                        );
+                      })}
+
+                      <circle cx={toTraceGraphX(poseX)} cy={toTraceGraphY(poseY)} r="6" className="pose-graph-point-current" />
+
+                      {tracePoints.map((point, index) => (
+                        <g key={`trace-${point.id}`}>
+                          <circle
+                            cx={toTraceGraphX(point.x)}
+                            cy={toTraceGraphY(point.y)}
+                            r={index === traceReplayIndex ? "6" : "5"}
+                            className={index === traceReplayIndex ? "trace-point-active" : "trace-point"}
+                          />
+                          <text
+                            x={toTraceGraphX(point.x) + 7}
+                            y={toTraceGraphY(point.y) - 8}
+                            className={index === traceReplayIndex ? "trace-point-label trace-point-label-active" : "trace-point-label"}
+                          >
+                            {index + 1}
+                          </text>
+                        </g>
+                      ))}
+
+                      <text x={graphPadding} y={graphPadding - 8} className="pose-graph-corner-label">
+                        Y {traceGraphMaxY.toFixed(2)}
                       </text>
-                    </g>
-                  ))}
-                </svg>
+                      <text x={graphPadding} y={graphHeight - 8} className="pose-graph-corner-label">
+                        Y {traceGraphMinY.toFixed(2)}
+                      </text>
+                      <text x={graphPadding} y={graphHeight - graphPadding + 16} className="pose-graph-corner-label">
+                        X {traceGraphMinX.toFixed(2)}
+                      </text>
+                      <text x={graphWidth - graphPadding - 84} y={graphHeight - graphPadding + 16} className="pose-graph-corner-label">
+                        X {traceGraphMaxX.toFixed(2)}
+                      </text>
+                    </svg>
 
-                <p className="pose-graph-interaction-hint">
-                  {tr(
-                    "左クリックでウェイポイント追加。現在のTarget Yaw値が各ウェイポイントのYawとして保存されます。",
-                    "Left click to add a waypoint. The current Target Yaw value is stored for each waypoint."
-                  )}
-                </p>
-              </section>
-
-              <section className="waypoint-list-card">
-                <div className="waypoint-summary-row">
-                  <span>{tr("登録数", "Count")}: {waypoints.length}</span>
-                  <span>{tr("アクティブ", "Active")}: {activeWaypointIndex >= 0 ? activeWaypointIndex + 1 : "-"}</span>
-                </div>
-
-                <div className="waypoint-list-box">
-                  {waypoints.length === 0 && (
-                    <p className="connection-hint">{tr("ウェイポイント未登録", "No waypoints")}</p>
-                  )}
-
-                  {waypoints.map((waypoint, index) => (
-                    <div
-                      key={waypoint.id}
-                      className={`waypoint-row ${index === activeWaypointIndex ? "waypoint-row-active" : ""}`}
-                    >
-                      <div className="waypoint-row-text">
-                        <strong>{waypoint.label}</strong>
-                        <span>
-                          X: {waypoint.x.toFixed(3)}, Y: {waypoint.y.toFixed(3)}, Yaw: {waypoint.yawDeg.toFixed(1)}
-                        </span>
-                      </div>
-                      <div className="waypoint-row-actions">
-                        <button
-                          className="connection-button btn-send waypoint-row-button"
-                          onClick={() => setWaypointAsActive(index, true)}
-                          disabled={!operationArmed}
-                        >
-                          {tr("適用&送信", "Apply & Send")}
-                        </button>
-                        <button
-                          className="connection-button btn-neutral waypoint-row-button"
-                          onClick={() => setWaypointAsActive(index, false)}
-                        >
-                          {tr("適用", "Apply")}
-                        </button>
-                        <button
-                          className="serial-clear-button waypoint-row-button"
-                          onClick={() => removeWaypointById(waypoint.id)}
-                        >
-                          {tr("削除", "Delete")}
-                        </button>
-                      </div>
+                    <div className="pose-graph-legend">
+                      <span className="pose-legend-item">
+                        <i className="pose-legend-dot pose-legend-current" />
+                        {tr("現在位置", "Current position")}
+                      </span>
+                      <span className="pose-legend-item">
+                        <i className="pose-legend-dot pose-legend-target" />
+                        {tr("記録点", "Trace points")}
+                      </span>
                     </div>
-                  ))}
+                  </section>
+
+                  <section className="trace-list-card">
+                    <div className="waypoint-summary-row">
+                      <span>{tr("登録数", "Count")}: {tracePoints.length}</span>
+                      <span>{tr("再生中", "Playing")}: {traceReplayIndex >= 0 ? traceReplayIndex + 1 : "-"}</span>
+                    </div>
+
+                    <div className="teaching-list-box">
+                      {tracePoints.map((point, index) => (
+                        <div
+                          key={point.id}
+                          className={`teaching-row ${index === traceReplayIndex ? "teaching-row-active" : ""}`}
+                        >
+                          <div className="teaching-row-text">
+                            <strong>{point.label}</strong>
+                            <span>
+                              X: {point.x.toFixed(3)}, Y: {point.y.toFixed(3)}, Yaw: {point.yawDeg.toFixed(1)} ({point.at})
+                            </span>
+                          </div>
+                          <div className="teaching-row-actions">
+                            <button
+                              className="connection-button btn-neutral teaching-row-button"
+                              onClick={() => applyTracePointToTarget(index, false)}
+                            >
+                              {tr("適用", "Apply")}
+                            </button>
+                            <button
+                              className="connection-button btn-send teaching-row-button"
+                              onClick={() => applyTracePointToTarget(index, true)}
+                              disabled={!operationArmed}
+                            >
+                              {tr("適用&送信", "Apply & Send")}
+                            </button>
+                            <button
+                              className="serial-clear-button teaching-row-button"
+                              onClick={() => removeTracePointById(point.id)}
+                            >
+                              {tr("削除", "Delete")}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
                 </div>
-              </section>
-            </div>
-
-            <p className="connection-hint">{translateRuntimeText(waypointInfo)}</p>
-          </section>
-        )}
-
-        {activePage === "teaching" && (
-          <section className="teaching-panel">
-            <h2 className="serial-packet-title">{tr("ティーチング / トレース再生", "Teaching / Trace Replay")}</h2>
-            <p className="serial-packet-hint">
-              {tr(
-                "手動操作で機体を動かしながら現在姿勢を記録し、あとで同じ順序で目標値として再生します。",
-                "Record current poses while manually driving, then replay them as sequential target values."
               )}
-            </p>
 
-            <div className="teaching-toolbar">
-              <button className="connection-button btn-connect" onClick={startTraceRecording} disabled={traceRecording}>
-                {tr("記録開始", "Start Rec")}
-              </button>
-              <button className="connection-button btn-neutral" onClick={stopTraceRecording} disabled={!traceRecording}>
-                {tr("記録停止", "Stop Rec")}
-              </button>
-              <button className="connection-button btn-send" onClick={appendCurrentPoseToTrace}>
-                {tr("現在姿勢を1点記録", "Record Current Pose")}
-              </button>
-              <button className="connection-button btn-connect" onClick={startTraceReplay} disabled={traceReplayRunning || tracePoints.length === 0}>
-                {tr("再生開始", "Start Replay")}
-              </button>
-              <button className="connection-button btn-neutral" onClick={stopTraceReplay} disabled={!traceReplayRunning}>
-                {tr("再生停止", "Stop Replay")}
-              </button>
-              <button className="serial-clear-button" onClick={clearTracePoints}>
-                {tr("記録全削除", "Clear All")}
-              </button>
-            </div>
-
-            <div className="teaching-settings-grid">
-              <label className="serial-packet-label">
-                {tr("記録周期 [ms]", "Record Interval [ms]")}
-                <input
-                  className="connection-input"
-                  type="number"
-                  min="50"
-                  max="10000"
-                  step="10"
-                  value={traceSampleMsInput}
-                  onChange={(e) => setTraceSampleMsInput(e.target.value)}
-                />
-              </label>
-
-              <label className="serial-packet-label">
-                {tr("再生周期 [ms]", "Replay Interval [ms]")}
-                <input
-                  className="connection-input"
-                  type="number"
-                  min="50"
-                  max="10000"
-                  step="10"
-                  value={traceReplayMsInput}
-                  onChange={(e) => setTraceReplayMsInput(e.target.value)}
-                />
-              </label>
-
-              <button
-                className={`toggle-button ${traceReplayLoop ? "toggle-on" : "toggle-off"}`}
-                onClick={() => setTraceReplayLoop((prev) => !prev)}
-              >
-                {traceReplayLoop ? tr("再生ループ: ON", "Replay Loop: ON") : tr("再生ループ: OFF", "Replay Loop: OFF")}
-              </button>
-
-              <button
-                className={`toggle-button ${traceReplayAutoPublish ? "toggle-on" : "toggle-off"}`}
-                onClick={() => setTraceReplayAutoPublish((prev) => !prev)}
-              >
-                {traceReplayAutoPublish ? tr("再生時送信: ON", "Publish on Replay: ON") : tr("再生時送信: OFF", "Publish on Replay: OFF")}
-              </button>
-            </div>
-
-            <div className="teaching-status-row">
-              <span>{tr("記録", "Recording")}: {traceRecording ? "ON" : "OFF"}</span>
-              <span>{tr("再生", "Replay")}: {traceReplayRunning ? "ON" : "OFF"}</span>
-              <span>{tr("点数", "Points")}: {tracePoints.length}</span>
-              <span>{tr("再生インデックス", "Replay Index")}: {traceReplayIndex >= 0 ? traceReplayIndex + 1 : "-"}</span>
-            </div>
-
-            <div className="teaching-list-box">
               {tracePoints.length === 0 && (
-                <p className="connection-hint">{tr("記録データはまだありません", "No trace points recorded yet")}</p>
+                <div className="teaching-list-box">
+                  <p className="connection-hint">{tr("記録データはまだありません", "No trace points recorded yet")}</p>
+                </div>
               )}
 
-              {tracePoints.map((point, index) => (
-                <div
-                  key={point.id}
-                  className={`teaching-row ${index === traceReplayIndex ? "teaching-row-active" : ""}`}
-                >
-                  <div className="teaching-row-text">
-                    <strong>{point.label}</strong>
-                    <span>
-                      X: {point.x.toFixed(3)}, Y: {point.y.toFixed(3)}, Yaw: {point.yawDeg.toFixed(1)} ({point.at})
-                    </span>
-                  </div>
-                  <div className="teaching-row-actions">
-                    <button
-                      className="connection-button btn-neutral teaching-row-button"
-                      onClick={() => applyTracePointToTarget(index, false)}
-                    >
-                      {tr("適用", "Apply")}
-                    </button>
-                    <button
-                      className="connection-button btn-send teaching-row-button"
-                      onClick={() => applyTracePointToTarget(index, true)}
-                      disabled={!operationArmed}
-                    >
-                      {tr("適用&送信", "Apply & Send")}
-                    </button>
-                    <button
-                      className="serial-clear-button teaching-row-button"
-                      onClick={() => removeTracePointById(point.id)}
-                    >
-                      {tr("削除", "Delete")}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+              <p className="connection-hint">{translateRuntimeText(traceInfo)}</p>
+            </section>
+          )}
 
-            <p className="connection-hint">{translateRuntimeText(traceInfo)}</p>
-          </section>
-        )}
+          {isPageActive("simulator") && (
+            <section className="serial-bridge-panel">
+              <h2 className="serial-packet-title">{tr("仮想オドメトリ", "Virtual Odometry")}</h2>
+              <p className="serial-packet-hint">
+                {tr("仮想オドメトリを発行します。", "Publish virtual odometry data.")}
+              </p>
+              {renderVirtualOdomPanel("simulator")}
+            </section>
+          )}
 
-        {activePage === "actuator" && (
-          <section className="serial-packet-section">
-            <h2 className="serial-packet-title">{tr("ダイレクト送信", "Direct Transmission")} (Int16MultiArray)</h2>
-            <p className="serial-packet-hint">
-              {tr("IDで送信先を切替えることができます。トピック名:", "Switch destination by ID. Topic:")} <strong>{serialTopicName}</strong>
-              <br />
-              {tr("入力値のチェックは行っていません。注意して入力してください。", "Input values are not validated. Use carefully.")}
-            </p>
+          {isPageActive("actuator") && (
+            <section className="serial-packet-section">
+              <h2 className="serial-packet-title">{tr("ダイレクト送信", "Direct Transmission")} (Int16MultiArray)</h2>
+              <p className="serial-packet-hint">
+                {tr("IDで送信先を切替えることができます。トピック名:", "Switch destination by ID. Topic:")} <strong>{serialTopicName}</strong>
+                <br />
+                {tr("入力値のチェックは行っていません。注意して入力してください。", "Input values are not validated. Use carefully.")}
+              </p>
 
-            <div className="serial-packet-controls">
-              <label className="serial-packet-label">
-                ID
-                <input
-                  className="connection-input"
-                  type="number"
-                  min="0"
-                  max="255"
-                  value={serialTargetIdInput}
-                  onChange={(e) => setSerialTargetIdInput(e.target.value)}
-                />
-              </label>
-              <label className="serial-packet-label">
-                {tr("要素数", "Length")}
-                <input
-                  className="connection-input"
-                  type="number"
-                  min="1"
-                  max="64"
-                  value={serialElementCount}
-                  onChange={(e) => updateSerialElementCount(e.target.value)}
-                />
-              </label>
-              <label className="serial-packet-label">
-                DEBUG
-                <input
-                  className="connection-input"
-                  type="number"
-                  min="0"
-                  max="1"
-                  value={serialValues[0] ?? 0}
-                  onChange={(e) => updateSerialValue(0, e.target.value)}
-                />
-              </label>
-            </div>
+              <div className="serial-packet-controls">
+                <label className="serial-packet-label">
+                  ID
+                  <input
+                    className="connection-input"
+                    type="number"
+                    min="0"
+                    max="255"
+                    value={serialTargetIdInput}
+                    onChange={(e) => setSerialTargetIdInput(e.target.value)}
+                  />
+                </label>
+                <label className="serial-packet-label">
+                  {tr("要素数", "Length")}
+                  <input
+                    className="connection-input"
+                    type="number"
+                    min="1"
+                    max="64"
+                    value={serialElementCount}
+                    onChange={(e) => updateSerialElementCount(e.target.value)}
+                  />
+                </label>
+                <label className="serial-packet-label">
+                  DEBUG
+                  <input
+                    className="connection-input"
+                    type="number"
+                    min="0"
+                    max="1"
+                    value={serialValues[0] ?? 0}
+                    onChange={(e) => updateSerialValue(0, e.target.value)}
+                  />
+                </label>
+              </div>
 
-            <div className="actuator-groups">
-              <section className="actuator-group">
-                <h3 className="actuator-group-title">{tr("モータ", "Motors")} (MD1 - MD8)</h3>
-                <div className="serial-packet-grid">
-                  {Array.from({ length: 8 }, (_, i) => i + 1)
-                    .filter((index) => index < serialElementCount)
-                    .map((index) => renderSerialInputItem(index))}
-                </div>
-              </section>
-
-              <section className="actuator-group">
-                <h3 className="actuator-group-title">{tr("サーボ", "Servos")} (SERVO1 - SERVO8)</h3>
-                <div className="serial-packet-grid">
-                  {Array.from({ length: 8 }, (_, i) => i + 9)
-                    .filter((index) => index < serialElementCount)
-                    .map((index) => renderSerialInputItem(index))}
-                </div>
-              </section>
-
-              <section className="actuator-group">
-                <h3 className="actuator-group-title">{tr("TR出力", "TR Outputs")} (TR1 - TR7)</h3>
-                <div className="serial-packet-grid">
-                  {Array.from({ length: 7 }, (_, i) => i + 17)
-                    .filter((index) => index < serialElementCount)
-                    .map((index) => renderSerialInputItem(index))}
-                </div>
-              </section>
-
-              <section className="actuator-group actuator-actions-group">
-                <h3 className="actuator-group-title">{tr("配列操作", "Array Operations")}</h3>
-                <div className="serial-packet-actions">
-                  <button className="connection-button serial-send-button btn-send" onClick={() => publishSerialPacket(true)} disabled={!operationArmed}>
-                    {tr("配列送信", "Send Array")}
-                  </button>
-                  <button className="serial-clear-button" onClick={clearSerialPacket}>
-                    {tr("配列クリア", "Clear Array")}
-                  </button>
-
-                  <label className="serial-packet-label">
-                    {tr("定期送信 Hz", "Periodic Hz")}
-                    <select
-                      className="connection-input"
-                      value={serialPeriodicHz}
-                      onChange={(e) => setSerialPeriodicHz(e.target.value)}
-                    >
-                      <option value="1">1</option>
-                      <option value="2">2</option>
-                      <option value="5">5</option>
-                      <option value="10">10</option>
-                      <option value="20">20</option>
-                      <option value="30">30</option>
-                      <option value="50">50</option>
-                    </select>
-                  </label>
-
-                  <button
-                    className={`serial-periodic-button ${serialPeriodicEnabled ? "serial-periodic-on" : ""}`}
-                    disabled={!operationArmed}
-                    onClick={() => setSerialPeriodicEnabled((prev) => !prev)}
-                  >
-                    {serialPeriodicEnabled ? tr("定期送信: ON", "Periodic: ON") : tr("定期送信: OFF", "Periodic: OFF")}
-                  </button>
-                </div>
-              </section>
-
-              {serialElementCount > 24 && (
+              <div className="actuator-groups">
                 <section className="actuator-group">
-                  <h3 className="actuator-group-title">{tr("追加チャネル", "Extra Channels")} (CH24+)</h3>
+                  <h3 className="actuator-group-title">{tr("モータ", "Motors")} (MD1 - MD8)</h3>
                   <div className="serial-packet-grid">
-                    {Array.from({ length: serialElementCount - 24 }, (_, i) => i + 24)
+                    {Array.from({ length: 8 }, (_, i) => i + 1)
+                      .filter((index) => index < serialElementCount)
                       .map((index) => renderSerialInputItem(index))}
                   </div>
                 </section>
-              )}
-            </div>
 
-            <p className="connection-hint">{translateRuntimeText(serialPublishInfo)}</p>
-          </section>
-        )}
-
-        {activePage === "topic" && (
-          <section className="topic-panel">
-            <h2 className="serial-packet-title">{tr("ROS2 トピック監視", "ROS2 Topic Monitor")}</h2>
-            <p className="serial-packet-hint">
-              {tr("トピック一覧を取得し、選択したトピックを subscribe して内容を確認できます。", "Fetch topic list and subscribe selected topic to inspect messages.")}
-            </p>
-
-            <div className="topic-toolbar">
-              <button className="connection-button btn-connect" onClick={refreshTopicList}>
-                {tr("トピック一覧を更新", "Refresh Topic List")}
-              </button>
-              <span className="connection-hint">
-                {topicListLoading ? tr("取得中...", "Loading...") : `${tr("件数", "Count")}: ${topicList.length}`}
-              </span>
-            </div>
-
-            {topicListError && <p className="connection-hint topic-error">{translateRuntimeText(topicListError)}</p>}
-
-            <div className="topic-select-row">
-              <select
-                className="connection-input"
-                value={selectedEchoTopic}
-                onChange={(e) => {
-                  const topicName = e.target.value;
-                  setSelectedEchoTopic(topicName);
-                  const matched = topicList.find((item) => item.name === topicName);
-                  setSelectedEchoType(matched?.type || "");
-                }}
-              >
-                <option value="">{tr("監視するトピックを選択", "Select topic to monitor")}</option>
-                {topicList.map((item) => (
-                  <option key={item.name} value={item.name}>
-                    {item.name} {item.type ? `(${item.type})` : ""}
-                  </option>
-                ))}
-              </select>
-
-              <button className="connection-button btn-send" onClick={startTopicEcho}>
-                {tr("Echo開始", "Start Echo")}
-              </button>
-              <button className="serial-clear-button" onClick={stopTopicEcho}>
-                {tr("Echo停止", "Stop Echo")}
-              </button>
-            </div>
-
-            <p className="connection-hint">
-              {translateRuntimeText(topicEchoInfo)} {topicEchoRunning ? translateRuntimeText("(受信中)") : ""}
-            </p>
-
-            <div className="topic-list-box">
-              {topicList.map((item) => (
-                <div key={item.name} className="topic-list-row">
-                  <span className="topic-list-name">{item.name}</span>
-                  <span className="topic-list-type">{item.type || translateRuntimeText("型不明")}</span>
-                </div>
-              ))}
-            </div>
-
-            <h3 className="topic-echo-title">{tr("Echoログ (最新30件)", "Echo Log (latest 30)")}</h3>
-            <div className="topic-echo-box">
-              {topicEchoMessages.length === 0 && (
-                <p className="connection-hint">{translateRuntimeText("まだ受信していません")}</p>
-              )}
-              {topicEchoMessages.map((row) => (
-                <article key={row.id} className="topic-echo-item">
-                  <header className="topic-echo-meta">{row.at}</header>
-                  <pre className="topic-echo-pre">{row.payload}</pre>
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {activePage === "camera" && (
-          <section className="topic-panel">
-            <h2 className="serial-packet-title">{tr("Realsense 映像ストリーミング", "Realsense Camera Streaming")}</h2>
-            <p className="serial-packet-hint">
-              {tr("sensor_msgs/msg/Image を購読して映像を表示します。depth(16UC1) は擬似グレースケール表示します。", "Subscribe to sensor_msgs/msg/Image and render frames. depth (16UC1) is shown as pseudo grayscale.")}
-            </p>
-
-            <div className="topic-select-row">
-              <input
-                className="connection-input"
-                value={cameraTopicInput}
-                onChange={(e) => setCameraTopicInput(e.target.value)}
-                placeholder="/camera/camera/depth/image_rect_raw"
-              />
-              <button className="connection-button btn-send" onClick={startCameraStream}>
-                {tr("開始", "Start")}
-              </button>
-              <button className="serial-clear-button" onClick={stopCameraStream}>
-                {tr("停止", "Stop")}
-              </button>
-            </div>
-
-            <p className="connection-hint">
-              {translateRuntimeText(cameraStreamInfo)}
-              {cameraStreamRunning ? ` | topic: ${cameraTopicName}` : ""}
-            </p>
-
-            <div className="serial-bridge-card serial-bridge-card-log" style={{ minHeight: 320 }}>
-              {cameraFrameUrl ? (
-                <>
-                  <img
-                    src={cameraFrameUrl}
-                    alt="camera stream"
-                    style={{ width: "100%", maxHeight: 520, objectFit: "contain", borderRadius: 10 }}
-                  />
-                  <p className="connection-hint" style={{ marginTop: 8 }}>
-                    {cameraFrameMeta.width} x {cameraFrameMeta.height} | {cameraFrameMeta.encoding || "unknown"} | {cameraFrameMeta.fps} fps
-                  </p>
-                </>
-              ) : (
-                <p className="connection-hint">{tr("映像未受信です。開始を押してください。", "No frame received yet. Press Start.")}</p>
-              )}
-            </div>
-          </section>
-        )}
-
-        {activePage === "serial-bridge" && (
-          <section className="serial-bridge-panel">
-            <h2 className="serial-packet-title">{tr("Serial Bridge 管理", "Serial Bridge")}</h2>
-            <p className="serial-packet-hint">
-              {tr("検出ポート、トピック由来のDevice ID、実行状態を確認し、ここから serial_bridge を手動起動できます。", "Check detected ports, topic-derived IDs, runtime status, and start serial_bridge manually.")}
-              <br />
-              {tr("serial_bridge はコンソール起動時には自動起動しません。", "serial_bridge does not auto-start with the console.")}
-            </p>
-
-            <div className="serial-bridge-toolbar">
-              <button className="connection-button btn-connect" onClick={refreshSerialBridgeStatus}>
-                {tr("状態更新", "Refresh Status")}
-              </button>
-              <button className="connection-button btn-send" onClick={startSerialBridgeFromConsole}>
-                {tr("serial_bridge 起動", "Start serial_bridge")}
-              </button>
-              <button className="connection-button btn-neutral" onClick={stopSerialBridgeFromConsole}>
-                {tr("serial_bridge 停止", "Stop serial_bridge")}
-              </button>
-              <button className="connection-button btn-connect" onClick={refreshSerialBridgeLogs}>
-                {tr("ログ更新", "Refresh Logs")}
-              </button>
-              <button
-                className={`serial-periodic-button ${serialBridgeLogRealtimeEnabled ? "serial-periodic-on" : ""}`}
-                onClick={() => setSerialBridgeLogRealtimeEnabled((prev) => !prev)}
-              >
-                {serialBridgeLogRealtimeEnabled ? tr("ログ自動更新: ON", "Auto Log: ON") : tr("ログ自動更新: OFF", "Auto Log: OFF")}
-              </button>
-              <span className="connection-hint">{serialBridgeLoading ? translateRuntimeText("処理中...") : translateRuntimeText(serialBridgeInfo)}</span>
-            </div>
-
-            <div className="serial-bridge-grid">
-              <section className="serial-bridge-card">
-                <h3 className="serial-bridge-title">{tr("実行状態", "Runtime")}</h3>
-                <p className="connection-hint">running: {serialBridgeRunning ? "ON" : "OFF"}</p>
-                <p className="connection-hint">pid: {serialBridgePid || "-"}</p>
-              </section>
-
-              <section className="serial-bridge-card">
-                <h3 className="serial-bridge-title">{tr("検出ポート", "Detected Ports")}</h3>
-                <div className="serial-bridge-list">
-                  {serialBridgePorts.length === 0 && <p className="connection-hint">{translateRuntimeText("ポート未検出")}</p>}
-                  {serialBridgePorts.map((port) => (
-                    <div className="serial-bridge-list-row" key={port}>{port}</div>
-                  ))}
-                </div>
-              </section>
-
-              <section className="serial-bridge-card">
-                <h3 className="serial-bridge-title">{tr("検出ID (serial_rx/tx)", "Detected IDs (serial_rx/tx)")}</h3>
-                <div className="serial-bridge-list">
-                  {serialBridgeIds.length === 0 && <p className="connection-hint">{translateRuntimeText("ID未検出")}</p>}
-                  {serialBridgeIds.map((id) => (
-                    <div className="serial-bridge-list-row" key={`id-${id}`}>{tr("ID", "ID")}: {id}</div>
-                  ))}
-                </div>
-              </section>
-
-              <section className="serial-bridge-card serial-bridge-card-log">
-                <h3 className="serial-bridge-title">{tr("serial_bridge ログ", "serial_bridge Logs")}</h3>
-                <div className="serial-bridge-log-box" ref={serialBridgeLogBoxRef}>
-                  {serialBridgeLogLoading && <p className="connection-hint">{translateRuntimeText("ログ取得中...")}</p>}
-                  {!serialBridgeLogLoading && serialBridgeLogs.length === 0 && (
-                    <p className="connection-hint">{translateRuntimeText("ログはまだありません")}</p>
-                  )}
-                  {!serialBridgeLogLoading && serialBridgeLogs.length > 0 && (
-                    <pre className="serial-bridge-log-pre">{serialBridgeLogs.join("\n")}</pre>
-                  )}
-                </div>
-              </section>
-            </div>
-          </section>
-        )}
-
-        {activePage === "shutdown" && (
-          <section className="serial-bridge-panel">
-            <h2 className="serial-packet-title">{tr("強制停止", "Shutdown")}</h2>
-            <p className="serial-packet-hint">
-              {tr("フロントエンドとバックエンドの強制停止操作を行います。実行すると復帰に再起動/再読み込みが必要です。強制停止後の機体の動作は保証できません。", "Force-stop frontend/backend processes. Recovery requires reload/restart. Robot behavior is not guaranteed after force shutdown.")}
-            </p>
-
-            <div className="serial-bridge-toolbar">
-              <button className="connection-button btn-neutral" onClick={forceShutdownFrontendFromConsole}>
-                {tr("frontend 強制停止", "Force Stop Frontend")}
-              </button>
-              <button className="connection-button btn-neutral" onClick={forceShutdownBackendFromConsole}>
-                {tr("backend 強制停止", "Force Stop Backend")}
-              </button>
-              <span className="connection-hint">{serialBridgeLoading ? translateRuntimeText("処理中...") : translateRuntimeText(serialBridgeInfo)}</span>
-            </div>
-          </section>
-        )}
-
-        {activePage === "settings" && (
-          <section className="serial-bridge-panel">
-            <h2 className="serial-packet-title">{tr("設定", "Settings")}</h2>
-            <p className="serial-packet-hint">
-              {tr("接続先、操作ロック、送信設定、ログ設定を一括管理します。", "Manage connection, safety lock, transmission, and log settings.")}
-            </p>
-
-            <div className="serial-bridge-grid">
-              <section className="serial-bridge-card">
-                <h3 className="serial-bridge-title">{tr("接続設定", "Connection")}</h3>
-                <div className="serial-bridge-list">
-                  <label className="serial-packet-label">
-                    ROS Host
-                    <input
-                      className="connection-input"
-                      value={rosHostInput}
-                      onChange={(e) => setRosHostInput(e.target.value)}
-                    />
-                  </label>
-                  <label className="serial-packet-label">
-                    ROS Port
-                    <input
-                      className="connection-input"
-                      value={rosPortInput}
-                      onChange={(e) => setRosPortInput(e.target.value)}
-                    />
-                  </label>
-                  <label className="serial-packet-label">
-                    Joy Topic
-                    <input
-                      className="connection-input"
-                      value={joyTopicInput}
-                      onChange={(e) => setJoyTopicInput(e.target.value)}
-                    />
-                  </label>
-                </div>
-              </section>
-
-              <section className="serial-bridge-card">
-                <h3 className="serial-bridge-title">{tr("操作設定", "Operation")}</h3>
-                <div className="serial-bridge-list">
-                  <div className="lang-switch-row">
-                    {renderLanguageSelect("lang-select lang-select-wide", "lang-settings")}
+                <section className="actuator-group">
+                  <h3 className="actuator-group-title">{tr("サーボ", "Servos")} (SERVO1 - SERVO8)</h3>
+                  <div className="serial-packet-grid">
+                    {Array.from({ length: 8 }, (_, i) => i + 9)
+                      .filter((index) => index < serialElementCount)
+                      .map((index) => renderSerialInputItem(index))}
                   </div>
-                  <button
-                    className={`toggle-button ${operationArmed ? "toggle-on" : "toggle-off"}`}
-                    onClick={() => {
-                      const next = !operationArmed;
-                      setOperationArmed(next);
-                      if (!next) {
-                        resetAllControls();
-                      }
-                    }}
-                  >
-                    {operationArmed ? tr("操作ロック: OFF", "Safety Lock: OFF") : tr("操作ロック: ON", "Safety Lock: ON")}
-                  </button>
-                  <button
-                    className={`toggle-button ${controllerEnabled ? "toggle-on" : "toggle-off"}`}
-                    onClick={() => setControllerEnabled((prev) => !prev)}
-                  >
-                    {controllerEnabled ? tr("コントローラー: ON", "Controller: ON") : tr("コントローラー: OFF", "Controller: OFF")}
-                  </button>
-                  <button
-                    className={`serial-periodic-button ${serialBridgeLogRealtimeEnabled ? "serial-periodic-on" : ""}`}
-                    onClick={() => setSerialBridgeLogRealtimeEnabled((prev) => !prev)}
-                  >
-                    {serialBridgeLogRealtimeEnabled ? tr("ログ自動更新: ON", "Auto Log: ON") : tr("ログ自動更新: OFF", "Auto Log: OFF")}
-                  </button>
-                </div>
-              </section>
+                </section>
 
-              <section className="serial-bridge-card">
-                <h3 className="serial-bridge-title">{tr("送信設定", "Transmission")}</h3>
-                <div className="serial-bridge-list">
-                  <label className="serial-packet-label">
-                    Serial Target ID
-                    <input
-                      className="connection-input"
-                      type="number"
-                      min="0"
-                      max="255"
-                      value={serialTargetIdInput}
-                      onChange={(e) => setSerialTargetIdInput(e.target.value)}
-                    />
-                  </label>
-                  <label className="serial-packet-label">
-                    {tr("配列要素数", "Array Length")}
-                    <input
-                      className="connection-input"
-                      type="number"
-                      min="1"
-                      max="64"
-                      value={serialElementCount}
-                      onChange={(e) => updateSerialElementCount(e.target.value)}
-                    />
-                  </label>
-                  <label className="serial-packet-label">
-                    {tr("定期送信Hz", "Periodic Hz")}
-                    <select
-                      className="connection-input"
-                      value={serialPeriodicHz}
-                      onChange={(e) => setSerialPeriodicHz(e.target.value)}
+                <section className="actuator-group">
+                  <h3 className="actuator-group-title">{tr("TR出力", "TR Outputs")} (TR1 - TR7)</h3>
+                  <div className="serial-packet-grid">
+                    {Array.from({ length: 7 }, (_, i) => i + 17)
+                      .filter((index) => index < serialElementCount)
+                      .map((index) => renderSerialInputItem(index))}
+                  </div>
+                </section>
+
+                <section className="actuator-group actuator-actions-group">
+                  <h3 className="actuator-group-title">{tr("配列操作", "Array Operations")}</h3>
+                  <div className="serial-packet-actions">
+                    <button className="connection-button serial-send-button btn-send" onClick={() => publishSerialPacket(true)} disabled={!operationArmed}>
+                      {tr("配列送信", "Send Array")}
+                    </button>
+                    <button className="serial-clear-button" onClick={clearSerialPacket}>
+                      {tr("配列クリア", "Clear Array")}
+                    </button>
+
+                    <label className="serial-packet-label">
+                      {tr("定期送信 Hz", "Periodic Hz")}
+                      <select
+                        className="connection-input"
+                        value={serialPeriodicHz}
+                        onChange={(e) => setSerialPeriodicHz(e.target.value)}
+                      >
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="5">5</option>
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="30">30</option>
+                        <option value="50">50</option>
+                      </select>
+                    </label>
+
+                    <button
+                      className={`serial-periodic-button ${serialPeriodicEnabled ? "serial-periodic-on" : ""}`}
+                      disabled={!operationArmed}
+                      onClick={() => setSerialPeriodicEnabled((prev) => !prev)}
                     >
-                      <option value="1">1</option>
-                      <option value="2">2</option>
-                      <option value="5">5</option>
-                      <option value="10">10</option>
-                      <option value="20">20</option>
-                      <option value="30">30</option>
-                      <option value="50">50</option>
-                    </select>
-                  </label>
-                </div>
-              </section>
+                      {serialPeriodicEnabled ? tr("定期送信: ON", "Periodic: ON") : tr("定期送信: OFF", "Periodic: OFF")}
+                    </button>
+                  </div>
+                </section>
 
-              <section className="serial-bridge-card">
-                <h3 className="serial-bridge-title">{tr("ログ設定", "Logs")}</h3>
-                <div className="serial-bridge-list">
-                  <label className="serial-packet-label">
-                    {tr("取得行数 (10-1000)", "Lines (10-1000)")}
-                    <input
-                      className="connection-input"
-                      type="number"
-                      min="10"
-                      max="1000"
-                      value={serialBridgeLogLinesInput}
-                      onChange={(e) => setSerialBridgeLogLinesInput(e.target.value)}
+                {serialElementCount > 24 && (
+                  <section className="actuator-group">
+                    <h3 className="actuator-group-title">{tr("追加チャネル", "Extra Channels")} (CH24+)</h3>
+                    <div className="serial-packet-grid">
+                      {Array.from({ length: serialElementCount - 24 }, (_, i) => i + 24)
+                        .map((index) => renderSerialInputItem(index))}
+                    </div>
+                  </section>
+                )}
+              </div>
+
+              <p className="connection-hint">{translateRuntimeText(serialPublishInfo)}</p>
+            </section>
+          )}
+
+          {isPageActive("topic") && (
+            <section className="topic-panel">
+              <h2 className="serial-packet-title">{tr("ROS2 トピック監視", "ROS2 Topic Monitor")}</h2>
+              <p className="serial-packet-hint">
+                {tr("トピック一覧を取得し、選択したトピックを subscribe して内容を確認できます。", "Fetch topic list and subscribe selected topic to inspect messages.")}
+              </p>
+
+              <div className="topic-toolbar">
+                <button className="connection-button btn-connect" onClick={refreshTopicList}>
+                  {tr("トピック一覧を更新", "Refresh Topic List")}
+                </button>
+                <span className="connection-hint">
+                  {topicListLoading ? tr("取得中...", "Loading...") : `${tr("件数", "Count")}: ${topicList.length}`}
+                </span>
+              </div>
+
+              {topicListError && <p className="connection-hint topic-error">{translateRuntimeText(topicListError)}</p>}
+
+              <div className="topic-select-row">
+                <select
+                  className="connection-input"
+                  value={selectedEchoTopic}
+                  onChange={(e) => {
+                    const topicName = e.target.value;
+                    setSelectedEchoTopic(topicName);
+                    const matched = topicList.find((item) => item.name === topicName);
+                    setSelectedEchoType(matched?.type || "");
+                  }}
+                >
+                  <option value="">{tr("監視するトピックを選択", "Select topic to monitor")}</option>
+                  {topicList.map((item) => (
+                    <option key={item.name} value={item.name}>
+                      {item.name} {item.type ? `(${item.type})` : ""}
+                    </option>
+                  ))}
+                </select>
+
+                <button className="connection-button btn-send" onClick={startTopicEcho}>
+                  {tr("Echo開始", "Start Echo")}
+                </button>
+                <button className="serial-clear-button" onClick={stopTopicEcho}>
+                  {tr("Echo停止", "Stop Echo")}
+                </button>
+              </div>
+
+              <p className="connection-hint">
+                {translateRuntimeText(topicEchoInfo)} {topicEchoRunning ? translateRuntimeText("(受信中)") : ""}
+              </p>
+
+              <div className="topic-list-box">
+                {topicList.map((item) => (
+                  <div key={item.name} className="topic-list-row">
+                    <span className="topic-list-name">{item.name}</span>
+                    <span className="topic-list-type">{item.type || translateRuntimeText("型不明")}</span>
+                  </div>
+                ))}
+              </div>
+
+              <h3 className="topic-echo-title">{tr("Echoログ (最新30件)", "Echo Log (latest 30)")}</h3>
+              <div className="topic-echo-box">
+                {topicEchoMessages.length === 0 && (
+                  <p className="connection-hint">{translateRuntimeText("まだ受信していません")}</p>
+                )}
+                {topicEchoMessages.map((row) => (
+                  <article key={row.id} className="topic-echo-item">
+                    <header className="topic-echo-meta">{row.at}</header>
+                    <pre className="topic-echo-pre">{row.payload}</pre>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {isPageActive("camera") && (
+            <section className="topic-panel">
+              <h2 className="serial-packet-title">{tr("Realsense 映像ストリーミング", "Realsense Camera Streaming")}</h2>
+              <p className="serial-packet-hint">
+                {tr("sensor_msgs/msg/Image を購読して映像を表示します。depth(16UC1) は擬似グレースケール表示します。", "Subscribe to sensor_msgs/msg/Image and render frames. depth (16UC1) is shown as pseudo grayscale.")}
+              </p>
+
+              <div className="topic-select-row">
+                <input
+                  className="connection-input"
+                  value={cameraTopicInput}
+                  onChange={(e) => setCameraTopicInput(e.target.value)}
+                  placeholder="/camera/camera/depth/image_rect_raw"
+                />
+                <button className="connection-button btn-send" onClick={startCameraStream}>
+                  {tr("開始", "Start")}
+                </button>
+                <button className="serial-clear-button" onClick={stopCameraStream}>
+                  {tr("停止", "Stop")}
+                </button>
+              </div>
+
+              <p className="connection-hint">
+                {translateRuntimeText(cameraStreamInfo)}
+                {cameraStreamRunning ? ` | topic: ${cameraTopicName}` : ""}
+              </p>
+
+              <div className="serial-bridge-card serial-bridge-card-log" style={{ minHeight: 320 }}>
+                {cameraFrameUrl ? (
+                  <>
+                    <img
+                      src={cameraFrameUrl}
+                      alt="camera stream"
+                      style={{ width: "100%", maxHeight: 520, objectFit: "contain", borderRadius: 10 }}
                     />
-                  </label>
-                  <p className="connection-hint">{tr("現在の取得行数:", "Current lines:")} {serialBridgeLogLineLimit}</p>
-                </div>
-              </section>
-            </div>
+                    <p className="connection-hint" style={{ marginTop: 8 }}>
+                      {cameraFrameMeta.width} x {cameraFrameMeta.height} | {cameraFrameMeta.encoding || "unknown"} | {cameraFrameMeta.fps} fps
+                    </p>
+                  </>
+                ) : (
+                  <p className="connection-hint">{tr("映像未受信です。開始を押してください。", "No frame received yet. Press Start.")}</p>
+                )}
+              </div>
+            </section>
+          )}
 
-            <div className="serial-bridge-toolbar">
-              <button className="connection-button btn-connect" onClick={applySettingsValues}>
-                {tr("設定を適用", "Apply Settings")}
-              </button>
-              <button className="connection-button btn-neutral" onClick={refreshSerialBridgeStatus}>
-                {tr("状態を再取得", "Refresh Status")}
-              </button>
-              <span className="connection-hint">{serialBridgeLoading ? translateRuntimeText("処理中...") : translateRuntimeText(serialBridgeInfo)}</span>
-            </div>
-          </section>
-        )}
+          {isPageActive("serial-bridge") && (
+            <section className="serial-bridge-panel">
+              <h2 className="serial-packet-title">{tr("Serial Bridge 管理", "Serial Bridge")}</h2>
+              <p className="serial-packet-hint">
+                {tr("検出ポート、トピック由来のDevice ID、実行状態を確認し、ここから serial_bridge を手動起動できます。", "Check detected ports, topic-derived IDs, runtime status, and start serial_bridge manually.")}
+                <br />
+                {tr("serial_bridge はコンソール起動時には自動起動しません。", "serial_bridge does not auto-start with the console.")}
+              </p>
+
+              <div className="serial-bridge-toolbar">
+                <button className="connection-button btn-connect" onClick={refreshSerialBridgeStatus}>
+                  {tr("状態更新", "Refresh Status")}
+                </button>
+                <button className="connection-button btn-send" onClick={startSerialBridgeFromConsole}>
+                  {tr("serial_bridge 起動", "Start serial_bridge")}
+                </button>
+                <button className="connection-button btn-neutral" onClick={stopSerialBridgeFromConsole}>
+                  {tr("serial_bridge 停止", "Stop serial_bridge")}
+                </button>
+                <button className="connection-button btn-connect" onClick={refreshSerialBridgeLogs}>
+                  {tr("ログ更新", "Refresh Logs")}
+                </button>
+                <button
+                  className={`serial-periodic-button ${serialBridgeLogRealtimeEnabled ? "serial-periodic-on" : ""}`}
+                  onClick={() => setSerialBridgeLogRealtimeEnabled((prev) => !prev)}
+                >
+                  {serialBridgeLogRealtimeEnabled ? tr("ログ自動更新: ON", "Auto Log: ON") : tr("ログ自動更新: OFF", "Auto Log: OFF")}
+                </button>
+                <span className="connection-hint">{serialBridgeLoading ? translateRuntimeText("処理中...") : translateRuntimeText(serialBridgeInfo)}</span>
+              </div>
+
+              <div className="serial-bridge-grid">
+                <section className="serial-bridge-card">
+                  <h3 className="serial-bridge-title">{tr("実行状態", "Runtime")}</h3>
+                  <p className="connection-hint">running: {serialBridgeRunning ? "ON" : "OFF"}</p>
+                  <p className="connection-hint">pid: {serialBridgePid || "-"}</p>
+                </section>
+
+                <section className="serial-bridge-card">
+                  <h3 className="serial-bridge-title">{tr("検出ポート", "Detected Ports")}</h3>
+                  <div className="serial-bridge-list">
+                    {serialBridgePorts.length === 0 && <p className="connection-hint">{translateRuntimeText("ポート未検出")}</p>}
+                    {serialBridgePorts.map((port) => (
+                      <div className="serial-bridge-list-row" key={port}>{port}</div>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="serial-bridge-card">
+                  <h3 className="serial-bridge-title">{tr("検出ID (serial_rx/tx)", "Detected IDs (serial_rx/tx)")}</h3>
+                  <div className="serial-bridge-list">
+                    {serialBridgeIds.length === 0 && <p className="connection-hint">{translateRuntimeText("ID未検出")}</p>}
+                    {serialBridgeIds.map((id) => (
+                      <div className="serial-bridge-list-row" key={`id-${id}`}>{tr("ID", "ID")}: {id}</div>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="serial-bridge-card serial-bridge-card-log">
+                  <h3 className="serial-bridge-title">{tr("serial_bridge ログ", "serial_bridge Logs")}</h3>
+                  <div className="serial-bridge-log-box" ref={serialBridgeLogBoxRef}>
+                    {serialBridgeLogLoading && <p className="connection-hint">{translateRuntimeText("ログ取得中...")}</p>}
+                    {!serialBridgeLogLoading && serialBridgeLogs.length === 0 && (
+                      <p className="connection-hint">{translateRuntimeText("ログはまだありません")}</p>
+                    )}
+                    {!serialBridgeLogLoading && serialBridgeLogs.length > 0 && (
+                      <pre className="serial-bridge-log-pre">{serialBridgeLogs.join("\n")}</pre>
+                    )}
+                  </div>
+                </section>
+              </div>
+            </section>
+          )}
+
+          {isPageActive("shutdown") && (
+            <section className="serial-bridge-panel">
+              <h2 className="serial-packet-title">{tr("強制停止", "Shutdown")}</h2>
+              <p className="serial-packet-hint">
+                {tr("フロントエンドとバックエンドの強制停止操作を行います。実行すると復帰に再起動/再読み込みが必要です。強制停止後の機体の動作は保証できません。", "Force-stop frontend/backend processes. Recovery requires reload/restart. Robot behavior is not guaranteed after force shutdown.")}
+              </p>
+
+              <div className="serial-bridge-toolbar">
+                <button className="connection-button btn-neutral" onClick={forceShutdownFrontendFromConsole}>
+                  {tr("frontend 強制停止", "Force Stop Frontend")}
+                </button>
+                <button className="connection-button btn-neutral" onClick={forceShutdownBackendFromConsole}>
+                  {tr("backend 強制停止", "Force Stop Backend")}
+                </button>
+                <span className="connection-hint">{serialBridgeLoading ? translateRuntimeText("処理中...") : translateRuntimeText(serialBridgeInfo)}</span>
+              </div>
+            </section>
+          )}
+
+          {isPageActive("settings") && (
+            <section className="serial-bridge-panel">
+              <h2 className="serial-packet-title">{tr("設定", "Settings")}</h2>
+              <p className="serial-packet-hint">
+                {tr("接続先、操作ロック、送信設定、ログ設定を一括管理します。", "Manage connection, safety lock, transmission, and log settings.")}
+              </p>
+
+              <div className="serial-bridge-grid">
+                <section className="serial-bridge-card">
+                  <h3 className="serial-bridge-title">{tr("接続設定", "Connection")}</h3>
+                  <div className="serial-bridge-list">
+                    <label className="serial-packet-label">
+                      ROS Host
+                      <input
+                        className="connection-input"
+                        value={rosHostInput}
+                        onChange={(e) => setRosHostInput(e.target.value)}
+                      />
+                    </label>
+                    <label className="serial-packet-label">
+                      ROS Port
+                      <input
+                        className="connection-input"
+                        value={rosPortInput}
+                        onChange={(e) => setRosPortInput(e.target.value)}
+                      />
+                    </label>
+                    <label className="serial-packet-label">
+                      Joy Topic
+                      <input
+                        className="connection-input"
+                        value={joyTopicInput}
+                        onChange={(e) => setJoyTopicInput(e.target.value)}
+                      />
+                    </label>
+                  </div>
+                </section>
+
+                <section className="serial-bridge-card">
+                  <h3 className="serial-bridge-title">{tr("操作設定", "Operation")}</h3>
+                  <div className="serial-bridge-list">
+                    <div className="lang-switch-row">
+                      {renderLanguageSelect("lang-select lang-select-wide", "lang-settings")}
+                    </div>
+                    <button
+                      className={`toggle-button ${operationArmed ? "toggle-on" : "toggle-off"}`}
+                      onClick={() => {
+                        const next = !operationArmed;
+                        setOperationArmed(next);
+                        if (!next) {
+                          resetAllControls();
+                        }
+                      }}
+                    >
+                      {operationArmed ? tr("操作ロック: OFF", "Safety Lock: OFF") : tr("操作ロック: ON", "Safety Lock: ON")}
+                    </button>
+                    <button
+                      className={`toggle-button ${controllerEnabled ? "toggle-on" : "toggle-off"}`}
+                      onClick={() => setControllerEnabled((prev) => !prev)}
+                    >
+                      {controllerEnabled ? tr("コントローラー: ON", "Controller: ON") : tr("コントローラー: OFF", "Controller: OFF")}
+                    </button>
+                    <button
+                      className={`serial-periodic-button ${serialBridgeLogRealtimeEnabled ? "serial-periodic-on" : ""}`}
+                      onClick={() => setSerialBridgeLogRealtimeEnabled((prev) => !prev)}
+                    >
+                      {serialBridgeLogRealtimeEnabled ? tr("ログ自動更新: ON", "Auto Log: ON") : tr("ログ自動更新: OFF", "Auto Log: OFF")}
+                    </button>
+                  </div>
+                </section>
+
+                <section className="serial-bridge-card">
+                  <h3 className="serial-bridge-title">{tr("グラフ設定", "Graph Settings")}</h3>
+                  <div className="serial-bridge-list">
+                    <label className="serial-packet-label">
+                      {tr("Yaw オフセット (°)", "Yaw Offset (°)")}
+                      <input
+                        className="connection-input"
+                        type="number"
+                        step="1"
+                        value={yawOffsetDegInput}
+                        onChange={(e) => setYawOffsetDegInput(e.target.value)}
+                      />
+                    </label>
+                    <p className="connection-hint">{tr("すべてのグラフにおける姿勢表示を調整します (0〜360°)", "Adjusts yaw orientation in all graphs (0-360°)")}</p>
+                  </div>
+                </section>
+
+                <section className="serial-bridge-card">
+                  <h3 className="serial-bridge-title">{tr("送信設定", "Transmission")}</h3>
+                  <div className="serial-bridge-list">
+                    <label className="serial-packet-label">
+                      Serial Target ID
+                      <input
+                        className="connection-input"
+                        type="number"
+                        min="0"
+                        max="255"
+                        value={serialTargetIdInput}
+                        onChange={(e) => setSerialTargetIdInput(e.target.value)}
+                      />
+                    </label>
+                    <label className="serial-packet-label">
+                      {tr("配列要素数", "Array Length")}
+                      <input
+                        className="connection-input"
+                        type="number"
+                        min="1"
+                        max="64"
+                        value={serialElementCount}
+                        onChange={(e) => updateSerialElementCount(e.target.value)}
+                      />
+                    </label>
+                    <label className="serial-packet-label">
+                      {tr("定期送信Hz", "Periodic Hz")}
+                      <select
+                        className="connection-input"
+                        value={serialPeriodicHz}
+                        onChange={(e) => setSerialPeriodicHz(e.target.value)}
+                      >
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="5">5</option>
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="30">30</option>
+                        <option value="50">50</option>
+                      </select>
+                    </label>
+                  </div>
+                </section>
+
+                <section className="serial-bridge-card">
+                  <h3 className="serial-bridge-title">{tr("ログ設定", "Logs")}</h3>
+                  <div className="serial-bridge-list">
+                    <label className="serial-packet-label">
+                      {tr("取得行数 (10-1000)", "Lines (10-1000)")}
+                      <input
+                        className="connection-input"
+                        type="number"
+                        min="10"
+                        max="1000"
+                        value={serialBridgeLogLinesInput}
+                        onChange={(e) => setSerialBridgeLogLinesInput(e.target.value)}
+                      />
+                    </label>
+                    <p className="connection-hint">{tr("現在の取得行数:", "Current lines:")} {serialBridgeLogLineLimit}</p>
+                  </div>
+                </section>
+              </div>
+
+              <div className="serial-bridge-toolbar">
+                <button className="connection-button btn-connect" onClick={applySettingsValues}>
+                  {tr("設定を適用", "Apply Settings")}
+                </button>
+                <button className="connection-button btn-neutral" onClick={refreshSerialBridgeStatus}>
+                  {tr("状態を再取得", "Refresh Status")}
+                </button>
+                <span className="connection-hint">{serialBridgeLoading ? translateRuntimeText("処理中...") : translateRuntimeText(serialBridgeInfo)}</span>
+              </div>
+            </section>
+          )}
+        </section>
       </main>
     </div>
   );
