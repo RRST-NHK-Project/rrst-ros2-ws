@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# R2 Console - 起動スクリプト
+# R1 Console - 起動スクリプト
 # rosbridge と GUI を起動します
 
 set -e
@@ -28,9 +28,9 @@ start_rosbridge() {
       unset VIRTUAL_ENV
       export PATH="${CLEAN_PATH}"
       exec ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=${BRIDGE_PORT}
-    ) >/tmp/r2_console_rosbridge.log 2>&1 &
+    ) >/tmp/r1_console_rosbridge.log 2>&1 &
   else
-    ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=${BRIDGE_PORT} >/tmp/r2_console_rosbridge.log 2>&1 &
+    ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=${BRIDGE_PORT} >/tmp/r1_console_rosbridge.log 2>&1 &
   fi
 
   BRIDGE_PID=$!
@@ -63,7 +63,7 @@ if command -v ros2 >/dev/null 2>&1; then
     sleep 1
 
     if ! kill -0 "${BRIDGE_PID}" >/dev/null 2>&1; then
-      echo "rosbridge の起動に失敗しました。ログ: /tmp/r2_console_rosbridge.log"
+      echo "rosbridge の起動に失敗しました。ログ: /tmp/r1_console_rosbridge.log"
       exit 1
     fi
   fi
@@ -77,12 +77,12 @@ if command -v node >/dev/null 2>&1; then
     echo "console backend は既にポート ${CONSOLE_BACKEND_PORT} で起動中です"
   else
     echo "console backend を起動中... (port: ${CONSOLE_BACKEND_PORT})"
-    CONSOLE_BACKEND_PORT="${CONSOLE_BACKEND_PORT}" node ./tools/console_backend.js >/tmp/r2_console_backend.log 2>&1 &
+    CONSOLE_BACKEND_PORT="${CONSOLE_BACKEND_PORT}" node ./tools/console_backend.js >/tmp/r1_console_backend.log 2>&1 &
     BACKEND_PID=$!
     sleep 1
 
     if ! kill -0 "${BACKEND_PID}" >/dev/null 2>&1; then
-      echo "console backend の起動に失敗しました。ログ: /tmp/r2_console_backend.log"
+      echo "console backend の起動に失敗しました。ログ: /tmp/r1_console_backend.log"
       exit 1
     fi
   fi
@@ -98,7 +98,7 @@ fi
 
 # 開発サーバーを起動
 echo "=================================="
-echo "R2 Console を起動しています..."
+echo "R1 Console を起動しています..."
 echo "=================================="
 echo ""
 echo "rosbridge: ws://localhost:${BRIDGE_PORT}"

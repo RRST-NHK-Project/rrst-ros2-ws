@@ -7,7 +7,7 @@ const BACKEND_PORT = Number.parseInt(process.env.CONSOLE_BACKEND_PORT || "3031",
 const CONSOLE_DIR = path.resolve(__dirname, "..");
 const SRC_DIR = path.resolve(CONSOLE_DIR, "..");
 const WS_DIR = path.resolve(SRC_DIR, "..");
-const SERIAL_LOG_PATH = "/tmp/r2_console_serial_bridge.log";
+const SERIAL_LOG_PATH = "/tmp/r1_console_serial_bridge.log";
 
 const jsonResponse = (res, statusCode, payload) => {
     res.writeHead(statusCode, {
