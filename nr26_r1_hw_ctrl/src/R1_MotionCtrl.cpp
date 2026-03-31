@@ -295,7 +295,45 @@ private:
         cross_pre = CROSS;
 
         // =================================================================
-        // CIRCLE:「棒ホールド機構」※CROSSと統合済み
+        // CIRCLE:「ワーク回収用機構」 ※未確認!起動は自己責任！！
+        // 
+        // ハンドの上下にリミッターついてるか不明だったので一旦スピード０にしてます。
+        // あとdata_ の番号は適当に決めたので後で確認お願いします
+        // =================================================================
+
+        static int circle_pre = 0;
+        static int CIRCLE_PUSH_COUNT = 0;
+        static int CIRCLE_PUSH_MAX = 6;
+
+        static int MOVE_SPEED = 0;
+        static int VACUUM_SPEED = 50;
+
+        if (CIRCLE == 1 && circle_pre == 0) {
+            CIRCLE_PUSH_COUNT = (CIRCLE_PUSH_COUNT + 1) % CIRCLE_PUSH_MAX;
+        }
+        if (CIRCLE_PUSH_COUNT == 0) {
+            data_[3] = MOVE_SPEED;
+        }                       
+        if (CIRCLE_PUSH_COUNT == 1) {
+            data_[4] = VACUUM_SPEED;
+        }
+        if (CIRCLE_PUSH_COUNT == 2) {
+            data_[3] = MOVE_SPEED * -1;
+        }
+        if (CIRCLE_PUSH_COUNT == 3) {
+            data_[4] = 0;             
+        }
+        if (CIRCLE_PUSH_COUNT == 4) {
+            data_[17] = 1;
+        }
+        if (CIRCLE_PUSH_COUNT == 5) {
+            data_[17] = 0;
+        }   
+
+        circle_pre = CIRCLE;
+
+        // =================================================================
+        // 元CIRCLE:「棒ホールド機構」※CROSSと統合済み
         // ボタンを一回押すごとに2つのサーボモーターの角度状態を同時に変化させる
         // =================================================================
         // angle = 10のとき最下部までお仕込み

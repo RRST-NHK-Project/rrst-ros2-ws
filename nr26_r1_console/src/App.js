@@ -2272,8 +2272,8 @@ function App() {
         <header className="console-header">
           <img src="/logo.svg" alt="NR26 Logo" className="console-logo" />
           <div>
-            <h1>R2 Console</h1>
-            <p>{tr("R2 テレオペレーションパネル", "ROS2 Teleoperation Panel")}</p>
+            <h1>R1 Console</h1>
+            <p>{tr("R1 テレオペレーションパネル", "ROS2 Teleoperation Panel")}</p>
           </div>
           <div className="header-tools">
             {renderLanguageSelect("lang-select", "lang-header")}

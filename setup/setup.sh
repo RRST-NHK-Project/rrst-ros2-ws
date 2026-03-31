@@ -28,5 +28,8 @@ sudo apt install libopencv-dev python3-opencv
 sudo apt install ros-jazzy-librealsense2*
 sudo apt install ros-jazzy-realsense2-*
 
+# 以下GUI用
+sudo apt install ros-jazzy-rosbridge-server
+
 # 他のスクリプトに一括で実行権限を渡す
 sudo chmod +x "${HOME}/ros2_ws/src/setup/"*.sh || true #エラーが出ても無視
