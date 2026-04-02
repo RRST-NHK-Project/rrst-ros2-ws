@@ -42,6 +42,10 @@ def generate_launch_description():
                         "size_tolerance_ratio_min": 0.45,
                         # 検出立方体のサイズ許容度（上限）：予想サイズに対する比率の最大値 (ステップ誤検知を防ぐ)
                         "size_tolerance_ratio_max": 1.90,
+                        # 画像上部のマスク比率 (0.0=マスクなし, 1.0=全体) - 段差など不要な領域を除外
+                        "mask_y_top_ratio": 0.0,
+                        # 画像下部のマスク比率 (0.0=全体, 1.0=マスク全体) - デフォルト0.5で下半分をマスク
+                        "mask_y_bottom_ratio": 0.5,
                     }
                 ],
             )

@@ -30,6 +30,8 @@ class CubeDetectorNode(Node):
         self.declare_parameter("size_tolerance_ratio_max", 1.90)
         self.declare_parameter("use_3d_filtering", True)
         self.declare_parameter("cube_3d_size_tolerance_mm", 100.0)
+        self.declare_parameter("mask_y_top_ratio", 0.0)
+        self.declare_parameter("mask_y_bottom_ratio", 0.5)
 
         image_topic = self.get_parameter("image_topic").value
         self.central_window_px = int(self.get_parameter("central_window_px").value)
@@ -57,6 +59,10 @@ class CubeDetectorNode(Node):
         self.use_3d_filtering = bool(self.get_parameter("use_3d_filtering").value)
         self.cube_3d_size_tolerance_mm = float(
             self.get_parameter("cube_3d_size_tolerance_mm").value
+        )
+        self.mask_y_top_ratio = float(self.get_parameter("mask_y_top_ratio").value)
+        self.mask_y_bottom_ratio = float(
+            self.get_parameter("mask_y_bottom_ratio").value
         )
 
         self.runtime_fx_px = self.camera_fx_px
@@ -209,6 +215,14 @@ class CubeDetectorNode(Node):
         band_mask = ((depth_image >= lower) & (depth_image <= upper) & valid).astype(
             np.uint8
         )
+
+        # Y軸方向のマスキング（段差など不要な領域を除外）
+        y_mask = np.ones((height, width), dtype=np.uint8)
+        y_min_px = int(height * self.mask_y_top_ratio)
+        y_max_px = int(height * self.mask_y_bottom_ratio)
+        y_mask[:y_min_px, :] = 0
+        y_mask[y_max_px:, :] = 0
+        band_mask = band_mask & y_mask
 
         kernel_size = self.morph_kernel_px
         kernel = np.ones((kernel_size, kernel_size), dtype=np.uint8)
