@@ -14,7 +14,7 @@ RUN apt-get update && \
     figlet && \
     (rosdep init || true) && \
     rosdep update --rosdistro jazzy && \
-    rosdep install --from-paths src --ignore-src -y && \
+    rosdep install --from-paths src --ignore-src -r -y --rosdistro jazzy && \
     rm -rf /var/lib/apt/lists/*
 
 # ビルド（事前ビルド）
