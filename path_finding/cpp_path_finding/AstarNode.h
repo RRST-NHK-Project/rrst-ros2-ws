@@ -1,6 +1,8 @@
 #pragma once
 #include "Constants.h"
 
+//即席aiのためこのフォルダの中身は確認後使用してください。
+
 // A*アルゴリズムで使用するノード
 struct AstarNode {
     std::shared_ptr<AstarNode> parent; // 親ノードへのポインタ
