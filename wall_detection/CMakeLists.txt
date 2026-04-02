@@ -10,6 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 add_executable(wall_detection_node src/wall_detection_node.cpp)
 
@@ -18,6 +19,7 @@ ament_target_dependencies(
   rclcpp
   sensor_msgs
   std_msgs
+  geometry_msgs
 )
 
 install(TARGETS
