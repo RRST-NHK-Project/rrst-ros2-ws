@@ -37,6 +37,8 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 // =================================================================
 std::atomic<int16_t> g_micro1_sw{0}; // マイクロスイッチ(上): 1=押されている
 std::atomic<int16_t> g_micro2_sw{0}; // マイクロスイッチ(下): 1=押されている
+std::atomic<int16_t> g_enc1_val{0};  // エンコーダ1(上端側): data[1]から受信
+std::atomic<int16_t> g_enc2_val{0};  // エンコーダ2(下端側): data[2]から受信
 
 // =================================================================
 // SwitchInputノード: ID=3のESP32からマイクロスイッチの状態を受信する
@@ -69,7 +71,9 @@ private:
         //   data[9]   = SW1 (マイクロスイッチ 上)
         //   data[10]  = SW2 (マイクロスイッチ 下)
         g_micro1_sw = msg->data[9]; 
-        g_micro2_sw = msg->data[10]; 
+        g_micro2_sw = msg->data[10];
+        g_enc1_val  = msg->data[1];  // ENC1: 上端側エンコーダ
+        g_enc2_val  = msg->data[2];  // ENC2: 下端側エンコーダ
 
         // デバッグ: 受信した全てのデータを表示（インデックス確認用）
         std::string debug_str = "[ID " + std::to_string(INPUT_DEVICE_ID) + " RX] ";
@@ -425,31 +429,48 @@ private:
 
         // =================================================================
         // L1,R1:「フォークリフト上下」
-        // マイクロスイッチによる安全機構付き（ID=3のESP32から受信）
-        // マイクロスイッチ(上)押下時: L1による正回転禁止、R1による逆回転は許可
-        // マイクロスイッチ(下)押下時: R1による逆回転禁止、L1による正回転は許可
+        // エンコーダ近接検知による減速 + マイクロスイッチによる強制停止
+        //
+        // 【上端方向 (L1=正回転)】
+        //   ENC1 >= ENC_SLOW_THRESHOLD → 減速 (speed=SLOW_SPEED)
+        //   マイクロスイッチ(上)押下  → 即停止 (逆回転R1のみ許可)
+        // 【下端方向 (R1=逆回転)】
+        //   ENC2 >= ENC_SLOW_THRESHOLD → 減速 (speed=SLOW_SPEED)
+        //   マイクロスイッチ(下)押下  → 即停止 (正回転L1のみ許可)
         // =================================================================
 
-        // マイクロスイッチ(上): 押下時は正回転(L1)を禁止、逆回転(R1)のみ許可
-        // マイクロスイッチ(下): 押下時は逆回転(R1)を禁止、正回転(L1)のみ許可
-        if (L1 == 1 && micro1_sw == 0) {
-            // L1ボタンで正回転（マイクロスイッチ(上)が押されていない場合のみ）
-            data_[2] = 127;
-        } else if (R1 == 1 && micro2_sw == 0) {
-            // R1ボタンで逆回転（マイクロスイッチ(下)が押されていない場合のみ）
-            data_[2] = -127;
-        } else if (R1 == 1 && micro1_sw == 1) {
-            // マイクロスイッチ(上)が押されていてもR1による逆回転は許可
-            data_[2] = 127;
-        } else if (L1 == 1 && micro2_sw == 1) {
-            // マイクロスイッチ(下)が押されていてもL1による正回転は許可
-            data_[2] = -127;
+        static const int NORMAL_SPEED   = 100; // 通常速度
+        static const int SLOW_SPEED     =  40; // 減速後速度
+        static const int ENC_SLOW_THRESHOLD = 1000; // 減速開始閾値
+
+        int16_t enc1 = g_enc1_val.load(); // ENC1: 上端側
+        int16_t enc2 = g_enc2_val.load(); // ENC2: 下端側
+
+        if (micro1_sw == 1) {
+            // ★マイクロスイッチ(上)押下: 正回転(L1)を強制停止
+            if (R1 == 1) {
+                // 逆回転(R1)は許可（エンコーダ減速も適用）
+                data_[2] = (enc2 >= ENC_SLOW_THRESHOLD) ? -SLOW_SPEED : -NORMAL_SPEED;
+            } else {
+                data_[2] = 0; // L1は禁止
+            }
+        } else if (micro2_sw == 1) {
+            // ★マイクロスイッチ(下)押下: 逆回転(R1)を強制停止
+            if (L1 == 1) {
+                // 正回転(L1)は許可（エンコーダ減速も適用）
+                data_[2] = (enc1 >= ENC_SLOW_THRESHOLD) ? SLOW_SPEED : NORMAL_SPEED;
+            } else {
+                data_[2] = 0; // R1は禁止
+            }
+        } else if (L1 == 1) {
+            // 通常: 正回転(L1) — ENC1が閾値超えで減速
+            data_[2] = (enc1 >= ENC_SLOW_THRESHOLD) ? SLOW_SPEED : NORMAL_SPEED;
+        } else if (R1 == 1) {
+            // 通常: 逆回転(R1) — ENC2が閾値超えで減速
+            data_[2] = (enc2 >= ENC_SLOW_THRESHOLD) ? -SLOW_SPEED : -NORMAL_SPEED;
         } else {
-            // どちらのボタンも押されていない場合は停止
             data_[2] = 0;
         }
-        // ※この場合、SW1が押されているとき、R1が効かない可能性がある 
-        // ※また、AW2においても押されているとき、L1が効かない可能性があるので確認すべし->確認済み
 
         // =================================================================
         // LR
