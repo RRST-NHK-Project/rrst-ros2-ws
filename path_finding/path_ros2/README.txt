@@ -4,10 +4,10 @@ pythonをC++に書き直すフォルダ
 ーーーーーーーーーーーーーーーーーーーーーーーーーーー
 
 path_system_latest-->path_ros2
-にpythonで書いた分をcppに移行してました。
+にpythonで書いた分をcppに移行途中でした。
 システムについては、  
     path_system_latest
-    　\READ_ME.txt へ
+    　\README.txt へ
 
 path_system_latestのpythonでかいたA*
 アルゴリズムだけ流用するとかのほうが、
