@@ -1,6 +1,4 @@
 from setuptools import setup
-import os
-from glob import glob
 
 package_name = "kfs_pkg"
 
@@ -10,9 +8,16 @@ setup(
     packages=[package_name],
     package_dir={"": "."},
     data_files=[
-        ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
+        ("share/ament_index/resource_index/packages", ["resource/kfs_pkg"]),
         ("share/" + package_name, ["package.xml"]),
-        (os.path.join("share", package_name, "resource"), glob("resource/*")),
+        (
+            "share/" + package_name + "/resource",
+            [
+                "resource/KFS_image_list.png",
+                "resource/KFS_image_list_all.png",
+                "resource/KFS_judgement_machine ver1.1.pth",
+            ],
+        ),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
