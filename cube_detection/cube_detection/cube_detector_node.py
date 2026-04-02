@@ -28,6 +28,8 @@ class CubeDetectorNode(Node):
         self.declare_parameter("use_camera_info_intrinsics", True)
         self.declare_parameter("size_tolerance_ratio_min", 0.45)
         self.declare_parameter("size_tolerance_ratio_max", 1.90)
+        self.declare_parameter("use_3d_filtering", True)
+        self.declare_parameter("cube_3d_size_tolerance_mm", 100.0)
 
         image_topic = self.get_parameter("image_topic").value
         self.central_window_px = int(self.get_parameter("central_window_px").value)
@@ -51,6 +53,10 @@ class CubeDetectorNode(Node):
         )
         self.size_ratio_max = float(
             self.get_parameter("size_tolerance_ratio_max").value
+        )
+        self.use_3d_filtering = bool(self.get_parameter("use_3d_filtering").value)
+        self.cube_3d_size_tolerance_mm = float(
+            self.get_parameter("cube_3d_size_tolerance_mm").value
         )
 
         self.runtime_fx_px = self.camera_fx_px
@@ -88,6 +94,72 @@ class CubeDetectorNode(Node):
                 self.runtime_cy_px = cy
         except Exception:
             return
+
+    def unproject_point(self, u: float, v: float, z_mm: float) -> tuple:
+        """
+        逆投影：画像座標と深度からカメラ座標系での3D座標を計算
+        Args:
+            u: ピクセル x座標
+            v: ピクセル y座標
+            z_mm: 深度値 (mm)
+        Returns:
+            (x_mm, y_mm, z_mm): カメラ座標系での3D座標 (mm)
+        """
+        z_m = z_mm / 1000.0
+        x_m = (u - self.runtime_cx_px) * z_m / self.runtime_fx_px
+        y_m = (v - self.runtime_cy_px) * z_m / self.runtime_fy_px
+        return (x_m * 1000.0, y_m * 1000.0, z_mm)
+
+    def check_3d_cube_validity(
+        self, depth_image: np.ndarray, comp_mask: np.ndarray
+    ) -> tuple:
+        """
+        3D座標ベースのキューブ検証（立方体のサイズが期待値に近いか確認）
+        Args:
+            depth_image: 深度画像
+            comp_mask: 接続成分のマスク
+        Returns:
+            (is_valid: bool, size_x_mm: float, size_y_mm: float, size_z_mm: float)
+        """
+        if not self.use_3d_filtering:
+            return (True, 0.0, 0.0, 0.0)
+
+        # マスク内の有効なピクセルを抽出
+        ys, xs = np.where(comp_mask > 0)
+        if len(xs) == 0:
+            return (False, 0.0, 0.0, 0.0)
+
+        # 逆投影して3D座標に変換
+        points_3d = []
+        for x, y in zip(xs, ys):
+            z_mm = depth_image[y, x]
+            if z_mm > 0:
+                x_mm, y_mm, z_mm = self.unproject_point(float(x), float(y), float(z_mm))
+                points_3d.append((x_mm, y_mm, z_mm))
+
+        if len(points_3d) < 10:  # 十分な点がない場合はスキップ
+            return (False, 0.0, 0.0, 0.0)
+
+        points_3d = np.array(points_3d)
+
+        # 3D空間でのAABB (Axis-Aligned Bounding Box) を計算
+        min_coords = np.min(points_3d, axis=0)
+        max_coords = np.max(points_3d, axis=0)
+        size_x = max_coords[0] - min_coords[0]
+        size_y = max_coords[1] - min_coords[1]
+        size_z = max_coords[2] - min_coords[2]
+
+        # サイズのチェック（350mm ± tolerance）
+        cube_size = self.cube_size_mm
+        tolerance = self.cube_3d_size_tolerance_mm
+
+        size_ok = (
+            abs(size_x - cube_size) <= tolerance
+            and abs(size_y - cube_size) <= tolerance
+            and abs(size_z - cube_size) <= tolerance
+        )
+
+        return (size_ok, size_x, size_y, size_z)
 
     def image_callback(self, msg: Image) -> None:
         try:
@@ -225,6 +297,21 @@ class CubeDetectorNode(Node):
             )
             self.publish_no_detection(depth_image=depth_image, mask=band_mask)
             return
+
+        # 3D座標ベースのフィルター
+        if self.use_3d_filtering:
+            comp_mask = labels == selected_label
+            is_3d_valid, size_x, size_y, size_z = self.check_3d_cube_validity(
+                depth_image, comp_mask
+            )
+            if not is_3d_valid:
+                self.get_logger().debug(
+                    f"3D size filtering rejected. "
+                    f"detected_size={size_x:.1f}x{size_y:.1f}x{size_z:.1f}mm, "
+                    f"expected={self.cube_size_mm:.1f}mm ± {self.cube_3d_size_tolerance_mm:.1f}mm"
+                )
+                self.publish_no_detection(depth_image=depth_image, mask=band_mask)
+                return
 
         score = max(
             0.0,

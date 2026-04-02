@@ -34,6 +34,10 @@ def generate_launch_description():
                         "camera_info_topic": "/camera/camera/depth/camera_info",
                         # CameraInfo トピックから焦点距離を動的に取得するか (True: D456実際の値を使用)
                         "use_camera_info_intrinsics": True,
+                        # 3次元座標空間でのキューブ検証を使用するか (2Dピクセルベースより堅牢)
+                        "use_3d_filtering": False,
+                        # 3D検証時のサイズ許容度 (mm): 350mm ± この値の範囲で立方体と判定
+                        "cube_3d_size_tolerance_mm": 100.0,
                         # 検出立方体のサイズ許容度（下限）：予想サイズに対する比率の最小値
                         "size_tolerance_ratio_min": 0.45,
                         # 検出立方体のサイズ許容度（上限）：予想サイズに対する比率の最大値 (ステップ誤検知を防ぐ)
