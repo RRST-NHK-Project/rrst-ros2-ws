@@ -12,6 +12,7 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include <iostream>
 #include <thread>
 #include <vector>
+#include <cstdint>
 
 // ROS
 #include "rclcpp/rclcpp.hpp"
@@ -34,11 +35,17 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 // =================================================================
 // マイクロスイッチの状態（ID=3のESP32から受信、2ノード間で共有）
 // atomic: スレッドセーフに読み書きするため
-// =================================================================
 std::atomic<int16_t> g_micro1_sw{0}; // マイクロスイッチ(上): 1=押されている
 std::atomic<int16_t> g_micro2_sw{0}; // マイクロスイッチ(下): 1=押されている
-std::atomic<int16_t> g_enc1_val{0};  // エンコーダ1(上端側): data[1]から受信
-std::atomic<int16_t> g_enc2_val{0};  // エンコーダ2(下端側): data[2]から受信
+std::atomic<int16_t> g_micro3_sw{0}; // マイクロスイッチ(外側): SW3
+std::atomic<int16_t> g_micro4_sw{0}; // マイクロスイッチ(内側): SW4
+std::atomic<int16_t> g_enc1_val{0};  // エンコーダ1: data[1]から受信
+
+// フォークリフト座標管理 (EncoderCoordinator)
+// エンコーダ減少 -> 座標増加 / エンコーダ増加 -> 座標減少
+std::atomic<int64_t> g_abs_coord{0};        // 現在の絶対座標
+std::atomic<int16_t> g_last_enc1_val{0};    // 前回のエンコーダ生値（差分計算用）
+std::atomic<bool> g_coord_initialized{false}; // 初期化フラグ
 
 // =================================================================
 // SwitchInputノード: ID=3のESP32からマイクロスイッチの状態を受信する
@@ -59,28 +66,77 @@ public:
 
 private:
     void sw_callback(const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
-        // ESP32 MODE=3 (8個) や直接通信の場合に対応するため、チェックを緩和
-        if (msg->data.size() < 6) {
+        // SW4 (data[12]) まで使用するため、サイズチェックを13以上に変更
+        if (msg->data.size() < 13) {
             RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000,
                         "serial_rx_%d: データが短すぎます (%zu)",
                         INPUT_DEVICE_ID, msg->data.size());
             return;
         }
 
-        // ESP32 esp32_serial_bridge の送信インデックス:
-        //   data[9]   = SW1 (マイクロスイッチ 上)
-        //   data[10]  = SW2 (マイクロスイッチ 下)
-        g_micro1_sw = msg->data[9]; 
-        g_micro2_sw = msg->data[10];
-        g_enc1_val  = msg->data[1];  // ENC1: 上端側エンコーダ
-        g_enc2_val  = msg->data[2];  // ENC2: 下端側エンコーダ
+        // マイクロスイッチの値を更新
+        // マイクロスイッチの値を更新 (物理配線に合わせて修正: 9=下, 10=上)
+        g_micro1_sw = msg->data[10]; // 上端スイッチ(micro1)
+        g_micro2_sw = msg->data[9];  // 下端スイッチ(micro2)
+        g_micro3_sw = msg->data[11];
+        g_micro4_sw = msg->data[12];
+        g_enc1_val  = msg->data[1];
 
-        // デバッグ: 受信した全てのデータを表示（インデックス確認用）
-        std::string debug_str = "[ID " + std::to_string(INPUT_DEVICE_ID) + " RX] ";
-        for (size_t i = 0; i < msg->data.size(); i++) {
-            debug_str += "d[" + std::to_string(i) + "]=" + std::to_string(msg->data[i]) + " ";
+        // =============================================================
+        // 座標調査用デバッグ実装
+        // =============================================================
+        int16_t current_enc1 = msg->data[1];
+
+        // 下端スイッチ(data[9])で座標リセット
+        if (msg->data[9] != 0) {
+            g_abs_coord.store(0);
+            g_last_enc1_val.store(current_enc1);
+            g_coord_initialized.store(true);
+            RCLCPP_INFO(get_logger(), "[COORD RESET!] 下端ボタン押下により 0 にリセットしました");
+        } else if (g_coord_initialized.load()) {
+            // 差分計算
+            int16_t diff = static_cast<int16_t>(current_enc1 - g_last_enc1_val.load());
+            
+            if (diff != 0) {
+                // 現状の定義: 減少->増加 (coord -= diff)
+                // ※もし上昇時に数値が減るようなら、ここを += に切り替える
+                g_abs_coord = g_abs_coord.load() - static_cast<int64_t>(diff);
+                g_last_enc1_val.store(current_enc1);
+                
+                // 変化があった時だけ詳細ログを出す
+                RCLCPP_INFO(get_logger(), "MOVE: enc=%d | diff=%d | raw=%ld | rot=%.3f",
+                            (int)current_enc1, (int)diff, g_abs_coord.load(), 
+                            (double)g_abs_coord.load() / 65536.0);
+            }
+        } else {
+            g_last_enc1_val.store(current_enc1);
+            g_coord_initialized.store(true);
         }
-        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500, "%s", debug_str.c_str());
+
+        // --- 通信デバッグ追加 ---
+        static uint64_t packet_count = 0;
+        packet_count++;
+
+        // 状態変化時のみ即時表示
+        static int16_t l9=0, l10=0, l11=0, l12=0;
+        if (msg->data[9] != l9 || msg->data[10] != l10 || msg->data[11] != l11 || msg->data[12] != l12) {
+            RCLCPP_INFO(get_logger(), "SW Changed! [下(9):%d, 上(10):%d, 外(11):%d, 内(12):%d]", 
+                        msg->data[9], msg->data[10], msg->data[11], msg->data[12]);
+            l9 = msg->data[9]; l10 = msg->data[10]; l11 = msg->data[11]; l12 = msg->data[12];
+        }
+
+        // 定期ダンプに受信件数を追加
+        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000, 
+            "RX Heartbeat (Total:%lu) | Dump: [%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d]",
+            packet_count,
+            msg->data[0], msg->data[1], msg->data[2], msg->data[3], 
+            msg->data[4], msg->data[5], msg->data[6], msg->data[7], 
+            msg->data[8], msg->data[9], msg->data[10], msg->data[11], 
+            msg->data[12], msg->data[13], msg->data[14], msg->data[15]);
+
+        // SW3, SW4専用の明示的なデバッグ
+        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
+            "【通信確認】SW3(外側):%d, SW4(内側):%d", msg->data[11], msg->data[12]);
     }
 
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sw_sub_;
@@ -197,12 +253,16 @@ private:
         // マイクロスイッチの状態をグローバル変数から取得
         int16_t micro1_sw = g_micro1_sw.load(); 
         int16_t micro2_sw = g_micro2_sw.load(); 
+        int16_t micro3_sw = g_micro3_sw.load(); 
+        int16_t micro4_sw = g_micro4_sw.load(); 
 
         // 制御ノード側のデバッグログ
         RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-            "【制御ノード表示】SW状態: 上=%d (%s), 下=%d (%s)", 
-            micro1_sw, micro1_sw ? "停止条件成立" : "通常",
-            micro2_sw, micro2_sw ? "停止条件成立" : "通常");
+            "【制御ノード表示】SW状態: 上=%d (%s), 下=%d (%s), 外=%d (%s), 内=%d (%s)", 
+            micro1_sw, micro1_sw ? "停止" : "通常",
+            micro2_sw, micro2_sw ? "停止" : "通常",
+            micro3_sw, micro3_sw ? "停止" : "通常",
+            micro4_sw, micro4_sw ? "停止" : "通常");
 
         // 以降、配列data_を操作する
         // =================================================================
@@ -309,28 +369,35 @@ private:
         static int CIRCLE_PUSH_COUNT = 0;
         static int CIRCLE_PUSH_MAX = 6;
 
-        static int MOVE_SPEED = 0;
+        static int MOVE_SPEED = 50;
         static int VACUUM_SPEED = 50;
 
         if (CIRCLE == 1 && circle_pre == 0) {
             CIRCLE_PUSH_COUNT = (CIRCLE_PUSH_COUNT + 1) % CIRCLE_PUSH_MAX;
         }
         if (CIRCLE_PUSH_COUNT == 0) {
-            data_[3] = MOVE_SPEED;
-        }                       
+            data_[1] = 0;
+            data_[4] = 0;
+            data_[17] = 0;
+        }
         if (CIRCLE_PUSH_COUNT == 1) {
+            data_[1] = MOVE_SPEED;
+            if (micro3_sw == 1) data_[1] = 0; // 外側SWで停止
+        }                       
+        if (CIRCLE_PUSH_COUNT == 2) {
             data_[4] = VACUUM_SPEED;
         }
-        if (CIRCLE_PUSH_COUNT == 2) {
-            data_[3] = MOVE_SPEED * -1;
-        }
         if (CIRCLE_PUSH_COUNT == 3) {
-            data_[4] = 0;             
+            data_[1] = MOVE_SPEED * -1;
+            if (micro4_sw == 1) data_[1] = 0; // 内側SWで停止
         }
         if (CIRCLE_PUSH_COUNT == 4) {
-            data_[17] = 1;
+            data_[4] = 0;             
         }
         if (CIRCLE_PUSH_COUNT == 5) {
+            data_[17] = 1;
+        }
+        if (CIRCLE_PUSH_COUNT == 6) {
             data_[17] = 0;
         }   
 
@@ -414,63 +481,79 @@ private:
         square_pre = SQUARE;
 
         // =================================================================
-        // UP,DOWN:「槍押上機構」
+        // UP,DOWN:「槍押上機構」　※実験のため一時コメントアウト中
         // ボタンを押し続けると槍を押し上げるモーターが回転し続ける
         // =================================================================
 
         // data_[3] = UP;
-        if (UP) {
-            data_[1] = 50;
-        } else if (DOWN) {
-            data_[1] = -50;
-        } else {
-            data_[1] = 0;
-        }
+        // if (UP) {
+        //     data_[1] = 50;
+        // } else if (DOWN) {
+        //     data_[1] = -50;
+        // } else {
+        //     data_[1] = 0;
+        // }
 
         // =================================================================
         // L1,R1:「フォークリフト上下」
-        // エンコーダ近接検知による減速 + マイクロスイッチによる強制停止
+        // 絶対座標に基づく減速 + マイクロスイッチによる方向制限
         //
-        // 【上端方向 (L1=正回転)】
-        //   ENC1 >= ENC_SLOW_THRESHOLD → 減速 (speed=SLOW_SPEED)
-        //   マイクロスイッチ(上)押下  → 即停止 (逆回転R1のみ許可)
-        // 【下端方向 (R1=逆回転)】
-        //   ENC2 >= ENC_SLOW_THRESHOLD → 減速 (speed=SLOW_SPEED)
-        //   マイクロスイッチ(下)押下  → 即停止 (正回転L1のみ許可)
+        // 座標: 下端スイッチ押下で 0 にリセット
+        //   座標 <= 3 → 減速 (正回転=30, 逆回転=-30)
+        //   座標 > 3  → 通常速度 (正回転=100, 逆回転=-100)
+        //   上マイクロスイッチ押下 → 正回転禁止、逆回転のみ許可
+        //   下マイクロスイッチ押下 → 逆回転禁止、正回転のみ許可
         // =================================================================
 
-        static const int NORMAL_SPEED   = 100; // 通常速度
-        static const int SLOW_SPEED     =  40; // 減速後速度
-        static const int ENC_SLOW_THRESHOLD = 1000; // 減速開始閾値
+        static const int NORMAL_SPEED = 100;  // 通常速度
+        static const int SLOW_SPEED   =  30;  // 減速後速度
 
-        int16_t enc1 = g_enc1_val.load(); // ENC1: 上端側
-        int16_t enc2 = g_enc2_val.load(); // ENC2: 下端側
+        int64_t abs_coord = g_abs_coord.load(); // 現在の絶対座標
+        double rot_units = static_cast<double>(abs_coord) / 65536.0; // 回転単位 (1周期=1.0)
 
-        if (micro1_sw == 1) {
-            // ★マイクロスイッチ(上)押下: 正回転(L1)を強制停止
+        // ヒステリシス（遊び）を持たせた減速ゾーン判定
+        // 下端付近 (0〜3回転) または 上限付近 (27〜30回転) で減速
+        static bool is_fork_slow = false;
+        if (rot_units <= 3.0 || rot_units >= 27.0) {
+            is_fork_slow = true;
+        } else if (rot_units >= 6.0 && rot_units <= 24.0) {
+            is_fork_slow = false;
+        }
+        bool in_slow_zone = is_fork_slow;
+
+        // 回転方向に応じた速度を決定
+        int fwd_speed = in_slow_zone ?  SLOW_SPEED :  NORMAL_SPEED;  // 正回転速度
+        int rev_speed = in_slow_zone ? -SLOW_SPEED : -NORMAL_SPEED;  // 逆回転速度
+
+        if (micro2_sw == 1 /* || rot_units >= 30.0 */) {
+            // ★上端制限: 正回転(L1)禁止 (デバッグのためソフトリミット一時解除)
             if (R1 == 1) {
-                // 逆回転(R1)は許可（エンコーダ減速も適用）
-                data_[2] = (enc2 >= ENC_SLOW_THRESHOLD) ? -SLOW_SPEED : -NORMAL_SPEED;
+                data_[2] = rev_speed;
             } else {
-                data_[2] = 0; // L1は禁止
+                data_[2] = 0;
             }
-        } else if (micro2_sw == 1) {
-            // ★マイクロスイッチ(下)押下: 逆回転(R1)を強制停止
+        } else if (micro1_sw == 1 /* || rot_units <= 0.0 */) {
+            // ★下端制限: 逆回転(R1)禁止 (デバッグのためソフトリミット一時解除)
             if (L1 == 1) {
-                // 正回転(L1)は許可（エンコーダ減速も適用）
-                data_[2] = (enc1 >= ENC_SLOW_THRESHOLD) ? SLOW_SPEED : NORMAL_SPEED;
+                data_[2] = fwd_speed;
             } else {
-                data_[2] = 0; // R1は禁止
+                data_[2] = 0;
             }
         } else if (L1 == 1) {
-            // 通常: 正回転(L1) — ENC1が閾値超えで減速
-            data_[2] = (enc1 >= ENC_SLOW_THRESHOLD) ? SLOW_SPEED : NORMAL_SPEED;
+            // 通常: 正回転(L1)
+            data_[2] = fwd_speed;
         } else if (R1 == 1) {
-            // 通常: 逆回転(R1) — ENC2が閾値超えで減速
-            data_[2] = (enc2 >= ENC_SLOW_THRESHOLD) ? -SLOW_SPEED : -NORMAL_SPEED;
+            // 通常: 逆回転(R1)
+            data_[2] = rev_speed;
         } else {
+            // ボタンなし: 停止
             data_[2] = 0;
         }
+
+        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
+            "【フォーク制御】回転数=%.2f, 減速=%s, 上SW=%d, 下SW=%d, data[2]=%d",
+            rot_units, in_slow_zone ? "ON" : "OFF",
+            micro2_sw, micro1_sw, data_[2]);
 
         // =================================================================
         // LR
@@ -493,11 +576,11 @@ private:
         // =================================================================
 
         // デバッグ用
-        RCLCPP_INFO(
-            get_logger(),
-            "data_[1-4]=[%d,%d,%d,%d], data_[9-12]=[%d,%d,%d,%d]",
-            data_[1], data_[2], data_[3], data_[4],
-            data_[9], data_[10], data_[11], data_[12]);
+        // RCLCPP_INFO(
+        //     get_logger(),
+        //     "data_[1-4]=[%d,%d,%d,%d], data_[9-12]=[%d,%d,%d,%d]",
+        //     data_[1], data_[2], data_[3], data_[4],
+        //     data_[9], data_[10], data_[11], data_[12]);
 
         // 配列操作ここまで
     }
