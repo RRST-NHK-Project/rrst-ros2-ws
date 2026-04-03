@@ -14,12 +14,19 @@ class WebcamCalibratorNode(Node):
     def __init__(self) -> None:
         super().__init__("webcam_calibrator")
 
-        self.declare_parameter("camera_index", 0)
+        package_root_dir = os.path.dirname(os.path.dirname(__file__))
+        default_output_dir = os.path.join(package_root_dir, "calibration")
+        default_output_yaml = os.path.join(
+            default_output_dir,
+            "webcam_calibration.yaml",
+        )
+
+        self.declare_parameter("camera_index", 2)
         self.declare_parameter("board_rows", 6)
         self.declare_parameter("board_cols", 9)
         self.declare_parameter("square_size_m", 0.024)
         self.declare_parameter("required_samples", 20)
-        self.declare_parameter("output_yaml", "webcam_calibration.yaml")
+        self.declare_parameter("output_yaml", default_output_yaml)
         self.declare_parameter("camera_name", "webcam")
         self.declare_parameter("show_undistorted", True)
 
@@ -63,6 +70,7 @@ class WebcamCalibratorNode(Node):
 
         calibrated_mtx = None
         calibrated_dist = None
+        auto_calibrated_once = False
 
         while rclpy.ok():
             ok, frame = cap.read()
@@ -116,7 +124,15 @@ class WebcamCalibratorNode(Node):
                     f"Captured sample {len(img_points)}/{self.required_samples}"
                 )
 
-            if key == ord("k") or len(img_points) >= self.required_samples:
+            should_calibrate = False
+            if key == ord("k"):
+                should_calibrate = True
+                auto_calibrated_once = False
+            elif len(img_points) >= self.required_samples and not auto_calibrated_once:
+                should_calibrate = True
+                auto_calibrated_once = True
+
+            if should_calibrate:
                 if len(img_points) < 3:
                     self.get_logger().warning("Need at least 3 samples to calibrate.")
                     continue
@@ -170,6 +186,7 @@ class WebcamCalibratorNode(Node):
             return None, None
 
         output_path = os.path.abspath(self.output_yaml)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
         self._write_calibration_yaml(
             output_path,
             image_size,
