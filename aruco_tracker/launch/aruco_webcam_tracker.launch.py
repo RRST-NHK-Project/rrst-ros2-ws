@@ -32,7 +32,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "marker_length",
-                default_value="0.05",
+                default_value="0.08",
                 description="Marker side length in meters",
             ),
             DeclareLaunchArgument(
