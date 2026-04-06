@@ -10,6 +10,10 @@ setup(
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
         (
+            "share/" + package_name + "/calibration",
+            ["calibration/webcam_calibration.yaml"],
+        ),
+        (
             "share/" + package_name + "/launch",
             [
                 "launch/aruco_tracker.launch.py",

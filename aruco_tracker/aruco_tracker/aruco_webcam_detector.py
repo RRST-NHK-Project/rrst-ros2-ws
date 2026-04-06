@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import os
+import platform
 from cv2 import aruco
 from cv_bridge import CvBridge
 from geometry_msgs.msg import PoseStamped
@@ -27,6 +28,7 @@ class ArucoWebcamDetector(Node):
         self.declare_parameter("distance_topic", "/aruco_distance")
         self.declare_parameter("frame_id", "webcam_frame")
         self.declare_parameter("marker_length", 0.05)
+        self.declare_parameter("camera_fourcc", "YUYV")
         self.declare_parameter("camera_info_yaml", "")
 
         self.camera_index = int(self.get_parameter("camera_index").value)
@@ -39,6 +41,7 @@ class ArucoWebcamDetector(Node):
         self.distance_topic = str(self.get_parameter("distance_topic").value)
         self.frame_id = str(self.get_parameter("frame_id").value)
         self.marker_length = float(self.get_parameter("marker_length").value)
+        self.camera_fourcc = str(self.get_parameter("camera_fourcc").value)
         self.camera_info_yaml = str(self.get_parameter("camera_info_yaml").value)
 
         self.declare_parameter("fx", 600.0)
@@ -67,11 +70,17 @@ class ArucoWebcamDetector(Node):
         self.pose_pub = self.create_publisher(PoseStamped, self.pose_topic, 10)
         self.distance_pub = self.create_publisher(Float32, self.distance_topic, 10)
 
-        self.cap = cv2.VideoCapture(self.camera_index)
+        self.cap = self._open_camera()
         if self.camera_width > 0:
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.camera_width)
         if self.camera_height > 0:
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.camera_height)
+        if self.camera_fourcc and len(self.camera_fourcc) == 4:
+            self.cap.set(
+                cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*self.camera_fourcc)
+            )
+        self.cap.set(cv2.CAP_PROP_FPS, self.publish_rate)
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
         if not self.cap.isOpened():
             raise RuntimeError(f"Cannot open camera index {self.camera_index}")
@@ -94,6 +103,14 @@ class ArucoWebcamDetector(Node):
             f"camera_index={self.camera_index}, image_topic={self.output_image_topic}, "
             f"pose_topic={self.pose_topic}"
         )
+
+    def _open_camera(self):
+        if platform.system().lower() == "linux":
+            cap = cv2.VideoCapture(self.camera_index, cv2.CAP_V4L2)
+            if cap.isOpened():
+                return cap
+
+        return cv2.VideoCapture(self.camera_index)
 
     def _load_intrinsics_from_yaml_if_available(self):
         if not self.camera_info_yaml:
