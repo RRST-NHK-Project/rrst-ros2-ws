@@ -316,7 +316,7 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > up_final_forward_wait)
+            if (sdm15_value_[2] < dis)
             {
                 next_up(StepUpState::DONE);
             }
