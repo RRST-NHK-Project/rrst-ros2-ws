@@ -3,7 +3,12 @@ import numpy as np
 from cv2 import aruco
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, QoSHistoryPolicy, QoSDurabilityPolicy, QoSReliabilityPolicy
+from rclpy.qos import (
+    QoSProfile,
+    QoSHistoryPolicy,
+    QoSDurabilityPolicy,
+    QoSReliabilityPolicy,
+)
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Float32, Int32
 from sensor_msgs.msg import Image, CameraInfo
@@ -20,6 +25,7 @@ class ArucoPosePublisher(Node):
         self.declare_parameter("camera_info_topic", "/camera/camera/color/camera_info")
         self.declare_parameter("output_image_topic", "/camera/image_raw")
         self.declare_parameter("frame_id", "camera_color_optical_frame")
+        self.declare_parameter("marker_length", 0.05)
 
         # QoS for best-effort, no-wait
         qos_profile = QoSProfile(
@@ -32,7 +38,9 @@ class ArucoPosePublisher(Node):
         # Publishers
         self.pose_pub = self.create_publisher(PoseStamped, "aruco_pose", qos_profile)
         self.id_pub = self.create_publisher(Int32, "aruco_id", qos_profile)
-        self.distance_pub = self.create_publisher(Float32, "aruco_distance", qos_profile)
+        self.distance_pub = self.create_publisher(
+            Float32, "aruco_distance", qos_profile
+        )
         self.bridge = CvBridge()
         output_image_topic = str(self.get_parameter("output_image_topic").value)
         self.image_pub = self.create_publisher(Image, output_image_topic, qos_profile)
@@ -40,7 +48,9 @@ class ArucoPosePublisher(Node):
         image_topic = str(self.get_parameter("image_topic").value)
         camera_info_topic = str(self.get_parameter("camera_info_topic").value)
         self.create_subscription(Image, image_topic, self.image_callback, qos_profile)
-        self.create_subscription(CameraInfo, camera_info_topic, self.camera_info_callback, 1)
+        self.create_subscription(
+            CameraInfo, camera_info_topic, self.camera_info_callback, 1
+        )
         self.get_logger().info(
             f"Subscribed image_topic={image_topic}, camera_info_topic={camera_info_topic}"
         )
@@ -64,7 +74,7 @@ class ArucoPosePublisher(Node):
         self.dist_coeffs = None
         self._camera_ready = False
         self._warned_camera_info = False
-        self.marker_length = 0.05  # マーカーの一辺の長さ [m]
+        self.marker_length = float(self.get_parameter("marker_length").value)
 
         # Performance tracking
         self._frame_count = 0
@@ -162,7 +172,9 @@ class ArucoPosePublisher(Node):
         # Debug: log detection results every 100 frames
         if self._frame_count % 100 == 0:
             if ids is not None:
-                self.get_logger().info(f"Detected {len(ids)} marker(s): {ids.flatten().tolist()}")
+                self.get_logger().info(
+                    f"Detected {len(ids)} marker(s): {ids.flatten().tolist()}"
+                )
             else:
                 self.get_logger().info("No markers detected")
 
@@ -173,14 +185,19 @@ class ArucoPosePublisher(Node):
                 # corner is shape (4, 1, 2) - 4 corners with (x, y)
                 pts = np.int32(corner)
                 cv2.polylines(frame, [pts], True, (0, 255, 0), 2)
-                
+
                 # Draw ID at center of marker
                 cX = np.mean(pts[:, 0])
                 cY = np.mean(pts[:, 1])
                 marker_id = ids[i][0]
                 cv2.putText(
-                    frame, f"ID:{marker_id}", (int(cX), int(cY)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2
+                    frame,
+                    f"ID:{marker_id}",
+                    (int(cX), int(cY)),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    (0, 255, 0),
+                    2,
                 )
         else:
             if self._frame_count % 100 == 0:
@@ -236,9 +253,13 @@ class ArucoPosePublisher(Node):
             self.distance_pub.publish(dist_msg)
 
         # Performance tracking - use actual frame timestamps
-        current_frame_time_ns = msg.header.stamp.sec * 1_000_000_000 + msg.header.stamp.nanosec
+        current_frame_time_ns = (
+            msg.header.stamp.sec * 1_000_000_000 + msg.header.stamp.nanosec
+        )
         if self._last_frame_time_ns is not None:
-            interval_s = (current_frame_time_ns - self._last_frame_time_ns) / 1_000_000_000
+            interval_s = (
+                current_frame_time_ns - self._last_frame_time_ns
+            ) / 1_000_000_000
             if interval_s > 0:
                 self._frame_intervals.append(interval_s)
                 if len(self._frame_intervals) > 30:
@@ -249,7 +270,9 @@ class ArucoPosePublisher(Node):
             avg_interval = np.mean(self._frame_intervals)
             fps = 1.0 / avg_interval if avg_interval > 0 else 0
             t_elapsed = time.time() - t_start
-            self.get_logger().info(f"Frames: {self._frame_count}, Process: {t_elapsed*1000:.2f}ms, Camera FPS: {fps:.1f}")
+            self.get_logger().info(
+                f"Frames: {self._frame_count}, Process: {t_elapsed*1000:.2f}ms, Camera FPS: {fps:.1f}"
+            )
 
         if ids is not None and self._frame_count % 100 == 0:
             marker_id = int(ids[0][0])

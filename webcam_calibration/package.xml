@@ -1,17 +1,13 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>aruco_tracker</name>
+  <name>webcam_calibration</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="koki2022@gmail.com">ubuntu</maintainer>
-  <license>TODO: License declaration</license>
+  <description>WebカメラをOpenCVでキャリブレーションし、カメラパラメータYAMLを保存するパッケージ</description>
+  <maintainer email="tashikou1682@gmail.com">dev</maintainer>
+  <license>Apache-2.0</license>
 
   <exec_depend>rclpy</exec_depend>
-  <exec_depend>geometry_msgs</exec_depend>
-  <exec_depend>std_msgs</exec_depend>
-  <exec_depend>sensor_msgs</exec_depend>
-  <exec_depend>cv_bridge</exec_depend>
   <exec_depend>python3-opencv</exec_depend>
   <exec_depend>python3-yaml</exec_depend>
   <exec_depend>launch_ros</exec_depend>
