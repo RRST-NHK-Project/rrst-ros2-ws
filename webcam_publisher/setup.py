@@ -10,10 +10,16 @@ setup(
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
         (
+            "share/" + package_name + "/calibration",
+            ["calibration/webcam_calibration.yaml"],
+        ),
+        (
             "share/" + package_name + "/launch",
             [
                 "launch/webcam_publisher.launch.py",
                 "launch/webcam_common.launch.py",
+                "launch/webcam_publisher_calibrated.launch.py",
+                "launch/webcam_calibrated_with_viewer.launch.py",
             ],
         ),
     ],

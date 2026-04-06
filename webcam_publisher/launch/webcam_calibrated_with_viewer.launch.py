@@ -7,10 +7,11 @@ import os
 
 
 def generate_launch_description():
-    """Webcam publisherのImage/CameraInfoを使ってArUco検出するlaunchファイル."""
+    """キャリブレーション済みWebカメラPublishとViewerを同時起動するlaunchファイル."""
     camera_index = LaunchConfiguration("camera_index")
-    marker_length = LaunchConfiguration("marker_length")
     calibration_yaml = LaunchConfiguration("calibration_yaml")
+    image_topic = LaunchConfiguration("image_topic")
+    camera_info_topic = LaunchConfiguration("camera_info_topic")
 
     default_yaml = os.path.join(
         get_package_share_directory("webcam_publisher"),
@@ -26,14 +27,19 @@ def generate_launch_description():
                 description="OpenCV camera index",
             ),
             DeclareLaunchArgument(
-                "marker_length",
-                default_value="0.05",
-                description="Marker side length in meters",
-            ),
-            DeclareLaunchArgument(
                 "calibration_yaml",
                 default_value=default_yaml,
-                description="Path to camera calibration YAML (camera_info format)",
+                description="Path to camera calibration YAML",
+            ),
+            DeclareLaunchArgument(
+                "image_topic",
+                default_value="/webcam/image_raw",
+                description="Image topic name",
+            ),
+            DeclareLaunchArgument(
+                "camera_info_topic",
+                default_value="/webcam/camera_info",
+                description="CameraInfo topic name",
             ),
             Node(
                 package="webcam_publisher",
@@ -43,8 +49,8 @@ def generate_launch_description():
                 parameters=[
                     {
                         "camera_index": camera_index,
-                        "topic_name": "/webcam/image_raw",
-                        "camera_info_topic": "/webcam/camera_info",
+                        "topic_name": image_topic,
+                        "camera_info_topic": camera_info_topic,
                         "frame_id": "webcam_frame",
                         "publish_rate": 30.0,
                         "frame_width": 640,
@@ -54,28 +60,14 @@ def generate_launch_description():
                 ],
             ),
             Node(
-                package="aruco_tracker",
-                executable="aruco_pose_publisher",
-                name="aruco_pose_publisher",
+                package="webcam_viewer",
+                executable="webcam_viewer",
+                name="webcam_viewer",
                 output="screen",
                 parameters=[
                     {
-                        "image_topic": "/webcam/image_raw",
-                        "camera_info_topic": "/webcam/camera_info",
-                        "output_image_topic": "/camera/image_raw",
-                        "frame_id": "webcam_frame",
-                        "marker_length": marker_length,
-                    }
-                ],
-            ),
-            Node(
-                package="aruco_tracker",
-                executable="aruco_viewer",
-                name="aruco_viewer",
-                output="screen",
-                parameters=[
-                    {
-                        "image_topic": "/camera/image_raw",
+                        "topic_name": image_topic,
+                        "window_name": "Webcam Viewer",
                     }
                 ],
             ),

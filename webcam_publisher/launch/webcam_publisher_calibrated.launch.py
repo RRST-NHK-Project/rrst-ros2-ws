@@ -7,9 +7,8 @@ import os
 
 
 def generate_launch_description():
-    """Webcam publisherのImage/CameraInfoを使ってArUco検出するlaunchファイル."""
+    """キャリブレーションYAMLを使ってWebカメラを起動するlaunchファイル."""
     camera_index = LaunchConfiguration("camera_index")
-    marker_length = LaunchConfiguration("marker_length")
     calibration_yaml = LaunchConfiguration("calibration_yaml")
 
     default_yaml = os.path.join(
@@ -26,14 +25,9 @@ def generate_launch_description():
                 description="OpenCV camera index",
             ),
             DeclareLaunchArgument(
-                "marker_length",
-                default_value="0.05",
-                description="Marker side length in meters",
-            ),
-            DeclareLaunchArgument(
                 "calibration_yaml",
                 default_value=default_yaml,
-                description="Path to camera calibration YAML (camera_info format)",
+                description="Path to camera calibration YAML",
             ),
             Node(
                 package="webcam_publisher",
@@ -50,32 +44,6 @@ def generate_launch_description():
                         "frame_width": 640,
                         "frame_height": 480,
                         "camera_info_yaml": calibration_yaml,
-                    }
-                ],
-            ),
-            Node(
-                package="aruco_tracker",
-                executable="aruco_pose_publisher",
-                name="aruco_pose_publisher",
-                output="screen",
-                parameters=[
-                    {
-                        "image_topic": "/webcam/image_raw",
-                        "camera_info_topic": "/webcam/camera_info",
-                        "output_image_topic": "/camera/image_raw",
-                        "frame_id": "webcam_frame",
-                        "marker_length": marker_length,
-                    }
-                ],
-            ),
-            Node(
-                package="aruco_tracker",
-                executable="aruco_viewer",
-                name="aruco_viewer",
-                output="screen",
-                parameters=[
-                    {
-                        "image_topic": "/camera/image_raw",
                     }
                 ],
             ),
