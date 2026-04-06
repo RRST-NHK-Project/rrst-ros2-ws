@@ -27,6 +27,8 @@ L1、R1で回転しようとすると前進、後進してしまう
 #include "std_msgs/msg/int16_multi_array.hpp"
 #include "std_msgs/msg/int32.hpp"
 
+#include "sensor_msgs/msg/laser_scan.hpp"
+
 // 自作
 #include "include/PacketController.hpp"
 PacketController pkt;
@@ -105,8 +107,11 @@ private:
     static constexpr int dis = 100;      // 障害物と見なす距離の閾値（要調整）
     static constexpr int down_dis = 100; // sdm15の値がこの時間(ms)更新されなければタイムアウトと見なす
 
+    static constexpr int wall = 100; // 前に障害物があると見なす距離の閾値（要調整）
+
     // シーケンスの状態管理に必要な変数
-    int32_t sdm15_value_[4] = {0, 0, 0,0};
+    int32_t sdm15_value_[4] = {0, 0, 0, 0};
+    int16_t lidar_value = 0;
 
     // モードの管理
     enum class StepMode
@@ -121,6 +126,7 @@ private:
     {
         IDLE,
         ALL_UP,
+        ALL_FORWARD,
         FIRST_FORWARD,
         FRONT_DOWN,
         SECOND_FORWARD,
@@ -254,7 +260,20 @@ private:
         {
         case StepUpState::IDLE: // アイドリングストップ
             break;
+            /////////////
+        case StepUpState::ALL_FORWARD: // 前進
+            if (!state_executed_)
+            {
+                move_forward();
+                state_executed_ = true;
+            }
+            if (lidar_value < wall) // 前に障害物があるなら
+            {
+                next_up(StepUpState::ALL_UP);
+            }
+            break;
 
+            //////////
         case StepUpState::ALL_UP: // 全て上げる
             if (!state_executed_)
             {
@@ -349,7 +368,7 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if (sdm15_value_[1] > down_dis || sdm15_value_[3] > down_dis)// 前のセンサーで障害物がなくなったら
+            if (sdm15_value_[1] > down_dis || sdm15_value_[3] > down_dis) // 前のセンサーで障害物がなくなったら
             {
                 next_down(StepDownState::FRONT_UP);
             }
@@ -483,6 +502,11 @@ public:
                       this,
                       std::placeholders::_1));
 
+        lidar_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
+            "/ldlidar_node/scan",
+            rclcpp::SensorDataQoS(),
+            std::bind(&HardWareControl::lidar_callback, this, std::placeholders::_1));
+
         // sdm15のSubscribe
         sdm15_sub1_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
             "serial_rx_17",
@@ -508,7 +532,7 @@ public:
                 this->sdm15_callback(msg, 2);
             });
 
-         sdm15_sub4_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
+        sdm15_sub4_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
             "serial_rx_19",
             rclcpp::SensorDataQoS(),
             [this](std_msgs::msg::Int16MultiArray::SharedPtr msg)
@@ -662,16 +686,25 @@ private:
         }
     }
 
-   void sdm15_callback(const std_msgs::msg::Int16MultiArray::SharedPtr msg, int index)
+    void lidar_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
+    {
+        if (msg->ranges.empty())
+            return;
+
+        int16_t lidar_value = msg->ranges[0]; // 0方向の距離
+    }
+
+    void sdm15_callback(const std_msgs::msg::Int16MultiArray::SharedPtr msg, int index)
     {
         // 配列が空でないか一応安全のためにチェック
-        if (msg->data.empty()) {
+        if (msg->data.empty())
+        {
             return;
         }
 
         // 2. 配列(msg->data)の中から、距離データが入っている「番目」を取り出す
         // ※ここでは仮に 0番目 としていますが、実際のマイコンの仕様に合わせて変更してください。
-        int16_t distance_val = msg->data[0]; 
+        int16_t distance_val = msg->data[0];
 
         // 3. 取り出した値を保存
         sdm15_value[index] = distance_val;
@@ -686,6 +719,7 @@ private:
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sensor_sub_;
+    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr lidar_sub_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sdm15_sub1_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sdm15_sub2_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sdm15_sub3_;
