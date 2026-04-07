@@ -88,7 +88,7 @@ public:
         pid_x_.set_target(target_x_);
         pid_y_.set_target(target_y_);
         pid_yaw_.set_target(target_yaw_);
-        this->declare_parameter("aruco_target_forward_m", 0.45);
+        this->declare_parameter("aruco_target_forward_m", 0.0);
         this->declare_parameter("aruco_target_lateral_m", 0.0);
         this->declare_parameter("aruco_target_yaw_rad", 0.0);
         this->declare_parameter("aruco_target_id", -1);
@@ -148,7 +148,7 @@ private:
     float aruco_distance_ = 0.0f;
     rclcpp::Time last_aruco_update_;
     bool has_aruco_pose_ = false;
-    float aruco_target_forward_ = 0.45f;
+    float aruco_target_forward_ = 0.0f;
     float aruco_target_lateral_ = 0.0f;
     float aruco_target_yaw_ = 0.0f;
     int aruco_target_id_ = -1;
@@ -173,6 +173,7 @@ private:
     float aruco_k_vy_ = 1.2f;
     float aruco_k_wz_ = 1.4f;
     float aruco_pose_timeout_sec_ = 0.5f;
+    float aruco_horizontal_deadband_m_ = 0.02f;
 
     static std::string drive_mode_to_string(DriveMode mode) {
         switch (mode) {
@@ -436,19 +437,25 @@ private:
             }
 
             // OpenCVのカメラ座標系: x=右, y=下, z=前
-            // 機体基準: X=前方, Y=左方
-            // カメラの機体中心からの位置（X/Y）を使って、マーカーの機体中心基準位置へ補正する
-            const float measured_forward = aruco_z_ + aruco_camera_offset_x_;
-            const float measured_lateral = aruco_camera_offset_y_ - aruco_x_;
+            // カメラは機体左方向を向いている前提:
+            //   camera +x(右) -> 機体 +X(前方)
+            //   camera +z(前) -> 機体 +Y(左方)
+            // 横方向合わせのみ行う（depth/yawは不使用）
+            const float measured_forward = aruco_x_;
 
-            const float forward_error = measured_forward - aruco_target_forward_;
-            const float lateral_error = measured_lateral - aruco_target_lateral_;
-            const float heading_error =
-                std::atan2(lateral_error, std::max(measured_forward, 0.05f)) - aruco_target_yaw_;
+            // 目標はカメラ基準の横位置だけを合わせる
+            const float target_forward = aruco_target_forward_;
+            const float forward_error = target_forward - measured_forward;
 
-            vx_ = std::clamp(aruco_k_vx_ * forward_error, -aruco_max_vx_, aruco_max_vx_);
-            vy_ = std::clamp(-aruco_k_vy_ * lateral_error, -aruco_max_vy_, aruco_max_vy_);
-            wz_ = std::clamp(-aruco_k_wz_ * heading_error, -aruco_max_wz_, aruco_max_wz_);
+            if (std::fabs(forward_error) < aruco_horizontal_deadband_m_) {
+                vx_ = 0.0f;
+                vy_ = 0.0f;
+                wz_ = 0.0f;
+            } else {
+                vx_ = 0.0f;
+                vy_ = std::clamp(aruco_k_vy_ * forward_error, -aruco_max_vy_, aruco_max_vy_);
+                wz_ = 0.0f;
+            }
 
             v1 = vy_ + vx_ + wz_;
             v3 = vy_ - vx_ - wz_;
@@ -477,10 +484,10 @@ private:
             publisher_->publish(msg);
 
             RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 50,
-                                 "[ARUCO] X: %.2f Y: %.2f Z: %.2f | T: %.2f %.2f %.2f | vx %.2f vy %.2f wz %.2f",
+                                 "[ARUCO] X: %.2f Y: %.2f Z: %.2f | TargetHorizontal: %.2f | vy %.2f",
                                  aruco_x_, aruco_y_, aruco_z_,
-                                 aruco_target_forward_, aruco_target_lateral_, aruco_target_yaw_,
-                                 vx_, vy_, wz_);
+                                 aruco_target_forward_,
+                                 vy_);
             return;
         }
 
