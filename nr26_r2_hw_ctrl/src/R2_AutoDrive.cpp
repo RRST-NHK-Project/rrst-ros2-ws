@@ -17,6 +17,7 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int16_multi_array.hpp"
+#include "std_msgs/msg/int32.hpp"
 #include "std_msgs/msg/string.hpp"
 
 // 自作
@@ -65,6 +66,12 @@ public:
         aruco_distance_sub_ = this->create_subscription<std_msgs::msg::Float32>(
             "/aruco_distance", 10,
             std::bind(&PIDMecanumController::aruco_distance_callback, this, std::placeholders::_1));
+        aruco_id_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+            "/aruco_id", 10,
+            std::bind(&PIDMecanumController::aruco_id_callback, this, std::placeholders::_1));
+        aruco_target_id_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+            "r2_aruco_target_id", 10,
+            std::bind(&PIDMecanumController::aruco_target_id_callback, this, std::placeholders::_1));
         aruco_camera_offset_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
             "r2_aruco_camera_offset", 10,
             std::bind(&PIDMecanumController::aruco_camera_offset_callback, this, std::placeholders::_1));
@@ -84,11 +91,13 @@ public:
         this->declare_parameter("aruco_target_forward_m", 0.45);
         this->declare_parameter("aruco_target_lateral_m", 0.0);
         this->declare_parameter("aruco_target_yaw_rad", 0.0);
+        this->declare_parameter("aruco_target_id", -1);
         this->declare_parameter("aruco_camera_offset_x_m", -0.1735);
         this->declare_parameter("aruco_camera_offset_y_m", 0.0);
         aruco_target_forward_ = static_cast<float>(this->get_parameter("aruco_target_forward_m").as_double());
         aruco_target_lateral_ = static_cast<float>(this->get_parameter("aruco_target_lateral_m").as_double());
         aruco_target_yaw_ = static_cast<float>(this->get_parameter("aruco_target_yaw_rad").as_double());
+        aruco_target_id_ = this->get_parameter("aruco_target_id").as_int();
         aruco_camera_offset_x_ = static_cast<float>(this->get_parameter("aruco_camera_offset_x_m").as_double());
         aruco_camera_offset_y_ = static_cast<float>(this->get_parameter("aruco_camera_offset_y_m").as_double());
         last_aruco_update_ = this->get_clock()->now();
@@ -107,6 +116,8 @@ private:
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr target_sub_;
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr aruco_pose_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr aruco_distance_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr aruco_id_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr aruco_target_id_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr aruco_camera_offset_sub_;
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
@@ -140,6 +151,8 @@ private:
     float aruco_target_forward_ = 0.45f;
     float aruco_target_lateral_ = 0.0f;
     float aruco_target_yaw_ = 0.0f;
+    int aruco_target_id_ = -1;
+    int current_aruco_id_ = -1;
     float aruco_camera_offset_x_ = 0.0f;
     float aruco_camera_offset_y_ = 0.0f;
 
@@ -269,6 +282,11 @@ private:
     }
 
     void aruco_pose_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
+        if (aruco_target_id_ >= 0 && current_aruco_id_ != aruco_target_id_) {
+            has_aruco_pose_ = false;
+            return;
+        }
+
         aruco_x_ = msg->pose.position.x;
         aruco_y_ = msg->pose.position.y;
         aruco_z_ = msg->pose.position.z;
@@ -278,6 +296,15 @@ private:
 
     void aruco_distance_callback(const std_msgs::msg::Float32::SharedPtr msg) {
         aruco_distance_ = msg->data;
+    }
+
+    void aruco_id_callback(const std_msgs::msg::Int32::SharedPtr msg) {
+        current_aruco_id_ = msg->data;
+    }
+
+    void aruco_target_id_callback(const std_msgs::msg::Int32::SharedPtr msg) {
+        aruco_target_id_ = msg->data;
+        RCLCPP_INFO(this->get_logger(), "Aruco target ID updated: %d", aruco_target_id_);
     }
 
     void aruco_camera_offset_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
