@@ -187,7 +187,7 @@ private:
     std::chrono::steady_clock::time_point alignment_start_time_;
     static constexpr double wall_alignment_timeout = 10.0; // 壁調整タイムアウト [s]
     static constexpr double wall_angle_threshold = 0.1745; // 約10度 [rad]
-    static constexpr double wall_distance_threshold = 50;  // 目標距離 [mm]
+    static constexpr double wall_distance_threshold = 0.2;  // 目標距離 [m]
     rclcpp::Time state_start_time_;
     bool state_executed_ = false; // 各状態での処理の実行状況を保存
 
@@ -832,6 +832,14 @@ private:
         {
             return;
         }
+
+
+        // // --- ここから追加：デバッグ用表示コード ---
+        // // 500ミリ秒（0.5秒）に1回、ターミナルに最も近い点の座標を表示します
+        // RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
+        // "Nearest Point -> x: %.3f m, y: %.3f m, dist: %.3f m",
+        // nearest_x, nearest_y, min_distance);
+        // // ---------------------------------------
 
         lidar_x_value = static_cast<int16_t>(nearest_x * 1000.0f);
         lidar_y_value = static_cast<int16_t>(nearest_y * 1000.0f);
