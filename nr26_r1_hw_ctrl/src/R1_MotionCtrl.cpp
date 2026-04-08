@@ -494,6 +494,27 @@ private:
         //     data_[1] = 0;
         // }
 
+        // =================================================================       
+        // TRIANGLE:「スピアヘッド回収ハンドの昇降機構」        
+        // ボタンを押すとスピアヘッド回収ハンド上昇機構のエアシリンダーによって上昇or下降        
+        // =================================================================
+            
+        static int triangle_pre = 0;        
+        static int triangle_count = 0;        
+        static int triangle_max = 2;
+                
+        if (TRIANGLE == 1 && triangle_pre == 0) {            
+        triangle_count = (triangle_count + 1) % triangle_max;        
+        }
+        if (triangle_count == 0) {            
+                data_[18] = 0;        
+        }        
+        if (triangle_count == 1) {            
+                data_[18] = 1;        
+        }
+                
+        triangle_pre = TRIANGLE;
+
         // =================================================================
         // L1,R1:「フォークリフト上下」
         // 絶対座標に基づく減速 + マイクロスイッチによる方向制限
