@@ -59,6 +59,11 @@ public:
             "r2_autodrive_cmd", 10,
             std::bind(&PIDMecanumController::target_callback, this, std::placeholders::_1));
 
+        // r2_console からのドライブモードコマンド
+        mode_cmd_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+            "r2_drive_mode_cmd", 10,
+            std::bind(&PIDMecanumController::mode_cmd_callback, this, std::placeholders::_1));
+
         // ArUco追従入力
         aruco_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
             "/aruco_pose", 10,
@@ -114,6 +119,7 @@ private:
     // ROS
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr odom_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr target_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr mode_cmd_sub_;
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr aruco_pose_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr aruco_distance_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr aruco_id_sub_;
@@ -280,6 +286,24 @@ private:
         RCLCPP_INFO(this->get_logger(),
                     "Target updated x=%.3f y=%.3f yaw=%.3f [rad]",
                     target_x_, target_y_, target_yaw_);
+    }
+
+    void mode_cmd_callback(const std_msgs::msg::Int32::SharedPtr msg) {
+        int32_t mode_code = msg->data;
+        if (mode_code < 0 || mode_code > 2) {
+            RCLCPP_WARN(this->get_logger(), "Invalid mode code: %ld (valid: 0-2)", static_cast<long>(mode_code));
+            return;
+        }
+
+        DriveMode new_mode = static_cast<DriveMode>(mode_code);
+        if (drive_mode_ == new_mode) {
+            return; // No change
+        }
+
+        drive_mode_ = new_mode;
+        stop_motors();
+        publish_mode();
+        RCLCPP_INFO(this->get_logger(), "Mode changed: %s (by mode command)", drive_mode_to_string(new_mode).c_str());
     }
 
     void aruco_pose_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
