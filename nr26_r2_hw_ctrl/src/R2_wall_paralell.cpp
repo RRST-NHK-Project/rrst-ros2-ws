@@ -186,8 +186,8 @@ private:
     rclcpp::TimerBase::SharedPtr timer_;
     std::chrono::steady_clock::time_point alignment_start_time_;
     static constexpr double wall_alignment_timeout = 10.0; // 壁調整タイムアウト [s]
-    static constexpr double wall_angle_threshold = 0.1745; // 約10度 [rad]
-    static constexpr double wall_distance_threshold = 0.2;  // 目標距離 [m]
+    static constexpr double wall_angle_threshold = 0.08; // 約5度 [rad]
+    static constexpr double wall_distance_threshold = 100;  // 目標距離 [m]
     rclcpp::Time state_start_time_;
     bool state_executed_ = false; // 各状態での処理の実行状況を保存
 
@@ -289,14 +289,16 @@ private:
     void wall_alignment_sequence()
     {
         using namespace std::chrono;
-        auto elapsed = duration_cast<duration<double>>(steady_clock::now() - alignment_start_time_).count();
 
-        if (elapsed > wall_alignment_timeout)
-        {
-            RCLCPP_WARN(get_logger(), "Wall alignment timeout. Canceling.");
-            mode_ = StepMode::NONE;
-            return;
-        }
+        // --- 以下のタイムアウト判定をコメントアウト ---
+        // auto elapsed = duration_cast<duration<double>>(steady_clock::now() - alignment_start_time_).count();
+
+        // if (elapsed > wall_alignment_timeout)
+        // {
+        //     RCLCPP_WARN(get_logger(), "Wall alignment timeout. Canceling.");
+        //     mode_ = StepMode::NONE;
+        //     return;
+        // }
 
         // 壁角度が閾値以下なら回転完了
         if (std::abs(wall_angle_) < wall_angle_threshold)
@@ -756,6 +758,8 @@ private:
         pkt.setMD(MD6, static_cast<int16_t>(v2 * duty_max));
         pkt.setMD(MD7, static_cast<int16_t>(v3 * duty_max));
         pkt.setMD(MD8, static_cast<int16_t>(v4 * duty_max));
+
+        
     }
 
     void publisher_timer_callback()
