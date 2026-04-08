@@ -142,6 +142,72 @@ private:
                 (int)r_count, abs_coord, rot);
         }
 
+             // =================================================================
+        // L1,R1:「フォークリフト上下」
+        // 絶対座標に基づく減速 + マイクロスイッチによる方向制限
+        //
+        // 座標: 下端スイッチ押下で 0 にリセット
+        //   座標 <= 3 → 減速 (正回転=30, 逆回転=-30)
+        //   座標 > 3  → 通常速度 (正回転=100, 逆回転=-100)
+        //   上マイクロスイッチ押下 → 正回転禁止、逆回転のみ許可
+        //   下マイクロスイッチ押下 → 逆回転禁止、正回転のみ許可
+        // =================================================================
+
+        static const int NORMAL_SPEED = 100; // 通常速度
+        static const int SLOW_SPEED   = 30;  // 減速後速度
+
+        // モーター1回転あたりのエンコーダのカウント数
+        // 実験結果により、1回転 = 8000 カウント に設定
+        static const double COUNTS_PER_ROTATION = 8000.0;
+
+        // 符号付き16bitの飛躍(-32768〜32767)は、差分累積(g_abs_coord)により計算・解決済みです
+        // ※上昇時（エンコーダ減少）に diff がマイナスになるため、「- diff」の計算によって絶対座標は増加（0→50）します
+        int64_t abs_coord = g_abs_coord.load(); 
+        double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
+
+        // ヒステリシス（遊び）を持たせた減速ゾーン判定（チャタリング防止用）
+        // 下端付近 (0〜3回転) または 上端付近 (47〜50回転) で減速
+        static bool is_fork_slow = false;
+        if (rot_units <= 3.0 || rot_units >= 47.0) {
+            is_fork_slow = true;
+        } else if (rot_units >= 4.0 && rot_units <= 46.0) {
+            is_fork_slow = false; // ヒステリシスにより、ゾーンから少し離れるまで通常速度に戻さない
+        }
+        bool in_slow_zone = is_fork_slow;
+
+        // 回転方向に応じた速度を決定
+        int fwd_speed = in_slow_zone ?  SLOW_SPEED :  NORMAL_SPEED;  // 正回転(上昇)の速度
+        int rev_speed = in_slow_zone ? -SLOW_SPEED : -NORMAL_SPEED;  // 逆回転(下降)の速度
+
+        if (micro2_sw == 1) {
+            // ★上端制限(micro2_sw): これ以上上に行かないように正回転(L1)を禁止し、逆回転(R1)のみ許可
+            if (R1 == 1) {
+                data_[2] = rev_speed;
+            } else {
+                data_[2] = 0;
+            }
+        } else if (micro1_sw == 1) {
+            // ★下端制限(micro1_sw): これ以上下に行かないように逆回転(R1)を禁止し、正回転(L1)のみ許可
+            if (L1 == 1) {
+                data_[2] = fwd_speed;
+            } else {
+                data_[2] = 0;
+            }
+        } else {
+            // マイクロスイッチに触れていない通常の範囲
+            if (L1 == 1) {
+                data_[2] = fwd_speed; // 上昇方向
+            } else if (R1 == 1) {
+                data_[2] = rev_speed; // 下降方向
+            } else {
+                data_[2] = 0;
+            }
+        }
+
+        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
+            "【フォーク制御】回転数=%.2f, 減速=%s, 上端SW=%d, 下端SW=%d, 出力=%d",
+            rot_units, in_slow_zone ? "ON" : "OFF",
+            micro2_sw, micro1_sw, data_[2]);
         // --- 通信デバッグ追加 ---
         static uint64_t packet_count = 0;
         packet_count++;
@@ -399,7 +465,7 @@ private:
         static int CIRCLE_PUSH_MAX = 6;
 
         static int MOVE_SPEED = 100;
-        static int VACUUM_SPEED = 50;
+        static int VACUUM_SPEED = 250;
 
         if (CIRCLE == 1 && circle_pre == 0) {
             CIRCLE_PUSH_COUNT = (CIRCLE_PUSH_COUNT + 1) % CIRCLE_PUSH_MAX;
@@ -414,6 +480,7 @@ private:
             if (micro3_sw == 1) data_[1] = 0; // 外側SWで停止
         }                       
         if (CIRCLE_PUSH_COUNT == 2) {
+            data_[1] = 0;
             data_[4] = VACUUM_SPEED;
         }
         if (CIRCLE_PUSH_COUNT == 3) {
@@ -421,6 +488,7 @@ private:
             if (micro4_sw == 1) data_[1] = 0; // 内側SWで停止
         }
         if (CIRCLE_PUSH_COUNT == 4) {
+            data_[1] = 0;
             data_[4] = 0;             
         }
         if (CIRCLE_PUSH_COUNT == 5) {
@@ -544,72 +612,72 @@ private:
                 
         triangle_pre = TRIANGLE;
 
-        // =================================================================
-        // L1,R1:「フォークリフト上下」
-        // 絶対座標に基づく減速 + マイクロスイッチによる方向制限
-        //
-        // 座標: 下端スイッチ押下で 0 にリセット
-        //   座標 <= 3 → 減速 (正回転=30, 逆回転=-30)
-        //   座標 > 3  → 通常速度 (正回転=100, 逆回転=-100)
-        //   上マイクロスイッチ押下 → 正回転禁止、逆回転のみ許可
-        //   下マイクロスイッチ押下 → 逆回転禁止、正回転のみ許可
-        // =================================================================
+        // // =================================================================
+        // // L1,R1:「フォークリフト上下」
+        // // 絶対座標に基づく減速 + マイクロスイッチによる方向制限
+        // //
+        // // 座標: 下端スイッチ押下で 0 にリセット
+        // //   座標 <= 3 → 減速 (正回転=30, 逆回転=-30)
+        // //   座標 > 3  → 通常速度 (正回転=100, 逆回転=-100)
+        // //   上マイクロスイッチ押下 → 正回転禁止、逆回転のみ許可
+        // //   下マイクロスイッチ押下 → 逆回転禁止、正回転のみ許可
+        // // =================================================================
 
-        static const int NORMAL_SPEED = 200; // 通常速度
-        static const int SLOW_SPEED   = 200;  // 減速後速度
+        // static const int NORMAL_SPEED = 100; // 通常速度
+        // static const int SLOW_SPEED   = 30;  // 減速後速度
 
-        // モーター1回転あたりのエンコーダのカウント数
-        // 実験結果により、1回転 = 8000 カウント に設定
-        static const double COUNTS_PER_ROTATION = 8000.0;
+        // // モーター1回転あたりのエンコーダのカウント数
+        // // 実験結果により、1回転 = 8000 カウント に設定
+        // static const double COUNTS_PER_ROTATION = 8000.0;
 
-        // 符号付き16bitの飛躍(-32768〜32767)は、差分累積(g_abs_coord)により計算・解決済みです
-        // ※上昇時（エンコーダ減少）に diff がマイナスになるため、「- diff」の計算によって絶対座標は増加（0→50）します
-        int64_t abs_coord = g_abs_coord.load(); 
-        double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
+        // // 符号付き16bitの飛躍(-32768〜32767)は、差分累積(g_abs_coord)により計算・解決済みです
+        // // ※上昇時（エンコーダ減少）に diff がマイナスになるため、「- diff」の計算によって絶対座標は増加（0→50）します
+        // int64_t abs_coord = g_abs_coord.load(); 
+        // double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
 
-        // ヒステリシス（遊び）を持たせた減速ゾーン判定（チャタリング防止用）
-        // 下端付近 (0〜3回転) または 上端付近 (47〜50回転) で減速
-        static bool is_fork_slow = false;
-        if (rot_units <= 3.0 || rot_units >= 47.0) {
-            is_fork_slow = true;
-        } else if (rot_units >= 4.0 && rot_units <= 46.0) {
-            is_fork_slow = false; // ヒステリシスにより、ゾーンから少し離れるまで通常速度に戻さない
-        }
-        bool in_slow_zone = is_fork_slow;
+        // // ヒステリシス（遊び）を持たせた減速ゾーン判定（チャタリング防止用）
+        // // 下端付近 (0〜3回転) または 上端付近 (47〜50回転) で減速
+        // static bool is_fork_slow = false;
+        // if (rot_units <= 3.0 || rot_units >= 47.0) {
+        //     is_fork_slow = true;
+        // } else if (rot_units >= 4.0 && rot_units <= 46.0) {
+        //     is_fork_slow = false; // ヒステリシスにより、ゾーンから少し離れるまで通常速度に戻さない
+        // }
+        // bool in_slow_zone = is_fork_slow;
 
-        // 回転方向に応じた速度を決定
-        int fwd_speed = in_slow_zone ?  SLOW_SPEED :  NORMAL_SPEED;  // 正回転(上昇)の速度
-        int rev_speed = in_slow_zone ? -SLOW_SPEED : -NORMAL_SPEED;  // 逆回転(下降)の速度
+        // // 回転方向に応じた速度を決定
+        // int fwd_speed = in_slow_zone ?  SLOW_SPEED :  NORMAL_SPEED;  // 正回転(上昇)の速度
+        // int rev_speed = in_slow_zone ? -SLOW_SPEED : -NORMAL_SPEED;  // 逆回転(下降)の速度
 
-        if (micro2_sw == 1) {
-            // ★上端制限(micro2_sw): これ以上上に行かないように正回転(L1)を禁止し、逆回転(R1)のみ許可
-            if (R1 == 1) {
-                data_[2] = rev_speed;
-            } else {
-                data_[2] = 0;
-            }
-        } else if (micro1_sw == 1) {
-            // ★下端制限(micro1_sw): これ以上下に行かないように逆回転(R1)を禁止し、正回転(L1)のみ許可
-            if (L1 == 1) {
-                data_[2] = fwd_speed;
-            } else {
-                data_[2] = 0;
-            }
-        } else {
-            // マイクロスイッチに触れていない通常の範囲
-            if (L1 == 1) {
-                data_[2] = fwd_speed; // 上昇方向
-            } else if (R1 == 1) {
-                data_[2] = rev_speed; // 下降方向
-            } else {
-                data_[2] = 0;
-            }
-        }
+        // if (micro2_sw == 1) {
+        //     // ★上端制限(micro2_sw): これ以上上に行かないように正回転(L1)を禁止し、逆回転(R1)のみ許可
+        //     if (R1 == 1) {
+        //         data_[2] = rev_speed;
+        //     } else {
+        //         data_[2] = 0;
+        //     }
+        // } else if (micro1_sw == 1) {
+        //     // ★下端制限(micro1_sw): これ以上下に行かないように逆回転(R1)を禁止し、正回転(L1)のみ許可
+        //     if (L1 == 1) {
+        //         data_[2] = fwd_speed;
+        //     } else {
+        //         data_[2] = 0;
+        //     }
+        // } else {
+        //     // マイクロスイッチに触れていない通常の範囲
+        //     if (L1 == 1) {
+        //         data_[2] = fwd_speed; // 上昇方向
+        //     } else if (R1 == 1) {
+        //         data_[2] = rev_speed; // 下降方向
+        //     } else {
+        //         data_[2] = 0;
+        //     }
+        // }
 
-        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-            "【フォーク制御】回転数=%.2f, 減速=%s, 上端SW=%d, 下端SW=%d, 出力=%d",
-            rot_units, in_slow_zone ? "ON" : "OFF",
-            micro2_sw, micro1_sw, data_[2]);
+        // RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
+        //     "【フォーク制御】回転数=%.2f, 減速=%s, 上端SW=%d, 下端SW=%d, 出力=%d",
+        //     rot_units, in_slow_zone ? "ON" : "OFF",
+        //     micro2_sw, micro1_sw, data_[2]);
 
         // =================================================================
         // LR
