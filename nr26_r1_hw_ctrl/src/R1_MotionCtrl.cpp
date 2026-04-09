@@ -43,9 +43,11 @@ std::atomic<int16_t> g_enc1_val{0};  // エンコーダ1: data[1]から受信
 
 // フォークリフト座標管理 (EncoderCoordinator)
 // エンコーダ減少 -> 座標増加 / エンコーダ増加 -> 座標減少
-std::atomic<int64_t> g_abs_coord{0};        // 現在の絶対座標
-std::atomic<int16_t> g_last_enc1_val{0};    // 前回のエンコーダ生値（差分計算用）
+std::atomic<int32_t> g_rotation_count{0};     // エンコーダの回転数(巻回り数)
+std::atomic<int64_t> g_zero_offset{0};        // 下端リセット時の絶対エンコーダ値
+std::atomic<int16_t> g_last_enc1_val{0};      // 前回のエンコーダ生値
 std::atomic<bool> g_coord_initialized{false}; // 初期化フラグ
+std::atomic<int64_t> g_abs_coord{0};          // 最終的な高さ座標(下端=0方向=プラス)
 
 // =================================================================
 // SwitchInputノード: ID=3のESP32からマイクロスイッチの状態を受信する
@@ -83,35 +85,63 @@ private:
         g_enc1_val  = msg->data[1];
 
         // =============================================================
-        // 座標調査用デバッグ実装
+        // 座標調査・ラップアラウンド計算実装（過去コード移植版）
         // =============================================================
         int16_t current_enc1 = msg->data[1];
 
-        // 下端スイッチ(data[9])で座標リセット
-        if (msg->data[9] != 0) {
-            g_abs_coord.store(0);
-            g_last_enc1_val.store(current_enc1);
-            g_coord_initialized.store(true);
-            RCLCPP_INFO(get_logger(), "[COORD RESET!] 下端ボタン押下により 0 にリセットしました");
-        } else if (g_coord_initialized.load()) {
-            // 差分計算
-            int16_t diff = static_cast<int16_t>(current_enc1 - g_last_enc1_val.load());
-            
-            if (diff != 0) {
-                // 現状の定義: 減少->増加 (coord -= diff)
-                // ※もし上昇時に数値が減るようなら、ここを += に切り替える
-                g_abs_coord = g_abs_coord.load() - static_cast<int64_t>(diff);
-                g_last_enc1_val.store(current_enc1);
-                
-                // 変化があった時だけ詳細ログを出す
-                RCLCPP_INFO(get_logger(), "MOVE: enc=%d | diff=%d | raw=%ld | rot=%.3f",
-                            (int)current_enc1, (int)diff, g_abs_coord.load(), 
-                            (double)g_abs_coord.load() / 65536.0);
-            }
-        } else {
+        if (!g_coord_initialized.load()) {
             g_last_enc1_val.store(current_enc1);
             g_coord_initialized.store(true);
         }
+
+        // =====================================================================
+        // 【重要】エンコーダの「飛躍（16bitハードの限界）」は 32768 または 65536 です。
+        // （「1周=8000」は機械的な回転数であり、デジタル的なラップアラウンド値とは別です）
+        // =====================================================================
+        const int HALF_ENCODER = 16384;    // デジタルデータの飛躍値の半分
+        const int64_t ENCODER_MAX = 32768; // デジタルデータの飛躍幅
+
+        int diff = (int)current_enc1 - (int)g_last_enc1_val.load();
+        int32_t r_count = g_rotation_count.load();
+
+        if (diff > HALF_ENCODER) {
+            r_count--;
+        } else if (diff < -HALF_ENCODER) {
+            r_count++;
+        }
+
+        g_rotation_count.store(r_count);
+        g_last_enc1_val.store(current_enc1);
+
+        // 連続化された総エンコーダカウント
+        int64_t total_encoder = (int64_t)r_count * ENCODER_MAX + (int64_t)current_enc1;
+
+        // 下端スイッチ(data[9])で座標リセット用のオフセットを設定
+        if (msg->data[9] != 0) {
+            g_zero_offset.store(total_encoder);
+            RCLCPP_INFO(get_logger(), "[COORD RESET!] 下端ボタン押下により座標0へオフセット設定");
+        }
+
+        // 最終的な高さを計算
+        int64_t zero_offset = g_zero_offset.load();
+        int64_t abs_coord = -(total_encoder - zero_offset);
+        g_abs_coord.store(abs_coord);
+
+        // ★ここで 8000 で割ることで「物理的な1回転」を算出します
+        double rot = (double)abs_coord / 8000.0; 
+
+        if (diff != 0) {
+            RCLCPP_INFO(get_logger(), 
+                "\n--- ROTATION DEBUG ---\n"
+                "  生値の変化 : %d -> %d (diff: %d)\n"
+                "  デジタルラップ : %d 回\n"
+                "  絶対カウント   : %ld\n"
+                "  現在回転数     : %.3f 回転 (1周8000)\n"
+                "----------------------", 
+                (int)current_enc1 - diff, (int)current_enc1, diff, 
+                (int)r_count, abs_coord, rot);
+        }
+
 
         // --- 通信デバッグ追加 ---
         static uint64_t packet_count = 0;
@@ -225,8 +255,8 @@ private:
 
         // bool LEFT = msg->axes[6] == 1.0;
         // bool RIGHT = msg->axes[6] == -1.0;
-        bool UP = msg->axes[7] == 1.0;
-        bool DOWN = msg->axes[7] == -1.0;
+        // bool UP = msg->axes[7] == 1.0;
+        // bool DOWN = msg->axes[7] == -1.0;
 
         bool L1 = msg->buttons[4];
         bool R1 = msg->buttons[5];
@@ -369,8 +399,8 @@ private:
         static int CIRCLE_PUSH_COUNT = 0;
         static int CIRCLE_PUSH_MAX = 6;
 
-        static int MOVE_SPEED = 50;
-        static int VACUUM_SPEED = 50;
+        static int MOVE_SPEED = 100;
+        static int VACUUM_SPEED = 250;
 
         if (CIRCLE == 1 && circle_pre == 0) {
             CIRCLE_PUSH_COUNT = (CIRCLE_PUSH_COUNT + 1) % CIRCLE_PUSH_MAX;
@@ -381,10 +411,11 @@ private:
             data_[17] = 0;
         }
         if (CIRCLE_PUSH_COUNT == 1) {
-            data_[1] = MOVE_SPEED;
+            data_[1] = MOVE_SPEED - 50;
             if (micro3_sw == 1) data_[1] = 0; // 外側SWで停止
         }                       
         if (CIRCLE_PUSH_COUNT == 2) {
+            data_[1] = 0;
             data_[4] = VACUUM_SPEED;
         }
         if (CIRCLE_PUSH_COUNT == 3) {
@@ -392,6 +423,7 @@ private:
             if (micro4_sw == 1) data_[1] = 0; // 内側SWで停止
         }
         if (CIRCLE_PUSH_COUNT == 4) {
+            data_[1] = 0;
             data_[4] = 0;             
         }
         if (CIRCLE_PUSH_COUNT == 5) {
@@ -494,6 +526,27 @@ private:
         //     data_[1] = 0;
         // }
 
+        // =================================================================       
+        // TRIANGLE:「スピアヘッド回収ハンドの昇降機構」        
+        // ボタンを押すとスピアヘッド回収ハンド上昇機構のエアシリンダーによって上昇or下降        
+        // =================================================================
+            
+        static int triangle_pre = 0;        
+        static int triangle_count = 0;        
+        static int triangle_max = 2;
+                
+        if (TRIANGLE == 1 && triangle_pre == 0) {            
+        triangle_count = (triangle_count + 1) % triangle_max;        
+        }
+        if (triangle_count == 0) {            
+                data_[18] = 0;        
+        }        
+        if (triangle_count == 1) {            
+                data_[18] = 1;        
+        }
+                
+        triangle_pre = TRIANGLE;
+
         // =================================================================
         // L1,R1:「フォークリフト上下」
         // 絶対座標に基づく減速 + マイクロスイッチによる方向制限
@@ -505,53 +558,59 @@ private:
         //   下マイクロスイッチ押下 → 逆回転禁止、正回転のみ許可
         // =================================================================
 
-        static const int NORMAL_SPEED = 100;  // 通常速度
-        static const int SLOW_SPEED   =  30;  // 減速後速度
+        static const int NORMAL_SPEED = 100; // 通常速度
+        static const int SLOW_SPEED   = 30;  // 減速後速度
 
-        int64_t abs_coord = g_abs_coord.load(); // 現在の絶対座標
-        double rot_units = static_cast<double>(abs_coord) / 65536.0; // 回転単位 (1周期=1.0)
+        // モーター1回転あたりのエンコーダのカウント数
+        // 実験結果により、1回転 = 8000 カウント に設定
+        static const double COUNTS_PER_ROTATION = 8000.0;
 
-        // ヒステリシス（遊び）を持たせた減速ゾーン判定
-        // 下端付近 (0〜3回転) または 上限付近 (27〜30回転) で減速
+        // 符号付き16bitの飛躍(-32768〜32767)は、差分累積(g_abs_coord)により計算・解決済みです
+        // ※上昇時（エンコーダ減少）に diff がマイナスになるため、「- diff」の計算によって絶対座標は増加（0→50）します
+        int64_t abs_coord = g_abs_coord.load(); 
+        double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
+
+        // ヒステリシス（遊び）を持たせた減速ゾーン判定（チャタリング防止用）
+        // 下端付近 (0〜3回転) または 上端付近 (47〜50回転) で減速
         static bool is_fork_slow = false;
-        if (rot_units <= 3.0 || rot_units >= 27.0) {
+        if (rot_units <= 3.0 || rot_units >= 47.0) {
             is_fork_slow = true;
-        } else if (rot_units >= 6.0 && rot_units <= 24.0) {
-            is_fork_slow = false;
+        } else if (rot_units >= 4.0 && rot_units <= 46.0) {
+            is_fork_slow = false; // ヒステリシスにより、ゾーンから少し離れるまで通常速度に戻さない
         }
         bool in_slow_zone = is_fork_slow;
 
         // 回転方向に応じた速度を決定
-        int fwd_speed = in_slow_zone ?  SLOW_SPEED :  NORMAL_SPEED;  // 正回転速度
-        int rev_speed = in_slow_zone ? -SLOW_SPEED : -NORMAL_SPEED;  // 逆回転速度
+        int fwd_speed = in_slow_zone ?  SLOW_SPEED :  NORMAL_SPEED;  // 正回転(上昇)の速度
+        int rev_speed = in_slow_zone ? -SLOW_SPEED : -NORMAL_SPEED;  // 逆回転(下降)の速度
 
-        if (micro2_sw == 1 /* || rot_units >= 30.0 */) {
-            // ★上端制限: 正回転(L1)禁止 (デバッグのためソフトリミット一時解除)
+        if (micro2_sw == 1) {
+            // ★上端制限(micro2_sw): これ以上上に行かないように正回転(L1)を禁止し、逆回転(R1)のみ許可
             if (R1 == 1) {
                 data_[2] = rev_speed;
             } else {
                 data_[2] = 0;
             }
-        } else if (micro1_sw == 1 /* || rot_units <= 0.0 */) {
-            // ★下端制限: 逆回転(R1)禁止 (デバッグのためソフトリミット一時解除)
+        } else if (micro1_sw == 1) {
+            // ★下端制限(micro1_sw): これ以上下に行かないように逆回転(R1)を禁止し、正回転(L1)のみ許可
             if (L1 == 1) {
                 data_[2] = fwd_speed;
             } else {
                 data_[2] = 0;
             }
-        } else if (L1 == 1) {
-            // 通常: 正回転(L1)
-            data_[2] = fwd_speed;
-        } else if (R1 == 1) {
-            // 通常: 逆回転(R1)
-            data_[2] = rev_speed;
         } else {
-            // ボタンなし: 停止
-            data_[2] = 0;
+            // マイクロスイッチに触れていない通常の範囲
+            if (L1 == 1) {
+                data_[2] = fwd_speed; // 上昇方向
+            } else if (R1 == 1) {
+                data_[2] = rev_speed; // 下降方向
+            } else {
+                data_[2] = 0;
+            }
         }
 
         RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-            "【フォーク制御】回転数=%.2f, 減速=%s, 上SW=%d, 下SW=%d, data[2]=%d",
+            "【フォーク制御】回転数=%.2f, 減速=%s, 上端SW=%d, 下端SW=%d, 出力=%d",
             rot_units, in_slow_zone ? "ON" : "OFF",
             micro2_sw, micro1_sw, data_[2]);
 
@@ -588,6 +647,23 @@ private:
     // publish
     void publisher_timer_callback() {
         std_msgs::msg::Int16MultiArray msg;
+
+        // ★★★ コントローラーの操作が無い時でも、マイクロスイッチの安全停止を最優先で適用する ★★★
+        // （PS4コントローラーのイベントが来ない間も常に制限をかけるため、ここに記述します）
+        int16_t micro1_sw = g_micro1_sw.load(); 
+        int16_t micro2_sw = g_micro2_sw.load(); 
+
+        // 上昇中（data_[2] が正の値）かつ 上端スイッチが押されている場合
+        if (micro2_sw == 1 && data_[2] > 0) {
+            data_[2] = 0;
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】上端リミット到達！モーターの上昇を即時遮断しました！");
+        }
+        
+        // 下降中（data_[2] が負の値）かつ 下端スイッチが押されている場合
+        if (micro1_sw == 1 && data_[2] < 0) {
+            data_[2] = 0;
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】下端リミット到達！モーターの下降を即時遮断しました！");
+        }
 
         msg.data = data_;
 
