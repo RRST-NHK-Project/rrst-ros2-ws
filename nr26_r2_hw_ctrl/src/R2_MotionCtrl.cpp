@@ -8,6 +8,7 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include <iostream>
 #include <thread>
 #include <vector>
+#include <atomic>
 
 // ROS
 #include "rclcpp/rclcpp.hpp"
@@ -25,6 +26,18 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 // スティックのデッドゾーン
 #define DEADZONE_L 0.3
 #define DEADZONE_R 0.3
+
+std::atomic<int16_t> g_micro1_sw{0}; // マイクロスイッチ(上): 1=押されている
+std::atomic<int16_t> g_micro2_sw{0}; // マイクロスイッチ(下): 1=押されている
+
+// フォークリフト座標管理 (EncoderCoordinator)
+// エンコーダ減少 -> 座標増加 / エンコーダ増加 -> 座標減少
+std::atomic<int32_t> g_rotation_count{0};     // エンコーダの回転数(巻回り数)
+std::atomic<int64_t> g_zero_offset{0};        // 下端リセット時の絶対エンコーダ値
+std::atomic<int16_t> g_last_enc1_val{0};      // 前回のエンコーダ生値
+std::atomic<bool> g_coord_initialized{false}; // 初期化フラグ
+std::atomic<int64_t> g_abs_coord{0};          // 最終的な座標(下端=0方向=プラス)
+
 
 class HardWareControl : public rclcpp::Node {
 public:
@@ -135,6 +148,64 @@ private:
         // 以降、配列data_を操作する
 
         // =================================================================
+        // L1,R1:「フォークリフト上下」
+        // 絶対座標に基づく減速 + マイクロスイッチによる方向制限
+        // =================================================================
+
+        int16_t micro1_sw = g_micro1_sw.load(); 
+        int16_t micro2_sw = g_micro2_sw.load(); 
+
+        static const int NORMAL_SPEED = 100;
+        static const int SLOW_SPEED   = 30;
+
+        static const double COUNTS_PER_ROTATION = 8000.0;
+
+        int64_t abs_coord = g_abs_coord.load(); 
+        double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
+
+        // ヒステリシス（遊び）を持たせた減速ゾーン判定
+        static bool is_fork_slow = false;
+        if (rot_units <= 3.0 || rot_units >= 47.0) {
+            is_fork_slow = true;
+        } else if (rot_units >= 4.0 && rot_units <= 46.0) {
+            is_fork_slow = false;
+        }
+        bool in_slow_zone = is_fork_slow;
+
+        int fwd_speed = in_slow_zone ?  SLOW_SPEED :  NORMAL_SPEED;
+        int rev_speed = in_slow_zone ? -SLOW_SPEED : -NORMAL_SPEED;
+
+        if (micro2_sw == 1) {
+            // 上端制限(micro2_sw): 正回転(L1)禁止
+            if (R1 == 1) {
+                data_[2] = rev_speed;
+            } else {
+                data_[2] = 0;
+            }
+        } else if (micro1_sw == 1) {
+            // 下端制限(micro1_sw): 逆回転(R1)禁止
+            if (L1 == 1) {
+                data_[2] = fwd_speed;
+            } else {
+                data_[2] = 0;
+            }
+        } else {
+            // 通常
+            if (L1 == 1) {
+                data_[2] = fwd_speed;
+            } else if (R1 == 1) {
+                data_[2] = rev_speed;
+            } else {
+                data_[2] = 0;
+            }
+        }
+
+        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
+            "【フォーク制御】回転数=%.2f, 減速=%s, 上端SW=%d, 下端SW=%d, 出力=%d",
+            rot_units, in_slow_zone ? "ON" : "OFF",
+            micro2_sw, micro1_sw, data_[2]);
+
+        // =================================================================
         // LR
         // マガジン調整用
         // =================================================================
@@ -188,22 +259,6 @@ private:
     void publisher_timer_callback() {
         std_msgs::msg::Int16MultiArray msg;
 
-        msg.data = data_;
-
-        publisher_->publish(msg);
-    }
-
-    void
-    sensor_callback(
-        const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
-        // 最低限：サイズチェック
-        if (msg->data.size() < RX16NUM) {
-            RCLCPP_WARN(this->get_logger(),
-                        "serial_rx_%d: data too short (%zu)",
-                        device_id_, msg->data.size());
-            return;
-        }
-
         // int16_t ENC1 = msg->data[1];
         // int16_t ENC2 = msg->data[2];
         // int16_t ENC3 = msg->data[3];
@@ -221,6 +276,98 @@ private:
         // int16_t SW6 = msg->data[14];
         // int16_t SW7 = msg->data[15];
         // int16_t SW8 = msg->data[16];
+
+        int16_t micro1_sw = g_micro1_sw.load(); 
+        int16_t micro2_sw = g_micro2_sw.load(); 
+
+        // 上昇中（data_[2] が正の値）かつ 上端スイッチが押されている場合
+        if (micro2_sw == 1 && data_[2] > 0) {
+            data_[2] = 0;
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】上端リミット到達！モーターの上昇を即時遮断しました！");
+        }
+        
+        // 下降中（data_[2] が負の値）かつ 下端スイッチが押されている場合
+        if (micro1_sw == 1 && data_[2] < 0) {
+            data_[2] = 0;
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】下端リミット到達！モーターの下降を即時遮断しました！");
+        }
+
+        msg.data = data_;
+
+        publisher_->publish(msg);
+    }
+
+    void
+    sensor_callback(
+        const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
+        // 最低限：サイズチェック
+        if (msg->data.size() < RX16NUM) {
+            RCLCPP_WARN(this->get_logger(),
+                        "serial_rx_%d: data too short (%zu)",
+                        device_id_, msg->data.size());
+            return;
+        }
+
+        // マイクロスイッチの値を更新 (物理配線に合わせて修正: 9=下, 10=上)
+        g_micro1_sw = msg->data[10]; // 上端スイッチ(micro1)
+        g_micro2_sw = msg->data[9];  // 下端スイッチ(micro2)
+
+        // =============================================================
+        // 座標調査・ラップアラウンド計算実装（過去コード移植版）
+        // =============================================================
+        int16_t current_enc1 = msg->data[1];
+
+        if (!g_coord_initialized.load()) {
+            g_last_enc1_val.store(current_enc1);
+            g_coord_initialized.store(true);
+        }
+
+        const int HALF_ENCODER = 16384;
+        const int64_t ENCODER_MAX = 32768;
+
+        int diff = (int)current_enc1 - (int)g_last_enc1_val.load();
+        int32_t r_count = g_rotation_count.load();
+
+        if (diff > HALF_ENCODER) {
+            r_count--;
+        } else if (diff < -HALF_ENCODER) {
+            r_count++;
+        }
+
+        g_rotation_count.store(r_count);
+        g_last_enc1_val.store(current_enc1);
+
+        int64_t total_encoder = (int64_t)r_count * ENCODER_MAX + (int64_t)current_enc1;
+
+        if (msg->data[9] != 0) {
+            g_zero_offset.store(total_encoder);
+            RCLCPP_INFO(get_logger(), "[COORD RESET!] 下端ボタン押下により座標0へオフセット設定");
+        }
+
+        int64_t zero_offset = g_zero_offset.load();
+        int64_t abs_coord = -(total_encoder - zero_offset);
+        g_abs_coord.store(abs_coord);
+
+        double rot = (double)abs_coord / 8000.0; 
+
+        if (diff != 0) {
+            RCLCPP_INFO(get_logger(), 
+                "\n--- ROTATION DEBUG ---\n"
+                "  生値の変化 : %d -> %d (diff: %d)\n"
+                "  デジタルラップ : %d 回\n"
+                "  絶対カウント   : %ld\n"
+                "  現在回転数     : %.3f 回転 (1周8000)\n"
+                "----------------------", 
+                (int)current_enc1 - diff, (int)current_enc1, diff, 
+                (int)r_count, abs_coord, rot);
+        }
+
+        static int16_t l9=0, l10=0;
+        if (msg->data[9] != l9 || msg->data[10] != l10) {
+            RCLCPP_INFO(get_logger(), "SW Changed! [下(9):%d, 上(10):%d]", 
+                        msg->data[9], msg->data[10]);
+            l9 = msg->data[9]; l10 = msg->data[10];
+        }
 
         // 以降、受信データを使った処理を記述
 
