@@ -44,6 +44,8 @@ namespace r2_planner {
         static constexpr int32_t kStateMffEnter = 1;
         static constexpr int32_t kStateMffLeave = 2;
         static constexpr int32_t kStateStaffAssembly = 3;
+        static constexpr int32_t kStateRackMove = 4;
+        static constexpr int32_t kStateStaffHandTrigger = 5;
 
         static constexpr int32_t kTransitionManual = 0;
         static constexpr int32_t kTransitionAuto = 1;
@@ -56,12 +58,14 @@ namespace r2_planner {
         rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr state_sequence_sub_;
         rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr state_pose_sub_;
         rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr state_mode_sub_;
+        rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr state_odom_reset_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr auto_send_enabled_sub_;
 
         rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr status_pub_;
         rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_text_pub_;
         rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr auto_drive_target_pub_;
         rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr drive_mode_cmd_pub_;
+        rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr odom_reset_pub_;
         rclcpp::TimerBase::SharedPtr publish_timer_;
         rclcpp::TimerBase::SharedPtr auto_transition_timer_;
 
@@ -71,6 +75,7 @@ namespace r2_planner {
         std::vector<int32_t> state_sequence_;
         std::unordered_map<int32_t, StatePoseTarget> state_pose_targets_;
         std::unordered_map<int32_t, int32_t> state_mode_targets_;
+        std::unordered_map<int32_t, bool> state_odom_reset_targets_;
         bool auto_send_enabled_{true};
 
         void onCommand(const std_msgs::msg::Int32MultiArray::SharedPtr msg);
@@ -81,6 +86,7 @@ namespace r2_planner {
         void onStateSequence(const std_msgs::msg::Int32MultiArray::SharedPtr msg);
         void onStatePose(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
         void onStateMode(const std_msgs::msg::Int32MultiArray::SharedPtr msg);
+        void onStateOdomReset(const std_msgs::msg::Int32MultiArray::SharedPtr msg);
         void onAutoSendEnabled(const std_msgs::msg::Bool::SharedPtr msg);
 
         void setState(int32_t state_code);
@@ -92,6 +98,7 @@ namespace r2_planner {
         static std::vector<int32_t> normalizedStateSequence(const std::vector<int32_t> &sequence);
         void publishAutoDriveTargetForState(int32_t state_code);
         void publishAutoDriveModeForState(int32_t state_code);
+        void publishOdomResetForState(int32_t state_code);
 
         static std::string stateName(int32_t state_code);
         static std::string colorName(int32_t color_code);
