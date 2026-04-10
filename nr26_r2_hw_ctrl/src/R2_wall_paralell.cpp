@@ -60,7 +60,7 @@ public:
           pid_distance_(0.0008f, 0.0f, 0.0f, 0.4f)
     {
         pid_angle_.set_target(0.0f);
-        pid_distance_.set_target(static_cast<float>(wall_distance_threshold));
+        pid_distance_.set_target(wall_approach_target_mm);
 
         timer_ = this->create_wall_timer(
             10ms,
@@ -78,7 +78,7 @@ public:
         }
         pid_angle_.reset();
         pid_distance_.reset();
-        pid_distance_.set_target(static_cast<float>(wall_distance_threshold));
+        pid_distance_.set_target(wall_approach_target_mm);
         mode_ = StepMode::WALL_ALIGN;
         alignment_start_time_ = std::chrono::steady_clock::now();
     }
@@ -194,10 +194,9 @@ private:
     };
 
     // PIDコントローラ
-    // pid_angle_ : 目標角度0[rad]、入力wall_angle_[rad]、出力=回転速度(正=CW, 負=CCW)
-    //   Kp=2.0, Ki=0.0, Kd=0.1, max_out=0.6
-    // pid_distance_ : 目標距離wall_distance_threshold[mm]、入力lidar_value[mm]、出力=前後速度
-    //   Kp=0.0008, Ki=0.0, Kd=0.0, max_out=0.4
+    // pid_angle_    : 目標0[rad]、入力wall_angle_[rad]、出力=回転速度(正=CW, 負=CCW)
+    // pid_distance_ : 目標wall_approach_target_mm[mm]、入力lidar_value[mm]、出力=前後速度
+    //                 (equilibrium < wall_distance_threshold なのでトリガーを確実に通過する)
     PIDController pid_angle_;
     PIDController pid_distance_;
 
@@ -208,9 +207,10 @@ private:
 
     rclcpp::TimerBase::SharedPtr timer_;
     std::chrono::steady_clock::time_point alignment_start_time_;
-    static constexpr double wall_alignment_timeout = 10.0; // 壁調整タイムアウト [s]
-    static constexpr double wall_angle_threshold = 0.08; // 約5度 [rad]
-    static constexpr double wall_distance_threshold = 400;  // 目標距離 [m]
+    static constexpr double wall_alignment_timeout    = 10.0;  // 壁調整タイムアウト [s]
+    static constexpr double wall_angle_threshold      = 0.10;  // 角度整列完了閾値 [rad]（約6度）
+    static constexpr int    wall_distance_threshold   = 250;   // 段差上り開始トリガー距離 [mm]
+    static constexpr float  wall_approach_target_mm   = 120.0f; // PIDの接近目標距離 [mm]（threshold未満）
     rclcpp::Time state_start_time_;
     bool state_executed_ = false; // 各状態での処理の実行状況を保存
 
@@ -310,8 +310,9 @@ private:
 
     // 壁調整シーケンス（PID制御版）
     // 角度PID: wall_angle_→0[rad] への回転制御
-    // 距離PID: lidar_value→wall_distance_threshold[mm] への前進制御
-    //          （角度がwall_angle_approach_threshold_以内になってから起動）
+    // 距離PID: lidar_value→wall_approach_target_mm[mm] への前進制御
+    //          PID平衡点 < wall_distance_threshold なのでトリガーを確実に通過する
+    //          （角度がwall_angle_approach_threshold_以内になってから前進起動）
     void wall_alignment_sequence()
     {
         constexpr float dt = 0.01f; // ループ周期 [s]（10msタイマー）
