@@ -560,6 +560,11 @@ public:
             10,
             std::bind(&HardWareControl::wall_callback, this, std::placeholders::_1));
 
+        step_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+            "/r2_mff_step_cmd",
+            10,
+            std::bind(&HardWareControl::step_callback, this, std::placeholders::_1));
+
         RCLCPP_INFO(get_logger(),
                     "serial_tx_%d started.", device_id_);
     }
@@ -785,6 +790,22 @@ private:
         seq_->set_wall_angle(msg->data);
     }
 
+    void step_callback(const std_msgs::msg::Int32::SharedPtr msg)
+    {
+        int cmd = msg->data;
+        if (cmd == 1)
+        {
+            seq_->start_step_up();
+        }
+        else if (cmd == -1)
+        {
+            seq_->start_step_down();
+        }
+        else if (cmd == 0)
+        {
+            // 何もしない（停止コマンドなどがあればここで処理
+        }
+    }
     uint8_t device_id_;
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
@@ -796,6 +817,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sdm15_sub2_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sdm15_sub3_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sdm15_sub4_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr step_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     std::vector<int16_t> data_;
