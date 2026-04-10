@@ -99,14 +99,19 @@ public:
         this->declare_parameter("aruco_target_id", -1);
         this->declare_parameter("aruco_camera_offset_x_m", -0.1735);
         this->declare_parameter("aruco_camera_offset_y_m", 0.0);
+        this->declare_parameter("enable_ps4_mode_toggle", false);
         aruco_target_forward_ = static_cast<float>(this->get_parameter("aruco_target_forward_m").as_double());
         aruco_target_lateral_ = static_cast<float>(this->get_parameter("aruco_target_lateral_m").as_double());
         aruco_target_yaw_ = static_cast<float>(this->get_parameter("aruco_target_yaw_rad").as_double());
         aruco_target_id_ = this->get_parameter("aruco_target_id").as_int();
         aruco_camera_offset_x_ = static_cast<float>(this->get_parameter("aruco_camera_offset_x_m").as_double());
         aruco_camera_offset_y_ = static_cast<float>(this->get_parameter("aruco_camera_offset_y_m").as_double());
+        enable_ps4_mode_toggle_ = this->get_parameter("enable_ps4_mode_toggle").as_bool();
         last_aruco_update_ = this->get_clock()->now();
         publish_mode();
+
+        RCLCPP_INFO(this->get_logger(), "PS4 mode toggle (OPTION): %s",
+                    enable_ps4_mode_toggle_ ? "ENABLED" : "DISABLED");
     }
 
 private:
@@ -180,6 +185,7 @@ private:
     float aruco_k_wz_ = 1.4f;
     float aruco_pose_timeout_sec_ = 0.5f;
     float aruco_horizontal_deadband_m_ = 0.02f;
+    bool enable_ps4_mode_toggle_ = false;
 
     static std::string drive_mode_to_string(DriveMode mode) {
         switch (mode) {
@@ -352,7 +358,7 @@ private:
         bool OPTION = msg->buttons[9];
         static bool last_option = false;
 
-        if (OPTION && !last_option) {
+        if (enable_ps4_mode_toggle_ && OPTION && !last_option) {
             if (drive_mode_ == DriveMode::MANUAL) {
                 enter_auto_mode();
                 RCLCPP_INFO(this->get_logger(), "Mode changed: AUTO");

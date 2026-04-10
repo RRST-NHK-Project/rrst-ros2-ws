@@ -1,16 +1,15 @@
-# 画像認識のxy座標と真偽だけ送るノード
+import cv2
+import numpy as np
 
 import rclpy
+from cv_bridge import CvBridge
 from rclpy.node import Node
-from rclpy.executors import SingleThreadedExecutor
-from sensor_msgs.msg import Joy
-from std_msgs.msg import Int32MultiArray
+from sensor_msgs.msg import CameraInfo
+from sensor_msgs.msg import Image
+from std_msgs.msg import Bool, Float32MultiArray
 
-from socket import *
-import time
-import math
 
-data = [0, 0, True]  # グローバル変数
+data = [True]  # グローバル変数
 
 
 class KFS_judge_node(Node):

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Path Finding GUI</title>
+    <style>
+      body { margin: 0; font-family: "Space Grotesk", "Noto Sans JP", sans-serif; background: linear-gradient(135deg, #faf6f6, #f3f2f2); }
+      .wrap { max-width: 980px; margin: 24px auto; background: rgba(255,255,255,0.9); border: 1px solid rgba(0,0,0,0.14); border-radius: 18px; padding: 16px; box-shadow: 0 24px 48px rgba(0,0,0,0.14); }
+      h1 { margin: 0; font-size: 1.5rem; }
+      p { margin: 6px 0 0; color: #555; }
+      .row { margin-top: 14px; display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; }
+      .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+      .cell { min-height: 84px; border: 1px solid rgba(0,0,0,0.15); border-radius: 12px; background: #fbfbfd; display:flex; align-items:center; justify-content:center; font-weight: 700; color:#444; }
+      .panel { display: grid; gap: 10px; }
+      .btn { min-height: 66px; border: none; border-radius: 14px; color: #fff; font-size: 1.6rem; font-weight: 800; background: linear-gradient(135deg, #cb1c14, #8f130e); }
+      .status { padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.82); border: 1px solid rgba(0,0,0,0.1); font-weight: 700; }
+      @media (max-width: 900px) { .row { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <h1>Path Finding Console</h1>
+      <p>URL確認用に再起動したGUIです。http://localhost:3010 で表示できます。</p>
+      <section class="row">
+        <div class="grid">
+          <div class="cell">1</div><div class="cell">2</div><div class="cell">3</div>
+          <div class="cell">4</div><div class="cell">5</div><div class="cell">6</div>
+          <div class="cell">7</div><div class="cell">8</div><div class="cell">9</div>
+          <div class="cell">10</div><div class="cell">11</div><div class="cell">12</div>
+        </div>
+        <aside class="panel">
+          <button class="btn">logo</button>
+          <button class="btn">❍</button>
+          <button class="btn">✖</button>
+          <div class="status">swift_path_gui 版は Xcode 実行です</div>
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>
