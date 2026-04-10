@@ -86,7 +86,7 @@ ament_target_dependencies(r2_wheel_odom rclcpp std_msgs sensor_msgs geometry_msg
 add_executable(r2_pp src/R2_PurePursuit.cpp)
 ament_target_dependencies(r2_pp rclcpp std_msgs sensor_msgs geometry_msgs)
 
-add_executable(r2_wall src/R2_wall_paralell.cpp)
+add_executable(r2_wall src/R2_wall_paralell.cpp src/include/PID.cpp)
 ament_target_dependencies(r2_wall rclcpp std_msgs sensor_msgs geometry_msgs)
 
 # インストール設定
