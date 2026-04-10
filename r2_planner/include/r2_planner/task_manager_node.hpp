@@ -77,6 +77,7 @@ namespace r2_planner {
         std::unordered_map<int32_t, int32_t> state_mode_targets_;
         std::unordered_map<int32_t, bool> state_odom_reset_targets_;
         bool auto_send_enabled_{true};
+        int32_t fallback_drive_mode_on_unset_{0};
 
         void onCommand(const std_msgs::msg::Int32MultiArray::SharedPtr msg);
         void onState(const std_msgs::msg::Int32::SharedPtr msg);
@@ -93,6 +94,7 @@ namespace r2_planner {
         void setColor(int32_t color_code);
         void setCell(int32_t cell);
         void setTransitionMode(int32_t transition_mode_code);
+        void publishStateSideEffects(int32_t state_code);
         void advanceAutoTransition();
         int32_t nextStateCode(int32_t current_state_code) const;
         static std::vector<int32_t> normalizedStateSequence(const std::vector<int32_t> &sequence);

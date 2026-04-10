@@ -29,6 +29,7 @@ namespace r2_planner {
         declare_parameter<std::string>("status_text_topic", "r2/task_status_text");
         declare_parameter<std::string>("auto_drive_target_topic", "r2_autodrive_cmd");
         declare_parameter<std::string>("drive_mode_cmd_topic", "r2_drive_mode_cmd");
+        declare_parameter<int>("fallback_drive_mode_on_unset", 0);
         declare_parameter<std::string>("odom_reset_topic", "odom_reset");
 
         status_.state_code = static_cast<int32_t>(get_parameter("initial_state_code").as_int());
@@ -52,6 +53,7 @@ namespace r2_planner {
         const auto status_text_topic = get_parameter("status_text_topic").as_string();
         const auto auto_drive_target_topic = get_parameter("auto_drive_target_topic").as_string();
         const auto drive_mode_cmd_topic = get_parameter("drive_mode_cmd_topic").as_string();
+        fallback_drive_mode_on_unset_ = static_cast<int32_t>(get_parameter("fallback_drive_mode_on_unset").as_int());
         const auto odom_reset_topic = get_parameter("odom_reset_topic").as_string();
         auto_send_enabled_ = get_parameter("initial_auto_send_enabled").as_bool();
 
@@ -250,6 +252,12 @@ namespace r2_planner {
         if (!enabled) {
             state_mode_targets_.erase(state_code);
             RCLCPP_INFO(get_logger(), "Cleared state mode target: state=%s(%ld)", stateName(state_code).c_str(), static_cast<long>(state_code));
+
+            if (auto_send_enabled_ && state_code == status_.state_code) {
+                publishAutoDriveModeForState(state_code);
+                RCLCPP_INFO(get_logger(), "Applied fallback mode immediately for current state=%s(%ld)",
+                            stateName(state_code).c_str(), static_cast<long>(state_code));
+            }
             return;
         }
 
@@ -268,6 +276,12 @@ namespace r2_planner {
         state_mode_targets_[state_code] = mode_code;
         RCLCPP_INFO(get_logger(), "Updated state mode target: state=%s(%ld) mode=%ld",
                     stateName(state_code).c_str(), static_cast<long>(state_code), static_cast<long>(mode_code));
+
+        if (auto_send_enabled_ && state_code == status_.state_code) {
+            publishAutoDriveModeForState(state_code);
+            RCLCPP_INFO(get_logger(), "Applied state mode immediately for current state=%s(%ld)",
+                        stateName(state_code).c_str(), static_cast<long>(state_code));
+        }
     }
 
     void TaskManagerNode::onAutoSendEnabled(const std_msgs::msg::Bool::SharedPtr msg) {
@@ -297,13 +311,15 @@ namespace r2_planner {
     }
 
     void TaskManagerNode::setState(int32_t state_code) {
-        if (status_.state_code == state_code) {
-            return;
-        }
         status_.state_code = state_code;
+        publishStateSideEffects(state_code);
+    }
+
+    void TaskManagerNode::publishStateSideEffects(int32_t state_code) {
         if (!auto_send_enabled_) {
             return;
         }
+
         publishAutoDriveTargetForState(state_code);
         publishAutoDriveModeForState(state_code);
         publishOdomResetForState(state_code);
@@ -464,12 +480,15 @@ namespace r2_planner {
 
     void TaskManagerNode::publishAutoDriveModeForState(int32_t state_code) {
         auto it = state_mode_targets_.find(state_code);
-        if (it == state_mode_targets_.end()) {
-            return;
-        }
-
         std_msgs::msg::Int32 mode_msg;
-        mode_msg.data = it->second;
+        if (it == state_mode_targets_.end()) {
+            if (fallback_drive_mode_on_unset_ < 0 || fallback_drive_mode_on_unset_ > 2) {
+                return;
+            }
+            mode_msg.data = fallback_drive_mode_on_unset_;
+        } else {
+            mode_msg.data = it->second;
+        }
         drive_mode_cmd_pub_->publish(mode_msg);
 
         RCLCPP_INFO(
@@ -477,7 +496,7 @@ namespace r2_planner {
             "Published auto drive mode for state=%s(%ld): mode=%ld",
             stateName(state_code).c_str(),
             static_cast<long>(state_code),
-            static_cast<long>(it->second));
+            static_cast<long>(mode_msg.data));
     }
 
     void TaskManagerNode::publishOdomResetForState(int32_t state_code) {
