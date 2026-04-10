@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-
 import rclpy
 from cv_bridge import CvBridge
 from rclpy.node import Node
@@ -341,6 +340,8 @@ class CubeDetectorNode(Node):
         detected_msg.data = True
         self.detected_pub.publish(detected_msg)
 
+
+        # 検出情報をFloat32MultiArrayで配信: [1.0, cx_norm, cy_norm, w_norm, h_norm, depth_m, score, area]
         info_msg = Float32MultiArray()
         info_msg.data = [
             1.0,

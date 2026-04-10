@@ -27,7 +27,9 @@ L1、R1で回転しようとすると前進、後進してしまう
 #include "std_msgs/msg/int16_multi_array.hpp"
 #include "std_msgs/msg/int32.hpp"
 
-#include "sensor_msgs/msg/laser_scan.hpp"
+#include "sensor_msgs/msg/point_cloud2.hpp"
+#include "sensor_msgs/point_cloud2_iterator.hpp"
+#include "std_msgs/msg/float64.hpp"
 
 // 自作
 #include "include/PacketController.hpp"
@@ -66,7 +68,7 @@ public:
             return; // 実行中なら無視
         }
         mode_ = StepMode::STEP_UP;
-        next_up(StepUpState::ALL_UP);
+        next_up(StepUpState::ALL_FORWARD);
     }
 
     void start_step_down()
@@ -91,10 +93,22 @@ public:
         sdm15_value_[index] = value;
     }
 
+    // lidar値を更新する関数
+    void set_lidar_value(int16_t value)
+    {
+        lidar_value = value;
+    }
+
+    // wall角度を更新する関数
+    void set_wall_angle(double angle)
+    {
+        wall_angle = angle;
+    }
+
 private:
     // 以下シーケンス内で使用する変数
     //  待機時間（要調整）
-    static constexpr double up_first_forward_wait = 2.0;
+    static constexpr double up_first_forward_wait = 1.5;
     static constexpr double up_second_forward_wait = 7.0;
     static constexpr double up_final_forward_wait = 6.0;
     static constexpr double down_first_forward_wait = 1.0;
@@ -107,11 +121,12 @@ private:
     static constexpr int dis = 100;      // 障害物と見なす距離の閾値（要調整）
     static constexpr int down_dis = 100; // sdm15の値がこの時間(ms)更新されなければタイムアウトと見なす
 
-    static constexpr int wall = 100; // 前に障害物があると見なす距離の閾値（要調整）
+    static constexpr int wall = 350; // 前に障害物があると見なす距離の閾値（要調整）
 
     // シーケンスの状態管理に必要な変数
     int32_t sdm15_value_[4] = {0, 0, 0, 0};
     int16_t lidar_value = 0;
+    double wall_angle = 0.0;
 
     // モードの管理
     enum class StepMode
@@ -125,6 +140,7 @@ private:
     enum class StepUpState
     {
         IDLE,
+        WALL,
         ALL_UP,
         ALL_FORWARD,
         FIRST_FORWARD,
@@ -243,10 +259,10 @@ private:
     void move_stop()
     {
         RCLCPP_INFO(get_logger(), "MOVE STOP");
-        pkt.setMD(MD5, 10);
-        pkt.setMD(MD6, 10);
-        pkt.setMD(MD7, 10);
-        pkt.setMD(MD8, 10);
+        pkt.setMD(MD5, 0);
+        pkt.setMD(MD6, 0);
+        pkt.setMD(MD7, 0);
+        pkt.setMD(MD8, 0);
     }
     // void move_backward() {
     //     RCLCPP_INFO(get_logger(), "MOVE BACKWARD");
@@ -310,11 +326,7 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            // if ((now_time - state_start_time_).seconds() > up_second_forward_wait)
-            // {
-            //     next_up(StepUpState::REAR_DOWN);
-            // }
-            if (sdm15_value_[0] < dis)
+            if (sdm15_value_[1] < dis)
             {
                 next_up(StepUpState::REAR_DOWN);
             }
@@ -335,7 +347,7 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if (sdm15_value_[2] < dis)
+            if (sdm15_value_[0] < dis)
             {
                 next_up(StepUpState::DONE);
             }
@@ -368,7 +380,7 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if (sdm15_value_[1] > down_dis || sdm15_value_[3] > down_dis) // 前のセンサーで障害物がなくなったら
+            if (sdm15_value_[2] > down_dis || sdm15_value_[3] > down_dis) // 前のセンサーで障害物がなくなったら
             {
                 next_down(StepDownState::FRONT_UP);
             }
@@ -400,7 +412,7 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if (sdm15_value_[0] > down_dis)
+            if (sdm15_value_[1] > down_dis)
             {
                 next_down(StepDownState::REAR_UP);
             }
@@ -421,7 +433,7 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if (sdm15_value_[2] > down_dis)
+            if (sdm15_value_[0] > down_dis)
             {
                 next_down(StepDownState::ALL_DOWN);
             }
@@ -451,22 +463,25 @@ private:
 
     void loop()
     {
-
+        // 追加（0.5秒ごとに表示）
+        // RCLCPP_INFO_THROTTLE(
+        //     this->get_logger(),
+        //     *this->get_clock(),
+        //     500,
+        //     "lidar_value: %d mm, %d mm",
+        //     wall - lidar_value, lidar_value);
         switch (mode_)
         {
 
         case StepMode::NONE:
-            // std::cout << "None sequence" << std::endl;
             break;
 
         case StepMode::STEP_UP:
             step_up_sequence();
-            // std::cout << "Up sequence" << std::endl;
             break;
 
         case StepMode::STEP_DOWN:
             step_down_sequence();
-            // std::cout << "Down sequence" << std::endl;
             break;
         }
     }
@@ -502,14 +517,9 @@ public:
                       this,
                       std::placeholders::_1));
 
-        lidar_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
-            "/ldlidar_node/scan",
-            rclcpp::SensorDataQoS(),
-            std::bind(&HardWareControl::lidar_callback, this, std::placeholders::_1));
-
         // sdm15のSubscribe
         sdm15_sub1_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
-            "serial_rx_17",
+            "serial_rx_16",
             rclcpp::SensorDataQoS(),
             [this](std_msgs::msg::Int16MultiArray::SharedPtr msg)
             {
@@ -517,7 +527,7 @@ public:
             });
 
         sdm15_sub2_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
-            "serial_rx_18",
+            "serial_rx_17",
             rclcpp::SensorDataQoS(),
             [this](std_msgs::msg::Int16MultiArray::SharedPtr msg)
             {
@@ -525,7 +535,7 @@ public:
             });
 
         sdm15_sub3_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
-            "serial_rx_16",
+            "serial_rx_18",
             rclcpp::SensorDataQoS(),
             [this](std_msgs::msg::Int16MultiArray::SharedPtr msg)
             {
@@ -539,6 +549,21 @@ public:
             {
                 this->sdm15_callback(msg, 3);
             });
+
+        lidar_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+            "/wall_detection/filtered_points",
+            rclcpp::SensorDataQoS(),
+            std::bind(&HardWareControl::lidar_callback, this, std::placeholders::_1));
+
+        wall_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+            "/wall_detection/angle",
+            10,
+            std::bind(&HardWareControl::wall_callback, this, std::placeholders::_1));
+
+        step_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+            "/r2_mff_step_cmd",
+            10,
+            std::bind(&HardWareControl::step_callback, this, std::placeholders::_1));
 
         RCLCPP_INFO(get_logger(),
                     "serial_tx_%d started.", device_id_);
@@ -556,6 +581,8 @@ private:
                           // v1:第一象限, v2:第二象限, v3:第三象限, v4:第四象限
 
     int32_t sdm15_value[4] = {0, 0, 0, 0}; // sdm15の値を保存する配列
+    int16_t lidar_x_value = 0;
+    int16_t lidar_y_value = 0;
 
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg)
     {
@@ -686,14 +713,6 @@ private:
         }
     }
 
-    void lidar_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
-    {
-        if (msg->ranges.empty())
-            return;
-
-        int16_t lidar_value = msg->ranges[0]; // 0方向の距離
-    }
-
     void sdm15_callback(const std_msgs::msg::Int16MultiArray::SharedPtr msg, int index)
     {
         // 配列が空でないか一応安全のためにチェック
@@ -714,16 +733,91 @@ private:
         //             "distance: %d, %d, %d",
         //             sdm15_value[0], sdm15_value[1], sdm15_value[2]);
     }
+
+    void lidar_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+    {
+        if (msg->width == 0)
+            return;
+
+        float nearest_x = 0.0f;
+        float nearest_y = 0.0f;
+        float min_distance = std::numeric_limits<float>::max();
+        bool has_valid_point = false;
+
+        sensor_msgs::PointCloud2ConstIterator<float> iter_x(*msg, "x");
+        sensor_msgs::PointCloud2ConstIterator<float> iter_y(*msg, "y");
+        const size_t point_count = static_cast<size_t>(msg->width) * static_cast<size_t>(msg->height);
+
+        for (size_t i = 0; i < point_count; ++i, ++iter_x, ++iter_y)
+        {
+            const float x = *iter_x;
+            const float y = *iter_y;
+
+            if (!std::isfinite(x) || !std::isfinite(y))
+            {
+                continue;
+            }
+
+            const float distance = std::sqrt(x * x + y * y);
+            if (distance < min_distance)
+            {
+                min_distance = distance;
+                nearest_x = x;
+                nearest_y = y;
+                has_valid_point = true;
+            }
+        }
+
+        if (!has_valid_point)
+        {
+            return;
+        }
+
+        // // --- ここから追加：デバッグ用表示コード ---
+        // // 500ミリ秒（0.5秒）に1回、ターミナルに最も近い点の座標を表示します
+        // RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
+        // "Nearest Point -> x: %.3f m, y: %.3f m, dist: %.3f m",
+        // nearest_x, nearest_y, min_distance);
+        // // ---------------------------------------
+
+        lidar_x_value = static_cast<int16_t>(nearest_x * 1000.0f);
+        lidar_y_value = static_cast<int16_t>(nearest_y * 1000.0f);
+        seq_->set_lidar_value(static_cast<int16_t>(min_distance * 1000.0f));
+    }
+
+    void wall_callback(const std_msgs::msg::Float64::SharedPtr msg)
+    {
+        seq_->set_wall_angle(msg->data);
+    }
+
+    void step_callback(const std_msgs::msg::Int32::SharedPtr msg)
+    {
+        int cmd = msg->data;
+        if (cmd == 1)
+        {
+            seq_->start_step_up();
+        }
+        else if (cmd == -1)
+        {
+            seq_->start_step_down();
+        }
+        else if (cmd == 0)
+        {
+            // 何もしない（停止コマンドなどがあればここで処理
+        }
+    }
     uint8_t device_id_;
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sensor_sub_;
-    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr lidar_sub_;
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr wall_sub_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sdm15_sub1_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sdm15_sub2_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sdm15_sub3_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sdm15_sub4_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr step_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     std::vector<int16_t> data_;
