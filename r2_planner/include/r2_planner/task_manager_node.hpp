@@ -38,7 +38,7 @@ namespace r2_planner {
         static constexpr int32_t kColorRed = 1;
 
         static constexpr int32_t kMffCellMin = 1;
-        static constexpr int32_t kMffCellMax = 15; // Includes entrance cells 1E(13), 2E(14), 3E(15)
+        static constexpr int32_t kMffCellMax = 18; // Includes entrance cells 1E-3E (13-15) and exit cells 1X-3X (16-18)
 
         static constexpr int32_t kStateWaiting = 0;
         static constexpr int32_t kStateMffEnter = 1;

@@ -7,7 +7,7 @@
 #include <sstream>
 
 namespace {
-    constexpr std::array<int32_t, 16> kMffHeightByCell = {
+    constexpr std::array<int32_t, 19> kMffHeightByCell = {
         0,   // 0 (unused)
         200, // 1
         0,   // 2
@@ -23,23 +23,28 @@ namespace {
         0,   // 12
         0,   // 13 (1E - entrance, flat)
         0,   // 14 (2E - entrance, flat)
-        0    // 15 (3E - entrance, flat)
+        0,   // 15 (3E - entrance, flat)
+        0,   // 16 (1X - exit, flat)
+        0,   // 17 (2X - exit, flat)
+        0    // 18 (3X - exit, flat)
     };
 
-    constexpr std::array<std::array<int32_t, 3>, 5> kMffLayoutRed = {{
+    constexpr std::array<std::array<int32_t, 3>, 6> kMffLayoutRed = {{
         {{13, 14, 15}}, // 1E, 2E, 3E (entrance side)
         {{1, 2, 3}},    // 1, 2, 3
         {{4, 5, 6}},    // 4, 5, 6
         {{7, 8, 9}},    // 7, 8, 9
         {{10, 11, 12}}, // 10, 11, 12
+        {{16, 17, 18}}, // 1X, 2X, 3X (exit side)
     }};
 
-    constexpr std::array<std::array<int32_t, 3>, 5> kMffLayoutBlue = {{
+    constexpr std::array<std::array<int32_t, 3>, 6> kMffLayoutBlue = {{
         {{15, 14, 13}}, // 3E, 2E, 1E (entrance side)
         {{3, 2, 1}},    // 3, 2, 1
         {{6, 5, 4}},    // 6, 5, 4
         {{9, 8, 7}},    // 9, 8, 7
         {{12, 11, 10}}, // 12, 11, 10
+        {{18, 17, 16}}, // 3X, 2X, 1X (exit side)
     }};
 } // namespace
 
@@ -685,13 +690,13 @@ namespace r2_planner {
             return false;
         }
 
-        const std::array<std::array<int32_t, 3>, 5> layout = status_.color_code == kColorBlue ? kMffLayoutBlue : kMffLayoutRed;
+        const std::array<std::array<int32_t, 3>, 6> layout = status_.color_code == kColorBlue ? kMffLayoutBlue : kMffLayoutRed;
 
         int32_t from_r = -1;
         int32_t from_c = -1;
         int32_t to_r = -1;
         int32_t to_c = -1;
-        for (int32_t r = 0; r < 5; ++r) {
+        for (int32_t r = 0; r < 6; ++r) {
             for (int32_t c = 0; c < 3; ++c) {
                 if (layout[r][c] == from_cell) {
                     from_r = r;
