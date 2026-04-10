@@ -121,7 +121,7 @@ private:
     static constexpr int dis = 100;      // 障害物と見なす距離の閾値（要調整）
     static constexpr int down_dis = 100; // sdm15の値がこの時間(ms)更新されなければタイムアウトと見なす
 
-    static constexpr int wall = 100; // 前に障害物があると見なす距離の閾値（要調整）
+    static constexpr int wall = 10; // 前に障害物があると見なす距離の閾値（要調整）
 
     // シーケンスの状態管理に必要な変数
     int32_t sdm15_value_[4] = {0, 0, 0, 0};
