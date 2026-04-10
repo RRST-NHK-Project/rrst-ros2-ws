@@ -6,10 +6,10 @@ from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo
 from sensor_msgs.msg import Image
-from std_msgs.msg import Bool, Float32MultiArray
+from std_msgs.msg import Bool, Float32MultiArray, Int32MultiArray
 
 
-data = [True]  # グローバル変数
+data = [0, 0, True]  # グローバル変数
 
 
 class KFS_judge_node(Node):
@@ -21,6 +21,15 @@ class KFS_judge_node(Node):
         )
         self.sub
         self.publisher_ = self.create_publisher(Int32MultiArray, "KFS_judge", 10)
+
+        self.info_sub = self.create_subscription(
+            Float32MultiArray,
+            "/cube_detection/info",
+            self.info_callback,
+            10
+        )
+        self.latest_info = None
+        
 
     def kfs_judge_callback(self, msg):
         global data
@@ -66,6 +75,30 @@ class udpsend:
 
 
 udp = udpsend()
+
+# call back
+def info_callback(self, msg):
+    self.latest_info = msg.data # 最新検出情報を変数に保存
+
+    if len(msg.data) < 8 :
+        return
+    self.target_data = {
+        'detected': bool(msg.data[0]),
+        'cx': msg.data[1],  # 画像内の中心X (0.0~1.0)
+        'cy': msg.data[2],  # 画像内の中心Y (0.0~1.0)
+        'depth': msg.data[5] # 距離 (m)
+    }    
+
+def image_callback(self, msg):
+    if self.latest_info is None or self.latest_info[0] == 0.0:  # 未検出ならスキップ  # 最新情報がない、または検出されていない場合
+        return
+    
+    flag = self
+    cx_norn = self.latest_info[1] # 画像内の中心X (0.0~1.0)
+    cy_norn = self.latest_info[2] # 画像内の中心Y
+    w_norm = self.latest_info[3]  # 画像内の幅 (0.0~1.0)
+    h_norm = self.latest_info[4]  # 画像内の高さ (0.0~1.0)
+    depth_m = self.latest_info[5] # 深度距離 (m)
 
 
 def main(args=None):
