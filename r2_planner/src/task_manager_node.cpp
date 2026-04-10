@@ -1,9 +1,47 @@
 #include "r2_planner/task_manager_node.hpp"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <sstream>
+
+namespace {
+    constexpr std::array<int32_t, 16> kMffHeightByCell = {
+        0,   // 0 (unused)
+        200, // 1
+        0,   // 2
+        200, // 3
+        0,   // 4
+        200, // 5
+        400, // 6
+        200, // 7
+        400, // 8
+        200, // 9
+        0,   // 10
+        200, // 11
+        0,   // 12
+        0,   // 13 (1E - entrance, flat)
+        0,   // 14 (2E - entrance, flat)
+        0    // 15 (3E - entrance, flat)
+    };
+
+    constexpr std::array<std::array<int32_t, 3>, 5> kMffLayoutRed = {{
+        {{13, 14, 15}}, // 1E, 2E, 3E (entrance side)
+        {{1, 2, 3}},    // 1, 2, 3
+        {{4, 5, 6}},    // 4, 5, 6
+        {{7, 8, 9}},    // 7, 8, 9
+        {{10, 11, 12}}, // 10, 11, 12
+    }};
+
+    constexpr std::array<std::array<int32_t, 3>, 5> kMffLayoutBlue = {{
+        {{15, 14, 13}}, // 3E, 2E, 1E (entrance side)
+        {{3, 2, 1}},    // 3, 2, 1
+        {{6, 5, 4}},    // 6, 5, 4
+        {{9, 8, 7}},    // 9, 8, 7
+        {{12, 11, 10}}, // 12, 11, 10
+    }};
+} // namespace
 
 namespace r2_planner {
 
@@ -29,6 +67,12 @@ namespace r2_planner {
         declare_parameter<std::string>("status_text_topic", "r2/task_status_text");
         declare_parameter<std::string>("auto_drive_target_topic", "r2_autodrive_cmd");
         declare_parameter<std::string>("drive_mode_cmd_topic", "r2_drive_mode_cmd");
+        declare_parameter<std::string>("mff_path_topic", "r2/task_mff_path");
+        declare_parameter<std::string>("mff_path_advance_topic", "r2/task_mff_path_advance");
+        declare_parameter<std::string>("mff_turn_cmd_topic", "r2_mff_turn_cmd");
+        declare_parameter<std::string>("mff_step_cmd_topic", "r2_mff_step_cmd");
+        declare_parameter<std::string>("mff_status_topic", "r2/task_mff_status");
+        declare_parameter<int>("initial_mff_heading_deg", 0);
         declare_parameter<int>("fallback_drive_mode_on_unset", 0);
         declare_parameter<std::string>("odom_reset_topic", "odom_reset");
 
@@ -53,6 +97,12 @@ namespace r2_planner {
         const auto status_text_topic = get_parameter("status_text_topic").as_string();
         const auto auto_drive_target_topic = get_parameter("auto_drive_target_topic").as_string();
         const auto drive_mode_cmd_topic = get_parameter("drive_mode_cmd_topic").as_string();
+        const auto mff_path_topic = get_parameter("mff_path_topic").as_string();
+        const auto mff_path_advance_topic = get_parameter("mff_path_advance_topic").as_string();
+        const auto mff_turn_cmd_topic = get_parameter("mff_turn_cmd_topic").as_string();
+        const auto mff_step_cmd_topic = get_parameter("mff_step_cmd_topic").as_string();
+        const auto mff_status_topic = get_parameter("mff_status_topic").as_string();
+        mff_heading_deg_ = normalizeHeadingDeg(static_cast<int32_t>(get_parameter("initial_mff_heading_deg").as_int()));
         fallback_drive_mode_on_unset_ = static_cast<int32_t>(get_parameter("fallback_drive_mode_on_unset").as_int());
         const auto odom_reset_topic = get_parameter("odom_reset_topic").as_string();
         auto_send_enabled_ = get_parameter("initial_auto_send_enabled").as_bool();
@@ -95,6 +145,14 @@ namespace r2_planner {
             state_odom_reset_topic, rclcpp::QoS(10),
             std::bind(&TaskManagerNode::onStateOdomReset, this, std::placeholders::_1));
 
+        mff_path_sub_ = create_subscription<std_msgs::msg::Int32MultiArray>(
+            mff_path_topic, rclcpp::QoS(10),
+            std::bind(&TaskManagerNode::onMffPath, this, std::placeholders::_1));
+
+        mff_path_advance_sub_ = create_subscription<std_msgs::msg::Bool>(
+            mff_path_advance_topic, rclcpp::QoS(10),
+            std::bind(&TaskManagerNode::onMffPathAdvance, this, std::placeholders::_1));
+
         auto_send_enabled_sub_ = create_subscription<std_msgs::msg::Bool>(
             auto_send_enabled_topic, rclcpp::QoS(10),
             std::bind(&TaskManagerNode::onAutoSendEnabled, this, std::placeholders::_1));
@@ -110,6 +168,15 @@ namespace r2_planner {
 
         drive_mode_cmd_pub_ = create_publisher<std_msgs::msg::Int32>(
             drive_mode_cmd_topic, rclcpp::QoS(10));
+
+        mff_turn_cmd_pub_ = create_publisher<std_msgs::msg::Int32>(
+            mff_turn_cmd_topic, rclcpp::QoS(10));
+
+        mff_step_cmd_pub_ = create_publisher<std_msgs::msg::Int32>(
+            mff_step_cmd_topic, rclcpp::QoS(10));
+
+        mff_status_pub_ = create_publisher<std_msgs::msg::Int32MultiArray>(
+            mff_status_topic, rclcpp::QoS(1).reliable().transient_local());
 
         odom_reset_pub_ = create_publisher<std_msgs::msg::Bool>(
             odom_reset_topic, rclcpp::QoS(10));
@@ -287,6 +354,72 @@ namespace r2_planner {
     void TaskManagerNode::onAutoSendEnabled(const std_msgs::msg::Bool::SharedPtr msg) {
         auto_send_enabled_ = msg->data;
         RCLCPP_INFO(get_logger(), "Auto send on state transition: %s", auto_send_enabled_ ? "ENABLED" : "DISABLED");
+    }
+
+    void TaskManagerNode::onMffPath(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        std::vector<int32_t> next_path;
+        next_path.reserve(msg->data.size());
+
+        for (const auto cell : msg->data) {
+            if (cell < kMffCellMin || cell > kMffCellMax) {
+                RCLCPP_WARN(get_logger(), "Ignoring invalid MFF path cell: %ld", static_cast<long>(cell));
+                continue;
+            }
+            next_path.push_back(cell);
+        }
+
+        if (next_path.empty()) {
+            RCLCPP_WARN(get_logger(), "Ignoring empty/invalid MFF path update");
+            return;
+        }
+
+        mff_path_ = next_path;
+        mff_path_index_ = 0;
+
+        auto it = std::find(mff_path_.begin(), mff_path_.end(), status_.mff_cell);
+        if (it != mff_path_.end()) {
+            mff_path_index_ = static_cast<size_t>(std::distance(mff_path_.begin(), it));
+        }
+
+        std::ostringstream oss;
+        for (size_t i = 0; i < mff_path_.size(); ++i) {
+            if (i > 0) {
+                oss << " -> ";
+            }
+            oss << mff_path_[i];
+        }
+        RCLCPP_INFO(get_logger(), "Updated MFF path (%zu): %s", mff_path_.size(), oss.str().c_str());
+        publishMffRuntimeStatus(true);
+    }
+
+    void TaskManagerNode::onMffPathAdvance(const std_msgs::msg::Bool::SharedPtr msg) {
+        if (!msg->data) {
+            return;
+        }
+
+        if (mff_path_.size() < 2) {
+            RCLCPP_WARN(get_logger(), "Ignoring MFF path advance: path has fewer than 2 cells");
+            return;
+        }
+
+        size_t current_index = mff_path_index_;
+        auto it = std::find(mff_path_.begin(), mff_path_.end(), status_.mff_cell);
+        if (it != mff_path_.end()) {
+            current_index = static_cast<size_t>(std::distance(mff_path_.begin(), it));
+        }
+
+        if (current_index + 1 >= mff_path_.size()) {
+            RCLCPP_INFO(get_logger(), "MFF path advance ignored: already at end of path");
+            return;
+        }
+
+        const int32_t from_cell = mff_path_[current_index];
+        const int32_t to_cell = mff_path_[current_index + 1];
+
+        publishMffTransitionCommands(from_cell, to_cell);
+        setCell(to_cell);
+        mff_path_index_ = current_index + 1;
+        publishStatus(true);
     }
 
     void TaskManagerNode::onStateOdomReset(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
@@ -516,6 +649,164 @@ namespace r2_planner {
             static_cast<long>(state_code));
     }
 
+    void TaskManagerNode::publishMffTransitionCommands(int32_t from_cell, int32_t to_cell) {
+        int32_t target_heading_deg = mff_heading_deg_;
+        int32_t turn_deg = 0;
+        int32_t step_cmd = 0;
+        if (!computeMffTransition(from_cell, to_cell, mff_heading_deg_, target_heading_deg, turn_deg, step_cmd)) {
+            return;
+        }
+        mff_heading_deg_ = normalizeHeadingDeg(target_heading_deg);
+
+        std_msgs::msg::Int32 turn_msg;
+        turn_msg.data = turn_deg;
+        mff_turn_cmd_pub_->publish(turn_msg);
+
+        std_msgs::msg::Int32 step_msg;
+        step_msg.data = step_cmd;
+        mff_step_cmd_pub_->publish(step_msg);
+
+        RCLCPP_INFO(get_logger(),
+                    "Published MFF transition commands: %ld -> %ld, turn=%ld deg, step=%ld",
+                    static_cast<long>(from_cell), static_cast<long>(to_cell),
+                    static_cast<long>(turn_deg), static_cast<long>(step_cmd));
+    }
+
+    bool TaskManagerNode::computeMffTransition(
+        int32_t from_cell,
+        int32_t to_cell,
+        int32_t current_heading_deg,
+        int32_t &target_heading_deg,
+        int32_t &turn_deg,
+        int32_t &step_cmd) const {
+        if (from_cell < kMffCellMin || from_cell > kMffCellMax || to_cell < kMffCellMin || to_cell > kMffCellMax) {
+            RCLCPP_WARN(get_logger(), "Skipping MFF transition command: invalid cell transition %ld -> %ld",
+                        static_cast<long>(from_cell), static_cast<long>(to_cell));
+            return false;
+        }
+
+        const std::array<std::array<int32_t, 3>, 5> layout = status_.color_code == kColorBlue ? kMffLayoutBlue : kMffLayoutRed;
+
+        int32_t from_r = -1;
+        int32_t from_c = -1;
+        int32_t to_r = -1;
+        int32_t to_c = -1;
+        for (int32_t r = 0; r < 5; ++r) {
+            for (int32_t c = 0; c < 3; ++c) {
+                if (layout[r][c] == from_cell) {
+                    from_r = r;
+                    from_c = c;
+                }
+                if (layout[r][c] == to_cell) {
+                    to_r = r;
+                    to_c = c;
+                }
+            }
+        }
+
+        if (from_r < 0 || to_r < 0) {
+            RCLCPP_WARN(get_logger(), "Skipping MFF transition command: cell not found in current layout");
+            return false;
+        }
+
+        const int32_t dr = to_r - from_r;
+        const int32_t dc = to_c - from_c;
+        if (std::abs(dr) + std::abs(dc) != 1) {
+            RCLCPP_WARN(get_logger(), "Skipping MFF transition command: non-adjacent transition %ld -> %ld",
+                        static_cast<long>(from_cell), static_cast<long>(to_cell));
+            return false;
+        }
+
+        target_heading_deg = current_heading_deg;
+        if (dc == 1) {
+            target_heading_deg = 0;
+        } else if (dr == 1) {
+            target_heading_deg = 90;
+        } else if (dc == -1) {
+            target_heading_deg = 180;
+        } else if (dr == -1) {
+            target_heading_deg = 270;
+        }
+
+        turn_deg = normalizeTurnDeg(target_heading_deg - current_heading_deg);
+
+        const int32_t from_h = kMffHeightByCell[static_cast<size_t>(from_cell)];
+        const int32_t to_h = kMffHeightByCell[static_cast<size_t>(to_cell)];
+        step_cmd = 0;
+        if (to_h > from_h) {
+            step_cmd = 1;
+        } else if (to_h < from_h) {
+            step_cmd = -1;
+        }
+
+        return true;
+    }
+
+    void TaskManagerNode::publishMffRuntimeStatus(bool force) {
+        if (!mff_status_pub_) {
+            return;
+        }
+        if (!force && has_published_status_ && !hasChanged(status_, last_published_status_)) {
+            return;
+        }
+
+        int32_t next_cell = 0;
+        int32_t next_turn_deg = 0;
+        int32_t next_step_cmd = 0;
+        int32_t predicted_heading_deg = mff_heading_deg_;
+
+        if (!mff_path_.empty()) {
+            size_t current_index = mff_path_index_;
+            const auto it = std::find(mff_path_.begin(), mff_path_.end(), status_.mff_cell);
+            if (it != mff_path_.end()) {
+                current_index = static_cast<size_t>(std::distance(mff_path_.begin(), it));
+            }
+
+            if (current_index + 1 < mff_path_.size()) {
+                next_cell = mff_path_[current_index + 1];
+                int32_t target_heading_deg = mff_heading_deg_;
+                if (!computeMffTransition(status_.mff_cell, next_cell, mff_heading_deg_, target_heading_deg, next_turn_deg, next_step_cmd)) {
+                    next_cell = 0;
+                    next_turn_deg = 0;
+                    next_step_cmd = 0;
+                } else {
+                    predicted_heading_deg = normalizeHeadingDeg(target_heading_deg);
+                }
+            }
+        }
+
+        std_msgs::msg::Int32MultiArray mff_status_msg;
+        // [current_cell, next_cell, next_turn_deg, next_step_cmd, current_heading_deg, predicted_heading_deg]
+        mff_status_msg.data = {
+            status_.mff_cell,
+            next_cell,
+            next_turn_deg,
+            next_step_cmd,
+            mff_heading_deg_,
+            predicted_heading_deg,
+        };
+        mff_status_pub_->publish(mff_status_msg);
+    }
+
+    int32_t TaskManagerNode::normalizeHeadingDeg(int32_t heading_deg) {
+        int32_t normalized = heading_deg % 360;
+        if (normalized < 0) {
+            normalized += 360;
+        }
+        const int32_t snapped = static_cast<int32_t>(std::lround(static_cast<double>(normalized) / 90.0)) * 90;
+        return (snapped + 360) % 360;
+    }
+
+    int32_t TaskManagerNode::normalizeTurnDeg(int32_t turn_deg) {
+        int32_t normalized = turn_deg % 360;
+        if (normalized <= -180) {
+            normalized += 360;
+        } else if (normalized > 180) {
+            normalized -= 360;
+        }
+        return static_cast<int32_t>(std::lround(static_cast<double>(normalized) / 90.0)) * 90;
+    }
+
     void TaskManagerNode::publishStatus(bool force) {
         if (!force && has_published_status_ && !hasChanged(status_, last_published_status_)) {
             return;
@@ -528,6 +819,8 @@ namespace r2_planner {
         std_msgs::msg::String text_msg;
         text_msg.data = buildStatusText(status_);
         status_text_pub_->publish(text_msg);
+
+        publishMffRuntimeStatus(force);
 
         if (has_published_status_ && hasChanged(status_, last_published_status_)) {
             RCLCPP_INFO(
