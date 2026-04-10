@@ -93,6 +93,7 @@ class PlaneDetectorNode(Node):
         )
         self._frame_count = 0
         self._warned_no_camera_info = False
+        self._crop_pub = self.create_publisher(Image, 'plane_detection/cropped_imageF', qos)
 
     # ------------------------------------------------------------------
     # コールバック
@@ -396,6 +397,18 @@ class PlaneDetectorNode(Node):
                 f'Normal=({nx:.2f},{ny:.2f},{nz:.2f}) Inliers={inlier_count}'
             )
 
+        #----　平面切り出し画像の作成とPublish ----
+        x, y, w, h = cv2.boundingRect(cnt)
+        # 画像の範囲外にならないようクリッピング（安全策）
+        h_max, w_max = vis.shape[:2]
+        y1, y2 = max(0, y), min(h_max, y + h)
+        x1, x2 = max(0, x), min(w_max, x + w)
+        cropped_img = vis[y1:y2, x1:x2] # ひとまず vis から切り出し
+        
+        if cropped_img.size > 0:
+            crop_msg = self._bridge.cv2_to_imgmsg(cropped_img, encoding='bgr8')
+            crop_msg.header = img_msg.header
+            self._crop_pub.publish(crop_msg)
 
 def main(args=None):
     rclpy.init(args=args)
