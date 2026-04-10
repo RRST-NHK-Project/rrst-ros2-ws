@@ -68,7 +68,7 @@ public:
             return; // 実行中なら無視
         }
         mode_ = StepMode::STEP_UP;
-        next_up(StepUpState::ALL_UP);
+        next_up(StepUpState::ALL_FORWARD);
     }
 
     void start_step_down()
@@ -108,7 +108,7 @@ public:
 private:
     // 以下シーケンス内で使用する変数
     //  待機時間（要調整）
-    static constexpr double up_first_forward_wait = 2.0;
+    static constexpr double up_first_forward_wait = 1.5;
     static constexpr double up_second_forward_wait = 7.0;
     static constexpr double up_final_forward_wait = 6.0;
     static constexpr double down_first_forward_wait = 1.0;
@@ -118,10 +118,10 @@ private:
     // 速度関連
     static constexpr int forward_speed = 40;
     static constexpr int up_speed = 40;
-    static constexpr int dis = 100;      // 障害物と見なす距離の閾値（要調整）
+    static constexpr int dis = 50;       // 障害物と見なす距離の閾値（要調整）
     static constexpr int down_dis = 100; // sdm15の値がこの時間(ms)更新されなければタイムアウトと見なす
 
-    static constexpr int wall = 10; // 前に障害物があると見なす距離の閾値（要調整）
+    static constexpr int wall = 350; // 前に障害物があると見なす距離の閾値（要調整）
 
     // シーケンスの状態管理に必要な変数
     int32_t sdm15_value_[4] = {0, 0, 0, 0};
@@ -140,6 +140,7 @@ private:
     enum class StepUpState
     {
         IDLE,
+        WALL,
         ALL_UP,
         ALL_FORWARD,
         FIRST_FORWARD,
@@ -325,11 +326,7 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            // if ((now_time - state_start_time_).seconds() > up_second_forward_wait)
-            // {
-            //     next_up(StepUpState::REAR_DOWN);
-            // }
-            if (sdm15_value_[0] < dis)
+            if (sdm15_value_[1] < dis)
             {
                 next_up(StepUpState::REAR_DOWN);
             }
@@ -350,7 +347,7 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if (sdm15_value_[2] < dis)
+            if (sdm15_value_[0] < dis)
             {
                 next_up(StepUpState::DONE);
             }
@@ -383,7 +380,7 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if (sdm15_value_[1] > down_dis || sdm15_value_[3] > down_dis) // 前のセンサーで障害物がなくなったら
+            if (sdm15_value_[2] > down_dis || sdm15_value_[3] > down_dis) // 前のセンサーで障害物がなくなったら
             {
                 next_down(StepDownState::FRONT_UP);
             }
@@ -415,7 +412,7 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if (sdm15_value_[0] > down_dis)
+            if (sdm15_value_[1] > down_dis)
             {
                 next_down(StepDownState::REAR_UP);
             }
@@ -436,7 +433,7 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if (sdm15_value_[2] > down_dis)
+            if (sdm15_value_[0] > down_dis)
             {
                 next_down(StepDownState::ALL_DOWN);
             }
@@ -466,22 +463,25 @@ private:
 
     void loop()
     {
-
+        // 追加（0.5秒ごとに表示）
+        // RCLCPP_INFO_THROTTLE(
+        //     this->get_logger(),
+        //     *this->get_clock(),
+        //     500,
+        //     "lidar_value: %d mm, %d mm",
+        //     wall - lidar_value, lidar_value);
         switch (mode_)
         {
 
         case StepMode::NONE:
-            // std::cout << "None sequence" << std::endl;
             break;
 
         case StepMode::STEP_UP:
             step_up_sequence();
-            // std::cout << "Up sequence" << std::endl;
             break;
 
         case StepMode::STEP_DOWN:
             step_down_sequence();
-            // std::cout << "Down sequence" << std::endl;
             break;
         }
     }
@@ -519,7 +519,7 @@ public:
 
         // sdm15のSubscribe
         sdm15_sub1_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
-            "serial_rx_17",
+            "serial_rx_16",
             rclcpp::SensorDataQoS(),
             [this](std_msgs::msg::Int16MultiArray::SharedPtr msg)
             {
@@ -527,7 +527,7 @@ public:
             });
 
         sdm15_sub2_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
-            "serial_rx_18",
+            "serial_rx_17",
             rclcpp::SensorDataQoS(),
             [this](std_msgs::msg::Int16MultiArray::SharedPtr msg)
             {
@@ -535,7 +535,7 @@ public:
             });
 
         sdm15_sub3_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
-            "serial_rx_16",
+            "serial_rx_18",
             rclcpp::SensorDataQoS(),
             [this](std_msgs::msg::Int16MultiArray::SharedPtr msg)
             {
