@@ -1,3 +1,4 @@
+import math
 import rclpy
 from rclpy.node import Node
 import cv2
@@ -92,9 +93,12 @@ class KFS_Judge_Node(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = KFS_Judge_Node()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
-
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
 if __name__ == "__main__":
     main()
