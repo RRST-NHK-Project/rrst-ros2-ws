@@ -22,7 +22,7 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 
 // 以下マイコンに合わせて設定
 #define OUTPUT_DEVICE_ID 2 // 出力マイコン（モーター制御）のID
-#define INPUT_DEVICE_ID  3 // 入力マイコン（マイクロスイッチ）のID
+#define INPUT_DEVICE_ID  3 // 入力マイコン（マイクロスイッチやエンコーダ）のID
 #define TX16NUM 24         // 送信データ数
 #define RX16NUM 17         // 受信データ数
 
@@ -48,6 +48,8 @@ std::atomic<int64_t> g_zero_offset{0};        // 下端リセット時の絶対�
 std::atomic<int16_t> g_last_enc1_val{0};      // 前回のエンコーダ生値
 std::atomic<bool> g_coord_initialized{false}; // 初期化フラグ
 std::atomic<int64_t> g_abs_coord{0};          // 最終的な高さ座標(下端=0方向=プラス)
+
+// =================================================================
 
 // =================================================================
 // SwitchInputノード: ID=3のESP32からマイクロスイッチの状態を受信する
@@ -85,7 +87,7 @@ private:
         g_enc1_val  = msg->data[1];
 
         // =============================================================
-        // 座標調査・ラップアラウンド計算実装（過去コード移植版）
+        // 座標調査・ラップアラウンド計算実装
         // =============================================================
         int16_t current_enc1 = msg->data[1];
 
@@ -95,8 +97,8 @@ private:
         }
 
         // =====================================================================
-        // 【重要】エンコーダの「飛躍（16bitハードの限界）」は 32768 または 65536 です。
-        // （「1周=8000」は機械的な回転数であり、デジタル的なラップアラウンド値とは別です）
+        // 【重要】エンコーダの「飛躍（16bitハードの限界）」は 32768 または 65536 
+        // （「1周=8000」は機械的な回転数であり、デジタル的なラップアラウンド値とは別）
         // =====================================================================
         const int HALF_ENCODER = 16384;    // デジタルデータの飛躍値の半分
         const int64_t ENCODER_MAX = 32768; // デジタルデータの飛躍幅
@@ -130,6 +132,7 @@ private:
         // ★ここで 8000 で割ることで「物理的な1回転」を算出します
         double rot = (double)abs_coord / 8000.0; 
 
+        // 以下リアルタイムで数値取るデバックログ　重いとき消すこと推奨
         if (diff != 0) {
             RCLCPP_INFO(get_logger(), 
                 "\n--- ROTATION DEBUG ---\n"
@@ -296,8 +299,9 @@ private:
 
         // 以降、配列data_を操作する
         // =================================================================
-        // CROSS:「マガジン回転」※未確認！絶対に起動するな！！自己責任！！
-        // ボタンを一回押すごとにサーボモーターを45°づつ回転する
+        // CROSS:「マガジン回転」※動作確認済み　※マガジン変更により一部変更予定　※近日一部コマンド化予定
+        // ボタンを一回押すごとにサーボモーターを回転させる
+        // スピアをマガジンに込めた後、装填し、使用後排莢
         // =================================================================
 
         static int MAG_SERVO_ANGLE[] = {270, 228, 186, 146, 100, 58, 13, 141, 95, 50, 53, 5, 8};
@@ -307,15 +311,15 @@ private:
         static int cross_pre = 0;
         static int CROSS_PUSH_COUNT = 0;
         static int CROSS_PUSH_MAX = 20;
-        static int ang_1 = 13;
-        static int ang_2 = 90;
+        static int REUSE_ANGLE = 13;
+        static int EJECT_ANGLE = 90;
 
         if (CROSS == 1 && cross_pre == 0) {
             CROSS_PUSH_COUNT = (CROSS_PUSH_COUNT + 1) % CROSS_PUSH_MAX;
         }
         if (CROSS_PUSH_COUNT == 0) {
             data_[9] = MAG_SERVO_ANGLE[0];
-            data_[12] = ang_1;
+            data_[12] = REUSE_ANGLE;
         }
         if (CROSS_PUSH_COUNT == 1) {
             data_[9] = MAG_SERVO_ANGLE[1];
@@ -337,12 +341,12 @@ private:
         }
         if (CROSS_PUSH_COUNT == 7) {
             data_[9] = MAG_SERVO_ANGLE[8];
-            // data_[12] = ang_2;
+            // data_[12] = EJECT_ANGLE;
         }
         if (CROSS_PUSH_COUNT == 8) {
             // data_[9] = MAG_SERVO_ANGLE[5];
             data_[10] = BAR_HOLD_ANGLE;
-            // data_[12] = ang_1;
+            // data_[12] = REUSE_ANGLE;
         }
         if (CROSS_PUSH_COUNT == 9) {
             data_[10] = BAR_PUSH_ANGLE;
@@ -352,12 +356,12 @@ private:
         }
         if (CROSS_PUSH_COUNT == 11) {
             data_[9] = MAG_SERVO_ANGLE[9];
-            // data_[12] = ang_2;
+            // data_[12] = EJECT_ANGLE;
         }
         if (CROSS_PUSH_COUNT == 12) {
             data_[9] = MAG_SERVO_ANGLE[5];
             data_[10] = BAR_HOLD_ANGLE;
-            // data_[12] = ang_1;
+            // data_[12] = REUSE_ANGLE;
         }
         if (CROSS_PUSH_COUNT == 13) {
             data_[10] = BAR_PUSH_ANGLE;
@@ -367,12 +371,12 @@ private:
         }
         if (CROSS_PUSH_COUNT == 15) {
             data_[9] = MAG_SERVO_ANGLE[10];
-            // data_[12] = ang_2;
+            // data_[12] = EJECT_ANGLE;
         }
         if (CROSS_PUSH_COUNT == 16) {
             data_[9] = MAG_SERVO_ANGLE[6];
             data_[10] = BAR_HOLD_ANGLE;
-            // data_[12] = ang_1;
+            // data_[12] = REUSE_ANGLE;
         }
         if (CROSS_PUSH_COUNT == 17) {
             data_[10] = BAR_PUSH_ANGLE;
@@ -383,16 +387,14 @@ private:
         }
         if (CROSS_PUSH_COUNT == 19) {
             data_[9] = MAG_SERVO_ANGLE[6];
-            // data_[12] = ang_2;
+            // data_[12] = EJECT_ANGLE;
         }
 
         cross_pre = CROSS;
 
         // =================================================================
-        // CIRCLE:「ワーク回収用機構」 ※未確認!起動は自己責任！！
-        // 
-        // ハンドの上下にリミッターついてるか不明だったので一旦スピード０にしてます。
-        // あとdata_ の番号は適当に決めたので後で確認お願いします
+        // CIRCLE:「KFS回収ハンド機構」 ※動作確認済み　※dataの値変える必要あり
+        // KFSをハンドについた吸盤で吸引することにより回収し、そろばん機構に流し、ソレノイドバルブによりプッシュ
         // =================================================================
 
         static int circle_pre = 0;
@@ -411,7 +413,7 @@ private:
             data_[17] = 0;
         }
         if (CIRCLE_PUSH_COUNT == 1) {
-            data_[1] = MOVE_SPEED - 50;
+            data_[1] = MOVE_SPEED - 50; // ハンド取り出し時速度を遅くするため-50
             if (micro3_sw == 1) data_[1] = 0; // 外側SWで停止
         }                       
         if (CIRCLE_PUSH_COUNT == 2) {
@@ -465,8 +467,8 @@ private:
         // circle_pre = CIRCLE;
 
         // =================================================================
-        // TRIANGLE:「棒取捨選択」
-        // ※とりあえずこの機能も統合
+        // TRIANGLE:「棒排莢選択」
+        // ※統合されているが、コマンド化の可能性あり　消さないで
         // =================================================================
 
         // static int triangle_pre = 0;
@@ -565,8 +567,8 @@ private:
         // 実験結果により、1回転 = 8000 カウント に設定
         static const double COUNTS_PER_ROTATION = 8000.0;
 
-        // 符号付き16bitの飛躍(-32768〜32767)は、差分累積(g_abs_coord)により計算・解決済みです
-        // ※上昇時（エンコーダ減少）に diff がマイナスになるため、「- diff」の計算によって絶対座標は増加（0→50）します
+        // 符号付き16bitの飛躍(-32768〜32767)は、差分累積(g_abs_coord)により計算・解決済み
+        // ※上昇時（エンコーダ減少）に diff がマイナスになるため、「- diff」の計算によって絶対座標は増加（0→50）する
         int64_t abs_coord = g_abs_coord.load(); 
         double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
 
@@ -609,6 +611,7 @@ private:
             }
         }
 
+        // フォークリフト制御のデバックログ
         RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
             "【フォーク制御】回転数=%.2f, 減速=%s, 上端SW=%d, 下端SW=%d, 出力=%d",
             rot_units, in_slow_zone ? "ON" : "OFF",
@@ -634,7 +637,7 @@ private:
         // right_pre = RIGHT;
         // =================================================================
 
-        // デバッグ用
+        // デバッグログ
         // RCLCPP_INFO(
         //     get_logger(),
         //     "data_[1-4]=[%d,%d,%d,%d], data_[9-12]=[%d,%d,%d,%d]",
@@ -649,19 +652,21 @@ private:
         std_msgs::msg::Int16MultiArray msg;
 
         // ★★★ コントローラーの操作が無い時でも、マイクロスイッチの安全停止を最優先で適用する ★★★
-        // （PS4コントローラーのイベントが来ない間も常に制限をかけるため、ここに記述します）
+        // （PS4コントローラーのイベントが来ない間も常に制限をかけるため、ここに記述する）
         int16_t micro1_sw = g_micro1_sw.load(); 
         int16_t micro2_sw = g_micro2_sw.load(); 
 
         // 上昇中（data_[2] が正の値）かつ 上端スイッチが押されている場合
         if (micro2_sw == 1 && data_[2] > 0) {
             data_[2] = 0;
+            // 重い場合以下のデバックのコメントアウト可
             RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】上端リミット到達！モーターの上昇を即時遮断しました！");
         }
         
         // 下降中（data_[2] が負の値）かつ 下端スイッチが押されている場合
         if (micro1_sw == 1 && data_[2] < 0) {
             data_[2] = 0;
+            // 重い場合以下のデバックのコメントアウト可
             RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】下端リミット到達！モーターの下降を即時遮断しました！");
         }
 
@@ -744,7 +749,7 @@ int main(int argc, char *argv[]) {
     auto hardware_control = std::make_shared<HardWareControl>();
     exec.add_node(hardware_control);
 
-    // ID=3: マイクロスイッチ入力ノード
+    // ID=3: マイクロスイッチ＆エンコーダ入力ノード
     auto switch_input = std::make_shared<SwitchInput>();
     exec.add_node(switch_input);
 
