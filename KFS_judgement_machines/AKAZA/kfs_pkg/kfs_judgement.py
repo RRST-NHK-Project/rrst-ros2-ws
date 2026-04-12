@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # ver2.2変更点：boxである可能性を検出したときのみにAKAZAマッチングを行うように変更、
-# 追加予定:pdfごとの判定、自動制御のための布石関数、
+# 追加予定:pdfごとの判定、自動制御のための布石関数
 # ver0系統：アフィン変換のみの特徴量検出,ver1系統:立体化対応・modelによる背景判定,ver2系統:リアルタイム対応
 # アフィン変換だけだと不十分なので、ホモグラフィ変換もやります。
 # リーダブルコードを心がけていますが、変数名や関数名が分かりにくい場合は遠慮なく質問してください。
@@ -48,37 +48,24 @@ def load_ksf_model(model_path):
     return model
 
 
-# スライディングウィンドウ的なアプローチでboxの位置を特定（物体検出かもしれない）
-def get_box_roi(image, model):
-    height, width = image.shape[:2]
-
-    input_size = 224
-    mean = [0.485, 0.456, 0.406]
-    std = [0.229, 0.224, 0.225]
-
-    preprocess = transforms.Compose(
-        [
-            transforms.Resize(input_size),
-            transforms.CenterCrop(input_size),
-            transforms.ToTensor(),
-            transforms.Normalize(mean, std),
-        ]
-    )
-
-    margin_rate = 0.15
-    x_start = int(width * margin_rate)
-    y_start = int(height * margin_rate)
-    x_end = int(width * (1 - margin_rate))
-    y_end = int(height * (1 - margin_rate))
-
-    roi = image[y_start:y_end, x_start:x_end]
-    offset = (x_start, y_start)
-
-    return roi, offset
+def prepare_map_data(list_path, akaze):
+    """マップ画像を読み込み、特徴量を抽出して返す関数"""
+    if not os.path.exists(list_path):
+        return None, None, None, None
+        
+    map_img_orig = cv2.imread(list_path, 0)
+    map_img = cv2.resize(map_img_orig, (map_img_orig.shape[1], map_img_orig.shape[0]))
+    kp_map, des_map = akaze.detectAndCompute(map_img, None)
+    h_map, w_map = map_img.shape[:2]
+    
+    return kp_map, des_map, h_map, w_map
 
 
 # 上位のキーポイントの相対関係を全て調べて多数決を取ることでノイズに強くする
-def vote_point(query_kp, map_kp, point_num):
+def vote_point(query_kp, map_kp, point_num, dif_range = 0.05,size_range_min=0.3, size_range_max=3.0
+               #パラメータ調整用の引数を追加
+               ):
+
 
     # 点i, jの相対角度と相対長さを格納する配列
     deg_cand = np.zeros((point_num, point_num))
@@ -121,9 +108,6 @@ def vote_point(query_kp, map_kp, point_num):
     # 多数決を取る
     # ある点iについて，j, kとの相対関係が一致するかを各jについて調べる
     cand_count = np.zeros((point_num, point_num))
-    size_range_min = 0.3  # 明らかに違う比率の結果を弾く重要パラメータ
-    size_range_max = 3  # 明らかに違う比率の結果を弾く重要パラメータ
-    dif_range = 0.05  # 重要パラメータ
 
     for i in range(len(deg_cand)):
         for j in range(len(deg_cand)):
@@ -433,4 +417,4 @@ def start_node(args=None):
 
 
 if __name__ == "__main__":
-    start_node()
+    start_node() #直接起動時のみカメラが起動

@@ -36,6 +36,7 @@ L1、R1で回転しようとすると前進、後進してしまう
 // 自作
 #include "include/PacketController.hpp"
 PacketController pkt;
+#include "include/PID.hpp"
 
 // 以下マイコンに合わせて設定
 #define TARGET_DEVICE_ID 6 // 宛先マイコンのID
@@ -53,8 +54,14 @@ class HardWareControl;
 class SequenceControl : public rclcpp::Node
 {
 public:
-    SequenceControl() : Node("sequence_ctrl_node")
+    SequenceControl()
+        : Node("sequence_ctrl_node"),
+          pid_angle_(2.0f, 0.0f, 0.1f, 0.6f),
+          pid_distance_(0.0008f, 0.0f, 0.0f, 0.4f)
     {
+        pid_angle_.set_target(0.0f);
+        pid_distance_.set_target(wall_approach_target_mm);
+
         timer_ = this->create_wall_timer(
             10ms,
             std::bind(&SequenceControl::loop, this));
@@ -69,6 +76,9 @@ public:
             RCLCPP_WARN(get_logger(), "Sequence busy. WALL_ALIGN ignored.");
             return;
         }
+        pid_angle_.reset();
+        pid_distance_.reset();
+        pid_distance_.set_target(wall_approach_target_mm);
         mode_ = StepMode::WALL_ALIGN;
         alignment_start_time_ = std::chrono::steady_clock::now();
     }
@@ -136,6 +146,11 @@ private:
 
     static constexpr int wall = 100; // 前に障害物があると見なす距離の閾値（要調整）
 
+    // 壁調整PID関連定数
+    static constexpr float align_duty_max_ = 100.0f;
+    // 距離PIDを起動する角度閾値 [rad]（この角度以内になったら前進を開始）
+    static constexpr float wall_angle_approach_threshold_ = 0.15f; // 約9度
+
     // シーケンスの状態管理に必要な変数
     int32_t sdm15_value_[4] = {0, 0, 0, 0};
     int16_t lidar_value = 0;  // 前方最短距離 [mm]
@@ -178,6 +193,13 @@ private:
         DONE
     };
 
+    // PIDコントローラ
+    // pid_angle_    : 目標0[rad]、入力wall_angle_[rad]、出力=回転速度(正=CW, 負=CCW)
+    // pid_distance_ : 目標wall_approach_target_mm[mm]、入力lidar_value[mm]、出力=前後速度
+    //                 (equilibrium < wall_distance_threshold なのでトリガーを確実に通過する)
+    PIDController pid_angle_;
+    PIDController pid_distance_;
+
     StepMode mode_ = StepMode::NONE;
 
     StepUpState state_up_ = StepUpState::IDLE;
@@ -185,9 +207,10 @@ private:
 
     rclcpp::TimerBase::SharedPtr timer_;
     std::chrono::steady_clock::time_point alignment_start_time_;
-    static constexpr double wall_alignment_timeout = 10.0; // 壁調整タイムアウト [s]
-    static constexpr double wall_angle_threshold = 0.08; // 約5度 [rad]
-    static constexpr double wall_distance_threshold = 100;  // 目標距離 [m]
+    static constexpr double wall_alignment_timeout    = 10.0;  // 壁調整タイムアウト [s]
+    static constexpr double wall_angle_threshold      = 0.10;  // 角度整列完了閾値 [rad]（約6度）
+    static constexpr int    wall_distance_threshold   = 250;   // 段差上り開始トリガー距離 [mm]
+    static constexpr float  wall_approach_target_mm   = 120.0f; // PIDの接近目標距離 [mm]（threshold未満）
     rclcpp::Time state_start_time_;
     bool state_executed_ = false; // 各状態での処理の実行状況を保存
 
@@ -285,73 +308,86 @@ private:
     //     RCLCPP_INFO(get_logger(), "MOVE BACKWARD");
     // }
 
-    // 壁調整シーケンス
+    // 壁調整シーケンス（PID制御版）
+    // 角度PID: wall_angle_→0[rad] への回転制御
+    // 距離PID: lidar_value→wall_approach_target_mm[mm] への前進制御
+    //          PID平衡点 < wall_distance_threshold なのでトリガーを確実に通過する
+    //          （角度がwall_angle_approach_threshold_以内になってから前進起動）
     void wall_alignment_sequence()
     {
-        using namespace std::chrono;
+        constexpr float dt = 0.01f; // ループ周期 [s]（10msタイマー）
 
-        // --- 以下のタイムアウト判定をコメントアウト ---
-        // auto elapsed = duration_cast<duration<double>>(steady_clock::now() - alignment_start_time_).count();
-
-        // if (elapsed > wall_alignment_timeout)
-        // {
-        //     RCLCPP_WARN(get_logger(), "Wall alignment timeout. Canceling.");
-        //     mode_ = StepMode::NONE;
-        //     return;
-        // }
-
-        // 壁角度が閾値以下なら回転完了
-        if (std::abs(wall_angle_) < wall_angle_threshold)
+        // LiDARデータなし → モーター停止して待機
+        if (lidar_value <= 0)
         {
-            // 距離チェック
-            if (lidar_value > 0 && lidar_value < wall_distance_threshold)
-            {
-                RCLCPP_INFO(get_logger(), "Wall aligned. Angle: %.4f rad, Distance: %d mm. Starting step up.",
-                            wall_angle_, lidar_value);
-                mode_ = StepMode::NONE; // 一旦終了
-                // キューに入れてシーケンス開始（次ループで実行される想定）
-                start_step_up();
-            }
-            else if (lidar_value <= 0)
-            {
-                // 距離データなし
-                return;
-            }
-            else
-            {
-                // 距離が遠い場合は前進指令
-                RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-                                     "Aligned but distance too far: %d mm. Moving forward.", lidar_value);
-                // 前進は呼び出し側（外側）で指令するか、ここで簡単に進める
-                // ここでは何もしないで次ループを待つ
-                return;
-            }
+            pkt.setMD(MD5, 0);
+            pkt.setMD(MD6, 0);
+            pkt.setMD(MD7, 0);
+            pkt.setMD(MD8, 0);
+            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500, "Waiting for LiDAR data...");
+            return;
+        }
+
+        // 終了条件：角度と距離の両方が閾値内 → 段差超えシーケンス開始
+        if (std::abs(wall_angle_) < wall_angle_threshold && lidar_value < wall_distance_threshold)
+        {
+            RCLCPP_INFO(get_logger(),
+                        "Wall aligned. Angle: %.4f rad, Distance: %d mm. Starting step up.",
+                        wall_angle_, lidar_value);
+            pkt.setMD(MD5, 0);
+            pkt.setMD(MD6, 0);
+            pkt.setMD(MD7, 0);
+            pkt.setMD(MD8, 0);
+            mode_ = StepMode::NONE;
+            start_step_up();
+            return;
+        }
+
+        // ── 角度PID ──────────────────────────────────────────────
+        // error = target(0) - current(wall_angle_)
+        // wall_angle_ > 0 → error < 0 → 負のwz → CCW回転
+        // wall_angle_ < 0 → error > 0 → 正のwz → CW回転
+        const float wz = pid_angle_.update(static_cast<float>(wall_angle_), dt);
+
+        // ── 距離PID ──────────────────────────────────────────────
+        // 角度がapproach閾値以内になってから前進を開始する
+        // error = target(wall_distance_threshold) - current(lidar_value)
+        // lidar > target → error < 0 → 負のvx → 前進（move_forward()の符号系に準拠）
+        float vx = 0.0f;
+        if (std::abs(wall_angle_) < wall_angle_approach_threshold_)
+        {
+            vx = pid_distance_.update(static_cast<float>(lidar_value), dt);
         }
         else
         {
-            // Z軸回転で角度を0に調整
-            int16_t rotation_speed = 30;
-            if (wall_angle_ > 0)
-            {
-                // CCW (左回転)
-                pkt.setMD(MD5, rotation_speed);
-                pkt.setMD(MD6, rotation_speed);
-                pkt.setMD(MD7, -rotation_speed);
-                pkt.setMD(MD8, -rotation_speed);
-            }
-            else
-            {
-                // CW (右回転)
-                pkt.setMD(MD5, -rotation_speed);
-                pkt.setMD(MD6, -rotation_speed);
-                pkt.setMD(MD7, rotation_speed);
-                pkt.setMD(MD8, rotation_speed);
-            }
-
-            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-                                 "Wall aligning. Angle: %.4f rad, Distance: %d mm",
-                                 wall_angle_, lidar_value);
+            // 角度が大きい間は距離PIDの積分をリセットして偏差を蓄積させない
+            pid_distance_.reset();
         }
+
+        // ── メカナム逆運動学（vy=0） ─────────────────────────────
+        // v1(MD5) =  vx + wz
+        // v2(MD6) = -(vx - wz)  （向き補正 *=-1）
+        // v3(MD7) = -(vx - wz)  （向き補正 *=-1）
+        // v4(MD8) =  vx + wz
+        float v1 =  vx + wz;
+        float v2 = -(vx - wz);
+        float v3 = -(vx - wz);
+        float v4 =  vx + wz;
+
+        // 出力クランプ（-1.0 ～ 1.0 の正規化済み値）
+        v1 = std::clamp(v1, -1.0f, 1.0f);
+        v2 = std::clamp(v2, -1.0f, 1.0f);
+        v3 = std::clamp(v3, -1.0f, 1.0f);
+        v4 = std::clamp(v4, -1.0f, 1.0f);
+
+        pkt.setMD(MD5, static_cast<int16_t>(v1 * align_duty_max_));
+        pkt.setMD(MD6, static_cast<int16_t>(v2 * align_duty_max_));
+        pkt.setMD(MD7, static_cast<int16_t>(v3 * align_duty_max_));
+        pkt.setMD(MD8, static_cast<int16_t>(v4 * align_duty_max_));
+
+        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
+                             "Wall align PID: angle=%.4f rad, dist=%d mm | vx=%.3f wz=%.3f",
+                             wall_angle_, lidar_value, vx, wz);
     }
 
     // 段差超えシーケンス（上り）

@@ -1,115 +1,104 @@
+import math
+import rclpy
+from rclpy.node import Node
 import cv2
 import numpy as np
-
-import rclpy
 from cv_bridge import CvBridge
-from rclpy.node import Node
-from sensor_msgs.msg import CameraInfo
 from sensor_msgs.msg import Image
-from std_msgs.msg import Bool, Float32MultiArray, Int32MultiArray
+from std_msgs.msg import Float32MultiArray
+import os
+import kfs_judgement  
 
-
-data = [0, 0, True]  # グローバル変数
-
-
-class KFS_judge_node(Node):
-
+class KFS_Judge_Node(Node):
     def __init__(self):
         super().__init__("kfs_judge_node")
-        self.sub = self.create_subscription(
-            Int32MultiArray, "/KFS_judge", self.kfs_judge_callback, 10
-        )
-        self.sub
-        self.publisher_ = self.create_publisher(Int32MultiArray, "KFS_judge", 10)
-
-        self.info_sub = self.create_subscription(
-            Float32MultiArray,
-            "/cube_detection/info",
-            self.info_callback,
-            10
-        )
-        self.latest_info = None
+        self._bridge = CvBridge()
         
+        # --- 1. AKAZE & 初期設定 ---
+        self.akaze = cv2.AKAZE_create()
+        self.ratio = 0.87
+        self.point_num_limit = 75
+        self.expand_query = 0.5
 
-    def kfs_judge_callback(self, msg):
-        global data
-        # データが正しく3つ以上入っているかチェックする
-        if len(msg.data) >= 3:
-            data[0] = msg.data[0]
-            data[1] = msg.data[1]
-            data[2] = bool(msg.data[2])  # 数値を真偽値に変換
+        # --- 2. マップ画像の準備 (kfs_judgementのロジックを利用) ---
+        list_path = "/path/to/KFS_image_list.png"
+        self.kp_map, self.des_map, self.h_map, self.w_map = kfs_judgement.prepare_map_data(list_path, self.akaze)
 
-            self.get_logger().info(f"UDP送信準備: {data}")
-            # クラス外の udp インスタンスの send メソッドを呼ぶ
-            udp.send()
-        else:
-            self.get_logger().warn(f"受信データの要素が足りません: {msg.data}")
+        # --- 3. Topic通信設定 ---
+        self.img_sub = self.create_subscription(Image, "/plane_detection/cropped_image", self.image_callback, 10)
+        self.info_sub = self.create_subscription(Float32MultiArray, "/cube_detection/info", self.info_callback, 10)
+        self.res_pub = self.create_publisher(Float32MultiArray, "/KFS_judge_result", 10)
 
+        self.latest_info = None
+        self.get_logger().info("KFS Node (Library Import Mode) 起動完了")
 
-class udpsend:
-    def __init__(self):
-        SrcIP = ""  # 送信元IP SFT1200
-        SrcPort = 4000  # 送信元ポート番号
-        self.SrcAddr = (SrcIP, SrcPort)  # アドレスをtupleに格納
+    def info_callback(self, msg):
+        self.latest_info = msg.data
 
-        DstIP = "192.168.8.215"  # 宛先IP
-        DstPort = 5000  # 宛先ポート番号
-        self.DstAddr = (DstIP, DstPort)  # アドレスをtupleに格納
+    def image_callback(self, msg):
+        # cube_detector の情報と同期
+        if self.latest_info is None or self.latest_info[0] == 0.0:
+            return
+        
+        # ROS 2画像をOpenCV形式に変換
+        query_roi = self._bridge.imgmsg_to_cv2(msg, "bgr8")
+        query_gray = cv2.cvtColor(query_roi, cv2.COLOR_BGR2GRAY)
+        
+        # リサイズ（kfs_judgementの想定に合わせる）
+        query_img = cv2.resize(query_gray, None, fx=self.expand_query, fy=self.expand_query)
+        h_q, w_q = query_img.shape[:2]
 
-        self.udpClntSock = socket(AF_INET, SOCK_DGRAM)  # ソケット作成
-        self.udpClntSock.bind(self.SrcAddr)  # 送信元アドレスでバインド
+        # 特徴量抽出
+        kp_q, des_q = self.akaze.detectAndCompute(query_img, None)
+        if des_q is None: return
 
-    def send(self):
+        # マッチング
+        bf = cv2.BFMatcher()
+        matches = bf.knnMatch(des_q, self.des_map, k=2)
+        good = [m for m, n in matches if m.distance < self.ratio * n.distance]
 
-        kfs_data = (
-            str(data[0]) + "," + str(data[1]) + "," + str(data[2])
-        )  # パケットを作成
+        if len(good) > 4:
+            good = sorted(good, key=lambda x: x.distance)
+            p_num = min(len(good), self.point_num_limit)
+            q_kp_list = [kp_q[m.queryIdx] for m in good[:p_num]]
+            m_kp_list = [self.kp_map[m.trainIdx] for m in good[:p_num]]
+            
+            # --- 核心：kfs_judgement の関数を呼び出し ---
+            deg, size, m1, m2 = kfs_judgement.vote_point(q_kp_list, m_kp_list, p_num)
 
-        send_data = kfs_data.encode("utf-8")  # 文字列をバイト型に変換
+            if deg is not None:
+                # 中心点計算 (ここも kfs_judgement 内に計算関数があるとさらにスッキリします)
+                # 今回は元のコードの計算式を適用
+                q_x1, q_y1 = q_kp_list[m1].pt
+                m_x1, m_y1 = m_kp_list[m1].pt
+                q_xc, q_yc = w_q / 2, h_q / 2
+                
+                q_c_deg = math.atan2(q_yc - q_y1, q_xc - q_x1) * 180 / np.pi
+                q_c_len = math.sqrt((q_xc - q_x1)**2 + (q_yc - q_y1)**2)
+                
+                m_c_deg = q_c_deg - deg
+                m_c_len = q_c_len / size
+                m_c_rad = m_c_deg * np.pi / 180
+                
+                m_xc = m_x1 + m_c_len * np.cos(m_c_rad)
+                m_yc = m_y1 + m_c_len * np.sin(m_c_rad)
 
-        self.udpClntSock.sendto(send_data, self.DstAddr)  # 宛先アドレスに送信
-
-        data[0] = 0
-        data[1] = 0
-        data[2] = True
-
-
-udp = udpsend()
-
-# call back
-def info_callback(self, msg):
-    self.latest_info = msg.data # 最新検出情報を変数に保存
-
-    if len(msg.data) < 8 :
-        return
-    self.target_data = {
-        'detected': bool(msg.data[0]),
-        'cx': msg.data[1],  # 画像内の中心X (0.0~1.0)
-        'cy': msg.data[2],  # 画像内の中心Y (0.0~1.0)
-        'depth': msg.data[5] # 距離 (m)
-    }    
-
-def image_callback(self, msg):
-    if self.latest_info is None or self.latest_info[0] == 0.0:  # 未検出ならスキップ  # 最新情報がない、または検出されていない場合
-        return
-    
-    flag = self
-    cx_norn = self.latest_info[1] # 画像内の中心X (0.0~1.0)
-    cy_norn = self.latest_info[2] # 画像内の中心Y
-    w_norm = self.latest_info[3]  # 画像内の幅 (0.0~1.0)
-    h_norm = self.latest_info[4]  # 画像内の高さ (0.0~1.0)
-    depth_m = self.latest_info[5] # 深度距離 (m)
-
+                # マップ範囲内なら結果をパブリッシュ
+                if (0 <= m_xc <= self.w_map) and (0 <= m_yc <= self.h_map):
+                    res_msg = Float32MultiArray()
+                    # [フラグ, マップX, マップY, 深度, 画像内ズレ]
+                    res_msg.data = [1.0, float(m_xc), float(m_yc), float(self.latest_info[5]), float(self.latest_info[1])]
+                    self.res_pub.publish(res_msg)
 
 def main(args=None):
     rclpy.init(args=args)
-    judge_node = KFS_judge_node()
-
-    rclpy.spin(judge_node)
-
-    judge_node.destroy_node()
-    rclpy.shutdown()
-
-
+    node = KFS_Judge_Node()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
 if __name__ == "__main__":
     main()

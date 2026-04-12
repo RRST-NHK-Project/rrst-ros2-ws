@@ -16,8 +16,10 @@ L1、R1で回転しようとすると前進、後進してしまう
 
 // 標準
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 #include <thread>
 
 // ROS　
@@ -34,6 +36,7 @@ L1、R1で回転しようとすると前進、後進してしまう
 // 自作
 #include "include/PacketController.hpp"
 PacketController pkt;
+#include "include/PID.hpp"
 
 // 以下マイコンに合わせて設定
 #define TARGET_DEVICE_ID 6 // 宛先マイコンのID
@@ -51,14 +54,35 @@ class HardWareControl;
 class SequenceControl : public rclcpp::Node
 {
 public:
-    SequenceControl() : Node("sequence_ctrl_node")
+    SequenceControl()
+        : Node("sequence_ctrl_node"),
+          pid_angle_(2.0f, 0.0f, 0.1f, 0.6f),
+          pid_distance_(0.0008f, 0.0f, 0.0f, 0.4f)
     {
+        pid_angle_.set_target(0.0f);
+        pid_distance_.set_target(wall_approach_target_mm);
+
         timer_ = this->create_wall_timer(
             10ms,
             std::bind(&SequenceControl::loop, this));
     }
 
     // トリガー関数
+
+    // 壁調整シーケンス開始（PIDで角度・距離を整えてから段差上りへ自動移行）
+    void start_wall_alignment()
+    {
+        if (mode_ != StepMode::NONE)
+        {
+            RCLCPP_WARN(get_logger(), "Sequence busy. WALL_ALIGN ignored.");
+            return;
+        }
+        pid_angle_.reset();
+        pid_distance_.reset();
+        pid_distance_.set_target(wall_approach_target_mm);
+        mode_ = StepMode::WALL_ALIGN;
+        RCLCPP_INFO(get_logger(), "Wall alignment started.");
+    }
 
     void start_step_up()
     {
@@ -123,6 +147,22 @@ private:
 
     static constexpr int wall = 350; // 前に障害物があると見なす距離の閾値（要調整）
 
+    // 壁調整PID関連定数
+    // !! wall_approach_target_mm < wall_distance_threshold の関係を必ず保つこと !!
+    // PIDがapproach_targetまで積極的に近づくことでdistance_thresholdを通過しトリガーが発火する
+    static constexpr int    wall_distance_threshold   = 250;   // 段差上り開始トリガー距離 [mm]
+    static constexpr float  wall_approach_target_mm   = 120.0f; // PIDの接近目標距離 [mm]（threshold未満に設定）
+    static constexpr double wall_angle_threshold      = 0.10;  // 角度整列完了閾値 [rad]（約6度）
+    static constexpr float  wall_angle_approach_thr   = 0.20f; // 前進開始角度閾値 [rad]（約11度）
+    static constexpr float  align_duty_max            = 100.0f;
+
+    // PIDコントローラ
+    // pid_angle_   : 目標0[rad]、入力wall_angle[rad]、出力=回転速度(正=CW, 負=CCW)
+    // pid_distance_: 目標wall_approach_target_mm[mm]、入力lidar_value[mm]、出力=前後速度
+    //               (equilibrium < wall_distance_threshold なのでトリガーを確実に通過する)
+    PIDController pid_angle_;
+    PIDController pid_distance_;
+
     // シーケンスの状態管理に必要な変数
     int32_t sdm15_value_[4] = {0, 0, 0, 0};
     int16_t lidar_value = 0;
@@ -132,6 +172,7 @@ private:
     enum class StepMode
     {
         NONE,
+        WALL_ALIGN, // 壁調整PID（角度・距離を整えてから段差上りへ自動移行）
         STEP_UP,
         STEP_DOWN
     };
@@ -268,6 +309,85 @@ private:
     //     RCLCPP_INFO(get_logger(), "MOVE BACKWARD");
     // }
 
+    // 壁調整シーケンス（PID制御版）
+    // 角度PID: wall_angle → 0[rad] への回転制御
+    // 距離PID: lidar_value → wall_distance_threshold[mm] への前進制御
+    //          角度がwall_angle_approach_thr以内になってから前進を開始
+    void wall_alignment_sequence()
+    {
+        constexpr float dt = 0.01f; // ループ周期 [s]（10msタイマー）
+
+        // LiDARデータなし → 停止して待機
+        if (lidar_value <= 0)
+        {
+            pkt.setMD(MD5, 0);
+            pkt.setMD(MD6, 0);
+            pkt.setMD(MD7, 0);
+            pkt.setMD(MD8, 0);
+            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500, "WALL_ALIGN: Waiting for LiDAR...");
+            return;
+        }
+
+        // 終了条件：角度と距離の両方が閾値内 → 段差上りへ移行（ALL_UPから開始）
+        if (std::abs(wall_angle) < wall_angle_threshold && lidar_value < wall_distance_threshold)
+        {
+            RCLCPP_INFO(get_logger(),
+                        "Wall aligned. angle=%.4f rad, dist=%d mm -> Starting STEP_UP.",
+                        wall_angle, lidar_value);
+            pkt.setMD(MD5, 0);
+            pkt.setMD(MD6, 0);
+            pkt.setMD(MD7, 0);
+            pkt.setMD(MD8, 0);
+            // 既に壁に近いのでALL_FORWARDをスキップしてALL_UPから開始
+            mode_ = StepMode::STEP_UP;
+            next_up(StepUpState::ALL_UP);
+            return;
+        }
+
+        // ── 角度PID ──────────────────────────────────────────────
+        // error = 0 - wall_angle
+        // wall_angle > 0 → error < 0 → 負のwz → CCW回転
+        // wall_angle < 0 → error > 0 → 正のwz → CW回転
+        const float wz = pid_angle_.update(static_cast<float>(wall_angle), dt);
+
+        // ── 距離PID ──────────────────────────────────────────────
+        // 角度がapproach閾値以内になってから前進を開始する
+        float vx = 0.0f;
+        if (std::abs(wall_angle) < wall_angle_approach_thr)
+        {
+            vx = pid_distance_.update(static_cast<float>(lidar_value), dt);
+        }
+        else
+        {
+            // 角度が大きい間はintegratorを蓄積させない
+            pid_distance_.reset();
+        }
+
+        // ── メカナム逆運動学（vy=0） ─────────────────────────────
+        // MD5(v1) =  vx + wz
+        // MD6(v2) = -(vx - wz)  （向き補正 *=-1）
+        // MD7(v3) = -(vx - wz)  （向き補正 *=-1）
+        // MD8(v4) =  vx + wz
+        float v1 =  vx + wz;
+        float v2 = -(vx - wz);
+        float v3 = -(vx - wz);
+        float v4 =  vx + wz;
+
+        v1 = std::clamp(v1, -1.0f, 1.0f);
+        v2 = std::clamp(v2, -1.0f, 1.0f);
+        v3 = std::clamp(v3, -1.0f, 1.0f);
+        v4 = std::clamp(v4, -1.0f, 1.0f);
+
+        pkt.setMD(MD5, static_cast<int16_t>(v1 * align_duty_max));
+        pkt.setMD(MD6, static_cast<int16_t>(v2 * align_duty_max));
+        pkt.setMD(MD7, static_cast<int16_t>(v3 * align_duty_max));
+        pkt.setMD(MD8, static_cast<int16_t>(v4 * align_duty_max));
+
+        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
+                             "WALL_ALIGN: angle=%.4f rad, dist=%d mm | vx=%.3f wz=%.3f",
+                             wall_angle, lidar_value, vx, wz);
+    }
+
     // 段差超えシーケンス（上り）
     void step_up_sequence()
     {
@@ -276,6 +396,10 @@ private:
         {
         case StepUpState::IDLE: // アイドリングストップ
             break;
+
+        case StepUpState::WALL: // （未使用：壁調整はWALL_ALIGNモードで実施）
+            break;
+
             /////////////
         case StepUpState::ALL_FORWARD: // 前進
             if (!state_executed_)
@@ -476,6 +600,10 @@ private:
         case StepMode::NONE:
             break;
 
+        case StepMode::WALL_ALIGN:
+            wall_alignment_sequence();
+            break;
+
         case StepMode::STEP_UP:
             step_up_sequence();
             break;
@@ -608,7 +736,8 @@ private:
 
         if (UP && !last_up)
         {
-            seq_->start_step_up();
+            // 十字キー上：壁調整PID → 自動段差上り
+            seq_->start_wall_alignment();
         }
 
         if (DOWN && !last_down)
@@ -795,6 +924,12 @@ private:
         int cmd = msg->data;
         if (cmd == 1)
         {
+            // 壁調整PID → 自動段差上り
+            seq_->start_wall_alignment();
+        }
+        else if (cmd == 2)
+        {
+            // 壁調整なしで直接段差上り（角度・距離に関係なく実行）
             seq_->start_step_up();
         }
         else if (cmd == -1)
@@ -803,7 +938,7 @@ private:
         }
         else if (cmd == 0)
         {
-            // 何もしない（停止コマンドなどがあればここで処理
+            // 何もしない（停止コマンドなどがあればここで処理）
         }
     }
     uint8_t device_id_;
