@@ -203,7 +203,7 @@ namespace r2_planner {
         auto_drive_target_pub_ = create_publisher<std_msgs::msg::Float32MultiArray>(
             auto_drive_target_topic, rclcpp::QoS(10));
 
-        drive_mode_cmd_pub_ = create_publisher<std_msgs::msg::Int32>(
+        drive_mode_cmd_pub_ = create_publisher<std_msgs::msg::Int32MultiArray>(
             drive_mode_cmd_topic, rclcpp::QoS(10));
 
         mff_turn_cmd_pub_ = create_publisher<std_msgs::msg::Int32>(
@@ -358,9 +358,11 @@ namespace r2_planner {
 
         const int32_t state_code = data[0];
         const bool enabled = data.size() >= 2 && data[1] >= 0;
+        const bool rotate_only = data.size() >= 3 && data[2] != 0;
 
         if (!enabled) {
             state_mode_targets_.erase(state_code);
+            state_rotate_only_targets_.erase(state_code);
             RCLCPP_INFO(get_logger(), "Cleared state mode target: state=%s(%ld)", stateDisplayName(state_code).c_str(), static_cast<long>(state_code));
 
             if (auto_send_enabled_ && state_code == status_.state_code) {
@@ -377,15 +379,17 @@ namespace r2_planner {
         }
 
         const int32_t mode_code = data[1];
-        if (mode_code < 0 || mode_code > 2) {
-            RCLCPP_WARN(get_logger(), "Ignoring invalid mode code %ld for state=%s(%ld) (valid: 0-2)",
+        if (mode_code < 0 || mode_code > 4) {
+            RCLCPP_WARN(get_logger(), "Ignoring invalid mode code %ld for state=%s(%ld) (valid: 0-4)",
                         static_cast<long>(mode_code), stateDisplayName(state_code).c_str(), static_cast<long>(state_code));
             return;
         }
 
         state_mode_targets_[state_code] = mode_code;
-        RCLCPP_INFO(get_logger(), "Updated state mode target: state=%s(%ld) mode=%ld",
-                    stateDisplayName(state_code).c_str(), static_cast<long>(state_code), static_cast<long>(mode_code));
+        state_rotate_only_targets_[state_code] = rotate_only;
+        RCLCPP_INFO(get_logger(), "Updated state mode target: state=%s(%ld) mode=%ld rotate_only=%s",
+                    stateDisplayName(state_code).c_str(), static_cast<long>(state_code), static_cast<long>(mode_code),
+                    rotate_only ? "true" : "false");
 
         if (auto_send_enabled_ && state_code == status_.state_code) {
             publishAutoDriveModeForState(state_code);
@@ -683,23 +687,27 @@ namespace r2_planner {
 
     void TaskManagerNode::publishAutoDriveModeForState(int32_t state_code) {
         auto it = state_mode_targets_.find(state_code);
-        std_msgs::msg::Int32 mode_msg;
+        auto rotate_it = state_rotate_only_targets_.find(state_code);
+
+        std_msgs::msg::Int32MultiArray mode_msg;
         if (it == state_mode_targets_.end()) {
-            if (fallback_drive_mode_on_unset_ < 0 || fallback_drive_mode_on_unset_ > 2) {
+            if (fallback_drive_mode_on_unset_ < 0 || fallback_drive_mode_on_unset_ > 4) {
                 return;
             }
-            mode_msg.data = fallback_drive_mode_on_unset_;
+            mode_msg.data = {fallback_drive_mode_on_unset_, 0};
         } else {
-            mode_msg.data = it->second;
+            const bool rotate_only = (rotate_it != state_rotate_only_targets_.end() && rotate_it->second);
+            mode_msg.data = {it->second, rotate_only ? 1 : 0};
         }
         drive_mode_cmd_pub_->publish(mode_msg);
 
         RCLCPP_INFO(
             get_logger(),
-            "Published auto drive mode for state=%s(%ld): mode=%ld",
+            "Published auto drive mode for state=%s(%ld): mode=%ld rotate_only=%s",
             stateDisplayName(state_code).c_str(),
             static_cast<long>(state_code),
-            static_cast<long>(mode_msg.data));
+            static_cast<long>(mode_msg.data[0]),
+            mode_msg.data.size() > 1 && mode_msg.data[1] ? "true" : "false");
     }
 
     void TaskManagerNode::publishOdomResetForState(int32_t state_code) {

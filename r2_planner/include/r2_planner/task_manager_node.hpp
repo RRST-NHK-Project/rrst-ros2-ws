@@ -67,7 +67,7 @@ namespace r2_planner {
         rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr status_pub_;
         rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_text_pub_;
         rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr auto_drive_target_pub_;
-        rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr drive_mode_cmd_pub_;
+        rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr drive_mode_cmd_pub_;
         rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr mff_turn_cmd_pub_;
         rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr mff_step_cmd_pub_;
         rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr mff_status_pub_;
@@ -83,6 +83,7 @@ namespace r2_planner {
         std::unordered_map<int32_t, std::string> state_name_overrides_;
         std::unordered_map<int32_t, StatePoseTarget> state_pose_targets_;
         std::unordered_map<int32_t, int32_t> state_mode_targets_;
+        std::unordered_map<int32_t, bool> state_rotate_only_targets_;
         std::unordered_map<int32_t, bool> state_odom_reset_targets_;
         std::vector<int32_t> mff_path_;
         size_t mff_path_index_{0};
