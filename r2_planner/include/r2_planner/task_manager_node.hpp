@@ -56,6 +56,7 @@ namespace r2_planner {
         rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr cell_sub_;
         rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr transition_mode_sub_;
         rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr state_sequence_sub_;
+        rclcpp::Subscription<std_msgs::msg::String>::SharedPtr state_sequence_names_sub_;
         rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr state_pose_sub_;
         rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr state_mode_sub_;
         rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr state_odom_reset_sub_;
@@ -78,6 +79,8 @@ namespace r2_planner {
         TaskStatus last_published_status_;
         bool has_published_status_{false};
         std::vector<int32_t> state_sequence_;
+        std::vector<std::string> pending_state_sequence_names_;
+        std::unordered_map<int32_t, std::string> state_name_overrides_;
         std::unordered_map<int32_t, StatePoseTarget> state_pose_targets_;
         std::unordered_map<int32_t, int32_t> state_mode_targets_;
         std::unordered_map<int32_t, bool> state_odom_reset_targets_;
@@ -93,6 +96,7 @@ namespace r2_planner {
         void onCell(const std_msgs::msg::Int32::SharedPtr msg);
         void onTransitionMode(const std_msgs::msg::Int32::SharedPtr msg);
         void onStateSequence(const std_msgs::msg::Int32MultiArray::SharedPtr msg);
+        void onStateSequenceNames(const std_msgs::msg::String::SharedPtr msg);
         void onStatePose(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
         void onStateMode(const std_msgs::msg::Int32MultiArray::SharedPtr msg);
         void onStateOdomReset(const std_msgs::msg::Int32MultiArray::SharedPtr msg);
@@ -113,6 +117,8 @@ namespace r2_planner {
         void publishOdomResetForState(int32_t state_code);
         void publishMffTransitionCommands(int32_t from_cell, int32_t to_cell);
         void publishMffRuntimeStatus(bool force = false);
+        void applyStateNameSequenceMapping();
+        std::vector<std::string> parseStateNameSequence(const std::string &names_text) const;
         bool computeMffTransition(
             int32_t from_cell,
             int32_t to_cell,
@@ -122,9 +128,10 @@ namespace r2_planner {
             int32_t &step_cmd) const;
 
         static std::string stateName(int32_t state_code);
+        std::string stateDisplayName(int32_t state_code) const;
         static std::string colorName(int32_t color_code);
         static std::string transitionModeName(int32_t transition_mode_code);
-        static std::string buildStatusText(const TaskStatus &status);
+        std::string buildStatusText(const TaskStatus &status) const;
         static bool hasChanged(const TaskStatus &lhs, const TaskStatus &rhs);
         static int32_t normalizeHeadingDeg(int32_t heading_deg);
         static int32_t normalizeTurnDeg(int32_t turn_deg);
