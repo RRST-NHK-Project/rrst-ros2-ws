@@ -1,17 +1,15 @@
 from launch import LaunchDescription
-from launch.substitutions import PathJoinSubstitution
 from launch_ros.actions import Node
-from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-    """MediaPipeジェスチャー検知ノードとビューアノードを同時起動する."""
+    """Hand state detectorとビューアを同時起動する."""
     return LaunchDescription(
         [
             Node(
                 package="gesture_detection",
-                executable="gesture_detector",
-                name="gesture_detector",
+                executable="hand_state_detector",
+                name="hand_state_detector",
                 output="screen",
                 parameters=[
                     {
@@ -19,18 +17,11 @@ def generate_launch_description():
                         "output_image_topic": "/gesture_detection/image",
                         "label_topic": "/gesture_detection/label",
                         "confidence_topic": "/gesture_detection/confidence",
-                        # MediaPipe Gesture Recognizer (.task) を使う場合
-                        "mediapipe_model_path": PathJoinSubstitution(
-                            [
-                                FindPackageShare("gesture_detection"),
-                                "models",
-                                "gesture_recognizer.task",
-                            ]
-                        ),
-                        "mediapipe_num_hands": 1,
-                        "mediapipe_min_hand_detection_confidence": 0.5,
-                        "mediapipe_min_hand_presence_confidence": 0.5,
-                        "mediapipe_min_tracking_confidence": 0.5,
+                        "auto_download_model": True,
+                        "num_hands": 1,
+                        "min_hand_detection_confidence": 0.7,
+                        "min_tracking_confidence": 0.7,
+                        "mirror_image": True,
                     }
                 ],
             ),

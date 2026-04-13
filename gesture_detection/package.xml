@@ -3,7 +3,7 @@
 <package format="3">
   <name>gesture_detection</name>
   <version>0.0.0</version>
-  <description>YOLOでジェスチャー検知を行い結果をPublishするパッケージ</description>
+  <description>MediaPipeでジェスチャー検知を行い結果をPublishするパッケージ</description>
   <maintainer email="tashikou1682@gmail.com">dev</maintainer>
   <license>Apache-2.0</license>
 
