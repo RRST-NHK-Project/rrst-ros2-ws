@@ -18,6 +18,7 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int16_multi_array.hpp"
 #include "std_msgs/msg/int32.hpp"
+#include "std_msgs/msg/int32_multi_array.hpp"
 #include "std_msgs/msg/string.hpp"
 
 // 自作
@@ -60,7 +61,7 @@ public:
             std::bind(&PIDMecanumController::target_callback, this, std::placeholders::_1));
 
         // r2_console からのドライブモードコマンド
-        mode_cmd_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+        mode_cmd_sub_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
             "r2_drive_mode_cmd", 10,
             std::bind(&PIDMecanumController::mode_cmd_callback, this, std::placeholders::_1));
 
@@ -119,12 +120,14 @@ private:
         MANUAL,
         AUTO,
         ARUCO,
+        PLANE,
+        MFF,
     };
 
     // ROS
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr odom_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr target_sub_;
-    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr mode_cmd_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mode_cmd_sub_;
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr aruco_pose_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr aruco_distance_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr aruco_id_sub_;
@@ -195,6 +198,10 @@ private:
             return "AUTO";
         case DriveMode::ARUCO:
             return "ARUCO";
+        case DriveMode::PLANE:
+            return "PLANE";
+        case DriveMode::MFF:
+            return "MFF";
         }
         return "MANUAL";
     }
@@ -213,6 +220,12 @@ private:
         vx_ = 0.0f;
         vy_ = 0.0f;
         wz_ = 0.0f;
+    }
+
+    void publish_packet() {
+        std_msgs::msg::Int16MultiArray msg;
+        msg.data = pkt.toVector();
+        publisher_->publish(msg);
     }
 
     void enter_auto_mode() {
@@ -244,6 +257,33 @@ private:
         drive_mode_ = DriveMode::MANUAL;
         stop_motors();
         publish_mode();
+    }
+
+    void enter_plane_mode() {
+        if (!has_target_cmd_) {
+            target_x_ = X_;
+            target_y_ = Y_;
+            target_yaw_ = yaw_;
+        }
+
+        pid_x_.set_target(target_x_);
+        pid_y_.set_target(target_y_);
+        pid_yaw_.set_target(target_yaw_);
+        pid_x_.reset();
+        pid_y_.reset();
+        pid_yaw_.reset();
+
+        drive_mode_ = DriveMode::PLANE;
+        stop_motors();
+        publish_mode();
+    }
+
+    void enter_mff_mode() {
+        drive_mode_ = DriveMode::MFF;
+        stop_motors();
+        publish_mode();
+        // MFF中はSequenceCtrlを主系にするため、停止パケットを1回だけ送る。
+        publish_packet();
     }
 
     // odom（状態更新のみ）
@@ -294,22 +334,49 @@ private:
                     target_x_, target_y_, target_yaw_);
     }
 
-    void mode_cmd_callback(const std_msgs::msg::Int32::SharedPtr msg) {
-        int32_t mode_code = msg->data;
-        if (mode_code < 0 || mode_code > 2) {
-            RCLCPP_WARN(this->get_logger(), "Invalid mode code: %ld (valid: 0-2)", static_cast<long>(mode_code));
+    void mode_cmd_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        if (msg->data.empty()) {
             return;
         }
 
-        DriveMode new_mode = static_cast<DriveMode>(mode_code);
-        if (drive_mode_ == new_mode) {
-            return; // No change
+        int32_t mode_code = msg->data[0];
+        if (mode_code < 0 || mode_code > 4) {
+            RCLCPP_WARN(this->get_logger(), "Invalid mode code: %ld (valid: 0-4)", static_cast<long>(mode_code));
+            return;
         }
 
-        drive_mode_ = new_mode;
-        stop_motors();
-        publish_mode();
-        RCLCPP_INFO(this->get_logger(), "Mode changed: %s (by mode command)", drive_mode_to_string(new_mode).c_str());
+        switch (mode_code) {
+        case 0:
+            if (drive_mode_ != DriveMode::MANUAL) {
+                enter_manual_mode();
+                RCLCPP_INFO(this->get_logger(), "Mode changed: MANUAL (by mode command)");
+            }
+            break;
+        case 1:
+            if (drive_mode_ != DriveMode::AUTO) {
+                enter_auto_mode();
+                RCLCPP_INFO(this->get_logger(), "Mode changed: AUTO (by mode command)");
+            }
+            break;
+        case 2:
+            if (drive_mode_ != DriveMode::ARUCO) {
+                enter_aruco_mode();
+                RCLCPP_INFO(this->get_logger(), "Mode changed: ARUCO (by mode command)");
+            }
+            break;
+        case 3:
+            if (drive_mode_ != DriveMode::PLANE) {
+                enter_plane_mode();
+                RCLCPP_INFO(this->get_logger(), "Mode changed: PLANE (by mode command)");
+            }
+            break;
+        case 4:
+            if (drive_mode_ != DriveMode::MFF) {
+                enter_mff_mode();
+                RCLCPP_INFO(this->get_logger(), "Mode changed: MFF (by mode command)");
+            }
+            break;
+        }
     }
 
     void aruco_pose_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
@@ -438,9 +505,7 @@ private:
     // 制御ループ
     void publish_timer() {
         if (drive_mode_ == DriveMode::MANUAL) {
-            std_msgs::msg::Int16MultiArray msg;
-            msg.data = pkt.toVector();
-            publisher_->publish(msg);
+            publish_packet();
 
             RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 50,
                                  "[MANUAL] X: %.2f Y: %.2f Yaw: %.2f | v1 %.2f v2 %.2f v3 %.2f v4 %.2f",
@@ -456,9 +521,7 @@ private:
             if (!has_aruco_pose_ || age_sec > aruco_pose_timeout_sec_) {
                 stop_motors();
 
-                std_msgs::msg::Int16MultiArray msg;
-                msg.data = pkt.toVector();
-                publisher_->publish(msg);
+                publish_packet();
 
                 RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
                                      "[ARUCO] waiting for marker pose (age=%.2f s)",
@@ -509,15 +572,17 @@ private:
             pkt.setMD(MD7, static_cast<int16_t>(v3 * duty_max));
             pkt.setMD(MD8, static_cast<int16_t>(v4 * duty_max));
 
-            std_msgs::msg::Int16MultiArray msg;
-            msg.data = pkt.toVector();
-            publisher_->publish(msg);
+            publish_packet();
 
             RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 50,
                                  "[ARUCO] X: %.2f Y: %.2f Z: %.2f | TargetHorizontal: %.2f | vy %.2f",
                                  aruco_x_, aruco_y_, aruco_z_,
                                  aruco_target_forward_,
                                  vy_);
+            return;
+        }
+
+        if (drive_mode_ == DriveMode::MFF) {
             return;
         }
 
@@ -565,9 +630,7 @@ private:
         pkt.setMD(MD7, static_cast<int16_t>(v3 * duty_max));
         pkt.setMD(MD8, static_cast<int16_t>(v4 * duty_max));
 
-        std_msgs::msg::Int16MultiArray msg;
-        msg.data = pkt.toVector();
-        publisher_->publish(msg);
+        publish_packet();
 
         RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 50,
                              "[AUTO] X: %.2f Y: %.2f Yaw: %.2f | T: %.2f %.2f %.2f | vx %.2f vy %.2f wz %.2f",

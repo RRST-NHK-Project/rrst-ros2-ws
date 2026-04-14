@@ -28,6 +28,7 @@ L1、R1で回転しようとすると前進、後進してしまう
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int16_multi_array.hpp"
 #include "std_msgs/msg/int32.hpp"
+#include "std_msgs/msg/int32_multi_array.hpp"
 
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "sensor_msgs/point_cloud2_iterator.hpp"
@@ -51,14 +52,12 @@ class SequenceControl;
 class HardWareControl;
 
 // 状態を管理しながらシーケンス制御
-class SequenceControl : public rclcpp::Node
-{
+class SequenceControl : public rclcpp::Node {
 public:
     SequenceControl()
         : Node("sequence_ctrl_node"),
           pid_angle_(2.0f, 0.0f, 0.1f, 0.6f),
-          pid_distance_(0.0008f, 0.0f, 0.0f, 0.4f)
-    {
+          pid_distance_(0.0008f, 0.0f, 0.0f, 0.4f) {
         pid_angle_.set_target(0.0f);
         pid_distance_.set_target(wall_approach_target_mm);
 
@@ -70,10 +69,8 @@ public:
     // トリガー関数
 
     // 壁調整シーケンス開始（PIDで角度・距離を整えてから段差上りへ自動移行）
-    void start_wall_alignment()
-    {
-        if (mode_ != StepMode::NONE)
-        {
+    void start_wall_alignment() {
+        if (mode_ != StepMode::NONE) {
             RCLCPP_WARN(get_logger(), "Sequence busy. WALL_ALIGN ignored.");
             return;
         }
@@ -84,10 +81,8 @@ public:
         RCLCPP_INFO(get_logger(), "Wall alignment started.");
     }
 
-    void start_step_up()
-    {
-        if (mode_ != StepMode::NONE)
-        {
+    void start_step_up() {
+        if (mode_ != StepMode::NONE) {
             RCLCPP_WARN(get_logger(), "Sequence busy. STEP_UP ignored.");
             return; // 実行中なら無視
         }
@@ -95,10 +90,8 @@ public:
         next_up(StepUpState::ALL_FORWARD);
     }
 
-    void start_step_down()
-    {
-        if (mode_ != StepMode::NONE)
-        {
+    void start_step_down() {
+        if (mode_ != StepMode::NONE) {
             RCLCPP_WARN(get_logger(), "Sequence busy. STEP_DOWN ignored.");
             return; // 実行中なら無視
         }
@@ -107,25 +100,47 @@ public:
     }
 
     // シーケンス実行中の判定
-    bool is_busy() const
-    {
+    bool is_busy() const {
         return mode_ != StepMode::NONE;
     }
+
+    bool is_mff_mode_enabled() const {
+        return mff_mode_enabled_;
+    }
+
+    void set_mff_mode_enabled(bool enabled) {
+        if (mff_mode_enabled_ == enabled) {
+            return;
+        }
+
+        mff_mode_enabled_ = enabled;
+
+        if (!mff_mode_enabled_) {
+            mode_ = StepMode::NONE;
+            state_up_ = StepUpState::IDLE;
+            state_down_ = StepDownState::IDLE;
+            state_executed_ = false;
+            pkt.setMD(MD5, 0);
+            pkt.setMD(MD6, 0);
+            pkt.setMD(MD7, 0);
+            pkt.setMD(MD8, 0);
+        }
+
+        RCLCPP_INFO(get_logger(), "Sequence mode: %s", mff_mode_enabled_ ? "MFF ENABLED" : "MFF DISABLED");
+    }
+
     // sdm15の値を更新する関数
-    void set_sdm15_value(int index, int32_t value)
-    {
+    void set_sdm15_value(int index, int32_t value) {
         sdm15_value_[index] = value;
     }
 
     // lidar値を更新する関数
-    void set_lidar_value(int16_t value)
-    {
+    void set_lidar_value(int16_t value) {
         lidar_value = value;
     }
 
     // wall角度を更新する関数
-    void set_wall_angle(double angle)
-    {
+    void set_wall_angle(double angle) {
         wall_angle = angle;
     }
 
@@ -150,11 +165,11 @@ private:
     // 壁調整PID関連定数
     // !! wall_approach_target_mm < wall_distance_threshold の関係を必ず保つこと !!
     // PIDがapproach_targetまで積極的に近づくことでdistance_thresholdを通過しトリガーが発火する
-    static constexpr int    wall_distance_threshold   = 250;   // 段差上り開始トリガー距離 [mm]
-    static constexpr float  wall_approach_target_mm   = 120.0f; // PIDの接近目標距離 [mm]（threshold未満に設定）
-    static constexpr double wall_angle_threshold      = 0.10;  // 角度整列完了閾値 [rad]（約6度）
-    static constexpr float  wall_angle_approach_thr   = 0.20f; // 前進開始角度閾値 [rad]（約11度）
-    static constexpr float  align_duty_max            = 100.0f;
+    static constexpr int wall_distance_threshold = 250;      // 段差上り開始トリガー距離 [mm]
+    static constexpr float wall_approach_target_mm = 120.0f; // PIDの接近目標距離 [mm]（threshold未満に設定）
+    static constexpr double wall_angle_threshold = 0.10;     // 角度整列完了閾値 [rad]（約6度）
+    static constexpr float wall_angle_approach_thr = 0.20f;  // 前進開始角度閾値 [rad]（約11度）
+    static constexpr float align_duty_max = 100.0f;
 
     // PIDコントローラ
     // pid_angle_   : 目標0[rad]、入力wall_angle[rad]、出力=回転速度(正=CW, 負=CCW)
@@ -169,8 +184,7 @@ private:
     double wall_angle = 0.0;
 
     // モードの管理
-    enum class StepMode
-    {
+    enum class StepMode {
         NONE,
         WALL_ALIGN, // 壁調整PID（角度・距離を整えてから段差上りへ自動移行）
         STEP_UP,
@@ -178,8 +192,7 @@ private:
     };
 
     // 状態管理（上り）
-    enum class StepUpState
-    {
+    enum class StepUpState {
         IDLE,
         WALL,
         ALL_UP,
@@ -193,8 +206,7 @@ private:
     };
 
     // 状態管理（下り）
-    enum class StepDownState
-    {
+    enum class StepDownState {
         IDLE,
         FIRST_FORWARD,
         FRONT_UP,
@@ -207,6 +219,7 @@ private:
     };
 
     StepMode mode_ = StepMode::NONE;
+    bool mff_mode_enabled_ = false;
 
     StepUpState state_up_ = StepUpState::IDLE;
     StepDownState state_down_ = StepDownState::IDLE;
@@ -216,36 +229,31 @@ private:
     bool state_executed_ = false; // 各状態での処理の実行状況を保存
 
     // 状態遷移関数
-    void next_up(StepUpState next)
-    {
+    void next_up(StepUpState next) {
         state_start_time_ = this->now();
         state_up_ = next;
         state_executed_ = false;
     }
 
-    void next_down(StepDownState next)
-    {
+    void next_down(StepDownState next) {
         state_start_time_ = this->now();
         state_down_ = next;
         state_executed_ = false;
     }
 
     // 機構関数
-    void all_up()
-    {
+    void all_up() {
         RCLCPP_INFO(get_logger(), "ALL UP");
         pkt.setTR(TR1, 1);
         pkt.setTR(TR2, 1);
     }
 
-    void front_down()
-    {
+    void front_down() {
         RCLCPP_INFO(get_logger(), "FRONT DOWN");
         pkt.setTR(TR2, 0);
     }
 
-    void rear_down()
-    {
+    void rear_down() {
         RCLCPP_INFO(get_logger(), "REAR DOWN");
         pkt.setTR(TR1, 0);
         pkt.setMD(MD5, -up_speed);
@@ -254,8 +262,7 @@ private:
         pkt.setMD(MD8, -up_speed);
     }
 
-    void stop_motion()
-    {
+    void stop_motion() {
         RCLCPP_INFO(get_logger(), "STOP");
         pkt.setTR(TR1, 0);
         pkt.setTR(TR2, 0);
@@ -265,8 +272,7 @@ private:
         pkt.setMD(MD8, 0);
     }
 
-    void front_up()
-    {
+    void front_up() {
         RCLCPP_INFO(get_logger(), "FRONT UP");
         pkt.setTR(TR2, 1);
         pkt.setMD(MD5, 0);
@@ -275,21 +281,18 @@ private:
         pkt.setMD(MD8, 0);
     }
 
-    void rear_up()
-    {
+    void rear_up() {
         RCLCPP_INFO(get_logger(), "REAR UP");
         pkt.setTR(TR1, 1);
     }
 
-    void all_down()
-    {
+    void all_down() {
         RCLCPP_INFO(get_logger(), "ALL DOWN");
         pkt.setTR(TR1, 0);
         pkt.setTR(TR2, 0);
     }
 
-    void move_forward()
-    {
+    void move_forward() {
         RCLCPP_INFO(get_logger(), "MOVE FORWARD");
         pkt.setMD(MD5, -forward_speed);
         pkt.setMD(MD6, forward_speed);
@@ -297,8 +300,7 @@ private:
         pkt.setMD(MD8, -forward_speed);
     }
 
-    void move_stop()
-    {
+    void move_stop() {
         RCLCPP_INFO(get_logger(), "MOVE STOP");
         pkt.setMD(MD5, 0);
         pkt.setMD(MD6, 0);
@@ -313,13 +315,11 @@ private:
     // 角度PID: wall_angle → 0[rad] への回転制御
     // 距離PID: lidar_value → wall_distance_threshold[mm] への前進制御
     //          角度がwall_angle_approach_thr以内になってから前進を開始
-    void wall_alignment_sequence()
-    {
+    void wall_alignment_sequence() {
         constexpr float dt = 0.01f; // ループ周期 [s]（10msタイマー）
 
         // LiDARデータなし → 停止して待機
-        if (lidar_value <= 0)
-        {
+        if (lidar_value <= 0) {
             pkt.setMD(MD5, 0);
             pkt.setMD(MD6, 0);
             pkt.setMD(MD7, 0);
@@ -329,8 +329,7 @@ private:
         }
 
         // 終了条件：角度と距離の両方が閾値内 → 段差上りへ移行（ALL_UPから開始）
-        if (std::abs(wall_angle) < wall_angle_threshold && lidar_value < wall_distance_threshold)
-        {
+        if (std::abs(wall_angle) < wall_angle_threshold && lidar_value < wall_distance_threshold) {
             RCLCPP_INFO(get_logger(),
                         "Wall aligned. angle=%.4f rad, dist=%d mm -> Starting STEP_UP.",
                         wall_angle, lidar_value);
@@ -353,12 +352,9 @@ private:
         // ── 距離PID ──────────────────────────────────────────────
         // 角度がapproach閾値以内になってから前進を開始する
         float vx = 0.0f;
-        if (std::abs(wall_angle) < wall_angle_approach_thr)
-        {
+        if (std::abs(wall_angle) < wall_angle_approach_thr) {
             vx = pid_distance_.update(static_cast<float>(lidar_value), dt);
-        }
-        else
-        {
+        } else {
             // 角度が大きい間はintegratorを蓄積させない
             pid_distance_.reset();
         }
@@ -368,10 +364,10 @@ private:
         // MD6(v2) = -(vx - wz)  （向き補正 *=-1）
         // MD7(v3) = -(vx - wz)  （向き補正 *=-1）
         // MD8(v4) =  vx + wz
-        float v1 =  vx + wz;
+        float v1 = vx + wz;
         float v2 = -(vx - wz);
         float v3 = -(vx - wz);
-        float v4 =  vx + wz;
+        float v4 = vx + wz;
 
         v1 = std::clamp(v1, -1.0f, 1.0f);
         v2 = std::clamp(v2, -1.0f, 1.0f);
@@ -389,11 +385,9 @@ private:
     }
 
     // 段差超えシーケンス（上り）
-    void step_up_sequence()
-    {
+    void step_up_sequence() {
         auto now_time = now();
-        switch (state_up_)
-        {
+        switch (state_up_) {
         case StepUpState::IDLE: // アイドリングストップ
             break;
 
@@ -402,8 +396,7 @@ private:
 
             /////////////
         case StepUpState::ALL_FORWARD: // 前進
-            if (!state_executed_)
-            {
+            if (!state_executed_) {
                 move_forward();
                 state_executed_ = true;
             }
@@ -415,8 +408,7 @@ private:
 
             //////////
         case StepUpState::ALL_UP: // 全て上げる
-            if (!state_executed_)
-            {
+            if (!state_executed_) {
                 all_up();
                 state_executed_ = true;
             }
@@ -424,20 +416,17 @@ private:
             break;
 
         case StepUpState::FIRST_FORWARD: // 前進
-            if (!state_executed_)
-            {
+            if (!state_executed_) {
                 move_forward();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > up_first_forward_wait)
-            {
+            if ((now_time - state_start_time_).seconds() > up_first_forward_wait) {
                 next_up(StepUpState::FRONT_DOWN);
             }
             break;
 
         case StepUpState::FRONT_DOWN: // 前を下げる
-            if (!state_executed_)
-            {
+            if (!state_executed_) {
                 front_down();
                 state_executed_ = true;
             }
@@ -445,20 +434,17 @@ private:
             break;
 
         case StepUpState::SECOND_FORWARD: // 前進
-            if (!state_executed_)
-            {
+            if (!state_executed_) {
                 move_forward();
                 state_executed_ = true;
             }
-            if (sdm15_value_[1] < dis)
-            {
+            if (sdm15_value_[1] < dis) {
                 next_up(StepUpState::REAR_DOWN);
             }
             break;
 
         case StepUpState::REAR_DOWN: // 後ろを下げる
-            if (!state_executed_)
-            {
+            if (!state_executed_) {
                 rear_down();
                 state_executed_ = true;
             }
@@ -466,20 +452,17 @@ private:
             break;
 
         case StepUpState::FINAL_FORWARD: // 前進
-            if (!state_executed_)
-            {
+            if (!state_executed_) {
                 move_forward();
                 state_executed_ = true;
             }
-            if (sdm15_value_[0] < dis)
-            {
+            if (sdm15_value_[0] < dis) {
                 next_up(StepUpState::DONE);
             }
             break;
 
         case StepUpState::DONE:
-            if (!state_executed_)
-            {
+            if (!state_executed_) {
                 stop_motion();
                 state_executed_ = true;
             }
@@ -490,17 +473,14 @@ private:
     }
 
     // 段差超えシーケンス（下り）
-    void step_down_sequence()
-    {
+    void step_down_sequence() {
         auto now_time = now();
-        switch (state_down_)
-        {
+        switch (state_down_) {
         case StepDownState::IDLE:
             break;
 
         case StepDownState::FIRST_FORWARD:
-            if (!state_executed_)
-            {
+            if (!state_executed_) {
                 move_forward();
                 state_executed_ = true;
             }
@@ -511,40 +491,34 @@ private:
             break;
 
         case StepDownState::FRONT_UP:
-            if (!state_executed_)
-            {
+            if (!state_executed_) {
                 front_up();
                 state_executed_ = true;
             }
             next_down(StepDownState::STOP);
             break;
         case StepDownState::STOP:
-            if (!state_executed_)
-            {
+            if (!state_executed_) {
                 move_stop();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > down_second_forward_wait)
-            {
+            if ((now_time - state_start_time_).seconds() > down_second_forward_wait) {
                 next_down(StepDownState::SECOND_FORWARD);
             }
             break;
 
         case StepDownState::SECOND_FORWARD:
-            if (!state_executed_)
-            {
+            if (!state_executed_) {
                 move_forward();
                 state_executed_ = true;
             }
-            if (sdm15_value_[1] > down_dis)
-            {
+            if (sdm15_value_[1] > down_dis) {
                 next_down(StepDownState::REAR_UP);
             }
             break;
 
         case StepDownState::REAR_UP:
-            if (!state_executed_)
-            {
+            if (!state_executed_) {
                 rear_up();
                 state_executed_ = true;
             }
@@ -552,20 +526,17 @@ private:
             break;
 
         case StepDownState::FINAL_FORWARD:
-            if (!state_executed_)
-            {
+            if (!state_executed_) {
                 move_forward();
                 state_executed_ = true;
             }
-            if (sdm15_value_[0] > down_dis)
-            {
+            if (sdm15_value_[0] > down_dis) {
                 next_down(StepDownState::ALL_DOWN);
             }
             break;
 
         case StepDownState::ALL_DOWN:
-            if (!state_executed_)
-            {
+            if (!state_executed_) {
                 all_down();
                 state_executed_ = true;
             }
@@ -574,8 +545,7 @@ private:
             break;
 
         case StepDownState::DONE:
-            if (!state_executed_)
-            {
+            if (!state_executed_) {
                 stop_motion();
                 state_executed_ = true;
             }
@@ -585,8 +555,11 @@ private:
         }
     }
 
-    void loop()
-    {
+    void loop() {
+        if (!mff_mode_enabled_) {
+            return;
+        }
+
         // 追加（0.5秒ごとに表示）
         // RCLCPP_INFO_THROTTLE(
         //     this->get_logger(),
@@ -594,8 +567,7 @@ private:
         //     500,
         //     "lidar_value: %d mm, %d mm",
         //     wall - lidar_value, lidar_value);
-        switch (mode_)
-        {
+        switch (mode_) {
 
         case StepMode::NONE:
             break;
@@ -615,14 +587,12 @@ private:
     }
 };
 
-class HardWareControl : public rclcpp::Node
-{
+class HardWareControl : public rclcpp::Node {
 public:
     HardWareControl(uint8_t device_id, std::shared_ptr<SequenceControl> seq)
         : Node("hardware_control_" + std::to_string(device_id)),
           device_id_(device_id),
-          seq_(seq)
-    {
+          seq_(seq) {
 
         // joyノードのSubscribe
         joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
@@ -649,32 +619,28 @@ public:
         sdm15_sub1_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
             "serial_rx_16",
             rclcpp::SensorDataQoS(),
-            [this](std_msgs::msg::Int16MultiArray::SharedPtr msg)
-            {
+            [this](std_msgs::msg::Int16MultiArray::SharedPtr msg) {
                 this->sdm15_callback(msg, 0);
             });
 
         sdm15_sub2_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
             "serial_rx_17",
             rclcpp::SensorDataQoS(),
-            [this](std_msgs::msg::Int16MultiArray::SharedPtr msg)
-            {
+            [this](std_msgs::msg::Int16MultiArray::SharedPtr msg) {
                 this->sdm15_callback(msg, 1);
             });
 
         sdm15_sub3_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
             "serial_rx_18",
             rclcpp::SensorDataQoS(),
-            [this](std_msgs::msg::Int16MultiArray::SharedPtr msg)
-            {
+            [this](std_msgs::msg::Int16MultiArray::SharedPtr msg) {
                 this->sdm15_callback(msg, 2);
             });
 
         sdm15_sub4_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
             "serial_rx_19",
             rclcpp::SensorDataQoS(),
-            [this](std_msgs::msg::Int16MultiArray::SharedPtr msg)
-            {
+            [this](std_msgs::msg::Int16MultiArray::SharedPtr msg) {
                 this->sdm15_callback(msg, 3);
             });
 
@@ -692,6 +658,11 @@ public:
             "/r2_mff_step_cmd",
             10,
             std::bind(&HardWareControl::step_callback, this, std::placeholders::_1));
+
+        mode_cmd_sub_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
+            "r2_drive_mode_cmd",
+            10,
+            std::bind(&HardWareControl::mode_cmd_callback, this, std::placeholders::_1));
 
         RCLCPP_INFO(get_logger(),
                     "serial_tx_%d started.", device_id_);
@@ -712,10 +683,12 @@ private:
     int16_t lidar_x_value = 0;
     int16_t lidar_y_value = 0;
 
-    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg)
-    {
-        if (seq_->is_busy())
-        {
+    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
+        if (!seq_->is_mff_mode_enabled()) {
+            return;
+        }
+
+        if (seq_->is_busy()) {
             return;
         }
 
@@ -734,14 +707,12 @@ private:
         static bool last_up = false;
         static bool last_down = false;
 
-        if (UP && !last_up)
-        {
+        if (UP && !last_up) {
             // 十字キー上：壁調整PID → 自動段差上り
             seq_->start_wall_alignment();
         }
 
-        if (DOWN && !last_down)
-        {
+        if (DOWN && !last_down) {
             seq_->start_step_down();
         }
 
@@ -770,16 +741,14 @@ private:
         v2 *= -1;
 
         // 回転
-        if (R1)
-        {
+        if (R1) {
             v1 = sp_yaw;
             v2 = -sp_yaw;
             v3 = -sp_yaw;
             v4 = sp_yaw;
         }
 
-        if (L1)
-        {
+        if (L1) {
             v1 = -sp_yaw;
             v2 = sp_yaw;
             v3 = sp_yaw;
@@ -806,8 +775,11 @@ private:
         pkt.setMD(MD8, static_cast<int16_t>(v4 * duty_max));
     }
 
-    void publisher_timer_callback()
-    {
+    void publisher_timer_callback() {
+        if (!seq_->is_mff_mode_enabled()) {
+            return;
+        }
+
         std_msgs::msg::Int16MultiArray msg;
 
         // msg.data = data_;
@@ -817,12 +789,10 @@ private:
         // print_data();
     }
 
-    void print_data()
-    {
+    void print_data() {
         const auto &pkt_data = pkt.data_;
         std::cout << "TX DATA: [";
-        for (size_t i = 0; i < pkt_data.size(); ++i)
-        {
+        for (size_t i = 0; i < pkt_data.size(); ++i) {
             std::cout << pkt_data[i];
             if (i + 1 < pkt_data.size())
                 std::cout << ", ";
@@ -831,10 +801,8 @@ private:
     }
 
     void sensor_callback(
-        const std_msgs::msg::Int16MultiArray::SharedPtr msg)
-    {
-        if (msg->data.size() < RX16NUM)
-        {
+        const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
+        if (msg->data.size() < RX16NUM) {
             RCLCPP_WARN(this->get_logger(),
                         "serial_rx_%d: data too short (%zu)",
                         device_id_, msg->data.size());
@@ -842,11 +810,9 @@ private:
         }
     }
 
-    void sdm15_callback(const std_msgs::msg::Int16MultiArray::SharedPtr msg, int index)
-    {
+    void sdm15_callback(const std_msgs::msg::Int16MultiArray::SharedPtr msg, int index) {
         // 配列が空でないか一応安全のためにチェック
-        if (msg->data.empty())
-        {
+        if (msg->data.empty()) {
             return;
         }
 
@@ -863,8 +829,7 @@ private:
         //             sdm15_value[0], sdm15_value[1], sdm15_value[2]);
     }
 
-    void lidar_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
-    {
+    void lidar_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
         if (msg->width == 0)
             return;
 
@@ -877,19 +842,16 @@ private:
         sensor_msgs::PointCloud2ConstIterator<float> iter_y(*msg, "y");
         const size_t point_count = static_cast<size_t>(msg->width) * static_cast<size_t>(msg->height);
 
-        for (size_t i = 0; i < point_count; ++i, ++iter_x, ++iter_y)
-        {
+        for (size_t i = 0; i < point_count; ++i, ++iter_x, ++iter_y) {
             const float x = *iter_x;
             const float y = *iter_y;
 
-            if (!std::isfinite(x) || !std::isfinite(y))
-            {
+            if (!std::isfinite(x) || !std::isfinite(y)) {
                 continue;
             }
 
             const float distance = std::sqrt(x * x + y * y);
-            if (distance < min_distance)
-            {
+            if (distance < min_distance) {
                 min_distance = distance;
                 nearest_x = x;
                 nearest_y = y;
@@ -897,8 +859,7 @@ private:
             }
         }
 
-        if (!has_valid_point)
-        {
+        if (!has_valid_point) {
             return;
         }
 
@@ -914,32 +875,36 @@ private:
         seq_->set_lidar_value(static_cast<int16_t>(min_distance * 1000.0f));
     }
 
-    void wall_callback(const std_msgs::msg::Float64::SharedPtr msg)
-    {
+    void wall_callback(const std_msgs::msg::Float64::SharedPtr msg) {
         seq_->set_wall_angle(msg->data);
     }
 
-    void step_callback(const std_msgs::msg::Int32::SharedPtr msg)
-    {
+    void step_callback(const std_msgs::msg::Int32::SharedPtr msg) {
+        if (!seq_->is_mff_mode_enabled()) {
+            return;
+        }
+
         int cmd = msg->data;
-        if (cmd == 1)
-        {
+        if (cmd == 1) {
             // 壁調整PID → 自動段差上り
             seq_->start_wall_alignment();
-        }
-        else if (cmd == 2)
-        {
+        } else if (cmd == 2) {
             // 壁調整なしで直接段差上り（角度・距離に関係なく実行）
             seq_->start_step_up();
-        }
-        else if (cmd == -1)
-        {
+        } else if (cmd == -1) {
             seq_->start_step_down();
-        }
-        else if (cmd == 0)
-        {
+        } else if (cmd == 0) {
             // 何もしない（停止コマンドなどがあればここで処理）
         }
+    }
+
+    void mode_cmd_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        if (msg->data.empty()) {
+            return;
+        }
+
+        const int32_t mode_code = msg->data[0];
+        seq_->set_mff_mode_enabled(mode_code == 4);
     }
     uint8_t device_id_;
 
@@ -953,6 +918,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sdm15_sub3_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sdm15_sub4_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr step_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mode_cmd_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     std::vector<int16_t> data_;
@@ -961,15 +927,13 @@ private:
     std::shared_ptr<SequenceControl> seq_;
 };
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
 
     // figletでノード名を表示
     std::string figletout = "figlet R2_SequenceCtrl";
     int result = std::system(figletout.c_str());
-    if (result != 0)
-    {
+    if (result != 0) {
         std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
                   << std::endl;
         std::cerr << "Please install 'figlet' with the following command:"
