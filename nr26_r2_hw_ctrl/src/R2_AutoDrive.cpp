@@ -14,12 +14,10 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
-#include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int16_multi_array.hpp"
 #include "std_msgs/msg/int32.hpp"
-#include "std_msgs/msg/int32_multi_array.hpp"
 #include "std_msgs/msg/string.hpp"
 
 // 自作
@@ -51,10 +49,6 @@ public:
         mode_pub_ = this->create_publisher<std_msgs::msg::String>(
             "r2_drive_mode", rclcpp::QoS(1).transient_local().reliable());
 
-        // オドメトリリセット
-        odom_reset_pub_ = this->create_publisher<std_msgs::msg::Bool>(
-            "odom_reset", rclcpp::QoS(10));
-
         // PS4入力
         joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
             "joy", 10,
@@ -66,7 +60,7 @@ public:
             std::bind(&PIDMecanumController::target_callback, this, std::placeholders::_1));
 
         // r2_console からのドライブモードコマンド
-        mode_cmd_sub_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
+        mode_cmd_sub_ = this->create_subscription<std_msgs::msg::Int32>(
             "r2_drive_mode_cmd", 10,
             std::bind(&PIDMecanumController::mode_cmd_callback, this, std::placeholders::_1));
 
@@ -86,12 +80,6 @@ public:
         aruco_camera_offset_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
             "r2_aruco_camera_offset", 10,
             std::bind(&PIDMecanumController::aruco_camera_offset_callback, this, std::placeholders::_1));
-
-        // MFF 旋回コマンド
-        mff_turn_cmd_sub_ = this->create_subscription<std_msgs::msg::Int32>(
-            "r2_mff_turn_cmd", 10,
-            std::bind(&PIDMecanumController::mff_turn_cmd_callback, this, std::placeholders::_1));
-        RCLCPP_INFO(this->get_logger(), "Subscribed to r2_mff_turn_cmd topic");
 
         // timer（制御周期固定）
         timer_ = this->create_wall_timer(
@@ -131,24 +119,20 @@ private:
         MANUAL,
         AUTO,
         ARUCO,
-        PLANE,
-        MFF,
     };
 
     // ROS
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr odom_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr target_sub_;
-    rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mode_cmd_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr mode_cmd_sub_;
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr aruco_pose_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr aruco_distance_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr aruco_id_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr aruco_target_id_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr aruco_camera_offset_sub_;
-    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr mff_turn_cmd_sub_;
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr mode_pub_;
-    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr odom_reset_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     // PID
@@ -211,24 +195,8 @@ private:
             return "AUTO";
         case DriveMode::ARUCO:
             return "ARUCO";
-        case DriveMode::PLANE:
-            return "PLANE";
-        case DriveMode::MFF:
-            return "MFF";
         }
         return "MANUAL";
-    }
-
-    static bool is_pose_pid_mode(DriveMode mode) {
-        return mode == DriveMode::AUTO || mode == DriveMode::PLANE;
-    }
-
-    static float normalize_angle_rad(float angle) {
-        while (angle > static_cast<float>(M_PI))
-            angle -= static_cast<float>(2.0 * M_PI);
-        while (angle < static_cast<float>(-M_PI))
-            angle += static_cast<float>(2.0 * M_PI);
-        return angle;
     }
 
     void publish_mode() {
@@ -302,29 +270,9 @@ private:
             return;
         }
 
-        // Check if this is a "rotation only" command (element [3] == 1)
-        bool rotate_only = (msg->data.size() >= 4 && msg->data[3] != 0.0f);
-
-        if (rotate_only) {
-            // Rotation only: keep current position as target, only update yaw
-            target_x_ = X_;
-            target_y_ = Y_;
-            target_yaw_ = msg->data[2];
-
-            RCLCPP_INFO(this->get_logger(),
-                        "Rotation-only commanded: keeping x=%.3f y=%.3f, targeting yaw=%.3f [rad]",
-                        target_x_, target_y_, target_yaw_);
-        } else {
-            // Normal mode: update all three targets
-            target_x_ = msg->data[0];
-            target_y_ = msg->data[1];
-            target_yaw_ = msg->data[2];
-
-            RCLCPP_INFO(this->get_logger(),
-                        "Target updated x=%.3f y=%.3f yaw=%.3f [rad]",
-                        target_x_, target_y_, target_yaw_);
-        }
-
+        target_x_ = msg->data[0];
+        target_y_ = msg->data[1];
+        target_yaw_ = msg->data[2];
         has_target_cmd_ = true;
 
         pid_x_.set_target(target_x_);
@@ -334,25 +282,22 @@ private:
         pid_y_.reset();
         pid_yaw_.reset();
 
-        if (!is_pose_pid_mode(drive_mode_)) {
-            drive_mode_ = DriveMode::PLANE;
+        if (drive_mode_ != DriveMode::AUTO) {
+            drive_mode_ = DriveMode::AUTO;
             stop_motors();
             publish_mode();
-            RCLCPP_INFO(this->get_logger(), "Mode changed: PLANE (by target command)");
+            RCLCPP_INFO(this->get_logger(), "Mode changed: AUTO (by target command)");
         }
+
+        RCLCPP_INFO(this->get_logger(),
+                    "Target updated x=%.3f y=%.3f yaw=%.3f [rad]",
+                    target_x_, target_y_, target_yaw_);
     }
 
-    void mode_cmd_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
-        if (!msg || msg->data.size() < 1) {
-            RCLCPP_WARN(this->get_logger(), "Invalid mode command message");
-            return;
-        }
-
-        int32_t mode_code = msg->data[0];
-        bool rotate_only = (msg->data.size() >= 2 && msg->data[1] != 0);
-
-        if (mode_code < 0 || mode_code > 4) {
-            RCLCPP_WARN(this->get_logger(), "Invalid mode code: %ld (valid: 0-4)", static_cast<long>(mode_code));
+    void mode_cmd_callback(const std_msgs::msg::Int32::SharedPtr msg) {
+        int32_t mode_code = msg->data;
+        if (mode_code < 0 || mode_code > 2) {
+            RCLCPP_WARN(this->get_logger(), "Invalid mode code: %ld (valid: 0-2)", static_cast<long>(mode_code));
             return;
         }
 
@@ -361,24 +306,10 @@ private:
             return; // No change
         }
 
-        if (rotate_only) {
-            // Rotation only: set current position as target, keep mode but apply rotation-only
-            target_x_ = X_;
-            target_y_ = Y_;
-            has_target_cmd_ = true;
-
-            pid_x_.set_target(target_x_);
-            pid_y_.set_target(target_y_);
-            pid_x_.reset();
-            pid_y_.reset();
-
-            RCLCPP_INFO(this->get_logger(), "Mode changed: %s (rotation-only, target set to current position)", drive_mode_to_string(new_mode).c_str());
-        } else {
-            drive_mode_ = new_mode;
-            stop_motors();
-            publish_mode();
-            RCLCPP_INFO(this->get_logger(), "Mode changed: %s (by mode command)", drive_mode_to_string(new_mode).c_str());
-        }
+        drive_mode_ = new_mode;
+        stop_motors();
+        publish_mode();
+        RCLCPP_INFO(this->get_logger(), "Mode changed: %s (by mode command)", drive_mode_to_string(new_mode).c_str());
     }
 
     void aruco_pose_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
@@ -419,44 +350,6 @@ private:
                     aruco_camera_offset_x_, aruco_camera_offset_y_);
     }
 
-    void mff_turn_cmd_callback(const std_msgs::msg::Int32::SharedPtr msg) {
-        RCLCPP_INFO(this->get_logger(), "[DEBUG] mff_turn_cmd received: turn_deg=%ld, current_mode=%d",
-                    static_cast<long>(msg->data), static_cast<int>(drive_mode_));
-
-        if (drive_mode_ != DriveMode::MFF) {
-            RCLCPP_WARN(this->get_logger(), "[MFF] Ignoring turn command: not in MFF mode (current mode=%d)",
-                        static_cast<int>(drive_mode_));
-            return; // MFF モード以外では無視
-        }
-
-        int32_t turn_deg = msg->data;
-        if (turn_deg == 0) {
-            // 旋回指令なし = 旋回完了、停止
-            target_yaw_ = yaw_;
-            has_target_cmd_ = false;
-            RCLCPP_INFO(this->get_logger(), "[MFF] No turn command (stay current yaw: %.2f rad)", yaw_);
-            return;
-        }
-
-        // オドメトリをリセット
-        std_msgs::msg::Bool reset_msg;
-        reset_msg.data = true;
-        odom_reset_pub_->publish(reset_msg);
-        RCLCPP_INFO(this->get_logger(), "[MFF] Odometry reset before turn command");
-
-        // 度数法から弧度法へ
-        // オドメトリをリセットするため、目標角は絶対値として turn_rad を使用
-        const float turn_rad = static_cast<float>(turn_deg) * static_cast<float>(M_PI) / 180.0f;
-        target_yaw_ = normalize_angle_rad(turn_rad);
-
-        pid_yaw_.set_target(target_yaw_);
-        pid_yaw_.reset();
-        has_target_cmd_ = true;
-
-        RCLCPP_INFO(this->get_logger(), "[MFF] Turn command: turn_deg=%ld, current_yaw=%.2f rad, target_yaw=%.2f rad",
-                    static_cast<long>(turn_deg), yaw_, target_yaw_);
-    }
-
     // PS4入力
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
         if (msg->axes.size() < 8 || msg->buttons.size() < 10)
@@ -467,11 +360,9 @@ private:
 
         if (enable_ps4_mode_toggle_ && OPTION && !last_option) {
             if (drive_mode_ == DriveMode::MANUAL) {
-                drive_mode_ = DriveMode::PLANE;
-                stop_motors();
-                publish_mode();
-                RCLCPP_INFO(this->get_logger(), "Mode changed: PLANE");
-            } else if (drive_mode_ == DriveMode::PLANE || drive_mode_ == DriveMode::AUTO) {
+                enter_auto_mode();
+                RCLCPP_INFO(this->get_logger(), "Mode changed: AUTO");
+            } else if (drive_mode_ == DriveMode::AUTO) {
                 enter_aruco_mode();
                 RCLCPP_INFO(this->get_logger(), "Mode changed: ARUCO");
             } else {
@@ -630,52 +521,6 @@ private:
             return;
         }
 
-        if (drive_mode_ == DriveMode::MFF) {
-            // MFF モード時は、mff_turn_cmd で指定された角度に旋回
-            // Yaw 制御のみ、XY は停止
-            const float dt = PUBLISH_RATE_MS / 1000.0f;
-            const float max_wz = 1.0f;
-            const float yaw_deadband_rad = 2.0f * static_cast<float>(M_PI) / 180.0f;
-
-            vx_ = 0.0f;
-            vy_ = 0.0f;
-            const float yaw_err = normalize_angle_rad(target_yaw_ - yaw_);
-            if (std::fabs(yaw_err) <= yaw_deadband_rad) {
-                wz_ = 0.0f;
-            } else {
-                // AUTO/PLANE と同じ符号系に合わせる
-                wz_ = -pid_yaw_.update(yaw_, dt);
-                wz_ = std::clamp(wz_, -max_wz, max_wz);
-            }
-
-            v1 = vy_ + vx_ + wz_;
-            v3 = vy_ - vx_ - wz_;
-            v4 = vy_ - vx_ + wz_;
-            v2 = vy_ + vx_ - wz_;
-
-            v3 *= -1;
-            v2 *= -1;
-
-            float max_v = std::max({fabs(v1), fabs(v2), fabs(v3), fabs(v4)});
-            if (max_v < 1.0f)
-                max_v = 1.0f;
-
-            v1 /= max_v;
-            v2 /= max_v;
-            v3 /= max_v;
-            v4 /= max_v;
-
-            pkt.setMD(MD5, static_cast<int16_t>(v1 * duty_max));
-            pkt.setMD(MD6, static_cast<int16_t>(v2 * duty_max));
-            pkt.setMD(MD7, static_cast<int16_t>(v3 * duty_max));
-            pkt.setMD(MD8, static_cast<int16_t>(v4 * duty_max));
-
-            std_msgs::msg::Int16MultiArray msg;
-            msg.data = pkt.toVector();
-            publisher_->publish(msg);
-            return;
-        }
-
         const float dt = PUBLISH_RATE_MS / 1000.0f;
 
         // PID計算
@@ -724,10 +569,9 @@ private:
         msg.data = pkt.toVector();
         publisher_->publish(msg);
 
-        const char *mode_tag = drive_mode_ == DriveMode::PLANE ? "PLANE" : "AUTO";
         RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 50,
-                             "[%s] X: %.2f Y: %.2f Yaw: %.2f | T: %.2f %.2f %.2f | vx %.2f vy %.2f wz %.2f",
-                             mode_tag, X_, Y_, yaw_, target_x_, target_y_, target_yaw_, vx_, vy_, wz_);
+                             "[AUTO] X: %.2f Y: %.2f Yaw: %.2f | T: %.2f %.2f %.2f | vx %.2f vy %.2f wz %.2f",
+                             X_, Y_, yaw_, target_x_, target_y_, target_yaw_, vx_, vy_, wz_);
     }
 };
 
