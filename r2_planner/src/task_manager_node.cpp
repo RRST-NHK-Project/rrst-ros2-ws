@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <sstream>
@@ -46,6 +47,32 @@ namespace {
         {{12, 11, 10}}, // 12, 11, 10
         {{18, 17, 16}}, // 3X, 2X, 1X (exit side)
     }};
+    std::string trimCopy(const std::string &text) {
+        const auto begin = std::find_if_not(text.begin(), text.end(), [](unsigned char ch) {
+            return std::isspace(ch) != 0;
+        });
+        const auto end = std::find_if_not(text.rbegin(), text.rend(), [](unsigned char ch) {
+                             return std::isspace(ch) != 0;
+                         }).base();
+
+        if (begin >= end) {
+            return "";
+        }
+        return std::string(begin, end);
+    }
+
+    std::vector<std::string> splitCommaSeparatedNames(const std::string &names_text) {
+        std::vector<std::string> names;
+        std::stringstream ss(names_text);
+        std::string token;
+        while (std::getline(ss, token, ',')) {
+            const auto trimmed = trimCopy(token);
+            if (!trimmed.empty()) {
+                names.push_back(trimmed);
+            }
+        }
+        return names;
+    }
 } // namespace
 
 namespace r2_planner {
@@ -113,6 +140,7 @@ namespace r2_planner {
         auto_send_enabled_ = get_parameter("initial_auto_send_enabled").as_bool();
 
         state_sequence_ = {kStateWaiting, kStateRackMove, kStateStaffHandTrigger, kStateStaffAssembly, kStateMffEnter, kStateMffLeave};
+        applyStateNameSequenceMapping();
 
         command_sub_ = create_subscription<std_msgs::msg::Int32MultiArray>(
             command_topic, rclcpp::QoS(10),
@@ -137,6 +165,10 @@ namespace r2_planner {
         state_sequence_sub_ = create_subscription<std_msgs::msg::Int32MultiArray>(
             state_sequence_topic, rclcpp::QoS(10),
             std::bind(&TaskManagerNode::onStateSequence, this, std::placeholders::_1));
+
+        state_sequence_names_sub_ = create_subscription<std_msgs::msg::String>(
+            "r2/task_state_sequence_names", rclcpp::QoS(10),
+            std::bind(&TaskManagerNode::onStateSequenceNames, this, std::placeholders::_1));
 
         state_pose_sub_ = create_subscription<std_msgs::msg::Float32MultiArray>(
             state_pose_topic, rclcpp::QoS(10),
@@ -171,7 +203,7 @@ namespace r2_planner {
         auto_drive_target_pub_ = create_publisher<std_msgs::msg::Float32MultiArray>(
             auto_drive_target_topic, rclcpp::QoS(10));
 
-        drive_mode_cmd_pub_ = create_publisher<std_msgs::msg::Int32>(
+        drive_mode_cmd_pub_ = create_publisher<std_msgs::msg::Int32MultiArray>(
             drive_mode_cmd_topic, rclcpp::QoS(10));
 
         mff_turn_cmd_pub_ = create_publisher<std_msgs::msg::Int32>(
@@ -199,7 +231,7 @@ namespace r2_planner {
         RCLCPP_INFO(
             get_logger(),
             "Task manager ready: state=%s(%ld) color=%s(%ld) cell=%ld mode=%s(%ld)",
-            stateName(status_.state_code).c_str(),
+            stateDisplayName(status_.state_code).c_str(),
             static_cast<long>(status_.state_code),
             colorName(status_.color_code).c_str(),
             static_cast<long>(status_.color_code),
@@ -263,14 +295,20 @@ namespace r2_planner {
         }
 
         state_sequence_ = next_sequence;
+        applyStateNameSequenceMapping();
         std::ostringstream oss;
         for (size_t i = 0; i < state_sequence_.size(); ++i) {
             if (i > 0) {
                 oss << " -> ";
             }
-            oss << stateName(state_sequence_[i]);
+            oss << stateDisplayName(state_sequence_[i]);
         }
         RCLCPP_INFO(get_logger(), "State sequence updated: %s", oss.str().c_str());
+    }
+
+    void TaskManagerNode::onStateSequenceNames(const std_msgs::msg::String::SharedPtr msg) {
+        pending_state_sequence_names_ = parseStateNameSequence(msg->data);
+        applyStateNameSequenceMapping();
     }
 
     void TaskManagerNode::onStatePose(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
@@ -285,7 +323,7 @@ namespace r2_planner {
 
         if (!enabled) {
             state_pose_targets_.erase(state_code);
-            RCLCPP_INFO(get_logger(), "Cleared state pose target: state=%s(%ld)", stateName(state_code).c_str(), static_cast<long>(state_code));
+            RCLCPP_INFO(get_logger(), "Cleared state pose target: state=%s(%ld)", stateDisplayName(state_code).c_str(), static_cast<long>(state_code));
             return;
         }
 
@@ -304,7 +342,7 @@ namespace r2_planner {
         RCLCPP_INFO(
             get_logger(),
             "Updated state pose target: state=%s(%ld) x=%.3f y=%.3f yaw=%.3f",
-            stateName(state_code).c_str(),
+            stateDisplayName(state_code).c_str(),
             static_cast<long>(state_code),
             static_cast<double>(target.x),
             static_cast<double>(target.y),
@@ -320,15 +358,17 @@ namespace r2_planner {
 
         const int32_t state_code = data[0];
         const bool enabled = data.size() >= 2 && data[1] >= 0;
+        const bool rotate_only = data.size() >= 3 && data[2] != 0;
 
         if (!enabled) {
             state_mode_targets_.erase(state_code);
-            RCLCPP_INFO(get_logger(), "Cleared state mode target: state=%s(%ld)", stateName(state_code).c_str(), static_cast<long>(state_code));
+            state_rotate_only_targets_.erase(state_code);
+            RCLCPP_INFO(get_logger(), "Cleared state mode target: state=%s(%ld)", stateDisplayName(state_code).c_str(), static_cast<long>(state_code));
 
             if (auto_send_enabled_ && state_code == status_.state_code) {
                 publishAutoDriveModeForState(state_code);
                 RCLCPP_INFO(get_logger(), "Applied fallback mode immediately for current state=%s(%ld)",
-                            stateName(state_code).c_str(), static_cast<long>(state_code));
+                            stateDisplayName(state_code).c_str(), static_cast<long>(state_code));
             }
             return;
         }
@@ -339,20 +379,22 @@ namespace r2_planner {
         }
 
         const int32_t mode_code = data[1];
-        if (mode_code < 0 || mode_code > 2) {
-            RCLCPP_WARN(get_logger(), "Ignoring invalid mode code %ld for state=%s(%ld) (valid: 0-2)",
-                        static_cast<long>(mode_code), stateName(state_code).c_str(), static_cast<long>(state_code));
+        if (mode_code < 0 || mode_code > 4) {
+            RCLCPP_WARN(get_logger(), "Ignoring invalid mode code %ld for state=%s(%ld) (valid: 0-4)",
+                        static_cast<long>(mode_code), stateDisplayName(state_code).c_str(), static_cast<long>(state_code));
             return;
         }
 
         state_mode_targets_[state_code] = mode_code;
-        RCLCPP_INFO(get_logger(), "Updated state mode target: state=%s(%ld) mode=%ld",
-                    stateName(state_code).c_str(), static_cast<long>(state_code), static_cast<long>(mode_code));
+        state_rotate_only_targets_[state_code] = rotate_only;
+        RCLCPP_INFO(get_logger(), "Updated state mode target: state=%s(%ld) mode=%ld rotate_only=%s",
+                    stateDisplayName(state_code).c_str(), static_cast<long>(state_code), static_cast<long>(mode_code),
+                    rotate_only ? "true" : "false");
 
         if (auto_send_enabled_ && state_code == status_.state_code) {
             publishAutoDriveModeForState(state_code);
             RCLCPP_INFO(get_logger(), "Applied state mode immediately for current state=%s(%ld)",
-                        stateName(state_code).c_str(), static_cast<long>(state_code));
+                        stateDisplayName(state_code).c_str(), static_cast<long>(state_code));
         }
     }
 
@@ -439,13 +481,13 @@ namespace r2_planner {
 
         if (!enabled) {
             state_odom_reset_targets_.erase(state_code);
-            RCLCPP_INFO(get_logger(), "Cleared state odom reset target: state=%s(%ld)", stateName(state_code).c_str(), static_cast<long>(state_code));
+            RCLCPP_INFO(get_logger(), "Cleared state odom reset target: state=%s(%ld)", stateDisplayName(state_code).c_str(), static_cast<long>(state_code));
             return;
         }
 
         state_odom_reset_targets_[state_code] = true;
         RCLCPP_INFO(get_logger(), "Updated state odom reset target: state=%s(%ld) enabled=true",
-                    stateName(state_code).c_str(), static_cast<long>(state_code));
+                    stateDisplayName(state_code).c_str(), static_cast<long>(state_code));
     }
 
     void TaskManagerNode::setState(int32_t state_code) {
@@ -541,6 +583,14 @@ namespace r2_planner {
         }
     }
 
+    std::string TaskManagerNode::stateDisplayName(int32_t state_code) const {
+        auto it = state_name_overrides_.find(state_code);
+        if (it != state_name_overrides_.end() && !it->second.empty()) {
+            return it->second;
+        }
+        return stateName(state_code);
+    }
+
     std::string TaskManagerNode::colorName(int32_t color_code) {
         switch (color_code) {
         case kColorBlue:
@@ -567,13 +617,32 @@ namespace r2_planner {
         }
     }
 
-    std::string TaskManagerNode::buildStatusText(const TaskStatus &status) {
+    std::string TaskManagerNode::buildStatusText(const TaskStatus &status) const {
         std::ostringstream oss;
-        oss << "state=" << stateName(status.state_code)
+        oss << "state=" << stateDisplayName(status.state_code)
             << " color=" << colorName(status.color_code)
             << " cell=" << status.mff_cell
             << " mode=" << transitionModeName(status.transition_mode_code);
         return oss.str();
+    }
+
+    void TaskManagerNode::applyStateNameSequenceMapping() {
+        state_name_overrides_.clear();
+
+        const auto sequenceSize = state_sequence_.size();
+        for (size_t i = 0; i < sequenceSize; ++i) {
+            const int32_t state_code = state_sequence_[i];
+            if (i < pending_state_sequence_names_.size()) {
+                const auto name = pending_state_sequence_names_[i];
+                if (!name.empty()) {
+                    state_name_overrides_[state_code] = name;
+                }
+            }
+        }
+    }
+
+    std::vector<std::string> TaskManagerNode::parseStateNameSequence(const std::string &names_text) const {
+        return splitCommaSeparatedNames(names_text);
     }
 
     bool TaskManagerNode::hasChanged(const TaskStatus &lhs, const TaskStatus &rhs) {
@@ -609,7 +678,7 @@ namespace r2_planner {
         RCLCPP_INFO(
             get_logger(),
             "Published auto drive target for state=%s(%ld): x=%.3f y=%.3f yaw=%.3f",
-            stateName(state_code).c_str(),
+            stateDisplayName(state_code).c_str(),
             static_cast<long>(state_code),
             static_cast<double>(it->second.x),
             static_cast<double>(it->second.y),
@@ -618,23 +687,27 @@ namespace r2_planner {
 
     void TaskManagerNode::publishAutoDriveModeForState(int32_t state_code) {
         auto it = state_mode_targets_.find(state_code);
-        std_msgs::msg::Int32 mode_msg;
+        auto rotate_it = state_rotate_only_targets_.find(state_code);
+
+        std_msgs::msg::Int32MultiArray mode_msg;
         if (it == state_mode_targets_.end()) {
-            if (fallback_drive_mode_on_unset_ < 0 || fallback_drive_mode_on_unset_ > 2) {
+            if (fallback_drive_mode_on_unset_ < 0 || fallback_drive_mode_on_unset_ > 4) {
                 return;
             }
-            mode_msg.data = fallback_drive_mode_on_unset_;
+            mode_msg.data = {fallback_drive_mode_on_unset_, 0};
         } else {
-            mode_msg.data = it->second;
+            const bool rotate_only = (rotate_it != state_rotate_only_targets_.end() && rotate_it->second);
+            mode_msg.data = {it->second, rotate_only ? 1 : 0};
         }
         drive_mode_cmd_pub_->publish(mode_msg);
 
         RCLCPP_INFO(
             get_logger(),
-            "Published auto drive mode for state=%s(%ld): mode=%ld",
-            stateName(state_code).c_str(),
+            "Published auto drive mode for state=%s(%ld): mode=%ld rotate_only=%s",
+            stateDisplayName(state_code).c_str(),
             static_cast<long>(state_code),
-            static_cast<long>(mode_msg.data));
+            static_cast<long>(mode_msg.data[0]),
+            mode_msg.data.size() > 1 && mode_msg.data[1] ? "true" : "false");
     }
 
     void TaskManagerNode::publishOdomResetForState(int32_t state_code) {
@@ -650,7 +723,7 @@ namespace r2_planner {
         RCLCPP_INFO(
             get_logger(),
             "Published odom reset for state=%s(%ld)",
-            stateName(state_code).c_str(),
+            stateDisplayName(state_code).c_str(),
             static_cast<long>(state_code));
     }
 

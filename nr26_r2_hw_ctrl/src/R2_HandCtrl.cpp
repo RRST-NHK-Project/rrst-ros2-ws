@@ -38,15 +38,20 @@ class R2_HandCtrl : public rclcpp::Node {
     enum HandState{
         //ハンドの状態定義
         HOME, //初期位置
-        EXTEND, //エアシリンダーとサーボの自動調節を同時に行う状態
-        GRASP, //KFS保持
-        RETRACT //KFS回収
+        READY, //回収待機
+        UP, //上段回収
+        MIDDLE,  //中段回収
+        LOW, //下段回収
+        HOLD, //KFS保持
+        MOVING, //KFS移動
+        SHOOT //TR中段シュート
     };
 
     enum TargetHeight{
         //KFSがある段の高さ定義
-        LOW, // LOW
         HIGH  // HIGH 
+        MIDDLE,  // MIDDLE
+        LOW, // LOW
     };
 
         /*
@@ -108,21 +113,39 @@ class R2_HandCtrl : public rclcpp::Node {
     private:
     // --- 各動作の数値設定 ---
     void set_home_values() {
-        tx_data_[13] = 0;  // サーボ：待機
+        tx_data_[9] = 0;  // サーボ：待機
         tx_data_[17] = 0;  // シリンダー：縮める
         tx_data_[18] = 0;  // ハンド：開く
     }
-
-    void set_extend_values() {
+    void set_ready_values() {
         if (target_height_ == TargetHeight::HIGH) {
-            tx_data_[13] = 45; // 高い段差用角度
+            tx_data_[9] = 45; // 高い段差用角度
         } else {
-            tx_data_[13] = 90; // 低い段差用角度
+            tx_data_[9] = 90; // 低い段差用角度
         }
         tx_data_[17] = 1;      // シリンダー：伸ばす
     }
+    void set_up_values() {
+        tx_data_[18] = 1;      // ハンド：閉じる
+    }
 
-    void set_grasp_values() {
+    void set_middle_values() {
+        tx_data_[18] = 1;      // ハンド：閉じる
+    }
+
+    void set_low_values() {
+        tx_data_[18] = 1;      // ハンド：閉じる
+    }
+    void set_hold_values() {
+        tx_data_[17] = 1;      // シリンダー：伸ばす
+        tx_data_[18] = 1;      // ハンド：閉じる
+    }
+    void set_moving_values() {
+        tx_data_[17] = 1;      // シリンダー：伸ばす
+        tx_data_[18] = 1;      // ハンド：閉じる
+    }
+    void set_shoot_values() {
+        tx_data_[17] = 1;      // シリンダー：伸ばす
         tx_data_[18] = 1;      // ハンド：閉じる
     }
 
