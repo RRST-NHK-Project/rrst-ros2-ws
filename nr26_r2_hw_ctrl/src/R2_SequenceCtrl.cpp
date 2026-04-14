@@ -25,6 +25,7 @@ L1、R1で回転しようとすると前進、後進してしまう
 // ROS　
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
+#include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int16_multi_array.hpp"
 #include "std_msgs/msg/int32.hpp"
@@ -88,6 +89,54 @@ public:
         }
         mode_ = StepMode::STEP_UP;
         next_up(StepUpState::ALL_FORWARD);
+    }
+
+    bool start_mff_turn(int32_t turn_deg) {
+        if (!mff_mode_enabled_) {
+            return false;
+        }
+
+        if (turn_deg == 0) {
+            return true;
+        }
+
+        if (mode_ != StepMode::NONE) {
+            RCLCPP_WARN(get_logger(), "Sequence busy. MFF_TURN ignored.");
+            return false;
+        }
+
+        // AutoDriveのメカナム逆運動学を参考に計算
+        const float wz = (turn_deg > 0) ? turn_speed_norm_ : -turn_speed_norm_;
+
+        // メカナム逆運動学（vx=0, vy=0）
+        float v1 = 0.0f + 0.0f + wz; // vx + vy + wz
+        float v3 = 0.0f - 0.0f - wz; // vx - vy - wz
+        float v4 = 0.0f - 0.0f + wz; // vx - vy + wz
+        float v2 = 0.0f + 0.0f - wz; // vx + vy - wz
+
+        // 向き補正
+        v3 *= -1;
+        v2 *= -1;
+
+        // 正規化
+        float max_v = std::max(
+            std::max(fabsf(v1), fabsf(v2)),
+            std::max(fabsf(v3), fabsf(v4)));
+
+        if (max_v < 1.0f)
+            max_v = 1.0f;
+
+        turn_v1_ = v1 / max_v;
+        turn_v2_ = v2 / max_v;
+        turn_v3_ = v3 / max_v;
+        turn_v4_ = v4 / max_v;
+
+        const double turn_sec = (std::abs(turn_deg) / 90.0) * turn_sec_per_90deg_;
+        turn_end_time_ = this->now() + rclcpp::Duration::from_seconds(turn_sec);
+        mode_ = StepMode::MFF_TURN;
+
+        RCLCPP_INFO(get_logger(), "MFF turn started: %ld deg (%.2f s)", static_cast<long>(turn_deg), turn_sec);
+        return true;
     }
 
     void start_step_down() {
@@ -188,7 +237,8 @@ private:
         NONE,
         WALL_ALIGN, // 壁調整PID（角度・距離を整えてから段差上りへ自動移行）
         STEP_UP,
-        STEP_DOWN
+        STEP_DOWN,
+        MFF_TURN
     };
 
     // 状態管理（上り）
@@ -220,6 +270,13 @@ private:
 
     StepMode mode_ = StepMode::NONE;
     bool mff_mode_enabled_ = false;
+    rclcpp::Time turn_end_time_;
+    float turn_v1_ = 0.0f;
+    float turn_v2_ = 0.0f;
+    float turn_v3_ = 0.0f;
+    float turn_v4_ = 0.0f;
+    static constexpr float turn_speed_norm_ = 0.5f;
+    static constexpr double turn_sec_per_90deg_ = 3.00;
 
     StepUpState state_up_ = StepUpState::IDLE;
     StepDownState state_down_ = StepDownState::IDLE;
@@ -555,6 +612,23 @@ private:
         }
     }
 
+    void mff_turn_sequence() {
+        if (this->now() >= turn_end_time_) {
+            pkt.setMD(MD5, 0);
+            pkt.setMD(MD6, 0);
+            pkt.setMD(MD7, 0);
+            pkt.setMD(MD8, 0);
+            mode_ = StepMode::NONE;
+            RCLCPP_INFO(get_logger(), "MFF turn finished.");
+            return;
+        }
+
+        pkt.setMD(MD5, static_cast<int16_t>(turn_v1_ * align_duty_max));
+        pkt.setMD(MD6, static_cast<int16_t>(turn_v2_ * align_duty_max));
+        pkt.setMD(MD7, static_cast<int16_t>(turn_v3_ * align_duty_max));
+        pkt.setMD(MD8, static_cast<int16_t>(turn_v4_ * align_duty_max));
+    }
+
     void loop() {
         if (!mff_mode_enabled_) {
             return;
@@ -582,6 +656,10 @@ private:
 
         case StepMode::STEP_DOWN:
             step_down_sequence();
+            break;
+
+        case StepMode::MFF_TURN:
+            mff_turn_sequence();
             break;
         }
     }
@@ -659,10 +737,18 @@ public:
             10,
             std::bind(&HardWareControl::step_callback, this, std::placeholders::_1));
 
+        turn_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+            "/r2_mff_turn_cmd",
+            10,
+            std::bind(&HardWareControl::turn_callback, this, std::placeholders::_1));
+
         mode_cmd_sub_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
             "r2_drive_mode_cmd",
             10,
             std::bind(&HardWareControl::mode_cmd_callback, this, std::placeholders::_1));
+
+        odom_reset_pub_ = this->create_publisher<std_msgs::msg::Bool>(
+            "odom_reset", 10);
 
         RCLCPP_INFO(get_logger(),
                     "serial_tx_%d started.", device_id_);
@@ -682,6 +768,28 @@ private:
     int32_t sdm15_value[4] = {0, 0, 0, 0}; // sdm15の値を保存する配列
     int16_t lidar_x_value = 0;
     int16_t lidar_y_value = 0;
+    int32_t pending_step_cmd_ = 0;
+    int32_t pending_turn_deg_ = 0;
+    bool has_pending_turn_ = false;
+
+    void publish_odom_reset() {
+        std_msgs::msg::Bool reset_msg;
+        reset_msg.data = true;
+        odom_reset_pub_->publish(reset_msg);
+        RCLCPP_INFO(get_logger(), "Published odom_reset before MFF turn.");
+    }
+
+    void dispatch_step_command(int cmd) {
+        if (cmd == 1) {
+            // 壁調整PID → 自動段差上り
+            seq_->start_wall_alignment();
+        } else if (cmd == 2) {
+            // 壁調整なしで直接段差上り（角度・距離に関係なく実行）
+            seq_->start_step_up();
+        } else if (cmd == -1) {
+            seq_->start_step_down();
+        }
+    }
 
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
         if (!seq_->is_mff_mode_enabled()) {
@@ -778,6 +886,19 @@ private:
     void publisher_timer_callback() {
         if (!seq_->is_mff_mode_enabled()) {
             return;
+        }
+
+        if (!seq_->is_busy()) {
+            if (has_pending_turn_) {
+                publish_odom_reset();
+                if (seq_->start_mff_turn(pending_turn_deg_)) {
+                    has_pending_turn_ = false;
+                }
+            } else if (pending_step_cmd_ != 0) {
+                const int32_t cmd = pending_step_cmd_;
+                pending_step_cmd_ = 0;
+                dispatch_step_command(cmd);
+            }
         }
 
         std_msgs::msg::Int16MultiArray msg;
@@ -884,17 +1005,33 @@ private:
             return;
         }
 
-        int cmd = msg->data;
-        if (cmd == 1) {
-            // 壁調整PID → 自動段差上り
-            seq_->start_wall_alignment();
-        } else if (cmd == 2) {
-            // 壁調整なしで直接段差上り（角度・距離に関係なく実行）
-            seq_->start_step_up();
-        } else if (cmd == -1) {
-            seq_->start_step_down();
-        } else if (cmd == 0) {
-            // 何もしない（停止コマンドなどがあればここで処理）
+        const int32_t cmd = msg->data;
+        if (cmd == 0) {
+            return;
+        }
+
+        if (seq_->is_busy()) {
+            pending_step_cmd_ = cmd;
+            return;
+        }
+
+        dispatch_step_command(cmd);
+    }
+
+    void turn_callback(const std_msgs::msg::Int32::SharedPtr msg) {
+        if (!seq_->is_mff_mode_enabled()) {
+            return;
+        }
+
+        const int32_t turn_deg = msg->data;
+        if (turn_deg == 0) {
+            return;
+        }
+
+        publish_odom_reset();
+        if (!seq_->start_mff_turn(turn_deg)) {
+            pending_turn_deg_ = turn_deg;
+            has_pending_turn_ = true;
         }
     }
 
@@ -918,7 +1055,9 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sdm15_sub3_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sdm15_sub4_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr step_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr turn_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mode_cmd_sub_;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr odom_reset_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     std::vector<int16_t> data_;
