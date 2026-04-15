@@ -30,7 +30,7 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #define RX16NUM 17         // 受信データ数
 #define PUBLISH_RATE_MS 20 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
 
-PacketController ctrlPkt;
+
 
 using namespace std::chrono_literals;
 
@@ -57,7 +57,7 @@ class serial_tx_7: public rclcpp::Node {
     };
 
         /*
-        マイコンに送信される配列"data_"
+        マイコンに送信される配列"data_"の解析
         debug: 機能未割り当て, MD: モータードライバー, TR: トランジスタ
         | data[n] | 詳細 | 範囲 |
         | ---- | ---- | ---- |
@@ -88,14 +88,14 @@ class serial_tx_7: public rclcpp::Node {
         | data[24] | TR8 | 0 or 1|
         */
 
-        serial_tx_7(): Node("serial_tx_7_" + std::to_string(OUTPUT_DEVICE_ID)) {
+        serial_tx_7(): Node("serial_tx_7_") {
 
         // 送信データを初期化
         tx_data_.assign(25, 0);
 
         // GUIからノードを受け取りたい（未実装）
         this->command_sub_ = this->create_subscription<std_msgs::msg::Int8>(
-            "/serial_tx_7_command", 10,
+            "/serial_tx_7", 10,
             [this](const std_msgs::msg::Int8::SharedPtr msg) {
                 this->on_command_received(msg);
             });
