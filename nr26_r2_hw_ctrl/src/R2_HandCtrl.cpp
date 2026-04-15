@@ -3,232 +3,266 @@ R2ハンド制御
 Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 */
 
-// まだ未確認！！！
-// 壊しても筆者は責任を負いません！！
-// リーダブルコードを心がけていますが、変数名や関数名が分かりにくい場合は遠慮なく質問してください。
-// ラムダ式を多用しています。
-
 // 標準
-#include <chrono>  // 時間管理
-#include <memory>  //ポインタ用
-#include <vector> //動的配列 std::vector を使うため
+#include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
-#include <thread>
+#include <memory>
+#include <string>
 
 // ROS
 #include "rclcpp/rclcpp.hpp"
-#include "sensor_msgs/msg/joy.hpp"
-#include <std_msgs/msg/int8.hpp>
-#include <std_msgs/msg/int16_multi_array.hpp>
-#include <std_msgs/msg/int32_multi_array.hpp>
+#include "std_msgs/msg/int16_multi_array.hpp"
+#include "std_msgs/msg/int32.hpp"
+#include "std_msgs/msg/int32_multi_array.hpp"
+#include "std_msgs/msg/string.hpp"
 
-// 以下マイコンに合わせて設定
-#define OUTPUT_DEVICE_ID 2 // 出力マイコン（モーター制御）のID
-#define INPUT_DEVICE_ID  3 // 入力マイコン（マイクロスイッチやエンコーダ）のID
+// 自作
+#include "include/PacketController.hpp"
+PacketController pkt;
+
+// マイコン設定
+#define TARGET_DEVICE_ID 7 // 宛先マイコンのID
 #define TX16NUM 24         // 送信データ数
-#define RX16NUM 17         // 受信データ数
-#define PUBLISH_RATE_MS 20 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
-
-
+#define PUBLISH_RATE_MS 20 // publish周期(ms)
 
 using namespace std::chrono_literals;
 
-class serial_tx_7: public rclcpp::Node { 
-    //rclcpp::Nodeを継承してノードを作成
-    public:
-    enum HandState{
-        //ハンドの状態定義
-        HOME, //初期位置
-        READY, //回収待機
-        UP, //上段回収
-        MIDDLE,  //中段回収
-        LOW, //下段回収
-        HOLD, //KFS保持
-        MOVING, //KFS移動
-        SHOOT //TR中段シュート
+class HardWareControl : public rclcpp::Node {
+public:
+    HardWareControl(uint8_t device_id)
+        : Node("hardware_control_" + std::to_string(device_id)),
+          device_id_(device_id) {
+        publisher_ = this->create_publisher<std_msgs::msg::Int16MultiArray>(
+            "serial_tx_" + std::to_string(device_id_), 10);
+
+        // GUIから直接状態が送られる場合の互換経路
+        state_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+            "r2/task_state", 10,
+            std::bind(&HardWareControl::task_state_callback, this, std::placeholders::_1));
+
+        // r2_plannerが管理する現在状態（[state, color, cell, mode]）
+        auto status_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
+        status_sub_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
+            "r2/task_status", status_qos,
+            std::bind(&HardWareControl::task_status_callback, this, std::placeholders::_1));
+
+        status_text_sub_ = this->create_subscription<std_msgs::msg::String>(
+            "/r2/task_status_text", status_qos,
+            std::bind(&HardWareControl::task_status_text_callback, this, std::placeholders::_1));
+
+        timer_ = this->create_wall_timer(
+            std::chrono::milliseconds(PUBLISH_RATE_MS),
+            std::bind(&HardWareControl::publish_packet, this));
+
+        apply_state_to_packet(current_planner_state_);
+        RCLCPP_INFO(get_logger(), "serial_tx_%d started.", device_id_);
+    }
+
+private:
+    static constexpr int32_t STATE_KFS_HAND_INIT = 6;
+    static constexpr int32_t STATE_KFS_PICK_WAITING = 7;
+    static constexpr int32_t STATE_PICK_UP = 8;
+    static constexpr int32_t STATE_PICK_MIDDLE = 9;
+    static constexpr int32_t STATE_PICK_DOWN = 10;
+    static constexpr int32_t STATE_KFS_HOLD = 11;
+    static constexpr int32_t STATE_KFS_MOVE = 12;
+    static constexpr int32_t STATE_TTR_SHOOT_MIDDLE = 13;
+
+    enum class TargetHeight {
+        UP,
+        MIDDLE,
+        DOWN
     };
 
-    enum TargetHeight{
-        //KFSがある段の高さ定義
-        HIGH  // HIGH 
-        MIDDLE,  // MIDDLE
-        LOW, // LOW
-    };
+    int32_t current_planner_state_ = 0;
+    std::string current_state_name_ = "";
+    TargetHeight target_height_ = TargetHeight::DOWN;
 
-        /*
-        マイコンに送信される配列"data_"の解析
-        debug: 機能未割り当て, MD: モータードライバー, TR: トランジスタ
-        | data[n] | 詳細 | 範囲 |
-        | ---- | ---- | ---- |
-        | data[0] | debug | 0 or 1 |
-        | data[1] | MD1 | -100 ~ 100 |
-        | data[2] | MD2 | -100 ~ 100 |
-        | data[3] | MD3 | -100 ~ 100 |
-        | data[4] | MD4 | -100 ~ 100 |
-        | data[5] | MD5 | -100 ~ 100 |
-        | data[6] | MD6 | -100 ~ 100 |
-        | data[7] | MD7 | -100 ~ 100 |
-        | data[8] | MD8 | -100 ~ 100 |
-        | data[9] | Servo1 | 0 ~ 270 |
-        | data[10] | Servo2 | 0 ~ 270 |
-        | data[11] | Servo3 | 0 ~ 270 |
-        | data[12] | Servo4 | 0 ~ 270 |
-        | data[13] | Servo5 | 0 ~ 270 |
-        | data[14] | Servo6 | 0 ~ 270 |
-        | data[15] | Servo7 | 0 ~ 270 |
-        | data[16] | Servo8 | 0 ~ 270 |
-        | data[17] | TR1 | 0 or 1|
-        | data[18] | TR2 | 0 or 1|
-        | data[19] | TR3 | 0 or 1|
-        | data[20] | TR4 | 0 or 1|
-        | data[21] | TR5 | 0 or 1|
-        | data[22] | TR6 | 0 or 1|
-        | data[23] | TR7 | 0 or 1|
-        | data[24] | TR8 | 0 or 1|
-        */
-
-        serial_tx_7(): Node("serial_tx_7_") {
-
-        // 送信データを初期化
-        tx_data_.assign(25, 0);
-
-        // GUIからノードを受け取りたい（未実装）
-        this->command_sub_ = this->create_subscription<std_msgs::msg::Int8>(
-            "/serial_tx_7", 10,
-            [this](const std_msgs::msg::Int8::SharedPtr msg) {
-                this->on_command_received(msg);
-            });
-
-        // マイコンへのパブリッシャー
-        publisher_ = create_publisher<std_msgs::msg::Int16MultiArray>("serial_tx_7", 10);
-
-        // 50ms周期で送信タイマーを回す（番兵用）(C++だとselfの代わりにthisポインタを第一引数に使う)
-        timer_ = create_wall_timer(50ms, [this]() {
-            on_timer_tick();
-        });
-
-        RCLCPP_INFO(get_logger(), "R2 Hand Control Node Started.");
-
-    }
-
-    private:
-    // --- 各動作の数値設定 ---
-    void set_home_values() {
-        tx_data_[9] = 0;  // サーボ：待機
-        tx_data_[17] = 0;  // シリンダー：縮める
-        tx_data_[18] = 0;  // ハンド：開く
-    }
-    void set_ready_values() {
-        if (target_height_ == TargetHeight::HIGH) {
-            tx_data_[9] = 45; // 高い段差用角度
-        } else {
-            tx_data_[9] = 90; // 低い段差用角度
-        }
-        tx_data_[17] = 1;      // シリンダー：伸ばす
-    }
-    void set_up_values() {
-        tx_data_[18] = 1;      // ハンド：閉じる
-    }
-
-    void set_middle_values() {
-        tx_data_[18] = 1;      // ハンド：閉じる
-    }
-
-    void set_low_values() {
-        tx_data_[18] = 1;      // ハンド：閉じる
-    }
-    void set_hold_values() {
-        tx_data_[17] = 1;      // シリンダー：伸ばす
-        tx_data_[18] = 1;      // ハンド：閉じる
-    }
-    void set_moving_values() {
-        tx_data_[17] = 1;      // シリンダー：伸ばす
-        tx_data_[18] = 1;      // ハンド：閉じる
-    }
-    void set_shoot_values() {
-        tx_data_[17] = 1;      // シリンダー：伸ばす
-        tx_data_[18] = 1;      // ハンド：閉じる
-    }
-
-    void on_command_received(const std_msgs::msg::Int8::SharedPtr msg) {
-        int cmd = msg->data;
-        // 状態遷移に応じて設定
-        if (cmd == 10) {
-            target_height_ = TargetHeight::LOW;
-            current_state_ = HandState::EXTEND;
-        } else if (cmd == 20) {
-            target_height_ = TargetHeight::HIGH;
-            current_state_ = HandState::EXTEND;
-        } else if (cmd == 0) {
-            current_state_ = HandState::HOME;
-        }
-        state_duration_count_ = 0; // カウンタリセット
-    }
-
-    void on_timer_tick() {
-        // シーケンスの更新
-        update_sequence();
-
-        // データの送信
-        std_msgs::msg::Int16MultiArray msg;
-        msg.data = tx_data_;
-        publisher_->publish(msg);
-
-        // 状態維持時間をカウント
-        state_duration_count_++;
-    }
-
-    void update_sequence() {
-        switch (current_state_) {
-            case HandState::HOME:
-                set_home_values();
-                break;
-
-            case HandState::EXTEND:
-                set_extend_values();
-                // 1秒待機
-                if (state_duration_count_ > 20) {
-                    current_state_ = HandState::GRASP;
-                    state_duration_count_ = 0;
-                }
-                break;
-
-            case HandState::GRASP:
-                set_grasp_values();
-                // 0.5秒待機
-                if (state_duration_count_ > 10) {
-                    current_state_ = HandState::RETRACT;
-                    state_duration_count_ = 0;
-                }
-                break;
-
-            case HandState::RETRACT:
-                tx_data_[17] = 0; // ハンドを閉じたままシリンダーを戻す
-                // 1秒待機してHOMEへ
-                if (state_duration_count_ > 20) {
-                    current_state_ = HandState::HOME;
-                    state_duration_count_ = 0;
-                }
-                break;
-        }
-    }
-
-    std::vector<int16_t> tx_data_; // マイコンへ送信するデータを格納するベクター（可変長配列用）
-    HandState current_state_ = HandState::HOME;
-    TargetHeight target_height_ = TargetHeight::LOW;
-    int state_duration_count_ = 0;
-    rclcpp::Subscription<std_msgs::msg::Int8>::SharedPtr command_sub_;
+    uint8_t device_id_;
     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr state_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr status_sub_;
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr status_text_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
+
+    static int32_t state_code_from_name(const std::string &state_name) {
+        if (state_name == "KFS_HAND_INIT")
+            return STATE_KFS_HAND_INIT;
+        if (state_name == "KFS_PICK_WAITING")
+            return STATE_KFS_PICK_WAITING;
+        if (state_name == "PICK_UP")
+            return STATE_PICK_UP;
+        if (state_name == "PICK_MIDDLE")
+            return STATE_PICK_MIDDLE;
+        if (state_name == "PICK_DOWN")
+            return STATE_PICK_DOWN;
+        if (state_name == "KFS_HOLD")
+            return STATE_KFS_HOLD;
+        if (state_name == "KFS_MOVE")
+            return STATE_KFS_MOVE;
+        if (state_name == "TTR_SHOOT_MIDDLE")
+            return STATE_TTR_SHOOT_MIDDLE;
+        return -1;
+    }
+
+    static std::string parse_state_name(const std::string &status_text) {
+        const std::string key = "state=";
+        const auto pos = status_text.find(key);
+        if (pos == std::string::npos) {
+            return "";
+        }
+
+        const auto begin = pos + key.size();
+        const auto end = status_text.find(' ', begin);
+        if (end == std::string::npos) {
+            return status_text.substr(begin);
+        }
+        return status_text.substr(begin, end - begin);
+    }
+
+    void reset_hand_outputs() {
+        pkt.setServo(SERVO1, 0);
+        pkt.setTR(TR1, false);
+        pkt.setTR(TR2, false);
+    }
+
+    void set_home_values() {
+        pkt.setServo(SERVO1, 0);
+        pkt.setTR(TR1, false); // シリンダー縮める
+        pkt.setTR(TR2, false); // ハンド開く
+    }
+
+    void set_ready_values() {
+        if (target_height_ == TargetHeight::UP) {
+            pkt.setServo(SERVO1, 45);
+        } else {
+            pkt.setServo(SERVO1, 90);
+        }
+        pkt.setTR(TR1, true); // シリンダー伸ばす
+        pkt.setTR(TR2, false);
+    }
+
+    void set_pick_values() {
+        pkt.setTR(TR1, true);
+        pkt.setTR(TR2, true); // ハンド閉じる
+    }
+
+    void set_hold_values() {
+        pkt.setTR(TR1, true);
+        pkt.setTR(TR2, true);
+    }
+
+    void set_moving_values() {
+        pkt.setTR(TR1, true);
+        pkt.setTR(TR2, true);
+    }
+
+    void set_shoot_values() {
+        pkt.setTR(TR1, true);
+        pkt.setTR(TR2, true);
+    }
+
+    void apply_state_to_packet(int32_t state_code) {
+        // 状態ごとに明示的に値を作り直し、残留値を防ぐ
+        reset_hand_outputs();
+
+        switch (state_code) {
+        case STATE_KFS_HAND_INIT:
+            set_home_values();
+            break;
+        case STATE_KFS_PICK_WAITING:
+            set_ready_values();
+            break;
+        case STATE_PICK_UP:
+            target_height_ = TargetHeight::UP;
+            set_ready_values();
+            set_pick_values();
+            break;
+        case STATE_PICK_MIDDLE:
+            target_height_ = TargetHeight::MIDDLE;
+            set_ready_values();
+            set_pick_values();
+            break;
+        case STATE_PICK_DOWN:
+            target_height_ = TargetHeight::DOWN;
+            set_ready_values();
+            set_pick_values();
+            break;
+        case STATE_KFS_HOLD:
+            set_hold_values();
+            break;
+        case STATE_KFS_MOVE:
+            set_moving_values();
+            break;
+        case STATE_TTR_SHOOT_MIDDLE:
+            set_shoot_values();
+            break;
+        default:
+            // ハンド非関連状態では安全側
+            set_home_values();
+            break;
+        }
+    }
+
+    void task_state_callback(const std_msgs::msg::Int32::SharedPtr msg) {
+        const int32_t next_state = msg->data;
+        if (next_state == current_planner_state_) {
+            return;
+        }
+
+        current_planner_state_ = next_state;
+        apply_state_to_packet(current_planner_state_);
+        RCLCPP_INFO(get_logger(), "task_state -> %ld", static_cast<long>(current_planner_state_));
+    }
+
+    void task_status_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        if (msg->data.empty()) {
+            return;
+        }
+
+        const int32_t next_state = msg->data[0];
+        if (next_state == current_planner_state_) {
+            return;
+        }
+
+        current_planner_state_ = next_state;
+        apply_state_to_packet(current_planner_state_);
+        RCLCPP_INFO(get_logger(), "task_status.state -> %ld", static_cast<long>(current_planner_state_));
+    }
+
+    void task_status_text_callback(const std_msgs::msg::String::SharedPtr msg) {
+        const std::string next_state_name = parse_state_name(msg->data);
+        if (next_state_name.empty() || next_state_name == current_state_name_) {
+            return;
+        }
+
+        current_state_name_ = next_state_name;
+        current_planner_state_ = state_code_from_name(current_state_name_);
+        apply_state_to_packet(current_planner_state_);
+
+        RCLCPP_INFO(get_logger(), "task_status_text.state -> %s", current_state_name_.c_str());
+    }
+
+    void publish_packet() {
+        std_msgs::msg::Int16MultiArray msg;
+        msg.data = pkt.toVector();
+        publisher_->publish(msg);
+    }
 };
 
 int main(int argc, char **argv) {
+    rclcpp::init(argc, argv);
 
-    rclcpp::init(argc, argv); // ROS2の初期化
-    auto hand_control_node = std::make_shared<serial_tx_7>();// ノードのインスタンス作成
-    rclcpp::spin(hand_control_node); // ノードをスピンしてコールバックを処理
-    rclcpp::shutdown(); // 処理終了
+    std::string figletout = "figlet R2_HandCtrl";
+    int result = std::system(figletout.c_str());
+    if (result != 0) {
+        std::cerr << "Please install 'figlet' with: sudo apt install figlet\n";
+    }
 
+    auto hardware_control = std::make_shared<HardWareControl>(TARGET_DEVICE_ID);
+    rclcpp::spin(hardware_control);
+    rclcpp::shutdown();
     return 0;
 }
