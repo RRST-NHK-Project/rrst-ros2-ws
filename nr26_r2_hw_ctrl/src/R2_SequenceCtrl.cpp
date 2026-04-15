@@ -204,8 +204,8 @@ private:
     static constexpr double down_final_forward_wait = 1.0;
 
     // 速度関連
-    static constexpr int forward_speed = 40;
-    static constexpr int up_speed = 40;
+    static constexpr int forward_speed = 60;
+    static constexpr int up_speed = 55;
     static constexpr int dis = 100;      // 障害物と見なす距離の閾値（要調整）
     static constexpr int down_dis = 100; // sdm15の値がこの時間(ms)更新されなければタイムアウトと見なす
 
