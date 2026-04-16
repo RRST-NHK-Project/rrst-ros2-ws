@@ -33,6 +33,8 @@ class CubeDetectorNode(Node):
         self.declare_parameter("cube_3d_size_tolerance_mm", 100.0)
         self.declare_parameter("mask_y_top_ratio", 0.0)
         self.declare_parameter("mask_y_bottom_ratio", 0.5)
+        self.declare_parameter("mask_range_topic", "/cube_detection/mask_y_range")
+        self.declare_parameter("use_mask_range_topic", True)
         self.declare_parameter("pointcloud_topic", "/camera/camera/depth/color/points")
         self.declare_parameter("use_pointcloud_for_pose", True)
         self.declare_parameter("pointcloud_max_age_sec", 0.35)
@@ -69,6 +71,10 @@ class CubeDetectorNode(Node):
         self.mask_y_bottom_ratio = float(
             self.get_parameter("mask_y_bottom_ratio").value
         )
+        self.mask_range_topic = str(self.get_parameter("mask_range_topic").value)
+        self.use_mask_range_topic = bool(
+            self.get_parameter("use_mask_range_topic").value
+        )
         self.pointcloud_topic = str(self.get_parameter("pointcloud_topic").value)
         self.use_pointcloud_for_pose = bool(
             self.get_parameter("use_pointcloud_for_pose").value
@@ -99,6 +105,10 @@ class CubeDetectorNode(Node):
             self.create_subscription(
                 CameraInfo, self.camera_info_topic, self.camera_info_callback, 10
             )
+        if self.use_mask_range_topic:
+            self.create_subscription(
+                Float32MultiArray, self.mask_range_topic, self.mask_range_callback, 10
+            )
         if self.use_pointcloud_for_pose:
             self.create_subscription(
                 PointCloud2, self.pointcloud_topic, self.pointcloud_callback, 10
@@ -106,6 +116,7 @@ class CubeDetectorNode(Node):
 
         self.get_logger().info(
             f"cube_detector started. depth_topic={image_topic}, "
+            f"mask_range_topic={self.mask_range_topic}, "
             f"pointcloud_for_pose={self.use_pointcloud_for_pose}, "
             f"pointcloud_topic={self.pointcloud_topic}"
         )
@@ -127,6 +138,26 @@ class CubeDetectorNode(Node):
 
     def pointcloud_callback(self, msg: PointCloud2) -> None:
         self.latest_pointcloud = msg
+
+    def mask_range_callback(self, msg: Float32MultiArray) -> None:
+        try:
+            data = list(msg.data or [])
+            if len(data) < 2:
+                return
+
+            top_ratio = float(data[0])
+            bottom_ratio = float(data[1])
+
+            top_ratio = float(np.clip(top_ratio, 0.0, 1.0))
+            bottom_ratio = float(np.clip(bottom_ratio, 0.0, 1.0))
+
+            if bottom_ratio < top_ratio:
+                top_ratio, bottom_ratio = bottom_ratio, top_ratio
+
+            self.mask_y_top_ratio = top_ratio
+            self.mask_y_bottom_ratio = bottom_ratio
+        except Exception:
+            return
 
     def unproject_point(self, u: float, v: float, z_mm: float) -> tuple:
         """

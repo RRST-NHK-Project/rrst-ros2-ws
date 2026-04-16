@@ -1,20 +1,13 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
-    camera_pitch_correction_deg = LaunchConfiguration("camera_pitch_correction_deg")
+    camera_pitch_correction_deg = 0.0
+    use_mask_range_topic = True
 
     return LaunchDescription(
         [
-            DeclareLaunchArgument(
-                "camera_pitch_correction_deg",
-                default_value="0.0",
-                description="Camera pitch correction in degrees (downward tilt positive).",
-            ),
             Node(
                 package="cube_detection",
                 executable="cube_detector",
@@ -56,10 +49,10 @@ def generate_launch_description():
                         "mask_y_top_ratio": 0.0,
                         # 画像下部のマスク比率 (0.0=全体, 1.0=マスク全体) - デフォルト0.5で下半分をマスク
                         "mask_y_bottom_ratio": 0.5,
+                        # マスク範囲トピックを使うか
+                        "use_mask_range_topic": True,
                         # カメラ取り付け角補正 (deg) - 下向き取り付けなら正の値
-                        "camera_pitch_correction_deg": ParameterValue(
-                            camera_pitch_correction_deg, value_type=float
-                        ),
+                        "camera_pitch_correction_deg": 0.0,
                     }
                 ],
             ),
