@@ -3,12 +3,13 @@ R2機構制御
 Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 */
 
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <iostream>
 #include <thread>
 #include <vector>
-#include <atomic>
+#include <cstdint>
 
 // ROS
 #include "rclcpp/rclcpp.hpp"
@@ -29,6 +30,7 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 
 std::atomic<int16_t> g_micro1_sw{0}; // マイクロスイッチ(上): 1=押されている
 std::atomic<int16_t> g_micro2_sw{0}; // マイクロスイッチ(下): 1=押されている
+std::atomic<int16_t> g_enc1_val{0};  // エンコーダ1: data[1]から受信
 
 // フォークリフト座標管理 (EncoderCoordinator)
 // エンコーダ減少 -> 座標増加 / エンコーダ増加 -> 座標減少
@@ -37,7 +39,6 @@ std::atomic<int64_t> g_zero_offset{0};        // 下端リセット時の絶対�
 std::atomic<int16_t> g_last_enc1_val{0};      // 前回のエンコーダ生値
 std::atomic<bool> g_coord_initialized{false}; // 初期化フラグ
 std::atomic<int64_t> g_abs_coord{0};          // 最終的な座標(下端=0方向=プラス)
-
 
 class HardWareControl : public rclcpp::Node {
 public:
@@ -152,98 +153,72 @@ private:
         // 絶対座標に基づく減速 + マイクロスイッチによる方向制限
         // =================================================================
 
+        // 座標: 下端スイッチ押下で 0 にリセット
+        //   座標 <= 3 → 減速 (正回転=30, 逆回転=-30)
+        //   座標 > 3  → 通常速度 (正回転=100, 逆回転=-100)
+        //   上マイクロスイッチ押下 → 正回転禁止、逆回転のみ許可
+        //   下マイクロスイッチ押下 → 逆回転禁止、正回転のみ許可
+
         int16_t micro1_sw = g_micro1_sw.load(); 
         int16_t micro2_sw = g_micro2_sw.load(); 
 
-        static const int NORMAL_SPEED = 50;
-        static const int SLOW_SPEED   = 30;
+        static const int NORMAL_SPEED = 50; // 通常速度
+        static const int SLOW_SPEED   = 30;  // 減速後速度
 
-        static const double COUNTS_PER_ROTATION = 8000.0;
+        // モーター1回転あたりのエンコーダのカウント数
+        // 実験結果により、1回転 = 8000 カウント に設定
+        static const double COUNTS_PER_ROTATION = 355.0;
 
+        // 符号付き16bitの飛躍(-32768〜32767)は、差分累積(g_abs_coord)により計算・解決済み
+        // ※上昇時（エンコーダ減少）に diff がマイナスになるため、「- diff」の計算によって絶対座標は増加（0→50）する
         int64_t abs_coord = g_abs_coord.load(); 
         double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
 
-        // ヒステリシス（遊び）を持たせた減速ゾーン判定
+        // ヒステリシス（遊び）を持たせた減速ゾーン判定（チャタリング防止用）
+        // 下端付近 (0〜3回転) または 上端付近 (47〜50回転) で減速
         static bool is_fork_slow = false;
         if (rot_units <= 1.0 || rot_units >= 6.0) {
             is_fork_slow = true;
         } else if (rot_units >= 1.5 && rot_units <= 5.5) {
-            is_fork_slow = false;
+            is_fork_slow = false; // ヒステリシスにより、ゾーンから少し離れるまで通常速度に戻さない
         }
         bool in_slow_zone = is_fork_slow;
 
-        int fwd_speed = in_slow_zone ?  SLOW_SPEED :  NORMAL_SPEED;
-        int rev_speed = in_slow_zone ? -SLOW_SPEED : -NORMAL_SPEED;
+        // 回転方向に応じた速度を決定
+        int fwd_speed = in_slow_zone ?  SLOW_SPEED :  NORMAL_SPEED;  // 正回転(上昇)の速度
+        int rev_speed = in_slow_zone ? -SLOW_SPEED : -NORMAL_SPEED;  // 逆回転(下降)の速度
 
         if (micro2_sw == 1) {
-            // 上端制限(micro2_sw): 正回転(L1)禁止
+            // ★上端制限(micro2_sw): これ以上上に行かないように正回転(L1)を禁止し、逆回転(R1)のみ許可
             if (R1 == 1) {
                 data_[2] = rev_speed;
             } else {
                 data_[2] = 0;
             }
-        } else if (micro1_sw == 1 || rot_units >= 7.0) {
-            // 下端制限(micro1_sw): 逆回転(R1)禁止
-            if (L1 == 1) {
+        } else if (micro1_sw == 1) {
+            // ★下端制限(micro1_sw): これ以上下に行かないように逆回転(R1)を禁止し、正回転(L1)のみ許可
+            if (L1 == 1 || rot_units >= 7.0) {
                 data_[2] = fwd_speed;
             } else {
                 data_[2] = 0;
             }
         } else {
-            // 通常
+            // マイクロスイッチに触れていない通常の範囲
             if (L1 == 1) {
-                data_[2] = fwd_speed;
+                data_[2] = fwd_speed; // 上昇方向
             } else if (R1 == 1) {
-                data_[2] = rev_speed;
+                data_[2] = rev_speed; // 下降方向
             } else {
                 data_[2] = 0;
             }
         }
 
+        // フォークリフト制御のデバックログ
         RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
             "【フォーク制御】回転数=%.2f, 減速=%s, 上端SW=%d, 下端SW=%d, 出力=%d",
             rot_units, in_slow_zone ? "ON" : "OFF",
             micro2_sw, micro1_sw, data_[2]);
 
-        // =================================================================
-        // LR
-        // マガジン調整用
-        // =================================================================
-        static int MAG_ADJ_STEP = 10;
-        static int up_pre = 0;
-        static int down_pre = 0;
-        static int mag_servo_angle = 0;
-
-        if (UP == 1 && up_pre == 0) {
-            mag_servo_angle += MAG_ADJ_STEP;
-            data_[9] = mag_servo_angle;
-        }
-        up_pre = UP;
-        if (DOWN == 1 && down_pre == 0) {
-            mag_servo_angle -= MAG_ADJ_STEP;
-            data_[9] = mag_servo_angle;
-        }
-        down_pre = DOWN;
-
-        // =================================================================
-        // LR
-        // マガジン調整用
-        // =================================================================
-        static int MAG_ADJ_STEP_ = 10;
-        static int triangle_pre = 0;
-        static int cross_pre = 0;
-        static int mag_servo_angle_ = 0;
-
-        if (TRIANGLE == 1 && triangle_pre == 0) {
-            mag_servo_angle_ -= MAG_ADJ_STEP;
-            data_[10] = mag_servo_angle_;
-        }
-        triangle_pre = TRIANGLE;
-        if (CROSS == 1 && cross_pre == 0) {
-            mag_servo_angle_ += MAG_ADJ_STEP;
-            data_[10] = mag_servo_angle_;
-        }
-        cross_pre = CROSS;
 
         // デバッグ用
         RCLCPP_INFO(
@@ -277,6 +252,8 @@ private:
         // int16_t SW7 = msg->data[15];
         // int16_t SW8 = msg->data[16];
 
+        // ★★★ コントローラーの操作が無い時でも、マイクロスイッチの安全停止を最優先で適用する ★★★
+        // （PS4コントローラーのイベントが来ない間も常に制限をかけるため、ここに記述する）
         int16_t micro1_sw = g_micro1_sw.load(); 
         int16_t micro2_sw = g_micro2_sw.load(); 
 
@@ -311,6 +288,7 @@ private:
         // マイクロスイッチの値を更新 (物理配線に合わせて修正: 9=下, 10=上)
         g_micro1_sw = msg->data[10]; // 上端スイッチ(micro1)
         g_micro2_sw = msg->data[9];  // 下端スイッチ(micro2)
+        g_enc1_val  = msg->data[1];  // エンコーダ1
 
         // =============================================================
         // 座標調査・ラップアラウンド計算実装（過去コード移植版）
@@ -348,7 +326,7 @@ private:
         int64_t abs_coord = -(total_encoder - zero_offset);
         g_abs_coord.store(abs_coord);
 
-        double rot = (double)abs_coord / 8000.0; 
+        double rot = (double)abs_coord / 355.0; 
 
         if (diff != 0) {
             RCLCPP_INFO(get_logger(), 
@@ -362,12 +340,26 @@ private:
                 (int)r_count, abs_coord, rot);
         }
 
+        // --- 通信デバッグ追加 ---
+        static uint64_t packet_count = 0;
+        packet_count++;
+
+        // 状態変化時のみ即時表示
         static int16_t l9=0, l10=0;
         if (msg->data[9] != l9 || msg->data[10] != l10) {
             RCLCPP_INFO(get_logger(), "SW Changed! [下(9):%d, 上(10):%d]", 
                         msg->data[9], msg->data[10]);
             l9 = msg->data[9]; l10 = msg->data[10];
         }
+
+        // 定期ダンプに受信件数を追加
+        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000, 
+            "RX Heartbeat (Total:%lu) | Dump: [%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d]",
+            packet_count,
+            msg->data[0], msg->data[1], msg->data[2], msg->data[3], 
+            msg->data[4], msg->data[5], msg->data[6], msg->data[7], 
+            msg->data[8], msg->data[9], msg->data[10], msg->data[11], 
+            msg->data[12], msg->data[13], msg->data[14], msg->data[15]);
 
         // 以降、受信データを使った処理を記述
 
