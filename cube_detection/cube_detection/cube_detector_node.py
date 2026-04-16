@@ -1,10 +1,12 @@
 import cv2
 import numpy as np
 import rclpy
+import struct
 from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo
 from sensor_msgs.msg import Image
+from sensor_msgs.msg import PointCloud2
 from std_msgs.msg import Bool, Float32MultiArray
 
 
@@ -31,6 +33,10 @@ class CubeDetectorNode(Node):
         self.declare_parameter("cube_3d_size_tolerance_mm", 100.0)
         self.declare_parameter("mask_y_top_ratio", 0.0)
         self.declare_parameter("mask_y_bottom_ratio", 0.5)
+        self.declare_parameter("pointcloud_topic", "/camera/camera/depth/color/points")
+        self.declare_parameter("use_pointcloud_for_pose", True)
+        self.declare_parameter("pointcloud_max_age_sec", 0.35)
+        self.declare_parameter("camera_pitch_correction_deg", 0.0)
 
         image_topic = self.get_parameter("image_topic").value
         self.central_window_px = int(self.get_parameter("central_window_px").value)
@@ -63,6 +69,16 @@ class CubeDetectorNode(Node):
         self.mask_y_bottom_ratio = float(
             self.get_parameter("mask_y_bottom_ratio").value
         )
+        self.pointcloud_topic = str(self.get_parameter("pointcloud_topic").value)
+        self.use_pointcloud_for_pose = bool(
+            self.get_parameter("use_pointcloud_for_pose").value
+        )
+        self.pointcloud_max_age_sec = float(
+            self.get_parameter("pointcloud_max_age_sec").value
+        )
+        self.camera_pitch_correction_deg = float(
+            self.get_parameter("camera_pitch_correction_deg").value
+        )
 
         self.runtime_fx_px = self.camera_fx_px
         self.runtime_fy_px = self.camera_fy_px
@@ -70,6 +86,7 @@ class CubeDetectorNode(Node):
         self.runtime_cy_px = self.camera_cy_px
 
         self.bridge = CvBridge()
+        self.latest_pointcloud = None
 
         self.detected_pub = self.create_publisher(Bool, "/cube_detection/detected", 10)
         self.info_pub = self.create_publisher(
@@ -82,8 +99,16 @@ class CubeDetectorNode(Node):
             self.create_subscription(
                 CameraInfo, self.camera_info_topic, self.camera_info_callback, 10
             )
+        if self.use_pointcloud_for_pose:
+            self.create_subscription(
+                PointCloud2, self.pointcloud_topic, self.pointcloud_callback, 10
+            )
 
-        self.get_logger().info(f"cube_detector started. depth_topic={image_topic}")
+        self.get_logger().info(
+            f"cube_detector started. depth_topic={image_topic}, "
+            f"pointcloud_for_pose={self.use_pointcloud_for_pose}, "
+            f"pointcloud_topic={self.pointcloud_topic}"
+        )
 
     def camera_info_callback(self, msg: CameraInfo) -> None:
         try:
@@ -99,6 +124,9 @@ class CubeDetectorNode(Node):
                 self.runtime_cy_px = cy
         except Exception:
             return
+
+    def pointcloud_callback(self, msg: PointCloud2) -> None:
+        self.latest_pointcloud = msg
 
     def unproject_point(self, u: float, v: float, z_mm: float) -> tuple:
         """
@@ -165,6 +193,155 @@ class CubeDetectorNode(Node):
         )
 
         return (size_ok, size_x, size_y, size_z)
+
+    def apply_camera_pitch_correction(self, points: np.ndarray) -> np.ndarray:
+        if points.shape[0] == 0:
+            return points
+
+        pitch_rad = np.deg2rad(self.camera_pitch_correction_deg)
+        if abs(pitch_rad) < 1e-8:
+            return points
+
+        cos_p = float(np.cos(-pitch_rad))
+        sin_p = float(np.sin(-pitch_rad))
+
+        corrected = points.copy()
+        y = corrected[:, 1]
+        z = corrected[:, 2]
+        corrected[:, 1] = cos_p * y - sin_p * z
+        corrected[:, 2] = sin_p * y + cos_p * z
+        return corrected
+
+    def estimate_face_yaw_deg_from_points(self, points: np.ndarray) -> float:
+        if points.shape[0] < 10:
+            return float("nan")
+
+        corrected_points = self.apply_camera_pitch_correction(points)
+
+        centered = corrected_points - np.mean(corrected_points, axis=0, keepdims=True)
+
+        try:
+            _, _, vh = np.linalg.svd(centered, full_matrices=False)
+        except np.linalg.LinAlgError:
+            return float("nan")
+
+        normal = vh[-1, :]
+        normal_norm = float(np.linalg.norm(normal))
+        if normal_norm < 1e-6:
+            return float("nan")
+
+        normal = normal / normal_norm
+        if normal[2] < 0.0:
+            normal = -normal
+
+        yaw_deg = float(np.degrees(np.arctan2(normal[0], normal[2])))
+        return yaw_deg
+
+    def estimate_face_yaw_deg_from_depth(
+        self, depth_image: np.ndarray, comp_mask: np.ndarray
+    ) -> float:
+        """
+        深度画像を逆投影して検出面の法線YAWを推定
+        カメラに対して正対時に 0 deg
+        """
+        ys, xs = np.where(comp_mask > 0)
+        point_count = len(xs)
+        if point_count < 30:
+            return float("nan")
+
+        # 点数が多すぎると重いので間引く
+        sample_step = max(1, point_count // 1500)
+        points_3d = []
+        for x, y in zip(xs[::sample_step], ys[::sample_step]):
+            z_mm = depth_image[y, x]
+            if z_mm > 0:
+                x_mm, y_mm, z_mm = self.unproject_point(float(x), float(y), float(z_mm))
+                points_3d.append((x_mm, y_mm, z_mm))
+
+        if len(points_3d) < 10:
+            return float("nan")
+
+        points = np.asarray(points_3d, dtype=np.float32)
+        points[:, :2] /= 1000.0
+        points[:, 2] /= 1000.0
+        return self.estimate_face_yaw_deg_from_points(points)
+
+    def estimate_face_yaw_deg_from_pointcloud(
+        self, comp_mask: np.ndarray, image_msg: Image
+    ) -> float:
+        cloud = self.latest_pointcloud
+        if cloud is None:
+            return float("nan")
+
+        if cloud.height <= 1:
+            return float("nan")
+
+        image_h, image_w = comp_mask.shape
+        if cloud.width != image_w or cloud.height != image_h:
+            return float("nan")
+
+        image_stamp_ns = int(image_msg.header.stamp.sec) * 1_000_000_000 + int(
+            image_msg.header.stamp.nanosec
+        )
+        cloud_stamp_ns = int(cloud.header.stamp.sec) * 1_000_000_000 + int(
+            cloud.header.stamp.nanosec
+        )
+        age_sec = abs(image_stamp_ns - cloud_stamp_ns) / 1_000_000_000.0
+        if age_sec > self.pointcloud_max_age_sec:
+            return float("nan")
+
+        field_offsets = {field.name: int(field.offset) for field in cloud.fields}
+        if (
+            "x" not in field_offsets
+            or "y" not in field_offsets
+            or "z" not in field_offsets
+        ):
+            return float("nan")
+
+        x_offset = field_offsets["x"]
+        y_offset = field_offsets["y"]
+        z_offset = field_offsets["z"]
+
+        ys, xs = np.where(comp_mask > 0)
+        point_count = len(xs)
+        if point_count < 30:
+            return float("nan")
+
+        sample_step = max(1, point_count // 1500)
+        unpack_fmt = ">f" if cloud.is_bigendian else "<f"
+        point_step = int(cloud.point_step)
+        row_step = int(cloud.row_step)
+
+        points_3d = []
+        for x_px, y_px in zip(xs[::sample_step], ys[::sample_step]):
+            base = int(y_px) * row_step + int(x_px) * point_step
+            x_m = struct.unpack_from(unpack_fmt, cloud.data, base + x_offset)[0]
+            y_m = struct.unpack_from(unpack_fmt, cloud.data, base + y_offset)[0]
+            z_m = struct.unpack_from(unpack_fmt, cloud.data, base + z_offset)[0]
+
+            if not np.isfinite(x_m) or not np.isfinite(y_m) or not np.isfinite(z_m):
+                continue
+            if z_m <= 0.0:
+                continue
+            points_3d.append((x_m, y_m, z_m))
+
+        if len(points_3d) < 10:
+            return float("nan")
+
+        points = np.asarray(points_3d, dtype=np.float32)
+        return self.estimate_face_yaw_deg_from_points(points)
+
+    def estimate_face_yaw_deg(
+        self, depth_image: np.ndarray, comp_mask: np.ndarray, image_msg: Image
+    ) -> float:
+        if self.use_pointcloud_for_pose:
+            yaw_from_cloud = self.estimate_face_yaw_deg_from_pointcloud(
+                comp_mask, image_msg
+            )
+            if np.isfinite(yaw_from_cloud):
+                return yaw_from_cloud
+
+        return self.estimate_face_yaw_deg_from_depth(depth_image, comp_mask)
 
     def image_callback(self, msg: Image) -> None:
         try:
@@ -326,6 +503,10 @@ class CubeDetectorNode(Node):
                 self.publish_no_detection(depth_image=depth_image, mask=band_mask)
                 return
 
+        face_yaw_deg = self.estimate_face_yaw_deg(depth_image, comp_mask, msg)
+        if not np.isfinite(face_yaw_deg):
+            face_yaw_deg = 0.0
+
         score = max(
             0.0,
             min(
@@ -340,8 +521,8 @@ class CubeDetectorNode(Node):
         detected_msg.data = True
         self.detected_pub.publish(detected_msg)
 
-
-        # 検出情報をFloat32MultiArrayで配信: [1.0, cx_norm, cy_norm, w_norm, h_norm, depth_m, score, area]
+        # 検出情報をFloat32MultiArrayで配信:
+        # [1.0, cx_norm, cy_norm, w_norm, h_norm, depth_m, score, area, face_yaw_deg]
         info_msg = Float32MultiArray()
         info_msg.data = [
             1.0,
@@ -352,6 +533,7 @@ class CubeDetectorNode(Node):
             depth_mm / 1000.0,
             score,
             float(area),
+            face_yaw_deg,
         ]
         self.info_pub.publish(info_msg)
 
@@ -362,6 +544,7 @@ class CubeDetectorNode(Node):
             center=(int(cx), int(cy)),
             depth_m=depth_mm / 1000.0,
             score=score,
+            face_yaw_deg=face_yaw_deg,
             mask=band_mask,
         )
 
@@ -371,7 +554,7 @@ class CubeDetectorNode(Node):
         self.detected_pub.publish(detected_msg)
 
         info_msg = Float32MultiArray()
-        info_msg.data = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        info_msg.data = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         self.info_pub.publish(info_msg)
 
         if depth_image is not None:
@@ -382,11 +565,20 @@ class CubeDetectorNode(Node):
                 center=None,
                 depth_m=0.0,
                 score=0.0,
+                face_yaw_deg=0.0,
                 mask=mask,
             )
 
     def publish_debug_image(
-        self, depth_image, detected, bbox, center, depth_m, score, mask=None
+        self,
+        depth_image,
+        detected,
+        bbox,
+        center,
+        depth_m,
+        score,
+        face_yaw_deg,
+        mask=None,
     ):
         clipped = np.clip(depth_image.astype(np.float32), 0.0, 4000.0)
         gray = (clipped / 4000.0 * 255.0).astype(np.uint8)
@@ -406,7 +598,10 @@ class CubeDetectorNode(Node):
             cv2.rectangle(debug, (x, y), (x + bw, y + bh), (0, 255, 0), 2)
             if center is not None:
                 cv2.circle(debug, center, 4, (0, 255, 0), -1)
-            text = f"Cube depth={depth_m:.2f}m score={score:.2f}"
+            text = (
+                f"Cube depth={depth_m:.2f}m score={score:.2f} "
+                f"yaw={face_yaw_deg:+.1f}deg"
+            )
             cv2.putText(
                 debug,
                 text,
