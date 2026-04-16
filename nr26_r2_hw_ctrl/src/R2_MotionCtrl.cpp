@@ -166,7 +166,7 @@ private:
         static const int SLOW_SPEED   = 30;  // 減速後速度
 
         // モーター1回転あたりのエンコーダのカウント数
-        // 実験結果により、1回転 = 8000 カウント に設定
+        // 実験結果により、1回転 = 355 カウント に設定
         static const double COUNTS_PER_ROTATION = 355.0;
 
         // 符号付き16bitの飛躍(-32768〜32767)は、差分累積(g_abs_coord)により計算・解決済み
@@ -175,7 +175,7 @@ private:
         double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
 
         // ヒステリシス（遊び）を持たせた減速ゾーン判定（チャタリング防止用）
-        // 下端付近 (0〜3回転) または 上端付近 (47〜50回転) で減速
+        // 下端付近 (0〜1回転) または 上端付近 (6〜7回転) で減速、7回転で停止
         static bool is_fork_slow = false;
         if (rot_units <= 1.0 || rot_units >= 6.0) {
             is_fork_slow = true;
@@ -215,7 +215,7 @@ private:
 
         // フォークリフト制御のデバックログ
         RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-            "【フォーク制御】回転数=%.2f, 減速=%s, 上端SW=%d, 下端SW=%d, 出力=%d",
+            "【フォーク制御】回転数=%.2f, 減速=%s, 始発SW=%d, 終点SW=%d, 出力=%d",
             rot_units, in_slow_zone ? "ON" : "OFF",
             micro2_sw, micro1_sw, data_[2]);
 
@@ -260,13 +260,13 @@ private:
         // 上昇中（data_[2] が正の値）かつ 上端スイッチが押されている場合
         if (micro2_sw == 1 && data_[2] > 0) {
             data_[2] = 0;
-            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】上端リミット到達！モーターの上昇を即時遮断しました！");
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】始発リミット到達！モーターの正回転を即時遮断しました！");
         }
         
         // 下降中（data_[2] が負の値）かつ 下端スイッチが押されている場合
         if (micro1_sw == 1 && data_[2] < 0) {
             data_[2] = 0;
-            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】下端リミット到達！モーターの下降を即時遮断しました！");
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】終点リミット到達！モーターの逆回転を即時遮断しました！");
         }
 
         msg.data = data_;
@@ -319,7 +319,7 @@ private:
 
         if (msg->data[9] != 0) {
             g_zero_offset.store(total_encoder);
-            RCLCPP_INFO(get_logger(), "[COORD RESET!] 下端ボタン押下により座標0へオフセット設定");
+            RCLCPP_INFO(get_logger(), "[COORD RESET!] 始発スイッチ押下により座標0へオフセット設定");
         }
 
         int64_t zero_offset = g_zero_offset.load();
