@@ -195,9 +195,9 @@ private:
             } else {
                 data_[2] = 0;
             }
-        } else if (micro1_sw == 1) {
+        } else if (micro1_sw == 1 || rot_units >= 7.0) {
             // ★下端制限(micro1_sw): これ以上下に行かないように逆回転(R1)を禁止し、正回転(L1)のみ許可
-            if (L1 == 1 || rot_units >= 7.0) {
+            if (L1 == 1) {
                 data_[2] = fwd_speed;
             } else {
                 data_[2] = 0;
