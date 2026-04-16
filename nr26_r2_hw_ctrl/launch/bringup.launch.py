@@ -25,8 +25,16 @@ def generate_launch_description():
         output='screen'
     )
 
+    r2_hand_ctrl = Node(
+        package='nr26_r2_hw_ctrl',
+        executable='r2_hand_ctrl',
+        name='r2_hand_ctrl',
+        output='screen'
+    )
+
     return LaunchDescription([
         joy_node,
         r2_md,
-        r2_mc
+        r2_mc,
+        r2_hand_ctrl
     ])

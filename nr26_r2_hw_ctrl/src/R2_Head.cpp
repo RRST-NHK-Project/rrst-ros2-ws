@@ -76,7 +76,6 @@ public:
         | data[21] | TR5 | 0 or 1|
         | data[22] | TR6 | 0 or 1|
         | data[23] | TR7 | 0 or 1|
-        | data[24] | TR8 | 0 or 1|
         */
 
         // joyノードのSubscribe
@@ -155,7 +154,7 @@ private:
         int16_t micro1_sw = g_micro1_sw.load(); 
         int16_t micro2_sw = g_micro2_sw.load(); 
 
-        static const int NORMAL_SPEED = 100;
+        static const int NORMAL_SPEED = 50;
         static const int SLOW_SPEED   = 30;
 
         static const double COUNTS_PER_ROTATION = 8000.0;

@@ -155,7 +155,7 @@ private:
         int16_t micro1_sw = g_micro1_sw.load(); 
         int16_t micro2_sw = g_micro2_sw.load(); 
 
-        static const int NORMAL_SPEED = 100;
+        static const int NORMAL_SPEED = 50;
         static const int SLOW_SPEED   = 30;
 
         static const double COUNTS_PER_ROTATION = 8000.0;
@@ -165,9 +165,9 @@ private:
 
         // ヒステリシス（遊び）を持たせた減速ゾーン判定
         static bool is_fork_slow = false;
-        if (rot_units <= 3.0 || rot_units >= 47.0) {
+        if (rot_units <= 1.0 || rot_units >= 6.0) {
             is_fork_slow = true;
-        } else if (rot_units >= 4.0 && rot_units <= 46.0) {
+        } else if (rot_units >= 1.5 && rot_units <= 5.5) {
             is_fork_slow = false;
         }
         bool in_slow_zone = is_fork_slow;
@@ -182,7 +182,7 @@ private:
             } else {
                 data_[2] = 0;
             }
-        } else if (micro1_sw == 1) {
+        } else if (micro1_sw == 1 || rot_units >= 7.0) {
             // 下端制限(micro1_sw): 逆回転(R1)禁止
             if (L1 == 1) {
                 data_[2] = fwd_speed;
