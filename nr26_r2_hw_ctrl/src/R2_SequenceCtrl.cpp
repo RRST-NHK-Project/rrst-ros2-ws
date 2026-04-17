@@ -58,9 +58,16 @@ public:
     SequenceControl()
         : Node("sequence_ctrl_node"),
           pid_angle_(2.0f, 0.0f, 0.1f, 0.6f),
-          pid_distance_(0.0008f, 0.0f, 0.0f, 0.4f) {
+          pid_distance_(0.0008f, 0.0f, 0.0f, 0.4f),
+          pid_cube_yaw_(2.0f, 0.0f, 0.1f, 0.6f),
+          pid_cube_dist_(0.5f, 0.0f, 0.0f, 0.4f),
+          pid_cube_lat_(1.2f, 0.0f, 0.0f, 0.4f) {
         pid_angle_.set_target(0.0f);
         pid_distance_.set_target(wall_approach_target_mm);
+        pid_cube_yaw_.set_target(0.0f);
+        pid_cube_dist_.set_target(cube_approach_target_m);
+        pid_cube_lat_.set_target(0.5f);
+        last_cube_update_ = rclcpp::Time(0, 0, get_clock()->get_clock_type());
 
         timer_ = this->create_wall_timer(
             10ms,
@@ -193,6 +200,32 @@ public:
         wall_angle = angle;
     }
 
+    // cube_detectionの情報を更新する関数
+    void set_cube_info(float depth_m, float cx_norm, float yaw_deg, bool detected) {
+        cube_depth_m_ = depth_m;
+        cube_cx_norm_ = cx_norm;
+        cube_yaw_deg_ = yaw_deg;
+        cube_detected_ = detected;
+        if (detected) {
+            last_cube_update_ = this->now();
+        }
+    }
+
+    // キューブへの平行接近PIDシーケンス開始
+    void start_cube_align() {
+        if (mode_ != StepMode::NONE) {
+            RCLCPP_WARN(get_logger(), "Sequence busy. CUBE_ALIGN ignored.");
+            return;
+        }
+        pid_cube_yaw_.reset();
+        pid_cube_dist_.reset();
+        pid_cube_lat_.reset();
+        pid_cube_dist_.set_target(cube_approach_target_m);
+        last_cube_update_ = this->now();
+        mode_ = StepMode::CUBE_ALIGN;
+        RCLCPP_INFO(get_logger(), "Cube alignment started. target_dist=%.2f m", cube_approach_target_m);
+    }
+
 private:
     // 以下シーケンス内で使用する変数
     //  待機時間（要調整）
@@ -227,10 +260,34 @@ private:
     PIDController pid_angle_;
     PIDController pid_distance_;
 
+    // キューブ接近用PID
+    // pid_cube_yaw_ : 目標0[rad]、入力face_yaw[rad]、出力=wz(回転)
+    // pid_cube_dist_: 目標cube_approach_target_m[m]、入力depth_m[m]、出力=vx(前後)
+    // pid_cube_lat_ : 目標0.5[norm]、入力cx_norm[0-1]、出力=vy(横移動)
+    PIDController pid_cube_yaw_;
+    PIDController pid_cube_dist_;
+    PIDController pid_cube_lat_;
+
     // シーケンスの状態管理に必要な変数
     int32_t sdm15_value_[4] = {0, 0, 0, 0};
     int16_t lidar_value = 0;
     double wall_angle = 0.0;
+
+    // キューブ検出データ
+    float cube_depth_m_ = 0.0f;
+    float cube_cx_norm_ = 0.5f;
+    float cube_yaw_deg_ = 0.0f;
+    bool cube_detected_ = false;
+    rclcpp::Time last_cube_update_;
+
+    // キューブ接近PID定数
+    static constexpr float cube_approach_target_m = 0.5f;     // 接近目標距離 [m]
+    static constexpr double cube_angle_threshold = 0.15;      // YAW整列完了閾値 [rad]（約9度）
+    static constexpr float cube_lateral_threshold = 0.08f;    // 横方向完了閾値 [cx_norm]
+    static constexpr float cube_distance_threshold = 0.08f;   // 距離完了閾値 [m]
+    static constexpr float cube_yaw_approach_thr = 0.30f;     // 前進開始YAW閾値 [rad]（約17度）
+    static constexpr double cube_detect_timeout_sec = 0.5;    // 検出途切れ待機タイムアウト [s]
+    static constexpr double cube_align_abort_sec = 3.0;       // アボートタイムアウト [s]
 
     // モードの管理
     enum class StepMode {
@@ -238,7 +295,8 @@ private:
         WALL_ALIGN, // 壁調整PID（角度・距離を整えてから段差上りへ自動移行）
         STEP_UP,
         STEP_DOWN,
-        MFF_TURN
+        MFF_TURN,
+        CUBE_ALIGN  // cube_detectionを使ったキューブへの平行接近PID
     };
 
     // 状態管理（上り）
@@ -635,6 +693,95 @@ private:
         pkt.setMD(MD8, static_cast<int16_t>(turn_v4_ * align_duty_max));
     }
 
+    // cube_detectionを使ったキューブへの平行接近シーケンス（PID制御）
+    // YAW PID  : face_yaw_deg → 0 [rad]（キューブ正面に向く）
+    // 距離PID  : depth_m → cube_approach_target_m [m]（目標距離まで前進）
+    // 横方向PID: cx_norm → 0.5（画像中央にキューブを合わせる）
+    void cube_alignment_sequence() {
+        constexpr float dt = 0.01f;
+
+        const double age_sec = (this->now() - last_cube_update_).seconds();
+
+        // 長時間検出なし → アボート
+        if (age_sec > cube_align_abort_sec) {
+            pkt.setMD(MD5, 0);
+            pkt.setMD(MD6, 0);
+            pkt.setMD(MD7, 0);
+            pkt.setMD(MD8, 0);
+            mode_ = StepMode::NONE;
+            RCLCPP_WARN(get_logger(), "CUBE_ALIGN aborted: cube lost for %.1f s", age_sec);
+            return;
+        }
+
+        // 短時間検出途切れ → 停止して待機
+        if (!cube_detected_ || age_sec > cube_detect_timeout_sec) {
+            pkt.setMD(MD5, 0);
+            pkt.setMD(MD6, 0);
+            pkt.setMD(MD7, 0);
+            pkt.setMD(MD8, 0);
+            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500, "CUBE_ALIGN: Waiting for cube detection...");
+            return;
+        }
+
+        const float yaw_rad = cube_yaw_deg_ * static_cast<float>(M_PI) / 180.0f;
+        const float lat_error = cube_cx_norm_ - 0.5f;
+        const float dist_error = cube_depth_m_ - cube_approach_target_m;
+
+        // 完了条件：角度・距離・横位置がすべて閾値内
+        if (std::abs(yaw_rad) < cube_angle_threshold &&
+            std::abs(dist_error) < cube_distance_threshold &&
+            std::abs(lat_error) < cube_lateral_threshold) {
+            pkt.setMD(MD5, 0);
+            pkt.setMD(MD6, 0);
+            pkt.setMD(MD7, 0);
+            pkt.setMD(MD8, 0);
+            mode_ = StepMode::NONE;
+            RCLCPP_INFO(get_logger(),
+                        "Cube aligned. yaw=%.2f deg, depth=%.3f m, cx=%.3f -> Done.",
+                        cube_yaw_deg_, cube_depth_m_, cube_cx_norm_);
+            return;
+        }
+
+        // ── YAW PID ──────────────────────────────────────────────
+        // error = 0 - yaw_rad。yaw_rad > 0 → wz < 0 → CCW回転
+        const float wz = pid_cube_yaw_.update(yaw_rad, dt);
+
+        // ── 距離PID ──────────────────────────────────────────────
+        // YAWが一定以内になってから前進開始
+        float vx = 0.0f;
+        if (std::abs(yaw_rad) < cube_yaw_approach_thr) {
+            // error = target - depth。遠い(depth > target) → error < 0 → vx < 0 → 前進
+            vx = pid_cube_dist_.update(cube_depth_m_, dt);
+        } else {
+            pid_cube_dist_.reset();
+        }
+
+        // ── 横方向PID ─────────────────────────────────────────────
+        // error = 0.5 - cx_norm。右寄り(cx > 0.5) → error < 0 → vy < 0
+        // vy の符号はカメラ取り付け方向による（要調整）
+        const float vy = pid_cube_lat_.update(cube_cx_norm_, dt);
+
+        // ── メカナム逆運動学（フル3軸） ───────────────────────────
+        float v1 = vx + vy + wz;
+        float v2 = -(vx + vy - wz);
+        float v3 = -(vx - vy - wz);
+        float v4 = vx - vy + wz;
+
+        v1 = std::clamp(v1, -1.0f, 1.0f);
+        v2 = std::clamp(v2, -1.0f, 1.0f);
+        v3 = std::clamp(v3, -1.0f, 1.0f);
+        v4 = std::clamp(v4, -1.0f, 1.0f);
+
+        pkt.setMD(MD5, static_cast<int16_t>(v1 * align_duty_max));
+        pkt.setMD(MD6, static_cast<int16_t>(v2 * align_duty_max));
+        pkt.setMD(MD7, static_cast<int16_t>(v3 * align_duty_max));
+        pkt.setMD(MD8, static_cast<int16_t>(v4 * align_duty_max));
+
+        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
+                             "CUBE_ALIGN: yaw=%.2f deg, depth=%.3f m, cx=%.3f | vx=%.3f vy=%.3f wz=%.3f",
+                             cube_yaw_deg_, cube_depth_m_, cube_cx_norm_, vx, vy, wz);
+    }
+
     void loop() {
         if (!mff_mode_enabled_) {
             return;
@@ -666,6 +813,10 @@ private:
 
         case StepMode::MFF_TURN:
             mff_turn_sequence();
+            break;
+
+        case StepMode::CUBE_ALIGN:
+            cube_alignment_sequence();
             break;
         }
     }
@@ -753,6 +904,16 @@ public:
             10,
             std::bind(&HardWareControl::mode_cmd_callback, this, std::placeholders::_1));
 
+        cube_detect_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+            "/cube_detection/info",
+            rclcpp::SensorDataQoS(),
+            std::bind(&HardWareControl::cube_detect_callback, this, std::placeholders::_1));
+
+        cube_align_cmd_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+            "/r2_cube_align_cmd",
+            10,
+            std::bind(&HardWareControl::cube_align_cmd_callback, this, std::placeholders::_1));
+
         odom_reset_pub_ = this->create_publisher<std_msgs::msg::Bool>(
             "odom_reset", 10);
 
@@ -818,8 +979,11 @@ private:
         bool L1 = msg->buttons[4];
         bool R1 = msg->buttons[5];
 
+        bool PS = msg->buttons.size() > 12 ? msg->buttons[12] : false;
+
         static bool last_up = false;
         static bool last_down = false;
+        static bool last_ps = false;
 
         if (UP && !last_up) {
             // 十字キー上：壁調整PID → 自動段差上り
@@ -830,8 +994,14 @@ private:
             seq_->start_step_down();
         }
 
+        if (PS && !last_ps) {
+            // PSボタン：キューブへの平行接近PID
+            seq_->start_cube_align();
+        }
+
         last_up = UP;
         last_down = DOWN;
+        last_ps = PS;
 
         if (fabsf(LS_X) < deadzone)
             LS_X = 0;
@@ -1049,6 +1219,27 @@ private:
         const int32_t mode_code = msg->data[0];
         seq_->set_mff_mode_enabled(mode_code == 4);
     }
+
+    // /cube_detection/info [flag, cx_norm, cy_norm, w_norm, h_norm, depth_m, score, area, face_yaw_deg]
+    void cube_detect_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
+        if (msg->data.size() < 9) {
+            return;
+        }
+        const bool detected = msg->data[0] > 0.5f;
+        const float cx_norm = msg->data[1];
+        const float depth_m = msg->data[5];
+        const float yaw_deg = msg->data[8];
+        seq_->set_cube_info(depth_m, cx_norm, yaw_deg, detected);
+    }
+
+    void cube_align_cmd_callback(const std_msgs::msg::Int32::SharedPtr msg) {
+        if (!seq_->is_mff_mode_enabled()) {
+            return;
+        }
+        if (msg->data == 1) {
+            seq_->start_cube_align();
+        }
+    }
     uint8_t device_id_;
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
@@ -1063,6 +1254,8 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr step_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr turn_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mode_cmd_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr cube_detect_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr cube_align_cmd_sub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr odom_reset_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
