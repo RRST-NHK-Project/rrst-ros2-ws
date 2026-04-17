@@ -205,17 +205,17 @@ private:
 
     // 速度関連
     static constexpr int forward_speed = 60;
-    static constexpr int up_speed = 55;
+    static constexpr int up_speed = 60;
     static constexpr int dis = 100;      // 障害物と見なす距離の閾値（要調整）
     static constexpr int down_dis = 100; // sdm15の値がこの時間(ms)更新されなければタイムアウトと見なす
 
-    static constexpr int wall = 350; // 前に障害物があると見なす距離の閾値（要調整）
+    static constexpr int wall = 500; // 前に障害物があると見なす距離の閾値（要調整）
 
     // 壁調整PID関連定数
     // !! wall_approach_target_mm < wall_distance_threshold の関係を必ず保つこと !!
     // PIDがapproach_targetまで積極的に近づくことでdistance_thresholdを通過しトリガーが発火する
-    static constexpr int wall_distance_threshold = 250;      // 段差上り開始トリガー距離 [mm]
-    static constexpr float wall_approach_target_mm = 120.0f; // PIDの接近目標距離 [mm]（threshold未満に設定）
+    static constexpr int wall_distance_threshold = 350;      // 段差上り開始トリガー距離 [mm]
+    static constexpr float wall_approach_target_mm = 300.0f; // PIDの接近目標距離 [mm]（threshold未満に設定）
     static constexpr double wall_angle_threshold = 0.10;     // 角度整列完了閾値 [rad]（約6度）
     static constexpr float wall_angle_approach_thr = 0.20f;  // 前進開始角度閾値 [rad]（約11度）
     static constexpr float align_duty_max = 100.0f;
@@ -313,10 +313,10 @@ private:
     void rear_down() {
         RCLCPP_INFO(get_logger(), "REAR DOWN");
         pkt.setTR(TR1, 0);
-        pkt.setMD(MD5, -up_speed);
-        pkt.setMD(MD6, up_speed);
-        pkt.setMD(MD7, up_speed);
-        pkt.setMD(MD8, -up_speed);
+        pkt.setMD(MD5, -forward_speed);
+        pkt.setMD(MD6, forward_speed);
+        pkt.setMD(MD7, forward_speed);
+        pkt.setMD(MD8, -forward_speed);
     }
 
     void stop_motion() {
@@ -487,7 +487,10 @@ private:
                 front_down();
                 state_executed_ = true;
             }
-            next_up(StepUpState::SECOND_FORWARD);
+            // エアシリンダが動き終わるまで待つ（要調整）
+            if ((now_time - state_start_time_).seconds() > 1.0) {
+                next_up(StepUpState::SECOND_FORWARD);
+            }
             break;
 
         case StepUpState::SECOND_FORWARD: // 前進
@@ -495,7 +498,7 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if (sdm15_value_[1] < dis) {
+            if (sdm15_value_[2] < 120) {
                 next_up(StepUpState::REAR_DOWN);
             }
             break;
@@ -505,7 +508,10 @@ private:
                 rear_down();
                 state_executed_ = true;
             }
+            // エアシリンダが動き終わるまで待つ（要調整）
+            if ((now_time - state_start_time_).seconds() > 1.0) {
             next_up(StepUpState::FINAL_FORWARD);
+            }
             break;
 
         case StepUpState::FINAL_FORWARD: // 前進
