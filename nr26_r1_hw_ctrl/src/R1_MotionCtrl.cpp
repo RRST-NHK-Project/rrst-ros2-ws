@@ -258,8 +258,8 @@ private:
 
         // bool LEFT = msg->axes[6] == 1.0;
         // bool RIGHT = msg->axes[6] == -1.0;
-        // bool UP = msg->axes[7] == 1.0;
-        // bool DOWN = msg->axes[7] == -1.0;
+        bool UP = msg->axes[7] == 1.0;
+        bool DOWN = msg->axes[7] == -1.0;
 
         bool L1 = msg->buttons[4];
         bool R1 = msg->buttons[5];
@@ -418,7 +418,7 @@ private:
         }                       
         if (CIRCLE_PUSH_COUNT == 2) {
             data_[1] = 0;
-            data_[4] = VACUUM_SPEED;
+            data_[3] = VACUUM_SPEED;
         }
         if (CIRCLE_PUSH_COUNT == 3) {
             data_[1] = MOVE_SPEED * -1;
@@ -426,7 +426,7 @@ private:
         }
         if (CIRCLE_PUSH_COUNT == 4) {
             data_[1] = 0;
-            data_[4] = 0;             
+            data_[3] = 0;             
         }
         if (CIRCLE_PUSH_COUNT == 5) {
             data_[17] = 1;
@@ -519,43 +519,55 @@ private:
         // ボタンを押し続けると槍を押し上げるモーターが回転し続ける
         // =================================================================
 
-        // data_[3] = UP;
-        // if (UP) {
-        //     data_[1] = 50;
-        // } else if (DOWN) {
-        //     data_[1] = -50;
-        // } else {
-        //     data_[1] = 0;
-        // }
+        if (UP==1) {
+            data_[4] = -75;
+        } else if (DOWN==1) {
+            data_[4] = 75;
+        } else {
+            data_[4] = 0;
+        }
 
         // =================================================================
-        // ボタン未定義:「雨樋機構」
+        // TRIANGLE:「雨樋機構」
         // スピアを掴んで持ってくる機構
         // =================================================================
 
-          
+        static int triangle_pre = 0;
+        static int triangle_count = 0;
+        static int triangle_max = 2;
+        
+        if (TRIANGLE == 1 && triangle_pre == 0) {
+            triangle_count = (triangle_count + 1) % triangle_max;
+        }
+        if (triangle_count == 0) {
+            data_[13] = 0;
+        }
+        if (triangle_count == 1) {
+            data_[13] = 90;
+        }
 
+        triangle_pre = TRIANGLE;
 
         // =================================================================       
         // TRIANGLE:「スピアヘッド回収ハンドの昇降機構」        
         // ボタンを押すとスピアヘッド回収ハンド上昇機構のエアシリンダーによって上昇or下降        
         // =================================================================
             
-        static int triangle_pre = 0;        
-        static int triangle_count = 0;        
-        static int triangle_max = 2;
+        // static int triangle_pre = 0;        
+        // static int triangle_count = 0;        
+        // static int triangle_max = 2;
                 
-        if (TRIANGLE == 1 && triangle_pre == 0) {            
-        triangle_count = (triangle_count + 1) % triangle_max;        
-        }
-        if (triangle_count == 0) {            
-                data_[18] = 0;        
-        }        
-        if (triangle_count == 1) {            
-                data_[18] = 1;        
-        }
+        // if (TRIANGLE == 1 && triangle_pre == 0) {            
+        // triangle_count = (triangle_count + 1) % triangle_max;        
+        // }
+        // if (triangle_count == 0) {            
+        //         data_[18] = 0;        
+        // }        
+        // if (triangle_count == 1) {            
+        //         data_[18] = 1;        
+        // }
                 
-        triangle_pre = TRIANGLE;
+        // triangle_pre = TRIANGLE;
 
         // =================================================================
         // L1,R1:「フォークリフト上下」
