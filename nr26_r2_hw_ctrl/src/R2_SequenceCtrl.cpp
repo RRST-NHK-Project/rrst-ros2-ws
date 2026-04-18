@@ -59,8 +59,8 @@ public:
         : Node("sequence_ctrl_node"),
           pid_angle_(2.0f, 0.0f, 0.1f, 0.6f),
           pid_distance_(0.0008f, 0.0f, 0.0f, 0.4f),
-          pid_cube_yaw_(2.0f, 0.0f, 0.1f, 0.6f),
-          pid_cube_dist_(0.5f, 0.0f, 0.0f, 0.4f),
+          pid_cube_yaw_(2.0f, 0.0f, 0.0f, 0.6f),
+          pid_cube_dist_(1.5f, 0.0f, 0.0f, 0.6f),
           pid_cube_lat_(1.2f, 0.0f, 0.0f, 0.4f) {
         pid_angle_.set_target(0.0f);
         pid_distance_.set_target(wall_approach_target_mm);
@@ -200,13 +200,20 @@ public:
         wall_angle = angle;
     }
 
+    void set_odom(float x, float y, float yaw) {
+        odom_x_ = x;
+        odom_y_ = y;
+        odom_yaw_ = yaw;
+        odom_received_ = true;
+    }
+
     // cube_detectionの情報を更新する関数
     void set_cube_info(float depth_m, float cx_norm, float yaw_deg, bool detected) {
-        cube_depth_m_ = depth_m;
-        cube_cx_norm_ = cx_norm;
-        cube_yaw_deg_ = yaw_deg;
         cube_detected_ = detected;
         if (detected) {
+            cube_depth_m_ = depth_m;
+            cube_cx_norm_ = cx_norm;
+            cube_yaw_deg_ = yaw_deg;
             last_cube_update_ = this->now();
         }
     }
@@ -222,6 +229,10 @@ public:
         pid_cube_lat_.reset();
         pid_cube_dist_.set_target(cube_approach_target_m);
         last_cube_update_ = this->now();
+        cube_once_detected_ = false;
+        cube_odom_active_ = false;
+        last_vy_ = 0.0f;
+        last_wz_ = 0.0f;
         mode_ = StepMode::CUBE_ALIGN;
         RCLCPP_INFO(get_logger(), "Cube alignment started. target_dist=%.2f m", cube_approach_target_m);
     }
@@ -279,6 +290,15 @@ private:
     float cube_yaw_deg_ = 0.0f;
     bool cube_detected_ = false;
     rclcpp::Time last_cube_update_;
+    bool cube_once_detected_ = false;
+    float last_vy_ = 0.0f, last_wz_ = 0.0f;
+    // オドメトリ
+    float odom_x_ = 0.0f, odom_y_ = 0.0f, odom_yaw_ = 0.0f;
+    bool odom_received_ = false;
+    float odom_x_at_detect_ = 0.0f, odom_y_at_detect_ = 0.0f, odom_yaw_at_detect_ = 0.0f;
+    float initial_cube_depth_ = 0.0f;
+    bool cube_odom_active_ = false;
+    rclcpp::Time cube_odom_start_time_;
 
     // キューブ接近PID定数
     static constexpr float cube_approach_target_m = 0.5f;     // 接近目標距離 [m]
@@ -287,7 +307,8 @@ private:
     static constexpr float cube_distance_threshold = 0.08f;   // 距離完了閾値 [m]
     static constexpr float cube_yaw_approach_thr = 0.30f;     // 前進開始YAW閾値 [rad]（約17度）
     static constexpr double cube_detect_timeout_sec = 0.5;    // 検出途切れ待機タイムアウト [s]
-    static constexpr double cube_align_abort_sec = 3.0;       // アボートタイムアウト [s]
+    static constexpr double cube_align_abort_sec = 3.0;       // 検出なし・odomなし時のアボート [s]
+    static constexpr double cube_odom_timeout_sec = 10.0;     // odomモード最大継続時間 [s]
 
     // モードの管理
     enum class StepMode {
@@ -702,26 +723,79 @@ private:
 
         const double age_sec = (this->now() - last_cube_update_).seconds();
 
-        // 長時間検出なし → アボート
-        if (age_sec > cube_align_abort_sec) {
-            pkt.setMD(MD5, 0);
-            pkt.setMD(MD6, 0);
-            pkt.setMD(MD7, 0);
-            pkt.setMD(MD8, 0);
-            mode_ = StepMode::NONE;
-            RCLCPP_WARN(get_logger(), "CUBE_ALIGN aborted: cube lost for %.1f s", age_sec);
+        // 短時間検出途切れ
+        if (age_sec > cube_detect_timeout_sec) {
+            if (cube_once_detected_ && odom_received_) {
+                // odomモード: 開始時刻を記録
+                if (!cube_odom_active_) {
+                    cube_odom_active_ = true;
+                    cube_odom_start_time_ = this->now();
+                }
+                const double odom_elapsed = (this->now() - cube_odom_start_time_).seconds();
+                if (odom_elapsed > cube_odom_timeout_sec) {
+                    pkt.setMD(MD5, 0); pkt.setMD(MD6, 0);
+                    pkt.setMD(MD7, 0); pkt.setMD(MD8, 0);
+                    mode_ = StepMode::NONE;
+                    RCLCPP_WARN(get_logger(), "CUBE_ALIGN aborted: odom timeout %.1f s", odom_elapsed);
+                    return;
+                }
+
+                // オドメトリで前進量を計算し推定深度を求める
+                const float dx = odom_x_ - odom_x_at_detect_;
+                const float dy = odom_y_ - odom_y_at_detect_;
+                const float forward = dx * std::cos(odom_yaw_at_detect_) +
+                                      dy * std::sin(odom_yaw_at_detect_);
+                const float est_depth = initial_cube_depth_ - forward;
+
+                if (est_depth <= cube_approach_target_m) {
+                    pkt.setMD(MD5, 0);
+                    pkt.setMD(MD6, 0);
+                    pkt.setMD(MD7, 0);
+                    pkt.setMD(MD8, 0);
+                    mode_ = StepMode::NONE;
+                    RCLCPP_INFO(get_logger(),
+                                "Cube aligned (odom). est_depth=%.3f m -> Done.", est_depth);
+                    return;
+                }
+
+                // 推定深度で距離PID継続、横方向・YAWは最後の値を保持
+                const float vx = pid_cube_dist_.update(est_depth, dt);
+                const float vy = last_vy_;
+                const float wz = last_wz_;
+
+                float v1 = std::clamp(vx + vy + wz, -1.0f, 1.0f);
+                float v2 = std::clamp(-(vx + vy - wz), -1.0f, 1.0f);
+                float v3 = std::clamp(-(vx - vy - wz), -1.0f, 1.0f);
+                float v4 = std::clamp(vx - vy + wz, -1.0f, 1.0f);
+
+                pkt.setMD(MD5, static_cast<int16_t>(v1 * align_duty_max));
+                pkt.setMD(MD6, static_cast<int16_t>(v2 * align_duty_max));
+                pkt.setMD(MD7, static_cast<int16_t>(v3 * align_duty_max));
+                pkt.setMD(MD8, static_cast<int16_t>(v4 * align_duty_max));
+
+                RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
+                                     "CUBE_ALIGN(odom): forward=%.3f m, est_depth=%.3f m, vx=%.3f",
+                                     forward, est_depth, vx);
+            } else {
+                // odomなし: 元のアボート判定
+                if (age_sec > cube_align_abort_sec) {
+                    pkt.setMD(MD5, 0); pkt.setMD(MD6, 0);
+                    pkt.setMD(MD7, 0); pkt.setMD(MD8, 0);
+                    mode_ = StepMode::NONE;
+                    RCLCPP_WARN(get_logger(), "CUBE_ALIGN aborted: cube lost for %.1f s", age_sec);
+                    return;
+                }
+                pkt.setMD(MD5, 0);
+                pkt.setMD(MD6, 0);
+                pkt.setMD(MD7, 0);
+                pkt.setMD(MD8, 0);
+                RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500, "CUBE_ALIGN: Waiting for cube detection...");
+            }
             return;
         }
 
-        // 短時間検出途切れ → 停止して待機
-        if (!cube_detected_ || age_sec > cube_detect_timeout_sec) {
-            pkt.setMD(MD5, 0);
-            pkt.setMD(MD6, 0);
-            pkt.setMD(MD7, 0);
-            pkt.setMD(MD8, 0);
-            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500, "CUBE_ALIGN: Waiting for cube detection...");
-            return;
-        }
+        // 検出あり → odomモードをリセット
+        cube_odom_active_ = false;
 
         const float yaw_rad = cube_yaw_deg_ * static_cast<float>(M_PI) / 180.0f;
         const float lat_error = cube_cx_norm_ - 0.5f;
@@ -771,6 +845,15 @@ private:
         v2 = std::clamp(v2, -1.0f, 1.0f);
         v3 = std::clamp(v3, -1.0f, 1.0f);
         v4 = std::clamp(v4, -1.0f, 1.0f);
+
+        // 検出中は毎フレームスナップショットを更新（検出途切れ直前の位置・深度を基準にする）
+        odom_x_at_detect_ = odom_x_;
+        odom_y_at_detect_ = odom_y_;
+        odom_yaw_at_detect_ = odom_yaw_;
+        initial_cube_depth_ = cube_depth_m_;
+        cube_once_detected_ = true;
+        last_vy_ = vy;
+        last_wz_ = wz;
 
         pkt.setMD(MD5, static_cast<int16_t>(v1 * align_duty_max));
         pkt.setMD(MD6, static_cast<int16_t>(v2 * align_duty_max));
@@ -914,6 +997,11 @@ public:
             10,
             std::bind(&HardWareControl::cube_align_cmd_callback, this, std::placeholders::_1));
 
+        odom_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+            "/odom_xy_yaw",
+            10,
+            std::bind(&HardWareControl::odom_callback, this, std::placeholders::_1));
+
         odom_reset_pub_ = this->create_publisher<std_msgs::msg::Bool>(
             "odom_reset", 10);
 
@@ -979,7 +1067,7 @@ private:
         bool L1 = msg->buttons[4];
         bool R1 = msg->buttons[5];
 
-        bool PS = msg->buttons.size() > 12 ? msg->buttons[12] : false;
+        bool PS = msg->buttons[10];
 
         static bool last_up = false;
         static bool last_down = false;
@@ -1232,6 +1320,11 @@ private:
         seq_->set_cube_info(depth_m, cx_norm, yaw_deg, detected);
     }
 
+    void odom_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
+        if (msg->data.size() < 3) return;
+        seq_->set_odom(msg->data[0], msg->data[1], msg->data[2]);
+    }
+
     void cube_align_cmd_callback(const std_msgs::msg::Int32::SharedPtr msg) {
         if (!seq_->is_mff_mode_enabled()) {
             return;
@@ -1256,6 +1349,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mode_cmd_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr cube_detect_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr cube_align_cmd_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr odom_sub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr odom_reset_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
