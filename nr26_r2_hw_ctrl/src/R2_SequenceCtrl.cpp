@@ -200,19 +200,16 @@ public:
         wall_angle = angle;
     }
 
-    void set_odom(float x, float y, float yaw) {
-        odom_x_ = x;
-        odom_y_ = y;
-        odom_yaw_ = yaw;
-        odom_received_ = true;
-    }
+    // カメラサーボの現在角度を返す
+    int get_camera_servo_angle() const { return static_cast<int>(servo_camera_angle_); }
 
     // cube_detectionの情報を更新する関数
-    void set_cube_info(float depth_m, float cx_norm, float yaw_deg, bool detected) {
+    void set_cube_info(float depth_m, float cx_norm, float cy_norm, float yaw_deg, bool detected) {
         cube_detected_ = detected;
         if (detected) {
             cube_depth_m_ = depth_m;
             cube_cx_norm_ = cx_norm;
+            cube_cy_norm_ = cy_norm;
             cube_yaw_deg_ = yaw_deg;
             last_cube_update_ = this->now();
         }
@@ -229,11 +226,10 @@ public:
         pid_cube_lat_.reset();
         pid_cube_dist_.set_target(cube_approach_target_m);
         last_cube_update_ = this->now();
-        cube_once_detected_ = false;
-        cube_odom_active_ = false;
-        last_vy_ = 0.0f;
-        last_wz_ = 0.0f;
-        mode_ = StepMode::CUBE_ALIGN;
+        servo_camera_angle_ = static_cast<float>(servo_scan_start);
+        servo_scan_dir_ = 1.0f;
+        // すでに検出中なら直接アライン、未検出ならスキャンから開始
+        mode_ = cube_detected_ ? StepMode::CUBE_ALIGN : StepMode::CUBE_SCAN;
         RCLCPP_INFO(get_logger(), "Cube alignment started. target_dist=%.2f m", cube_approach_target_m);
     }
 
@@ -287,18 +283,13 @@ private:
     // キューブ検出データ
     float cube_depth_m_ = 0.0f;
     float cube_cx_norm_ = 0.5f;
+    float cube_cy_norm_ = 0.5f;
     float cube_yaw_deg_ = 0.0f;
     bool cube_detected_ = false;
     rclcpp::Time last_cube_update_;
-    bool cube_once_detected_ = false;
-    float last_vy_ = 0.0f, last_wz_ = 0.0f;
-    // オドメトリ
-    float odom_x_ = 0.0f, odom_y_ = 0.0f, odom_yaw_ = 0.0f;
-    bool odom_received_ = false;
-    float odom_x_at_detect_ = 0.0f, odom_y_at_detect_ = 0.0f, odom_yaw_at_detect_ = 0.0f;
-    float initial_cube_depth_ = 0.0f;
-    bool cube_odom_active_ = false;
-    rclcpp::Time cube_odom_start_time_;
+    // カメラサーボ
+    float servo_camera_angle_ = 70.0f;  // 現在のサーボ角度 [deg]（起動時から原点）
+    float servo_scan_dir_ = 1.0f;       // スキャン方向 (+1=増加, -1=減少)
 
     // キューブ接近PID定数
     static constexpr float cube_approach_target_m = 0.5f;     // 接近目標距離 [m]
@@ -307,8 +298,21 @@ private:
     static constexpr float cube_distance_threshold = 0.08f;   // 距離完了閾値 [m]
     static constexpr float cube_yaw_approach_thr = 0.30f;     // 前進開始YAW閾値 [rad]（約17度）
     static constexpr double cube_detect_timeout_sec = 0.5;    // 検出途切れ待機タイムアウト [s]
-    static constexpr double cube_align_abort_sec = 3.0;       // 検出なし・odomなし時のアボート [s]
-    static constexpr double cube_odom_timeout_sec = 10.0;     // odomモード最大継続時間 [s]
+    static constexpr double cube_align_abort_sec = 1.0;       // アボートタイムアウト [s]
+    // カメラ取り付けオフセット補正
+    // カメラが前方中心から右に180mmオフセット→目標cx_normを左にシフト
+    // cx_offset = 0.5 * camera_offset_m / (depth_m * tan(hfov/2))
+    // tan_hfov_half: カメラの水平FOVの半角タンジェント（90°→1.0、60°→0.577）
+    static constexpr float camera_offset_right_m = 0.180f;
+    static constexpr float camera_tan_hfov_half = 1.0f;  // 要調整（90°FOV想定）
+    // カメラサーボ定数
+    static constexpr int camera_servo_idx = SERVO1;           // ★使用するサーボ番号
+    static constexpr int servo_scan_start = 40;                // スキャン開始角度 [deg]
+    static constexpr int servo_scan_end = 70;                 // スキャン終了角度 [deg]
+    static constexpr float servo_scan_speed_dps = 20.0f;      // スキャン速度 [deg/s]
+    static constexpr float servo_track_kp = 60.0f;            // cy追跡ゲイン [deg/cy_err]
+    static constexpr int servo_angle_min = 0;
+    static constexpr int servo_angle_max = 270;
 
     // モードの管理
     enum class StepMode {
@@ -317,6 +321,7 @@ private:
         STEP_UP,
         STEP_DOWN,
         MFF_TURN,
+        CUBE_SCAN,  // キューブ探索（サーボスキャン）
         CUBE_ALIGN  // cube_detectionを使ったキューブへの平行接近PID
     };
 
@@ -714,101 +719,76 @@ private:
         pkt.setMD(MD8, static_cast<int16_t>(turn_v4_ * align_duty_max));
     }
 
+    // キューブ探索シーケンス: サーボを往復スキャンしてキューブを探す
+    void cube_scan_sequence() {
+        constexpr float dt = 0.01f;
+
+        if (cube_detected_) {
+            pid_cube_yaw_.reset();
+            pid_cube_dist_.reset();
+            pid_cube_lat_.reset();
+            mode_ = StepMode::CUBE_ALIGN;
+            RCLCPP_INFO(get_logger(), "CUBE_SCAN: cube found at servo=%.1f deg -> CUBE_ALIGN", servo_camera_angle_);
+            return;
+        }
+
+        servo_camera_angle_ += servo_scan_dir_ * servo_scan_speed_dps * dt;
+        if (servo_camera_angle_ >= static_cast<float>(servo_scan_end)) {
+            servo_camera_angle_ = static_cast<float>(servo_scan_end);
+            servo_scan_dir_ = -1.0f;
+        } else if (servo_camera_angle_ <= static_cast<float>(servo_scan_start)) {
+            servo_camera_angle_ = static_cast<float>(servo_scan_start);
+            servo_scan_dir_ = 1.0f;
+        }
+        // サーボ送信はHardWareControl経由（Device7）
+        pkt.setMD(MD5, 0); pkt.setMD(MD6, 0);
+        pkt.setMD(MD7, 0); pkt.setMD(MD8, 0);
+
+        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
+                             "CUBE_SCAN: angle=%.1f deg", servo_camera_angle_);
+    }
+
     // cube_detectionを使ったキューブへの平行接近シーケンス（PID制御）
     // YAW PID  : face_yaw_deg → 0 [rad]（キューブ正面に向く）
     // 距離PID  : depth_m → cube_approach_target_m [m]（目標距離まで前進）
     // 横方向PID: cx_norm → 0.5（画像中央にキューブを合わせる）
+    // サーボ追跡: cy_norm → 0.5（カメラがキューブを捉え続けるよう垂直角調整）
     void cube_alignment_sequence() {
         constexpr float dt = 0.01f;
 
         const double age_sec = (this->now() - last_cube_update_).seconds();
 
-        // 短時間検出途切れ
+        // 検出途切れ: モーター停止して待機
         if (age_sec > cube_detect_timeout_sec) {
-            if (cube_once_detected_ && odom_received_) {
-                // odomモード: 開始時刻を記録
-                if (!cube_odom_active_) {
-                    cube_odom_active_ = true;
-                    cube_odom_start_time_ = this->now();
-                }
-                const double odom_elapsed = (this->now() - cube_odom_start_time_).seconds();
-                if (odom_elapsed > cube_odom_timeout_sec) {
-                    pkt.setMD(MD5, 0); pkt.setMD(MD6, 0);
-                    pkt.setMD(MD7, 0); pkt.setMD(MD8, 0);
-                    mode_ = StepMode::NONE;
-                    RCLCPP_WARN(get_logger(), "CUBE_ALIGN aborted: odom timeout %.1f s", odom_elapsed);
-                    return;
-                }
+            pkt.setMD(MD5, 0); pkt.setMD(MD6, 0);
+            pkt.setMD(MD7, 0); pkt.setMD(MD8, 0);
 
-                // オドメトリで前進量を計算し推定深度を求める
-                const float dx = odom_x_ - odom_x_at_detect_;
-                const float dy = odom_y_ - odom_y_at_detect_;
-                const float forward = dx * std::cos(odom_yaw_at_detect_) +
-                                      dy * std::sin(odom_yaw_at_detect_);
-                const float est_depth = initial_cube_depth_ - forward;
-
-                if (est_depth <= cube_approach_target_m) {
-                    pkt.setMD(MD5, 0);
-                    pkt.setMD(MD6, 0);
-                    pkt.setMD(MD7, 0);
-                    pkt.setMD(MD8, 0);
-                    mode_ = StepMode::NONE;
-                    RCLCPP_INFO(get_logger(),
-                                "Cube aligned (odom). est_depth=%.3f m -> Done.", est_depth);
-                    return;
-                }
-
-                // 推定深度で距離PID継続、横方向・YAWは最後の値を保持
-                const float vx = pid_cube_dist_.update(est_depth, dt);
-                const float vy = last_vy_;
-                const float wz = last_wz_;
-
-                float v1 = std::clamp(vx + vy + wz, -1.0f, 1.0f);
-                float v2 = std::clamp(-(vx + vy - wz), -1.0f, 1.0f);
-                float v3 = std::clamp(-(vx - vy - wz), -1.0f, 1.0f);
-                float v4 = std::clamp(vx - vy + wz, -1.0f, 1.0f);
-
-                pkt.setMD(MD5, static_cast<int16_t>(v1 * align_duty_max));
-                pkt.setMD(MD6, static_cast<int16_t>(v2 * align_duty_max));
-                pkt.setMD(MD7, static_cast<int16_t>(v3 * align_duty_max));
-                pkt.setMD(MD8, static_cast<int16_t>(v4 * align_duty_max));
-
-                RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
-                                     "CUBE_ALIGN(odom): forward=%.3f m, est_depth=%.3f m, vx=%.3f",
-                                     forward, est_depth, vx);
-            } else {
-                // odomなし: 元のアボート判定
-                if (age_sec > cube_align_abort_sec) {
-                    pkt.setMD(MD5, 0); pkt.setMD(MD6, 0);
-                    pkt.setMD(MD7, 0); pkt.setMD(MD8, 0);
-                    mode_ = StepMode::NONE;
-                    RCLCPP_WARN(get_logger(), "CUBE_ALIGN aborted: cube lost for %.1f s", age_sec);
-                    return;
-                }
-                pkt.setMD(MD5, 0);
-                pkt.setMD(MD6, 0);
-                pkt.setMD(MD7, 0);
-                pkt.setMD(MD8, 0);
-                RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500, "CUBE_ALIGN: Waiting for cube detection...");
+            if (age_sec > cube_align_abort_sec) {
+                mode_ = StepMode::CUBE_SCAN;
+                servo_camera_angle_ = static_cast<float>(servo_scan_start);
+                servo_scan_dir_ = 1.0f;
+                RCLCPP_WARN(get_logger(), "CUBE_ALIGN aborted: cube lost for %.1f s -> CUBE_SCAN", age_sec);
+                return;
             }
+            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
+                                 "CUBE_ALIGN: Waiting for cube detection... (%.1f s)", age_sec);
             return;
         }
 
-        // 検出あり → odomモードをリセット
-        cube_odom_active_ = false;
-
         const float yaw_rad = cube_yaw_deg_ * static_cast<float>(M_PI) / 180.0f;
-        const float lat_error = cube_cx_norm_ - 0.5f;
+        // カメラオフセット補正: カメラが右180mmのため目標cx_normを深さに応じて左にシフト
+        const float cx_offset = 0.5f * camera_offset_right_m /
+            (std::max(cube_depth_m_, 0.1f) * camera_tan_hfov_half);
+        const float cx_target = std::clamp(0.5f - cx_offset, 0.0f, 1.0f);
+        const float lat_error = cube_cx_norm_ - cx_target;
         const float dist_error = cube_depth_m_ - cube_approach_target_m;
 
         // 完了条件：角度・距離・横位置がすべて閾値内
         if (std::abs(yaw_rad) < cube_angle_threshold &&
             std::abs(dist_error) < cube_distance_threshold &&
             std::abs(lat_error) < cube_lateral_threshold) {
-            pkt.setMD(MD5, 0);
-            pkt.setMD(MD6, 0);
-            pkt.setMD(MD7, 0);
-            pkt.setMD(MD8, 0);
+            pkt.setMD(MD5, 0); pkt.setMD(MD6, 0);
+            pkt.setMD(MD7, 0); pkt.setMD(MD8, 0);
             mode_ = StepMode::NONE;
             RCLCPP_INFO(get_logger(),
                         "Cube aligned. yaw=%.2f deg, depth=%.3f m, cx=%.3f -> Done.",
@@ -817,43 +797,32 @@ private:
         }
 
         // ── YAW PID ──────────────────────────────────────────────
-        // error = 0 - yaw_rad。yaw_rad > 0 → wz < 0 → CCW回転
         const float wz = pid_cube_yaw_.update(yaw_rad, dt);
 
         // ── 距離PID ──────────────────────────────────────────────
-        // YAWが一定以内になってから前進開始
         float vx = 0.0f;
         if (std::abs(yaw_rad) < cube_yaw_approach_thr) {
-            // error = target - depth。遠い(depth > target) → error < 0 → vx < 0 → 前進
             vx = pid_cube_dist_.update(cube_depth_m_, dt);
         } else {
             pid_cube_dist_.reset();
         }
 
         // ── 横方向PID ─────────────────────────────────────────────
-        // error = 0.5 - cx_norm。右寄り(cx > 0.5) → error < 0 → vy < 0
-        // vy の符号はカメラ取り付け方向による（要調整）
-        const float vy = pid_cube_lat_.update(cube_cx_norm_, dt);
+        pid_cube_lat_.set_target(cx_target);
+        const float vy = -pid_cube_lat_.update(cube_cx_norm_, dt);
+
+        // ── サーボ追跡: cy_normで垂直方向を調整 ───────────────────
+        // cy_norm=0.5が中心。上寄り(cy<0.5)→カメラを下げる(角度+)、下寄り(cy>0.5)→カメラを上げる(角度-)
+        const float cy_err = 0.5f - cube_cy_norm_;
+        servo_camera_angle_ += servo_track_kp * cy_err * dt;
+        servo_camera_angle_ = std::clamp(servo_camera_angle_, static_cast<float>(servo_angle_min), static_cast<float>(servo_angle_max));
+        // サーボ送信はHardWareControl経由（Device7）
 
         // ── メカナム逆運動学（フル3軸） ───────────────────────────
-        float v1 = vx + vy + wz;
-        float v2 = -(vx + vy - wz);
-        float v3 = -(vx - vy - wz);
-        float v4 = vx - vy + wz;
-
-        v1 = std::clamp(v1, -1.0f, 1.0f);
-        v2 = std::clamp(v2, -1.0f, 1.0f);
-        v3 = std::clamp(v3, -1.0f, 1.0f);
-        v4 = std::clamp(v4, -1.0f, 1.0f);
-
-        // 検出中は毎フレームスナップショットを更新（検出途切れ直前の位置・深度を基準にする）
-        odom_x_at_detect_ = odom_x_;
-        odom_y_at_detect_ = odom_y_;
-        odom_yaw_at_detect_ = odom_yaw_;
-        initial_cube_depth_ = cube_depth_m_;
-        cube_once_detected_ = true;
-        last_vy_ = vy;
-        last_wz_ = wz;
+        const float v1 = std::clamp(vx + vy + wz, -1.0f, 1.0f);
+        const float v2 = std::clamp(-(vx + vy - wz), -1.0f, 1.0f);
+        const float v3 = std::clamp(-(vx - vy - wz), -1.0f, 1.0f);
+        const float v4 = std::clamp(vx - vy + wz, -1.0f, 1.0f);
 
         pkt.setMD(MD5, static_cast<int16_t>(v1 * align_duty_max));
         pkt.setMD(MD6, static_cast<int16_t>(v2 * align_duty_max));
@@ -861,8 +830,8 @@ private:
         pkt.setMD(MD8, static_cast<int16_t>(v4 * align_duty_max));
 
         RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
-                             "CUBE_ALIGN: yaw=%.2f deg, depth=%.3f m, cx=%.3f | vx=%.3f vy=%.3f wz=%.3f",
-                             cube_yaw_deg_, cube_depth_m_, cube_cx_norm_, vx, vy, wz);
+                             "CUBE_ALIGN: yaw=%.2f deg, depth=%.3f m, cx=%.3f(tgt=%.2f) cy=%.3f servo=%.1f | vx=%.3f vy=%.3f wz=%.3f",
+                             cube_yaw_deg_, cube_depth_m_, cube_cx_norm_, cx_target, cube_cy_norm_, servo_camera_angle_, vx, vy, wz);
     }
 
     void loop() {
@@ -880,6 +849,8 @@ private:
         switch (mode_) {
 
         case StepMode::NONE:
+            // サーボはDevice7経由（R2_HandCtrl）で制御するため、ここでは待機中角度をキープ
+            servo_camera_angle_ = 70.0f;
             break;
 
         case StepMode::WALL_ALIGN:
@@ -896,6 +867,10 @@ private:
 
         case StepMode::MFF_TURN:
             mff_turn_sequence();
+            break;
+
+        case StepMode::CUBE_SCAN:
+            cube_scan_sequence();
             break;
 
         case StepMode::CUBE_ALIGN:
@@ -997,13 +972,11 @@ public:
             10,
             std::bind(&HardWareControl::cube_align_cmd_callback, this, std::placeholders::_1));
 
-        odom_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
-            "/odom_xy_yaw",
-            10,
-            std::bind(&HardWareControl::odom_callback, this, std::placeholders::_1));
-
         odom_reset_pub_ = this->create_publisher<std_msgs::msg::Bool>(
             "odom_reset", 10);
+
+        camera_servo_pub_ = this->create_publisher<std_msgs::msg::Int32>(
+            "/r2/camera_servo_angle", 10);
 
         RCLCPP_INFO(get_logger(),
                     "serial_tx_%d started.", device_id_);
@@ -1166,12 +1139,14 @@ private:
         }
 
         std_msgs::msg::Int16MultiArray msg;
-
-        // msg.data = data_;
         msg.data = pkt.toVector();
-
         publisher_->publish(msg);
-        // print_data();
+        print_data();
+
+        // カメラサーボ角度をDevice7（R2_HandCtrl）へ通知
+        std_msgs::msg::Int32 servo_msg;
+        servo_msg.data = seq_->get_camera_servo_angle();
+        camera_servo_pub_->publish(servo_msg);
     }
 
     void print_data() {
@@ -1315,14 +1290,10 @@ private:
         }
         const bool detected = msg->data[0] > 0.5f;
         const float cx_norm = msg->data[1];
+        const float cy_norm = msg->data[2];
         const float depth_m = msg->data[5];
         const float yaw_deg = msg->data[8];
-        seq_->set_cube_info(depth_m, cx_norm, yaw_deg, detected);
-    }
-
-    void odom_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
-        if (msg->data.size() < 3) return;
-        seq_->set_odom(msg->data[0], msg->data[1], msg->data[2]);
+        seq_->set_cube_info(depth_m, cx_norm, cy_norm, yaw_deg, detected);
     }
 
     void cube_align_cmd_callback(const std_msgs::msg::Int32::SharedPtr msg) {
@@ -1349,8 +1320,8 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mode_cmd_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr cube_detect_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr cube_align_cmd_sub_;
-    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr odom_sub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr odom_reset_pub_;
+    rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr camera_servo_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     std::vector<int16_t> data_;

@@ -118,6 +118,10 @@ public:
             "/r2/task_status_text", status_qos,
             std::bind(&HardWareControl::task_status_text_callback, this, std::placeholders::_1));
 
+        camera_servo_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+            "/r2/camera_servo_angle", 10,
+            std::bind(&HardWareControl::camera_servo_callback, this, std::placeholders::_1));
+
         // 初期状態を適用
         apply_state_to_packet(current_planner_state_);
 
@@ -291,6 +295,10 @@ private:
         RCLCPP_INFO(get_logger(), "task_status.state -> %ld", static_cast<long>(current_planner_state_));
     }
 
+    void camera_servo_callback(const std_msgs::msg::Int32::SharedPtr msg) {
+        data_[10] = static_cast<int16_t>(std::clamp(msg->data, 0, 270));
+    }
+
     void task_status_text_callback(const std_msgs::msg::String::SharedPtr msg) {
         const std::string next_state_name = parse_state_name(msg->data);
         if (next_state_name.empty() || next_state_name == current_state_name_) {
@@ -356,8 +364,8 @@ private:
         int16_t micro1_sw = g_micro1_sw.load();
         int16_t micro2_sw = g_micro2_sw.load();
 
-        static const int NORMAL_SPEED = 50;
-        static const int SLOW_SPEED   = 30;
+        static const int NORMAL_SPEED = 130;
+        static const int SLOW_SPEED   = 100;
 
         int64_t abs_coord = g_abs_coord.load();
         double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
@@ -530,6 +538,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr state_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr status_sub_;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr status_text_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr camera_servo_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     std::vector<int16_t> data_;
