@@ -190,6 +190,7 @@ class KfsCubeFusionNode(Node):
                 KfsDetection(False, 0.0, 0.0, 0.0, 0, cube_center_x, cube_center_y),
                 color_image,
                 cube_roi,
+                color_msg.header,
             )
             return
 
@@ -201,11 +202,12 @@ class KfsCubeFusionNode(Node):
                 KfsDetection(False, 0.0, 0.0, 0.0, 0, cube_center_x, cube_center_y),
                 color_image,
                 cube_roi,
+                color_msg.header,
             )
             return
 
         detection.depth_mm = sampled_depth
-        self._publish_result(detection, color_image, cube_roi)
+        self._publish_result(detection, color_image, cube_roi, color_msg.header)
 
     @staticmethod
     def _depth_to_mm(depth_image: np.ndarray) -> np.ndarray:
@@ -411,6 +413,7 @@ class KfsCubeFusionNode(Node):
         detection: KfsDetection,
         color_image: np.ndarray,
         cube_roi: tuple[int, int, int, int] | None,
+        image_header,
     ) -> None:
         result_msg = Float32MultiArray()
         result_msg.data = [
@@ -455,7 +458,7 @@ class KfsCubeFusionNode(Node):
                 cv2.LINE_AA,
             )
         out_msg = self.bridge.cv2_to_imgmsg(debug_image, encoding="bgr8")
-        out_msg.header = self._latest_color_msg.header
+        out_msg.header = image_header
         self.debug_pub.publish(out_msg)
 
 
