@@ -272,7 +272,7 @@ private:
 
         // bool SHARE = msg->buttons[8];
         // bool OPTION = msg->buttons[9];
-        // bool PS = msg->buttons[10];
+        bool PS = msg->buttons[10];
 
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
@@ -304,102 +304,145 @@ private:
         // スピアをマガジンに込めた後、装填し、使用後排莢
         // =================================================================
 
-        static int MAG_SERVO_ANGLE[] = {270, 228, 186, 146, 100, 58, 13, 141, 95, 50, 53, 5, 8};
+        static int MAG_SERVO_ANGLE[] = {270, 233, 187, 139, 93, 49, 4};
         static int BAR_PUSH_ANGLE = 10;
         static int BAR_HOLD_ANGLE = 43;
         static int BAR_RELE_ANGLE = 245;
         static int cross_pre = 0;
         static int CROSS_PUSH_COUNT = 0;
-        static int CROSS_PUSH_MAX = 20;
-        static int REUSE_ANGLE = 13;
+        static int CROSS_PUSH_MAX = 31;
+        static int REUSE_ANGLE = 8;
         static int EJECT_ANGLE = 90;
 
         if (CROSS == 1 && cross_pre == 0) {
             CROSS_PUSH_COUNT = (CROSS_PUSH_COUNT + 1) % CROSS_PUSH_MAX;
         }
+        // SETに1を合わせる
         if (CROSS_PUSH_COUNT == 0) {
-            data_[9] = MAG_SERVO_ANGLE[0];
+            data_[9] = 270;
             data_[12] = REUSE_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 1) {
+        // SETに2を合わせる
+            if (CROSS_PUSH_COUNT == 1) {
             data_[9] = MAG_SERVO_ANGLE[1];
         }
+        // SETに3を合わせる
         if (CROSS_PUSH_COUNT == 2) {
             data_[9] = MAG_SERVO_ANGLE[2];
         }
+        // SETに4を合わせる＆SHOOTに1を合わせる
         if (CROSS_PUSH_COUNT == 3) {
             data_[9] = MAG_SERVO_ANGLE[3];
+            data_[10] = BAR_HOLD_ANGLE;
         }
         if (CROSS_PUSH_COUNT == 4) {
-            data_[10] = BAR_HOLD_ANGLE;
+            data_[10] = BAR_PUSH_ANGLE;
         }
         if (CROSS_PUSH_COUNT == 5) {
-            data_[10] = BAR_PUSH_ANGLE;
-        }
-        if (CROSS_PUSH_COUNT == 6) {
             data_[10] = BAR_RELE_ANGLE;
+        }
+        // SHOOTに2を合わせる
+        if (CROSS_PUSH_COUNT == 6) {
+            data_[9] = MAG_SERVO_ANGLE[4];
         }
         if (CROSS_PUSH_COUNT == 7) {
-            data_[9] = MAG_SERVO_ANGLE[8];
-            // data_[12] = EJECT_ANGLE;
+            data_[10] = BAR_HOLD_ANGLE;
         }
         if (CROSS_PUSH_COUNT == 8) {
-            // data_[9] = MAG_SERVO_ANGLE[5];
-            data_[10] = BAR_HOLD_ANGLE;
-            // data_[12] = REUSE_ANGLE;
-        }
-        if (CROSS_PUSH_COUNT == 9) {
             data_[10] = BAR_PUSH_ANGLE;
         }
-         if (CROSS_PUSH_COUNT == 10) {
+         if (CROSS_PUSH_COUNT == 9) {
             data_[10] = BAR_RELE_ANGLE;
+        }
+        // SHOOTに4を合わせる
+        if (CROSS_PUSH_COUNT == 10) {
+            data_[9] = MAG_SERVO_ANGLE[6];
         }
         if (CROSS_PUSH_COUNT == 11) {
-            data_[9] = MAG_SERVO_ANGLE[9];
-            // data_[12] = EJECT_ANGLE;
+            data_[10] = BAR_HOLD_ANGLE;
         }
         if (CROSS_PUSH_COUNT == 12) {
-            data_[9] = MAG_SERVO_ANGLE[5];
-            data_[10] = BAR_HOLD_ANGLE;
-            // data_[12] = REUSE_ANGLE;
-        }
-        if (CROSS_PUSH_COUNT == 13) {
             data_[10] = BAR_PUSH_ANGLE;
         }
-         if (CROSS_PUSH_COUNT == 14) {
+         if (CROSS_PUSH_COUNT == 13) {
             data_[10] = BAR_RELE_ANGLE;
+        }
+        // SHOOTに3を合わせる
+        if (CROSS_PUSH_COUNT == 14) {
+            data_[9] = MAG_SERVO_ANGLE[5];
         }
         if (CROSS_PUSH_COUNT == 15) {
-            data_[9] = MAG_SERVO_ANGLE[10];
-            // data_[12] = EJECT_ANGLE;
+            data_[10] = BAR_HOLD_ANGLE;
         }
         if (CROSS_PUSH_COUNT == 16) {
-            data_[9] = MAG_SERVO_ANGLE[6];
-            data_[10] = BAR_HOLD_ANGLE;
-            // data_[12] = REUSE_ANGLE;
-        }
-        if (CROSS_PUSH_COUNT == 17) {
             data_[10] = BAR_PUSH_ANGLE;
-            data_[9] = MAG_SERVO_ANGLE[5];
         }
-         if (CROSS_PUSH_COUNT == 18) {
+         if (CROSS_PUSH_COUNT == 17) {
             data_[10] = BAR_RELE_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 19) {
+        // SHOOTに4を合わせる＆RELEASEに3を合わせる
+        if (CROSS_PUSH_COUNT == 18) {
             data_[9] = MAG_SERVO_ANGLE[6];
-            // data_[12] = EJECT_ANGLE;
+            data_[12] = EJECT_ANGLE;
+            data_[10] = BAR_HOLD_ANGLE;
+        }
+        if (CROSS_PUSH_COUNT == 19) {
+            data_[10] = BAR_PUSH_ANGLE;
+            data_[12] = REUSE_ANGLE;
+        }
+        // SHOOTに3を合わせる
+        if (CROSS_PUSH_COUNT == 20) {
+            data_[9] = MAG_SERVO_ANGLE[5];
+        }
+        if (CROSS_PUSH_COUNT == 21) {
+            data_[10] = BAR_RELE_ANGLE;
+        }
+        if (CROSS_PUSH_COUNT == 22) {
+            data_[9] = MAG_SERVO_ANGLE[6];
+            data_[12] = EJECT_ANGLE;
+        }
+        if (CROSS_PUSH_COUNT == 23) {
+            data_[12] = REUSE_ANGLE;
+        }
+        // SHOOTに1を合わせる
+        if (CROSS_PUSH_COUNT == 24) {
+            data_[9] = MAG_SERVO_ANGLE[3];
+            data_[10] = BAR_HOLD_ANGLE;
+        }
+        if (CROSS_PUSH_COUNT == 25) {
+            data_[10] = BAR_PUSH_ANGLE;
+        }
+         if (CROSS_PUSH_COUNT == 26) {
+            data_[10] = BAR_RELE_ANGLE;
+        }
+        // RELEASEに1を合わせる＆SHOOTに2を合わせる
+        if (CROSS_PUSH_COUNT == 27) {
+            data_[9] = MAG_SERVO_ANGLE[4];
+            data_[12] = EJECT_ANGLE;
+            data_[10] = BAR_HOLD_ANGLE;
+        }
+        if (CROSS_PUSH_COUNT == 28) {
+            data_[10] = BAR_PUSH_ANGLE;
+        }
+         if (CROSS_PUSH_COUNT == 29) {
+            data_[10] = BAR_RELE_ANGLE;
+        }
+        // RELEASEに2を合わせる
+        if (CROSS_PUSH_COUNT == 30) {
+            data_[9] = MAG_SERVO_ANGLE[5];
+            data_[12] = EJECT_ANGLE;
         }
 
         cross_pre = CROSS;
 
         // =================================================================
-        // CIRCLE:「KFS回収ハンド機構」 ※動作確認済み　※dataの値変える必要あり
+        // CIRCLE:「KFS回収ハンド機構」 ※動作確認済み
         // KFSをハンドについた吸盤で吸引することにより回収し、そろばん機構に流し、ソレノイドバルブによりプッシュ
         // =================================================================
 
         static int circle_pre = 0;
         static int CIRCLE_PUSH_COUNT = 0;
-        static int CIRCLE_PUSH_MAX = 6;
+        static int CIRCLE_PUSH_MAX = 7;
 
         static int MOVE_SPEED = 100;
         static int VACUUM_SPEED = 250;
@@ -413,7 +456,7 @@ private:
             data_[17] = 0;
         }
         if (CIRCLE_PUSH_COUNT == 1) {
-            data_[1] = MOVE_SPEED - 50; // ハンド取り出し時速度を遅くするため-50
+            data_[1] = MOVE_SPEED - 70; // ハンド取り出し時速度を遅くするため-50
             if (micro3_sw == 1) data_[1] = 0; // 外側SWで停止
         }                       
         if (CIRCLE_PUSH_COUNT == 2) {
@@ -520,9 +563,9 @@ private:
         // =================================================================
 
         if (UP==1) {
-            data_[4] = -75;
+            data_[4] = -120;
         } else if (DOWN==1) {
-            data_[4] = 75;
+            data_[4] = 120;
         } else {
             data_[4] = 0;
         }
@@ -553,21 +596,21 @@ private:
         // ボタンを押すとスピアヘッド回収ハンド上昇機構のエアシリンダーによって上昇or下降        
         // =================================================================
             
-        // static int triangle_pre = 0;        
-        // static int triangle_count = 0;        
-        // static int triangle_max = 2;
+        static int ps_pre = 0;        
+        static int ps_count = 0;        
+        static int ps_max = 2;
                 
-        // if (TRIANGLE == 1 && triangle_pre == 0) {            
-        // triangle_count = (triangle_count + 1) % triangle_max;        
-        // }
-        // if (triangle_count == 0) {            
-        //         data_[18] = 0;        
-        // }        
-        // if (triangle_count == 1) {            
-        //         data_[18] = 1;        
-        // }
+        if (PS == 1 && ps_pre == 0) {            
+        ps_count = (ps_count + 1) % ps_max;        
+        }
+        if (ps_count == 0) {            
+                data_[18] = 0;        
+        }        
+        if (ps_count == 1) {            
+                data_[18] = 1;        
+        }
                 
-        // triangle_pre = TRIANGLE;
+        ps_pre = PS;
 
         // =================================================================
         // L1,R1:「フォークリフト上下」
