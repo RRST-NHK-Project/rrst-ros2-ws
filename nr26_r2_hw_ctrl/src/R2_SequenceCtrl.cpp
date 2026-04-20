@@ -59,14 +59,13 @@ public:
         : Node("sequence_ctrl_node"),
           pid_angle_(2.0f, 0.0f, 0.1f, 0.6f),
           pid_distance_(0.0008f, 0.0f, 0.0f, 0.4f),
-          pid_cube_yaw_(2.0f, 0.0f, 0.0f, 0.6f),
-          pid_cube_dist_(1.5f, 0.0f, 0.0f, 0.6f),
-          pid_cube_lat_(1.2f, 0.0f, 0.0f, 0.4f) {
+          pid_cube_dist_(3.0f, 0.0f, 0.0f, 1.0f),
+          pid_cube_lat_(1.2f, 0.0f, 0.0f, 0.6f) {
         pid_angle_.set_target(0.0f);
         pid_distance_.set_target(wall_approach_target_mm);
-        pid_cube_yaw_.set_target(0.0f);
         pid_cube_dist_.set_target(cube_approach_target_m);
         pid_cube_lat_.set_target(0.5f);
+        this->declare_parameter("use_camera_offset", false);
         last_cube_update_ = rclcpp::Time(0, 0, get_clock()->get_clock_type());
 
         timer_ = this->create_wall_timer(
@@ -221,7 +220,6 @@ public:
             RCLCPP_WARN(get_logger(), "Sequence busy. CUBE_ALIGN ignored.");
             return;
         }
-        pid_cube_yaw_.reset();
         pid_cube_dist_.reset();
         pid_cube_lat_.reset();
         pid_cube_dist_.set_target(cube_approach_target_m);
@@ -268,10 +266,8 @@ private:
     PIDController pid_distance_;
 
     // キューブ接近用PID
-    // pid_cube_yaw_ : 目標0[rad]、入力face_yaw[rad]、出力=wz(回転)
     // pid_cube_dist_: 目標cube_approach_target_m[m]、入力depth_m[m]、出力=vx(前後)
-    // pid_cube_lat_ : 目標0.5[norm]、入力cx_norm[0-1]、出力=vy(横移動)
-    PIDController pid_cube_yaw_;
+    // pid_cube_lat_ : 目標cx_target[norm]、入力cx_norm[0-1]、出力=vy(横移動)
     PIDController pid_cube_dist_;
     PIDController pid_cube_lat_;
 
@@ -292,12 +288,9 @@ private:
     float servo_scan_dir_ = 1.0f;       // スキャン方向 (+1=増加, -1=減少)
 
     // キューブ接近PID定数
-    static constexpr float cube_approach_target_m = 0.5f;     // 接近目標距離 [m]
-    static constexpr double cube_angle_threshold = 0.15;      // YAW整列完了閾値 [rad]（約9度）
-    static constexpr float cube_lateral_threshold = 0.08f;    // 横方向完了閾値 [cx_norm]
-    static constexpr float cube_distance_threshold = 0.08f;   // 距離完了閾値 [m]
-    static constexpr float cube_yaw_approach_thr = 0.30f;     // 前進開始YAW閾値 [rad]（約17度）
-    static constexpr double cube_detect_timeout_sec = 0.5;    // 検出途切れ待機タイムアウト [s]
+    static constexpr float cube_approach_target_m = 0.3f;     // 接近目標距離 [m]
+    static constexpr float cube_lateral_threshold = 0.03f;    // 横方向完了閾値 [cx_norm]
+    static constexpr float cube_distance_threshold = 0.03f;   // 距離完了閾値 [m]
     static constexpr double cube_align_abort_sec = 1.0;       // アボートタイムアウト [s]
     // カメラ取り付けオフセット補正
     // カメラが前方中心から右に180mmオフセット→目標cx_normを左にシフト
@@ -724,7 +717,6 @@ private:
         constexpr float dt = 0.01f;
 
         if (cube_detected_) {
-            pid_cube_yaw_.reset();
             pid_cube_dist_.reset();
             pid_cube_lat_.reset();
             mode_ = StepMode::CUBE_ALIGN;
@@ -769,64 +761,66 @@ private:
             return;
         }
 
-        // 検出途切れ: 即座にモーター停止（ドリフト防止）
+        // 検出途切れ: 横移動のみ停止、前進は継続（ドリフト防止＆停止しすぎ防止）
         if (!cube_detected_) {
-            pkt.setMD(MD5, 0); pkt.setMD(MD6, 0);
-            pkt.setMD(MD7, 0); pkt.setMD(MD8, 0);
-            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-                                 "CUBE_ALIGN: cube lost, stopped. (%.1f s)", age_sec);
+            if (age_sec > 0.2) {
+                pkt.setMD(MD5, 0); pkt.setMD(MD6, 0);
+                pkt.setMD(MD7, 0); pkt.setMD(MD8, 0);
+                RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
+                                     "CUBE_ALIGN: cube lost, stopped. (%.1f s)", age_sec);
+            }
             return;
         }
 
-        const float yaw_rad = cube_yaw_deg_ * static_cast<float>(M_PI) / 180.0f;
-        // // カメラオフセット補正: カメラが右180mmのため目標cx_normを深さに応じて左にシフト
-        // const float cx_offset = 0.5f * camera_offset_right_m /
-        //     (std::max(cube_depth_m_, 0.1f) * camera_tan_hfov_half);
-        // const float cx_target = std::clamp(0.5f - cx_offset, 0.0f, 1.0f);
-        const float cx_target = 0.5f;
+        // カメラオフセット補正: launchパラメータ use_camera_offset=true で有効化
+        float cx_target = 0.5f;
+        if (this->get_parameter("use_camera_offset").as_bool()) {
+            const float cx_offset = 0.5f * camera_offset_right_m /
+                (std::max(cube_depth_m_, 0.1f) * camera_tan_hfov_half);
+            cx_target = std::clamp(0.5f - cx_offset, 0.0f, 1.0f);
+        }
+
         const float lat_error = cube_cx_norm_ - cx_target;
         const float dist_error = cube_depth_m_ - cube_approach_target_m;
 
-        // 完了条件：角度・距離・横位置がすべて閾値内
-        if (std::abs(yaw_rad) < cube_angle_threshold &&
-            std::abs(dist_error) < cube_distance_threshold &&
+        // 完了条件：距離・横位置が閾値内
+        if (std::abs(dist_error) < cube_distance_threshold &&
             std::abs(lat_error) < cube_lateral_threshold) {
             pkt.setMD(MD5, 0); pkt.setMD(MD6, 0);
             pkt.setMD(MD7, 0); pkt.setMD(MD8, 0);
             mode_ = StepMode::NONE;
             RCLCPP_INFO(get_logger(),
-                        "Cube aligned. yaw=%.2f deg, depth=%.3f m, cx=%.3f -> Done.",
-                        cube_yaw_deg_, cube_depth_m_, cube_cx_norm_);
+                        "Cube aligned. depth=%.3f m, cx=%.3f(tgt=%.2f) -> Done.",
+                        cube_depth_m_, cube_cx_norm_, cx_target);
             return;
         }
 
-        // ── YAW PID ──────────────────────────────────────────────
-        const float wz = pid_cube_yaw_.update(yaw_rad, dt);
-
         // ── 距離PID ──────────────────────────────────────────────
-        float vx = 0.0f;
-        if (std::abs(yaw_rad) < cube_yaw_approach_thr) {
-            vx = pid_cube_dist_.update(cube_depth_m_, dt);
-        } else {
-            pid_cube_dist_.reset();
-        }
+        const float vx = pid_cube_dist_.update(cube_depth_m_, dt);
 
         // ── 横方向PID ─────────────────────────────────────────────
         pid_cube_lat_.set_target(cx_target);
         const float vy = -pid_cube_lat_.update(cube_cx_norm_, dt);
 
         // ── サーボ追跡: cy_normで垂直方向を調整 ───────────────────
-        // cy_norm=0.5が中心。上寄り(cy<0.5)→カメラを下げる(角度+)、下寄り(cy>0.5)→カメラを上げる(角度-)
         const float cy_err = 0.5f - cube_cy_norm_;
         servo_camera_angle_ += servo_track_kp * cy_err * dt;
         servo_camera_angle_ = std::clamp(servo_camera_angle_, static_cast<float>(servo_angle_min), static_cast<float>(servo_angle_max));
-        // サーボ送信はHardWareControl経由（Device7）
 
-        // ── メカナム逆運動学（フル3軸） ───────────────────────────
-        const float v1 = std::clamp(vx + vy + wz, -1.0f, 1.0f);
-        const float v2 = std::clamp(-(vx + vy - wz), -1.0f, 1.0f);
-        const float v3 = std::clamp(-(vx - vy - wz), -1.0f, 1.0f);
-        const float v4 = std::clamp(vx - vy + wz, -1.0f, 1.0f);
+        // ── メカナム逆運動学（壁調整と同形式、vyを追加） ──────────
+        // MD5(v1) =  vx + vy
+        // MD6(v2) = -(vx + vy)  （向き補正 *=-1）
+        // MD7(v3) = -(vx - vy)  （向き補正 *=-1）
+        // MD8(v4) =  vx - vy
+        float v1 = vx + vy;
+        float v2 = -(vx + vy);
+        float v3 = -(vx - vy);
+        float v4 = vx - vy;
+
+        v1 = std::clamp(v1, -1.0f, 1.0f);
+        v2 = std::clamp(v2, -1.0f, 1.0f);
+        v3 = std::clamp(v3, -1.0f, 1.0f);
+        v4 = std::clamp(v4, -1.0f, 1.0f);
 
         pkt.setMD(MD5, static_cast<int16_t>(v1 * align_duty_max));
         pkt.setMD(MD6, static_cast<int16_t>(v2 * align_duty_max));
@@ -834,8 +828,8 @@ private:
         pkt.setMD(MD8, static_cast<int16_t>(v4 * align_duty_max));
 
         RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
-                             "CUBE_ALIGN: yaw=%.2f deg, depth=%.3f m, cx=%.3f(tgt=%.2f) cy=%.3f servo=%.1f | vx=%.3f vy=%.3f wz=%.3f",
-                             cube_yaw_deg_, cube_depth_m_, cube_cx_norm_, cx_target, cube_cy_norm_, servo_camera_angle_, vx, vy, wz);
+                             "CUBE_ALIGN: depth=%.3f m, cx=%.3f(tgt=%.2f) cy=%.3f servo=%.1f | vx=%.3f vy=%.3f",
+                             cube_depth_m_, cube_cx_norm_, cx_target, cube_cy_norm_, servo_camera_angle_, vx, vy);
     }
 
     void loop() {

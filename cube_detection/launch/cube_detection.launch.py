@@ -3,9 +3,9 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    temporal_stabilization_enabled = False
-    temporal_smoothing_enabled = False
-    temporal_hold_enabled = False
+    temporal_stabilization_enabled = True
+    temporal_smoothing_enabled = True
+    temporal_hold_enabled = True
 
     return LaunchDescription(
         [
