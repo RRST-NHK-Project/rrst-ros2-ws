@@ -818,25 +818,31 @@ private:
             return;
         }
 
-        // ── YAW制御 ───────────────────────────────────────────────
-        float wz = pid_cube_yaw_.update(yaw_rad, dt);
-        if (std::abs(yaw_rad) < cube_yaw_deadband_rad) {
-            wz = 0.0f;
-        }
-        wz = std::clamp(wz, -cube_wz_max, cube_wz_max);
+        const bool dist_ready = std::abs(dist_error) < cube_distance_threshold;
+        const bool lat_ready = std::abs(lat_error) < cube_lateral_threshold;
 
-        // ── 距離PID ──────────────────────────────────────────────
+        // ── 距離・横方向PID ───────────────────────────────────────
+        // yaw は最後に回すため、距離と横位置がまだ合っていない間は yaw を動かさない
         float vx = 0.0f;
         float vy = 0.0f;
-        if (std::abs(yaw_rad) < cube_yaw_approach_thr) {
+        float wz = 0.0f;
+
+        if (!(dist_ready && lat_ready)) {
+            pid_cube_yaw_.reset();
             vx = pid_cube_dist_.update(cube_depth_m_, dt);
 
-            // ── 横方向PID ─────────────────────────────────────────────
             pid_cube_lat_.set_target(cx_target);
             vy = -pid_cube_lat_.update(cube_cx_norm_, dt);
         } else {
-            pid_cube_dist_.reset();
-            pid_cube_lat_.reset();
+            vx = 0.0f;
+            vy = 0.0f;
+
+            // ── YAW制御 ───────────────────────────────────────────
+            wz = pid_cube_yaw_.update(yaw_rad, dt);
+            if (std::abs(yaw_rad) < cube_yaw_deadband_rad) {
+                wz = 0.0f;
+            }
+            wz = std::clamp(wz, -cube_wz_max, cube_wz_max);
         }
 
         // ── サーボ追跡: cy_normで垂直方向を調整 ───────────────────
