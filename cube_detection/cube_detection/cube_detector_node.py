@@ -19,6 +19,8 @@ class CubeDetectorNode(Node):
         self.declare_parameter("depth_band_mm", 180)
         self.declare_parameter("min_area_px", 350)
         self.declare_parameter("max_center_offset_px", 180)
+        self.declare_parameter("max_center_offset_x_px", -1)
+        self.declare_parameter("max_center_offset_y_px", -1)
         self.declare_parameter("morph_kernel_px", 5)
         self.declare_parameter("cube_size_mm", 350.0)
         self.declare_parameter("camera_fx_px", 615.0)
@@ -46,6 +48,12 @@ class CubeDetectorNode(Node):
         self.min_area_px = int(self.get_parameter("min_area_px").value)
         self.max_center_offset_px = int(
             self.get_parameter("max_center_offset_px").value
+        )
+        self.max_center_offset_x_px = int(
+            self.get_parameter("max_center_offset_x_px").value
+        )
+        self.max_center_offset_y_px = int(
+            self.get_parameter("max_center_offset_y_px").value
         )
         self.morph_kernel_px = max(1, int(self.get_parameter("morph_kernel_px").value))
         self.cube_size_mm = float(self.get_parameter("cube_size_mm").value)
@@ -448,16 +456,50 @@ class CubeDetectorNode(Node):
         ):
             selected_label = int(center_label)
         else:
-            best_distance = float("inf")
+            max_offset_x = (
+                self.max_center_offset_x_px
+                if self.max_center_offset_x_px > 0
+                else self.max_center_offset_px
+            )
+            max_offset_y = (
+                self.max_center_offset_y_px
+                if self.max_center_offset_y_px > 0
+                else self.max_center_offset_px
+            )
+            max_offset_x = max(1, max_offset_x)
+            max_offset_y = max(1, max_offset_y)
+
+            candidates = []
+            max_area = 1
             for label in range(1, num_labels):
-                area = stats[label, cv2.CC_STAT_AREA]
+                area = int(stats[label, cv2.CC_STAT_AREA])
                 if area < self.min_area_px:
                     continue
                 cx, cy = centroids[label]
-                distance = float(np.hypot(cx - center_x, cy - center_y))
-                if distance <= self.max_center_offset_px and distance < best_distance:
-                    best_distance = distance
-                    selected_label = label
+                dx = float(abs(cx - center_x))
+                dy = float(abs(cy - center_y))
+                candidates.append((label, area, dx, dy))
+                max_area = max(max_area, area)
+
+            best_score = float("inf")
+            best_area = -1
+            for label, area, dx, dy in candidates:
+                if dx > max_offset_x or dy > max_offset_y:
+                    continue
+
+                distance_norm = float(np.hypot(dx / max_offset_x, dy / max_offset_y))
+                area_bonus = 0.25 * (float(area) / float(max_area))
+                candidate_score = distance_norm - area_bonus
+                if candidate_score < best_score:
+                    best_score = candidate_score
+                    selected_label = int(label)
+
+                if area > best_area:
+                    best_area = area
+
+            # If no candidate passed the center-offset gate, use the largest area.
+            if selected_label <= 0 and candidates:
+                selected_label = int(max(candidates, key=lambda c: c[1])[0])
 
         if selected_label <= 0:
             self.get_logger().debug(

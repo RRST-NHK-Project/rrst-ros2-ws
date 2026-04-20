@@ -10,6 +10,9 @@ def generate_launch_description() -> LaunchDescription:
                 executable="kfs_akaze_detector",
                 name="kfs_akaze_detector",
                 output="screen",
+                additional_env={
+                    "PYTHONNOUSERSITE": "1",
+                },
                 parameters=[
                     {
                         "image_topic": "/camera/camera/color/image_raw",

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 import os
 
 import cv2
@@ -143,7 +142,7 @@ class KfsAkazeDetectorNode(Node):
         query_kp, query_des = self.akaze.detectAndCompute(query_gray, None)
         if query_des is None or len(query_kp) == 0:
             return KfsDetectionResult(detected=False), self._draw_debug(
-                query_gray, query_kp, []
+                query_gray,
             )
 
         raw_matches = self.bf.knnMatch(query_des, self.template_des, k=2)
@@ -158,31 +157,45 @@ class KfsAkazeDetectorNode(Node):
         if len(good) < self.minimum_good_matches:
             return KfsDetectionResult(
                 detected=False, match_count=len(good)
-            ), self._draw_debug(query_gray, query_kp, good)
+            ), self._draw_debug(query_gray)
 
         src_pts = np.float32([query_kp[m.queryIdx].pt for m in good]).reshape(-1, 1, 2)
         dst_pts = np.float32([self.template_kp[m.trainIdx].pt for m in good]).reshape(
             -1, 1, 2
         )
 
-        affine, inlier_mask = cv2.estimateAffinePartial2D(
+        homography, inlier_mask = cv2.findHomography(
             src_pts, dst_pts, method=cv2.RANSAC, ransacReprojThreshold=4.0
         )
 
-        if affine is None or inlier_mask is None:
+        if homography is None or inlier_mask is None:
             return KfsDetectionResult(
                 detected=False, match_count=len(good)
-            ), self._draw_debug(query_gray, query_kp, good)
+            ), self._draw_debug(query_gray)
 
         center_query = np.array(
             [[[query_gray.shape[1] * 0.5, query_gray.shape[0] * 0.5]]], dtype=np.float32
         )
-        center_map = cv2.transform(center_query, affine)[0, 0]
+        center_map = cv2.perspectiveTransform(center_query, homography)[0, 0]
 
-        a00 = float(affine[0, 0])
-        a10 = float(affine[1, 0])
-        yaw_deg = float(np.degrees(np.arctan2(a10, a00)))
-        scale = float(math.sqrt(a00 * a00 + a10 * a10))
+        # Estimate local yaw/scale around image center using a small probe segment.
+        probe_len = 20.0
+        center_x = float(center_query[0, 0, 0])
+        center_y = float(center_query[0, 0, 1])
+        probe_query = np.array(
+            [[[center_x, center_y]], [[center_x + probe_len, center_y]]],
+            dtype=np.float32,
+        )
+        probe_map = cv2.perspectiveTransform(probe_query, homography)
+        probe_vec = probe_map[1, 0] - probe_map[0, 0]
+        vec_norm = float(np.linalg.norm(probe_vec))
+        if vec_norm <= 1e-6:
+            return KfsDetectionResult(
+                detected=False, match_count=len(good)
+            ), self._draw_debug(query_gray)
+
+        yaw_deg = float(np.degrees(np.arctan2(probe_vec[1], probe_vec[0])))
+        scale = float(vec_norm / probe_len)
 
         inliers = int(np.sum(inlier_mask))
         inlier_ratio = float(inliers) / float(len(good))
@@ -197,53 +210,73 @@ class KfsAkazeDetectorNode(Node):
             inlier_ratio=inlier_ratio,
         )
 
-        debug = self._draw_debug(query_gray, query_kp, good)
-        cv2.circle(
-            debug,
-            (int(center_map[0]) + query_gray.shape[1], int(center_map[1])),
-            10,
-            (0, 0, 255),
-            -1,
+        template_h, template_w = self.template_gray.shape[:2]
+        template_corners = np.float32(
+            [
+                [[0.0, 0.0]],
+                [[template_w - 1.0, 0.0]],
+                [[template_w - 1.0, template_h - 1.0]],
+                [[0.0, template_h - 1.0]],
+            ]
+        )
+        try:
+            inv_homography = np.linalg.inv(homography)
+        except np.linalg.LinAlgError:
+            return KfsDetectionResult(
+                detected=False, match_count=len(good)
+            ), self._draw_debug(query_gray)
+
+        bbox_query = cv2.perspectiveTransform(template_corners, inv_homography)
+
+        debug = self._draw_debug(
+            query_gray,
+            bbox_query=bbox_query,
+            match_count=len(good),
+            inlier_ratio=inlier_ratio,
         )
         return result, debug
 
     def _draw_debug(
         self,
         query_gray: np.ndarray,
-        query_kp: list[cv2.KeyPoint],
-        good_matches: list[cv2.DMatch],
+        bbox_query: np.ndarray | None = None,
+        match_count: int = 0,
+        inlier_ratio: float = 0.0,
     ) -> np.ndarray:
-        template_vis = (
-            self.template_gray
-            if self.template_gray is not None
-            else np.zeros_like(query_gray)
-        )
         query_vis = (
             query_gray
             if query_gray.ndim == 2
             else cv2.cvtColor(query_gray, cv2.COLOR_BGR2GRAY)
         )
-
         query_bgr = cv2.cvtColor(query_vis, cv2.COLOR_GRAY2BGR)
-        template_bgr = cv2.cvtColor(template_vis, cv2.COLOR_GRAY2BGR)
 
-        h = max(query_bgr.shape[0], template_bgr.shape[0])
-        w = query_bgr.shape[1] + template_bgr.shape[1]
-        canvas = np.zeros((h, w, 3), dtype=np.uint8)
+        if bbox_query is not None and bbox_query.size == 8:
+            polygon = np.round(bbox_query).astype(np.int32)
+            cv2.polylines(
+                query_bgr,
+                [polygon.reshape(-1, 1, 2)],
+                isClosed=True,
+                color=(0, 255, 0),
+                thickness=2,
+                lineType=cv2.LINE_AA,
+            )
 
-        canvas[: query_bgr.shape[0], : query_bgr.shape[1]] = query_bgr
-        canvas[: template_bgr.shape[0], query_bgr.shape[1] :] = template_bgr
+            center = np.mean(polygon.reshape(-1, 2), axis=0).astype(np.int32)
+            cv2.circle(query_bgr, (int(center[0]), int(center[1])), 5, (0, 0, 255), -1)
 
-        # Keep visualization lightweight by plotting only the strongest matches.
-        max_vis = min(60, len(good_matches))
-        for match in sorted(good_matches, key=lambda m: m.distance)[:max_vis]:
-            qx, qy = query_kp[match.queryIdx].pt
-            tx, ty = self.template_kp[match.trainIdx].pt
-            p1 = (int(qx), int(qy))
-            p2 = (int(tx) + query_bgr.shape[1], int(ty))
-            cv2.line(canvas, p1, p2, (0, 255, 0), 1, cv2.LINE_AA)
+            status_text = f"matches={match_count} inlier={inlier_ratio:.2f}"
+            cv2.putText(
+                query_bgr,
+                status_text,
+                (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (0, 255, 0),
+                2,
+                cv2.LINE_AA,
+            )
 
-        return canvas
+        return query_bgr
 
     def _publish_result(
         self, result: KfsDetectionResult, debug_image: np.ndarray | None

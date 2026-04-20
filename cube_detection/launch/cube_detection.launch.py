@@ -23,6 +23,12 @@ def generate_launch_description():
                         "depth_band_mm": 180,
                         # 接続成分の最小面積閾値 (ピクセル)
                         "min_area_px": 350,
+                        # 画像中心から候補を許容する最大オフセット (全体)
+                        "max_center_offset_px": 180,
+                        # 横方向オフセット許容値 (左/右に広く探索したい場合に増やす)
+                        "max_center_offset_x_px": 320,
+                        # 縦方向オフセット許容値
+                        "max_center_offset_y_px": 180,
                         # 検出対象立方体の実際のサイズ (mm) - ロボット上の350mm立方体を想定
                         "cube_size_mm": 350.0,
                         # カメラの焦点距離 X (ピクセル) - フォールバック値; CameraInfoで上書き可
