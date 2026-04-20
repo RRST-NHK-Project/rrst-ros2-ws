@@ -6,6 +6,8 @@ from launch_ros.actions import Node
 
 def _launch_setup(context, *args, **kwargs):
     viewer = LaunchConfiguration("viewer").perform(context)
+    color_topic = LaunchConfiguration("color_topic").perform(context)
+    depth_topic = LaunchConfiguration("depth_topic").perform(context)
 
     nodes = [
         Node(
@@ -15,8 +17,8 @@ def _launch_setup(context, *args, **kwargs):
             output="screen",
             parameters=[
                 {
-                    "color_topic": "/camera/camera/color/image_raw",
-                    "depth_topic": "/camera/camera/aligned_depth_to_color/image_raw",
+                    "color_topic": color_topic,
+                    "depth_topic": depth_topic,
                     "sync_slop_sec": 0.08,
                     "template_package": "kfs_pkg",
                     "template_image_name": "KFS_image_list.png",
@@ -73,6 +75,16 @@ def generate_launch_description():
                 "viewer",
                 default_value="none",
                 description="Select viewer to start with the fusion node: none, builtin, or rqt_image_view",
+            ),
+            DeclareLaunchArgument(
+                "color_topic",
+                default_value="/camera/camera/color/image_raw",
+                description="Input color image topic (sensor_msgs/Image)",
+            ),
+            DeclareLaunchArgument(
+                "depth_topic",
+                default_value="/camera/camera/depth/image_rect_raw",
+                description="Input depth image topic (sensor_msgs/Image)",
             ),
             OpaqueFunction(function=_launch_setup),
         ]
