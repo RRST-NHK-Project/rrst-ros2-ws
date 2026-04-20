@@ -296,7 +296,7 @@ private:
     // キューブ接近PID定数
 
     static constexpr float cube_approach_target_m = 0.5f;   // 接近目標距離 [m]
-    static constexpr double cube_angle_threshold = 0.15;    // YAW整列完了閾値 [rad]（約9度）
+    static constexpr double cube_angle_threshold = 0.05;    // YAW整列完了閾値 [rad]（約9度）
     static constexpr float cube_yaw_deadband_rad = 0.05f;   // YAW制御デッドバンド [rad]（約3度）
     static constexpr float cube_lateral_threshold = 0.08f;  // 横方向完了閾値 [cx_norm]
     static constexpr float cube_distance_threshold = 0.08f; // 距離完了閾値 [m]
@@ -838,7 +838,7 @@ private:
             vy = 0.0f;
 
             // ── YAW制御 ───────────────────────────────────────────
-            wz = pid_cube_yaw_.update(yaw_rad, dt);
+            wz = -pid_cube_yaw_.update(yaw_rad, dt);
             if (std::abs(yaw_rad) < cube_yaw_deadband_rad) {
                 wz = 0.0f;
             }
