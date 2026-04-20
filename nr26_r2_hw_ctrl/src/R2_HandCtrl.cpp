@@ -52,6 +52,10 @@ public:
             "/r2/task_status_text", status_qos,
             std::bind(&HardWareControl::task_status_text_callback, this, std::placeholders::_1));
 
+        camera_servo_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+            "/r2/camera_servo_angle", 10,
+            std::bind(&HardWareControl::camera_servo_callback, this, std::placeholders::_1));
+
         timer_ = this->create_wall_timer(
             std::chrono::milliseconds(PUBLISH_RATE_MS),
             std::bind(&HardWareControl::publish_packet, this));
@@ -85,6 +89,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr state_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr status_sub_;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr status_text_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr camera_servo_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     static int32_t state_code_from_name(const std::string &state_name) {
@@ -243,6 +248,10 @@ private:
         apply_state_to_packet(current_planner_state_);
 
         RCLCPP_INFO(get_logger(), "task_status_text.state -> %s", current_state_name_.c_str());
+    }
+
+    void camera_servo_callback(const std_msgs::msg::Int32::SharedPtr msg) {
+        pkt.setServo(SERVO2, msg->data);
     }
 
     void publish_packet() {
