@@ -18,7 +18,7 @@ def generate_launch_description():
                         # 入力の深度画像トピック (ROS2トピック名)
                         "image_topic": "/camera/camera/depth/image_rect_raw",
                         # 立方体検出の対象地域：画像中央からの検索窓サイズ (ピクセル)
-                        "central_window_px": 40,
+                        "central_window_px": 200,
                         # 立方体がある深度範囲：中央画素からの±深度 (mm)
                         "depth_band_mm": 180,
                         # 接続成分の最小面積閾値 (ピクセル)
