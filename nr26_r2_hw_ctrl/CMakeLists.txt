@@ -89,6 +89,9 @@ ament_target_dependencies(r2_pp rclcpp std_msgs sensor_msgs geometry_msgs)
 add_executable(r2_wall src/R2_wall_paralell.cpp src/include/PID.cpp)
 ament_target_dependencies(r2_wall rclcpp std_msgs sensor_msgs geometry_msgs)
 
+add_executable(r2_hand_ctrl src/R2_HandCtrl.cpp)
+ament_target_dependencies(r2_hand_ctrl rclcpp std_msgs)
+
 # インストール設定
 install(TARGETS
   nr26_r2_move
@@ -103,6 +106,7 @@ install(TARGETS
   optical_flow_odom
   r2_odom
   r2_pp
+  r2_hand_ctrl
   r2_wheel_odom
   DESTINATION lib/${PROJECT_NAME})
 

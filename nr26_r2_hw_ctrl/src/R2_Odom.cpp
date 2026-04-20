@@ -156,7 +156,7 @@ private:
         // オドメトリ（X,Y,YAWのみ）
 
         // エンコーダ取得
-        int16_t enc_f = msg->data[1];  // F:横方向
+        int16_t enc_f = -msg->data[1]; // F:横方向
         int16_t enc_l = msg->data[2];  // L:前進方向
         int16_t enc_r = -msg->data[3]; // R:前進方向、符号反転済み
 

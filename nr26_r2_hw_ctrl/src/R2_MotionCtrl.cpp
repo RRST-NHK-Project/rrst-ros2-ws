@@ -3,18 +3,21 @@ R2機構制御
 Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 */
 
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <iostream>
 #include <thread>
 #include <vector>
-#include <atomic>
+#include <cstdint>
 
 // ROS
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include <std_msgs/msg/int16_multi_array.hpp>
+#include <std_msgs/msg/int32.hpp>
 #include <std_msgs/msg/int32_multi_array.hpp>
+#include <std_msgs/msg/string.hpp>
 
 // 以下マイコンに合わせて設定
 #define TARGET_DEVICE_ID 7 // 宛先マイコンのID
@@ -27,8 +30,9 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #define DEADZONE_L 0.3
 #define DEADZONE_R 0.3
 
-std::atomic<int16_t> g_micro1_sw{0}; // マイクロスイッチ(上): 1=押されている
-std::atomic<int16_t> g_micro2_sw{0}; // マイクロスイッチ(下): 1=押されている
+std::atomic<int16_t> g_micro1_sw{0}; // マイクロスイッチ(始発): 1=押されている
+std::atomic<int16_t> g_micro2_sw{0}; // マイクロスイッチ(終点): 1=押されている
+std::atomic<int16_t> g_enc1_val{0};  // エンコーダ1: data[1]から受信
 
 // フォークリフト座標管理 (EncoderCoordinator)
 // エンコーダ減少 -> 座標増加 / エンコーダ増加 -> 座標減少
@@ -37,7 +41,6 @@ std::atomic<int64_t> g_zero_offset{0};        // 下端リセット時の絶対�
 std::atomic<int16_t> g_last_enc1_val{0};      // 前回のエンコーダ生値
 std::atomic<bool> g_coord_initialized{false}; // 初期化フラグ
 std::atomic<int64_t> g_abs_coord{0};          // 最終的な座標(下端=0方向=プラス)
-
 
 class HardWareControl : public rclcpp::Node {
 public:
@@ -84,7 +87,7 @@ public:
             "joy", 10,
             std::bind(&HardWareControl::ps4_listener_callback, this, std::placeholders::_1));
 
-        // seial_bridgeへpublish
+        // serial_bridgeへpublish
         publisher_ = this->create_publisher<std_msgs::msg::Int16MultiArray>(
             "serial_tx_" + std::to_string(device_id_), 10);
 
@@ -100,11 +103,217 @@ public:
                       this,
                       std::placeholders::_1));
 
+        // GUIから直接状態が送られる場合の互換経路
+        state_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+            "r2/task_state", 10,
+            std::bind(&HardWareControl::task_state_callback, this, std::placeholders::_1));
+
+        // r2_plannerが管理する現在状態（[state, color, cell, mode]）
+        auto status_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
+        status_sub_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
+            "r2/task_status", status_qos,
+            std::bind(&HardWareControl::task_status_callback, this, std::placeholders::_1));
+
+        status_text_sub_ = this->create_subscription<std_msgs::msg::String>(
+            "/r2/task_status_text", status_qos,
+            std::bind(&HardWareControl::task_status_text_callback, this, std::placeholders::_1));
+
+        camera_servo_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+            "/r2/camera_servo_angle", 10,
+            std::bind(&HardWareControl::camera_servo_callback, this, std::placeholders::_1));
+
+        // 初期状態を適用
+        apply_state_to_packet(current_planner_state_);
+
         RCLCPP_INFO(get_logger(),
                     "serial_tx_%d started.", device_id_);
     }
 
 private:
+    // =====================================================================
+    // 状態定義
+    // =====================================================================
+    static constexpr int32_t STATE_HEAD_HAND_INIT = 0;
+    static constexpr int32_t STATE_HEAD_HAND_PICK_UP_SETTING = 1;
+    static constexpr int32_t STATE_HEAD_HAND_GATTAI_WAITING = 2;
+    static constexpr int32_t STATE_HEAD_HAND_GATTAI_ASSEMBLY = 3;
+
+    int32_t current_planner_state_ = 0;
+    std::string current_state_name_ = "";
+
+    // モーター1回転あたりのエンコーダのカウント数
+    static constexpr double COUNTS_PER_ROTATION = 355.0;
+
+    // =====================================================================
+    // 状態名→状態コード変換
+    // =====================================================================
+    static int32_t state_code_from_name(const std::string &state_name) {
+        if (state_name == "HEAD_HAND_INIT")
+            return STATE_HEAD_HAND_INIT;
+        if (state_name == "HEAD_HAND_PICK_UP_SETTING")
+            return STATE_HEAD_HAND_PICK_UP_SETTING;
+        if (state_name == "HEAD_HAND_GATTAI_WAITING")
+            return STATE_HEAD_HAND_GATTAI_WAITING;
+        if (state_name == "HEAD_HAND_GATTAI_ASSEMBLY")
+            return STATE_HEAD_HAND_GATTAI_ASSEMBLY;
+        return -1;
+    }
+
+    // =====================================================================
+    // 状態テキストからパース
+    // =====================================================================
+    static std::string parse_state_name(const std::string &status_text) {
+        const std::string key = "state=";
+        const auto pos = status_text.find(key);
+        if (pos == std::string::npos) {
+            return "";
+        }
+
+        const auto begin = pos + key.size();
+        const auto end = status_text.find(' ', begin);
+        if (end == std::string::npos) {
+            return status_text.substr(begin);
+        }
+        return status_text.substr(begin, end - begin);
+    }
+
+    // =====================================================================
+    // 全体共通: モーター方向制限
+    // ・micro1_sw（始発）押下 → 正回転禁止、逆回転のみ許可
+    // ・rot_units >= 7.0 → 逆回転禁止、正回転のみ許可
+    // =====================================================================
+    int16_t apply_direction_limit(int16_t raw_speed) {
+        int16_t micro1_sw = g_micro1_sw.load();
+        int64_t abs_coord = g_abs_coord.load();
+        double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
+
+        // 始発SW押下時 → 正回転(speed > 0)禁止
+        if (micro1_sw == 1 && raw_speed > 0) {
+            return 0;
+        }
+
+        // rot_units >= 7.0 → 逆回転(speed < 0)禁止
+        if (rot_units >= 7.0 && raw_speed < 0) {
+            return 0;
+        }
+
+        return raw_speed;
+    }
+
+    // =====================================================================
+    // 状態別モーター制御（タイマーコールバック毎周期呼び出し）
+    // =====================================================================
+    void apply_state_to_packet(int32_t state_code) {
+        int16_t micro1_sw = g_micro1_sw.load();
+        int64_t abs_coord = g_abs_coord.load();
+        double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
+
+        switch (state_code) {
+        case STATE_HEAD_HAND_INIT:
+            // モーターを速度30で回し続ける（正回転＝始発方向へ）
+            // マイクロスイッチ（始発）が押されたとき → モーター停止
+            if (micro1_sw == 1) {
+                data_[1] = 0;
+            } else {
+                data_[1] = apply_direction_limit(30);
+            }
+            break;
+
+        case STATE_HEAD_HAND_PICK_UP_SETTING:
+            // モーターを速度-30で回し続ける（逆回転）
+            // rot_unitsが7.0になったとき → モーター即停止
+            if (rot_units >= 7.0) {
+                data_[1] = 0;
+            } else {
+                data_[1] = apply_direction_limit(-30);
+            }
+            break;
+
+        case STATE_HEAD_HAND_GATTAI_WAITING:
+            // モーターを速度30で回し続ける（正回転＝始発方向へ）
+            // マイクロスイッチ（始発）が押されたとき → モーター停止
+            if (micro1_sw == 1) {
+                data_[1] = 0;
+            } else {
+                data_[1] = apply_direction_limit(30);
+            }
+            break;
+
+        case STATE_HEAD_HAND_GATTAI_ASSEMBLY:
+            // 回転数が0でない限り、回転数を0にするべくモーターを速度10で回転
+            // （始発SWによるリセットも含む）
+            // 回転数が0になったとき → モーター停止
+            // この監視状態は終了指示か別状態への移行まで維持
+            if (micro1_sw == 1) {
+                // 始発SWが押されていれば既にrot_units=0相当なので停止
+                data_[1] = 0;
+            } else if (std::abs(rot_units) < 0.05) {
+                // rot_unitsがほぼ0（許容誤差内）→ 停止
+                data_[1] = 0;
+            } else {
+                // rot_unitsを0に近づけるため、正回転方向（始発方向）に速度10で回す
+                data_[1] = apply_direction_limit(10);
+            }
+            break;
+
+        default:
+            // 未知の状態では安全のため停止
+            data_[1] = 0;
+            break;
+        }
+
+        // デバッグログ
+        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
+            "【MotionCtrl】状態=%d, 回転数=%.3f, 始発SW=%d, MD1出力=%d",
+            state_code, rot_units, (int)micro1_sw, data_[1]);
+    }
+
+    // =====================================================================
+    // 状態遷移コールバック群 
+    // =====================================================================
+    void task_state_callback(const std_msgs::msg::Int32::SharedPtr msg) {
+        const int32_t next_state = msg->data;
+        if (next_state == current_planner_state_) {
+            return;
+        }
+
+        current_planner_state_ = next_state;
+        RCLCPP_INFO(get_logger(), "task_state -> %ld", static_cast<long>(current_planner_state_));
+    }
+
+    void task_status_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        if (msg->data.empty()) {
+            return;
+        }
+
+        const int32_t next_state = msg->data[0];
+        if (next_state == current_planner_state_) {
+            return;
+        }
+
+        current_planner_state_ = next_state;
+        RCLCPP_INFO(get_logger(), "task_status.state -> %ld", static_cast<long>(current_planner_state_));
+    }
+
+    void camera_servo_callback(const std_msgs::msg::Int32::SharedPtr msg) {
+        data_[10] = static_cast<int16_t>(std::clamp(msg->data, 0, 270));
+    }
+
+    void task_status_text_callback(const std_msgs::msg::String::SharedPtr msg) {
+        const std::string next_state_name = parse_state_name(msg->data);
+        if (next_state_name.empty() || next_state_name == current_state_name_) {
+            return;
+        }
+
+        current_state_name_ = next_state_name;
+        current_planner_state_ = state_code_from_name(current_state_name_);
+
+        RCLCPP_INFO(get_logger(), "task_status_text.state -> %s", current_state_name_.c_str());
+    }
+
+    // =====================================================================
+    // PS4コントローラーコールバック（手動制御用）
+    // =====================================================================
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
 
         // コントローラーの入力を取得、使わない入力はコメントアウト推奨
@@ -152,22 +361,20 @@ private:
         // 絶対座標に基づく減速 + マイクロスイッチによる方向制限
         // =================================================================
 
-        int16_t micro1_sw = g_micro1_sw.load(); 
-        int16_t micro2_sw = g_micro2_sw.load(); 
+        int16_t micro1_sw = g_micro1_sw.load();
+        int16_t micro2_sw = g_micro2_sw.load();
 
-        static const int NORMAL_SPEED = 100;
-        static const int SLOW_SPEED   = 30;
+        static const int NORMAL_SPEED = 130;
+        static const int SLOW_SPEED   = 100;
 
-        static const double COUNTS_PER_ROTATION = 8000.0;
-
-        int64_t abs_coord = g_abs_coord.load(); 
+        int64_t abs_coord = g_abs_coord.load();
         double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
 
-        // ヒステリシス（遊び）を持たせた減速ゾーン判定
+        // ヒステリシス（遊び）を持たせた減速ゾーン判定（チャタリング防止用）
         static bool is_fork_slow = false;
-        if (rot_units <= 3.0 || rot_units >= 47.0) {
+        if (rot_units <= 1.0 || rot_units >= 6.0) {
             is_fork_slow = true;
-        } else if (rot_units >= 4.0 && rot_units <= 46.0) {
+        } else if (rot_units >= 1.5 && rot_units <= 5.5) {
             is_fork_slow = false;
         }
         bool in_slow_zone = is_fork_slow;
@@ -176,21 +383,18 @@ private:
         int rev_speed = in_slow_zone ? -SLOW_SPEED : -NORMAL_SPEED;
 
         if (micro2_sw == 1) {
-            // 上端制限(micro2_sw): 正回転(L1)禁止
             if (R1 == 1) {
                 data_[2] = rev_speed;
             } else {
                 data_[2] = 0;
             }
-        } else if (micro1_sw == 1) {
-            // 下端制限(micro1_sw): 逆回転(R1)禁止
+        } else if (micro1_sw == 1 || rot_units >= 7.0) {
             if (L1 == 1) {
                 data_[2] = fwd_speed;
             } else {
                 data_[2] = 0;
             }
         } else {
-            // 通常
             if (L1 == 1) {
                 data_[2] = fwd_speed;
             } else if (R1 == 1) {
@@ -201,49 +405,9 @@ private:
         }
 
         RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-            "【フォーク制御】回転数=%.2f, 減速=%s, 上端SW=%d, 下端SW=%d, 出力=%d",
+            "【フォーク制御】回転数=%.2f, 減速=%s, 始発SW=%d, 終点SW=%d, 出力=%d",
             rot_units, in_slow_zone ? "ON" : "OFF",
             micro2_sw, micro1_sw, data_[2]);
-
-        // =================================================================
-        // LR
-        // マガジン調整用
-        // =================================================================
-        static int MAG_ADJ_STEP = 10;
-        static int up_pre = 0;
-        static int down_pre = 0;
-        static int mag_servo_angle = 0;
-
-        if (UP == 1 && up_pre == 0) {
-            mag_servo_angle += MAG_ADJ_STEP;
-            data_[9] = mag_servo_angle;
-        }
-        up_pre = UP;
-        if (DOWN == 1 && down_pre == 0) {
-            mag_servo_angle -= MAG_ADJ_STEP;
-            data_[9] = mag_servo_angle;
-        }
-        down_pre = DOWN;
-
-        // =================================================================
-        // LR
-        // マガジン調整用
-        // =================================================================
-        static int MAG_ADJ_STEP_ = 10;
-        static int triangle_pre = 0;
-        static int cross_pre = 0;
-        static int mag_servo_angle_ = 0;
-
-        if (TRIANGLE == 1 && triangle_pre == 0) {
-            mag_servo_angle_ -= MAG_ADJ_STEP;
-            data_[10] = mag_servo_angle_;
-        }
-        triangle_pre = TRIANGLE;
-        if (CROSS == 1 && cross_pre == 0) {
-            mag_servo_angle_ += MAG_ADJ_STEP;
-            data_[10] = mag_servo_angle_;
-        }
-        cross_pre = CROSS;
 
         // デバッグ用
         RCLCPP_INFO(
@@ -259,48 +423,30 @@ private:
     void publisher_timer_callback() {
         std_msgs::msg::Int16MultiArray msg;
 
-        // int16_t ENC1 = msg->data[1];
-        // int16_t ENC2 = msg->data[2];
-        // int16_t ENC3 = msg->data[3];
-        // int16_t ENC4 = msg->data[4];
-        // int16_t ENC5 = msg->data[5];
-        // int16_t ENC6 = msg->data[6];
-        // int16_t ENC7 = msg->data[7];
-        // int16_t ENC8 = msg->data[8];
+        // ★★★ 状態別のモーター制御を毎周期適用 ★★★
+        apply_state_to_packet(current_planner_state_);
 
-        // int16_t SW1 = msg->data[9];
-        // int16_t SW2 = msg->data[10];
-        // int16_t SW3 = msg->data[11];
-        // int16_t SW4 = msg->data[12];
-        // int16_t SW5 = msg->data[13];
-        // int16_t SW6 = msg->data[14];
-        // int16_t SW7 = msg->data[15];
-        // int16_t SW8 = msg->data[16];
+        // ★★★ マイクロスイッチの安全停止を最優先で適用 ★★★
+        int16_t micro1_sw = g_micro1_sw.load();
+        int16_t micro2_sw = g_micro2_sw.load();
 
-        int16_t micro1_sw = g_micro1_sw.load(); 
-        int16_t micro2_sw = g_micro2_sw.load(); 
-
-        // 上昇中（data_[2] が正の値）かつ 上端スイッチが押されている場合
         if (micro2_sw == 1 && data_[2] > 0) {
             data_[2] = 0;
-            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】上端リミット到達！モーターの上昇を即時遮断しました！");
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】始発リミット到達！モーターの正回転を即時遮断しました！");
         }
-        
-        // 下降中（data_[2] が負の値）かつ 下端スイッチが押されている場合
+
         if (micro1_sw == 1 && data_[2] < 0) {
             data_[2] = 0;
-            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】下端リミット到達！モーターの下降を即時遮断しました！");
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】終点リミット到達！モーターの逆回転を即時遮断しました！");
         }
 
         msg.data = data_;
-
         publisher_->publish(msg);
     }
 
     void
     sensor_callback(
         const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
-        // 最低限：サイズチェック
         if (msg->data.size() < RX16NUM) {
             RCLCPP_WARN(this->get_logger(),
                         "serial_rx_%d: data too short (%zu)",
@@ -308,12 +454,13 @@ private:
             return;
         }
 
-        // マイクロスイッチの値を更新 (物理配線に合わせて修正: 9=下, 10=上)
+        // マイクロスイッチの値を更新
         g_micro1_sw = msg->data[10]; // 上端スイッチ(micro1)
         g_micro2_sw = msg->data[9];  // 下端スイッチ(micro2)
+        g_enc1_val  = msg->data[1];  // エンコーダ1
 
         // =============================================================
-        // 座標調査・ラップアラウンド計算実装（過去コード移植版）
+        // 座標調査・ラップアラウンド計算
         // =============================================================
         int16_t current_enc1 = msg->data[1];
 
@@ -339,39 +486,48 @@ private:
 
         int64_t total_encoder = (int64_t)r_count * ENCODER_MAX + (int64_t)current_enc1;
 
+        // 始発スイッチ押下時に座標をゼロリセット
         if (msg->data[9] != 0) {
             g_zero_offset.store(total_encoder);
-            RCLCPP_INFO(get_logger(), "[COORD RESET!] 下端ボタン押下により座標0へオフセット設定");
+            RCLCPP_INFO(get_logger(), "[COORD RESET!] 始発スイッチ押下により座標0へオフセット設定");
         }
 
         int64_t zero_offset = g_zero_offset.load();
         int64_t abs_coord = -(total_encoder - zero_offset);
         g_abs_coord.store(abs_coord);
 
-        double rot = (double)abs_coord / 8000.0; 
+        double rot = (double)abs_coord / COUNTS_PER_ROTATION;
 
         if (diff != 0) {
-            RCLCPP_INFO(get_logger(), 
+            RCLCPP_INFO(get_logger(),
                 "\n--- ROTATION DEBUG ---\n"
                 "  生値の変化 : %d -> %d (diff: %d)\n"
                 "  デジタルラップ : %d 回\n"
                 "  絶対カウント   : %ld\n"
-                "  現在回転数     : %.3f 回転 (1周8000)\n"
-                "----------------------", 
-                (int)current_enc1 - diff, (int)current_enc1, diff, 
+                "  現在回転数     : %.3f 回転 (1周355)\n"
+                "----------------------",
+                (int)current_enc1 - diff, (int)current_enc1, diff,
                 (int)r_count, abs_coord, rot);
         }
 
+        // --- 通信デバッグ追加 ---
+        static uint64_t packet_count = 0;
+        packet_count++;
+
         static int16_t l9=0, l10=0;
         if (msg->data[9] != l9 || msg->data[10] != l10) {
-            RCLCPP_INFO(get_logger(), "SW Changed! [下(9):%d, 上(10):%d]", 
+            RCLCPP_INFO(get_logger(), "SW Changed! [下(9):%d, 上(10):%d]",
                         msg->data[9], msg->data[10]);
             l9 = msg->data[9]; l10 = msg->data[10];
         }
 
-        // 以降、受信データを使った処理を記述
-
-        // 受信データ処理ここまで
+        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
+            "RX Heartbeat (Total:%lu) | Dump: [%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d]",
+            packet_count,
+            msg->data[0], msg->data[1], msg->data[2], msg->data[3],
+            msg->data[4], msg->data[5], msg->data[6], msg->data[7],
+            msg->data[8], msg->data[9], msg->data[10], msg->data[11],
+            msg->data[12], msg->data[13], msg->data[14], msg->data[15]);
     }
 
     uint8_t device_id_;
@@ -379,6 +535,10 @@ private:
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sensor_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr state_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr status_sub_;
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr status_text_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr camera_servo_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     std::vector<int16_t> data_;

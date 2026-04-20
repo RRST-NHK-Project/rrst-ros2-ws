@@ -3,6 +3,10 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
+    temporal_stabilization_enabled = True
+    temporal_smoothing_enabled = True
+    temporal_hold_enabled = True
+
     return LaunchDescription(
         [
             Node(
@@ -15,11 +19,17 @@ def generate_launch_description():
                         # 入力の深度画像トピック (ROS2トピック名)
                         "image_topic": "/camera/camera/depth/image_rect_raw",
                         # 立方体検出の対象地域：画像中央からの検索窓サイズ (ピクセル)
-                        "central_window_px": 40,
+                        "central_window_px": 200,
                         # 立方体がある深度範囲：中央画素からの±深度 (mm)
                         "depth_band_mm": 180,
                         # 接続成分の最小面積閾値 (ピクセル)
                         "min_area_px": 350,
+                        # 画像中心から候補を許容する最大オフセット (全体)
+                        "max_center_offset_px": 180,
+                        # 横方向オフセット許容値 (左/右に広く探索したい場合に増やす)
+                        "max_center_offset_x_px": 320,
+                        # 縦方向オフセット許容値
+                        "max_center_offset_y_px": 180,
                         # 検出対象立方体の実際のサイズ (mm) - ロボット上の350mm立方体を想定
                         "cube_size_mm": 350.0,
                         # カメラの焦点距離 X (ピクセル) - フォールバック値; CameraInfoで上書き可
@@ -46,8 +56,18 @@ def generate_launch_description():
                         "mask_y_top_ratio": 0.0,
                         # 画像下部のマスク比率 (0.0=全体, 1.0=マスク全体) - デフォルト0.5で下半分をマスク
                         "mask_y_bottom_ratio": 0.5,
+                        # マスク範囲トピックを使うか
+                        "use_mask_range_topic": True,
+                        # カメラ取り付け角補正 (deg) - 下向き取り付けなら正の値
+                        "camera_pitch_correction_deg": 0.0,
+                        # 時系列安定化のマスタースイッチ (falseなら平滑化/保持とも無効)
+                        "temporal_stabilization_enabled": temporal_stabilization_enabled,
+                        # 検出値をEMAで平滑化するか
+                        "temporal_smoothing_enabled": temporal_smoothing_enabled,
+                        # 未検出時に前回検出を一定フレーム保持するか
+                        "temporal_hold_enabled": temporal_hold_enabled,
                     }
                 ],
-            )
+            ),
         ]
     )
