@@ -758,28 +758,32 @@ private:
 
         const double age_sec = (this->now() - last_cube_update_).seconds();
 
-        // 検出途切れ: モーター停止して待機
-        if (age_sec > cube_detect_timeout_sec) {
+        // アボート: 長時間未検出 → CUBE_SCANへ戻る
+        if (age_sec > cube_align_abort_sec) {
             pkt.setMD(MD5, 0); pkt.setMD(MD6, 0);
             pkt.setMD(MD7, 0); pkt.setMD(MD8, 0);
+            mode_ = StepMode::CUBE_SCAN;
+            servo_camera_angle_ = static_cast<float>(servo_scan_start);
+            servo_scan_dir_ = 1.0f;
+            RCLCPP_WARN(get_logger(), "CUBE_ALIGN aborted: cube lost for %.1f s -> CUBE_SCAN", age_sec);
+            return;
+        }
 
-            if (age_sec > cube_align_abort_sec) {
-                mode_ = StepMode::CUBE_SCAN;
-                servo_camera_angle_ = static_cast<float>(servo_scan_start);
-                servo_scan_dir_ = 1.0f;
-                RCLCPP_WARN(get_logger(), "CUBE_ALIGN aborted: cube lost for %.1f s -> CUBE_SCAN", age_sec);
-                return;
-            }
+        // 検出途切れ: 即座にモーター停止（ドリフト防止）
+        if (!cube_detected_) {
+            pkt.setMD(MD5, 0); pkt.setMD(MD6, 0);
+            pkt.setMD(MD7, 0); pkt.setMD(MD8, 0);
             RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-                                 "CUBE_ALIGN: Waiting for cube detection... (%.1f s)", age_sec);
+                                 "CUBE_ALIGN: cube lost, stopped. (%.1f s)", age_sec);
             return;
         }
 
         const float yaw_rad = cube_yaw_deg_ * static_cast<float>(M_PI) / 180.0f;
-        // カメラオフセット補正: カメラが右180mmのため目標cx_normを深さに応じて左にシフト
-        const float cx_offset = 0.5f * camera_offset_right_m /
-            (std::max(cube_depth_m_, 0.1f) * camera_tan_hfov_half);
-        const float cx_target = std::clamp(0.5f - cx_offset, 0.0f, 1.0f);
+        // // カメラオフセット補正: カメラが右180mmのため目標cx_normを深さに応じて左にシフト
+        // const float cx_offset = 0.5f * camera_offset_right_m /
+        //     (std::max(cube_depth_m_, 0.1f) * camera_tan_hfov_half);
+        // const float cx_target = std::clamp(0.5f - cx_offset, 0.0f, 1.0f);
+        const float cx_target = 0.5f;
         const float lat_error = cube_cx_norm_ - cx_target;
         const float dist_error = cube_depth_m_ - cube_approach_target_m;
 
@@ -1121,6 +1125,13 @@ private:
     }
 
     void publisher_timer_callback() {
+        // MFFモード無効でもサーボ角度は常に送信
+        {
+            std_msgs::msg::Int32 servo_msg;
+            servo_msg.data = seq_->get_camera_servo_angle();
+            camera_servo_pub_->publish(servo_msg);
+        }
+
         if (!seq_->is_mff_mode_enabled()) {
             return;
         }
