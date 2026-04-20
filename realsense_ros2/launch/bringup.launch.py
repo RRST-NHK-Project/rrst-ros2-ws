@@ -19,7 +19,7 @@ def generate_launch_description():
                     "pointcloud.enable": "true",
                     "pointcloud.ordered_pc": "true",
                     "pointcloud.allow_no_texture_points": "true",
-                    "enable_color": "false",
+                    "enable_color": "true",
                     "enable_depth": "true",
                     "align_depth.enable": "false",
                     "depth_module.depth_profile": "640x480x15",
