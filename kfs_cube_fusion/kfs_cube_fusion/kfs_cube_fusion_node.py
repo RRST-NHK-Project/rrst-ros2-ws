@@ -71,6 +71,9 @@ class KfsCubeFusionNode(Node):
         self.depth_sample_window_px = max(
             1, int(self.get_parameter("depth_sample_window_px").value)
         )
+        self.output_topic = str(self.get_parameter("output_topic").value)
+        self.detected_topic = str(self.get_parameter("detected_topic").value)
+        self.debug_image_topic = str(self.get_parameter("debug_image_topic").value)
 
         self.bridge = CvBridge()
         self.akaze = cv2.AKAZE_create()
@@ -90,9 +93,11 @@ class KfsCubeFusionNode(Node):
         self._latest_color_msg = None
         self._last_processed_depth_stamp = None
 
-        self.result_pub = self.create_publisher(Float32MultiArray, output_topic, 10)
-        self.detected_pub = self.create_publisher(Bool, detected_topic, 10)
-        self.debug_pub = self.create_publisher(Image, debug_image_topic, 10)
+        self.result_pub = self.create_publisher(
+            Float32MultiArray, self.output_topic, 10
+        )
+        self.detected_pub = self.create_publisher(Bool, self.detected_topic, 10)
+        self.debug_pub = self.create_publisher(Image, self.debug_image_topic, 10)
 
         self.create_subscription(Image, self.color_topic, self.color_callback, 10)
         self.create_subscription(Image, self.depth_topic, self.depth_callback, 10)
