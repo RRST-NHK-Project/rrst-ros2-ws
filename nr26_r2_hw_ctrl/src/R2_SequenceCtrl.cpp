@@ -310,7 +310,7 @@ private:
     // カメラが前方中心から右に180mmオフセット→目標cx_normを左にシフト
     // cx_offset = 0.5 * camera_offset_m / (depth_m * tan(hfov/2))
     // tan_hfov_half: カメラの水平FOVの半角タンジェント（90°→1.0、60°→0.577）
-    static constexpr float camera_offset_right_m = 0.180f;
+    static constexpr float camera_offset_right_m = 0.290f;
     static constexpr float camera_tan_hfov_half = 1.0f; // 要調整（90°FOV想定）
     // カメラサーボ定数
     static constexpr int camera_servo_idx = SERVO1;      // ★使用するサーボ番号
@@ -795,13 +795,10 @@ private:
             return;
         }
 
-        // カメラオフセット補正: launchパラメータ use_camera_offset=true で有効化
-        float cx_target = 0.5f;
-        if (this->get_parameter("use_camera_offset").as_bool()) {
-            const float cx_offset = 0.5f * camera_offset_right_m /
-                                    (std::max(cube_depth_m_, 0.1f) * camera_tan_hfov_half);
-            cx_target = std::clamp(0.5f - cx_offset, 0.0f, 1.0f);
-        }
+        // カメラオフセット補正: 右290mmオフセットを常に適用
+        const float cx_offset = 0.5f * camera_offset_right_m /
+                                (std::max(cube_depth_m_, 0.1f) * camera_tan_hfov_half);
+        const float cx_target = std::clamp(0.5f - cx_offset, 0.0f, 1.0f);
 
         const float yaw_rad = cube_yaw_deg_ * static_cast<float>(M_PI) / 180.0f;
         const float lat_error = cube_cx_norm_ - cx_target;
