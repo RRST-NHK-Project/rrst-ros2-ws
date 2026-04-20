@@ -16,12 +16,10 @@ def generate_launch_description():
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(realsense_launch),
                 launch_arguments={
-                    "pointcloud.enable": "true",
-                    "pointcloud.ordered_pc": "true",
-                    "pointcloud.allow_no_texture_points": "true",
                     "enable_color": "true",
                     "enable_depth": "true",
-                    "align_depth.enable": "false",
+                    "align_depth.enable": "true",
+                    "pointcloud.enable": "false",
                     "depth_module.depth_profile": "640x480x15",
                 }.items(),
             )

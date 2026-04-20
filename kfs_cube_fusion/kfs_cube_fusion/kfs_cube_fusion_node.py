@@ -11,6 +11,7 @@ import message_filters
 from ament_index_python.packages import get_package_share_directory
 from cv_bridge import CvBridge
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
 from std_msgs.msg import Bool, Float32MultiArray
 
@@ -97,8 +98,12 @@ class KfsCubeFusionNode(Node):
         self.detected_pub = self.create_publisher(Bool, self.detected_topic, 10)
         self.debug_pub = self.create_publisher(Image, self.debug_image_topic, 10)
 
-        self.color_sub = message_filters.Subscriber(self, Image, self.color_topic)
-        self.depth_sub = message_filters.Subscriber(self, Image, self.depth_topic)
+        self.color_sub = message_filters.Subscriber(
+            self, Image, self.color_topic, qos_profile=qos_profile_sensor_data
+        )
+        self.depth_sub = message_filters.Subscriber(
+            self, Image, self.depth_topic, qos_profile=qos_profile_sensor_data
+        )
         self.sync = message_filters.ApproximateTimeSynchronizer(
             [self.color_sub, self.depth_sub], queue_size=10, slop=self.sync_slop_sec
         )
