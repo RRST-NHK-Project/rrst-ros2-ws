@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 import rclpy
+import message_filters
 from ament_index_python.packages import get_package_share_directory
 from cv_bridge import CvBridge
 from rclpy.node import Node
@@ -90,17 +91,18 @@ class KfsCubeFusionNode(Node):
                 self.template_gray, None
             )
 
-        self._latest_color_msg = None
-        self._last_processed_depth_stamp = None
-
         self.result_pub = self.create_publisher(
             Float32MultiArray, self.output_topic, 10
         )
         self.detected_pub = self.create_publisher(Bool, self.detected_topic, 10)
         self.debug_pub = self.create_publisher(Image, self.debug_image_topic, 10)
 
-        self.create_subscription(Image, self.color_topic, self.color_callback, 10)
-        self.create_subscription(Image, self.depth_topic, self.depth_callback, 10)
+        self.color_sub = message_filters.Subscriber(self, Image, self.color_topic)
+        self.depth_sub = message_filters.Subscriber(self, Image, self.depth_topic)
+        self.sync = message_filters.ApproximateTimeSynchronizer(
+            [self.color_sub, self.depth_sub], queue_size=10, slop=self.sync_slop_sec
+        )
+        self.sync.registerCallback(self.synced_callback)
 
         self.get_logger().info(
             "kfs_cube_fusion started: color=%s depth=%s template=%s/%s"
@@ -148,28 +150,12 @@ class KfsCubeFusionNode(Node):
                     return image
         return None
 
-    def color_callback(self, msg: Image) -> None:
-        self._latest_color_msg = msg
-
-    def depth_callback(self, msg: Image) -> None:
-        if self._latest_color_msg is None:
-            return
-
-        if not self._is_recent_pair(self._latest_color_msg, msg):
-            return
-
-        depth_stamp = self._stamp_to_float(
-            msg.header.stamp.sec, msg.header.stamp.nanosec
-        )
-        if self._last_processed_depth_stamp == depth_stamp:
-            return
-        self._last_processed_depth_stamp = depth_stamp
-
+    def synced_callback(self, color_msg: Image, depth_msg: Image) -> None:
         try:
-            color_image = self.bridge.imgmsg_to_cv2(
-                self._latest_color_msg, desired_encoding="bgr8"
+            color_image = self.bridge.imgmsg_to_cv2(color_msg, desired_encoding="bgr8")
+            depth_image = self.bridge.imgmsg_to_cv2(
+                depth_msg, desired_encoding="passthrough"
             )
-            depth_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
         except Exception as exc:
             self.get_logger().warn(f"image conversion failed: {exc}")
             return
@@ -215,21 +201,6 @@ class KfsCubeFusionNode(Node):
 
         detection.depth_mm = sampled_depth
         self._publish_result(detection, color_image, cube_roi)
-
-    def _is_recent_pair(self, color_msg: Image, depth_msg: Image) -> bool:
-        color_stamp = self._stamp_to_float(
-            color_msg.header.stamp.sec, color_msg.header.stamp.nanosec
-        )
-        depth_stamp = self._stamp_to_float(
-            depth_msg.header.stamp.sec, depth_msg.header.stamp.nanosec
-        )
-        if color_stamp == 0.0 or depth_stamp == 0.0:
-            return True
-        return abs(color_stamp - depth_stamp) <= self.sync_slop_sec
-
-    @staticmethod
-    def _stamp_to_float(sec: int, nanosec: int) -> float:
-        return float(sec) + float(nanosec) * 1e-9
 
     @staticmethod
     def _depth_to_mm(depth_image: np.ndarray) -> np.ndarray:
