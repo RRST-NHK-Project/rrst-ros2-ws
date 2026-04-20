@@ -809,12 +809,9 @@ private:
             return;
         }
 
-        // ── YAW PID ──────────────────────────────────────────────
-        float wz = pid_cube_yaw_.update(yaw_rad, dt);
-        if (std::abs(yaw_rad) < cube_yaw_deadband_rad) {
-            wz = 0.0f;
-        }
-        wz = std::clamp(wz, -cube_wz_max, cube_wz_max);
+        // ── YAW制御 ───────────────────────────────────────────────
+        // 位置合わせ中の不意な旋回を防ぐため、回転コマンドは固定でゼロにする
+        const float wz = 0.0f;
 
         // ── 距離PID ──────────────────────────────────────────────
         const float vx = pid_cube_dist_.update(cube_depth_m_, dt);
