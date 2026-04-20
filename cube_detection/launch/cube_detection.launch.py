@@ -3,8 +3,9 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    camera_pitch_correction_deg = 0.0
-    use_mask_range_topic = True
+    temporal_stabilization_enabled = False
+    temporal_smoothing_enabled = False
+    temporal_hold_enabled = False
 
     return LaunchDescription(
         [
@@ -59,6 +60,12 @@ def generate_launch_description():
                         "use_mask_range_topic": True,
                         # カメラ取り付け角補正 (deg) - 下向き取り付けなら正の値
                         "camera_pitch_correction_deg": 0.0,
+                        # 時系列安定化のマスタースイッチ (falseなら平滑化/保持とも無効)
+                        "temporal_stabilization_enabled": temporal_stabilization_enabled,
+                        # 検出値をEMAで平滑化するか
+                        "temporal_smoothing_enabled": temporal_smoothing_enabled,
+                        # 未検出時に前回検出を一定フレーム保持するか
+                        "temporal_hold_enabled": temporal_hold_enabled,
                     }
                 ],
             ),
