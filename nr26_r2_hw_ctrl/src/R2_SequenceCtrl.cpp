@@ -1,5 +1,5 @@
 /*
-R2段差超えシーケンス（状態管理）
+R2統合シーケンス制御ノード
 Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 */
 
