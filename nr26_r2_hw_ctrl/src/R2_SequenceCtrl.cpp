@@ -59,10 +59,12 @@ public:
         : Node("sequence_ctrl_node"),
           pid_angle_(2.0f, 0.0f, 0.1f, 0.6f),
           pid_distance_(0.0008f, 0.0f, 0.0f, 0.4f),
+          pid_cube_yaw_(2.0f, 0.0f, 0.0f, 0.8f),
           pid_cube_dist_(3.0f, 0.0f, 0.0f, 1.0f),
           pid_cube_lat_(1.2f, 0.0f, 0.0f, 0.6f) {
         pid_angle_.set_target(0.0f);
         pid_distance_.set_target(wall_approach_target_mm);
+        pid_cube_yaw_.set_target(0.0f);
         pid_cube_dist_.set_target(cube_approach_target_m);
         pid_cube_lat_.set_target(0.5f);
         this->declare_parameter("use_camera_offset", false);
@@ -220,8 +222,10 @@ public:
             RCLCPP_WARN(get_logger(), "Sequence busy. CUBE_ALIGN ignored.");
             return;
         }
+        pid_cube_yaw_.reset();
         pid_cube_dist_.reset();
         pid_cube_lat_.reset();
+        pid_cube_yaw_.set_target(0.0f);
         pid_cube_dist_.set_target(cube_approach_target_m);
         last_cube_update_ = this->now();
         servo_camera_angle_ = static_cast<float>(servo_scan_start);
@@ -266,8 +270,10 @@ private:
     PIDController pid_distance_;
 
     // キューブ接近用PID
+    // pid_cube_yaw_ : 目標0[rad]、入力face_yaw[rad]、出力=wz(回転)
     // pid_cube_dist_: 目標cube_approach_target_m[m]、入力depth_m[m]、出力=vx(前後)
     // pid_cube_lat_ : 目標cx_target[norm]、入力cx_norm[0-1]、出力=vy(横移動)
+    PIDController pid_cube_yaw_;
     PIDController pid_cube_dist_;
     PIDController pid_cube_lat_;
 
@@ -724,6 +730,7 @@ private:
         constexpr float dt = 0.01f;
 
         if (cube_detected_) {
+            pid_cube_yaw_.reset();
             pid_cube_dist_.reset();
             pid_cube_lat_.reset();
             mode_ = StepMode::CUBE_ALIGN;
@@ -792,11 +799,13 @@ private:
             cx_target = std::clamp(0.5f - cx_offset, 0.0f, 1.0f);
         }
 
+        const float yaw_rad = cube_yaw_deg_ * static_cast<float>(M_PI) / 180.0f;
         const float lat_error = cube_cx_norm_ - cx_target;
         const float dist_error = cube_depth_m_ - cube_approach_target_m;
 
-        // 完了条件：距離・横位置が閾値内
-        if (std::abs(dist_error) < cube_distance_threshold &&
+        // 完了条件：YAW・距離・横位置が閾値内
+        if (std::abs(yaw_rad) < cube_angle_threshold &&
+            std::abs(dist_error) < cube_distance_threshold &&
             std::abs(lat_error) < cube_lateral_threshold) {
             pkt.setMD(MD5, 0);
             pkt.setMD(MD6, 0);
@@ -804,21 +813,31 @@ private:
             pkt.setMD(MD8, 0);
             mode_ = StepMode::NONE;
             RCLCPP_INFO(get_logger(),
-                        "Cube aligned. depth=%.3f m, cx=%.3f(tgt=%.2f) -> Done.",
-                        cube_depth_m_, cube_cx_norm_, cx_target);
+                        "Cube aligned. yaw=%.2f deg, depth=%.3f m, cx=%.3f(tgt=%.2f) -> Done.",
+                        cube_yaw_deg_, cube_depth_m_, cube_cx_norm_, cx_target);
             return;
         }
 
         // ── YAW制御 ───────────────────────────────────────────────
-        // 位置合わせ中の不意な旋回を防ぐため、回転コマンドは固定でゼロにする
-        const float wz = 0.0f;
+        float wz = pid_cube_yaw_.update(yaw_rad, dt);
+        if (std::abs(yaw_rad) < cube_yaw_deadband_rad) {
+            wz = 0.0f;
+        }
+        wz = std::clamp(wz, -cube_wz_max, cube_wz_max);
 
         // ── 距離PID ──────────────────────────────────────────────
-        const float vx = pid_cube_dist_.update(cube_depth_m_, dt);
+        float vx = 0.0f;
+        float vy = 0.0f;
+        if (std::abs(yaw_rad) < cube_yaw_approach_thr) {
+            vx = pid_cube_dist_.update(cube_depth_m_, dt);
 
-        // ── 横方向PID ─────────────────────────────────────────────
-        pid_cube_lat_.set_target(cx_target);
-        const float vy = -pid_cube_lat_.update(cube_cx_norm_, dt);
+            // ── 横方向PID ─────────────────────────────────────────────
+            pid_cube_lat_.set_target(cx_target);
+            vy = -pid_cube_lat_.update(cube_cx_norm_, dt);
+        } else {
+            pid_cube_dist_.reset();
+            pid_cube_lat_.reset();
+        }
 
         // ── サーボ追跡: cy_normで垂直方向を調整 ───────────────────
         const float cy_err = 0.5f - cube_cy_norm_;
@@ -854,8 +873,8 @@ private:
         pkt.setMD(MD8, static_cast<int16_t>(v4 * align_duty_max));
 
         RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
-                             "CUBE_ALIGN: depth=%.3f m, cx=%.3f(tgt=%.2f) cy=%.3f servo=%.1f | vx=%.3f vy=%.3f",
-                             cube_depth_m_, cube_cx_norm_, cx_target, cube_cy_norm_, servo_camera_angle_, vx, vy);
+                             "CUBE_ALIGN: yaw=%.2f deg, depth=%.3f m, cx=%.3f(tgt=%.2f) cy=%.3f servo=%.1f | vx=%.3f vy=%.3f wz=%.3f",
+                             cube_yaw_deg_, cube_depth_m_, cube_cx_norm_, cx_target, cube_cy_norm_, servo_camera_angle_, vx, vy, wz);
     }
 
     void loop() {
