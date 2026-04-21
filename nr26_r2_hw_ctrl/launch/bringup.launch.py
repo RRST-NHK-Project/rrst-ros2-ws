@@ -4,10 +4,6 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
 
-    r2_md = Node(
-        package="nr26_r2_hw_ctrl", executable="r2_md", name="r2_md", output="screen"
-    )
-
     r2_mc = Node(
         package="nr26_r2_hw_ctrl", executable="r2_mc", name="r2_mc", output="screen"
     )
