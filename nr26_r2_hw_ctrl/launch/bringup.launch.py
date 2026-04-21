@@ -4,8 +4,11 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
 
-    r2_mc = Node(
-        package="nr26_r2_hw_ctrl", executable="r2_mc", name="r2_mc", output="screen"
+    r2_auto = Node(
+        package="nr26_r2_hw_ctrl",
+        executable="r2_auto",
+        name="r2_auto",
+        output="screen",
     )
 
     r2_sc = Node(
@@ -15,9 +18,17 @@ def generate_launch_description():
         output="screen",
     )
 
+    r2_mc = Node(
+        package="nr26_r2_hw_ctrl",
+        executable="r2_mc",
+        name="r2_mc",
+        output="screen",
+    )
+
     return LaunchDescription(
         [
-            r2_mc,
             r2_sc,
+            r2_mc,
+            r2_auto,
         ]
     )
