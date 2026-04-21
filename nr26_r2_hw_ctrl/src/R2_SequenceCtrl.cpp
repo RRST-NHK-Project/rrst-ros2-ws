@@ -270,9 +270,10 @@ private:
     PIDController pid_distance_;
 
     // キューブ接近用PID
-    // pid_cube_yaw_ : 目標0[rad]、入力face_yaw[rad]、出力=wz(回転)
     // pid_cube_dist_: 目標cube_approach_target_m[m]、入力depth_m[m]、出力=vx(前後)
     // pid_cube_lat_ : 目標cx_target[norm]、入力cx_norm[0-1]、出力=vy(横移動)
+    // pid_cube_yaw_ : 目標0[rad]、入力face_yaw[rad]、出力=wz(回転)
+    //                 現在は「距離・横位置を先に合わせ、最後にYAWを仕上げる」段階制御で使用
     PIDController pid_cube_yaw_;
     PIDController pid_cube_dist_;
     PIDController pid_cube_lat_;
@@ -296,11 +297,11 @@ private:
     // キューブ接近PID定数
 
     static constexpr float cube_approach_target_m = 0.5f;   // 接近目標距離 [m]
-    static constexpr double cube_angle_threshold = 0.05;    // YAW整列完了閾値 [rad]（約9度）
+    static constexpr double cube_angle_threshold = 0.05;    // YAW整列完了閾値 [rad]（約3度）
     static constexpr float cube_yaw_deadband_rad = 0.05f;   // YAW制御デッドバンド [rad]（約3度）
     static constexpr float cube_lateral_threshold = 0.08f;  // 横方向完了閾値 [cx_norm]
     static constexpr float cube_distance_threshold = 0.08f; // 距離完了閾値 [m]
-    static constexpr float cube_yaw_approach_thr = 0.30f;   // 前進開始YAW閾値 [rad]（約17度）
+    static constexpr float cube_yaw_approach_thr = 0.30f;   // 予備: YAW優先前進ゲート閾値 [rad]（現在未使用）
     static constexpr float cube_wz_max = 0.35f;             // 旋回速度上限（過旋回防止）
     static constexpr double cube_detect_timeout_sec = 0.5;  // 検出途切れ待機タイムアウト [s]
     static constexpr double cube_align_abort_sec = 1.0;     // アボートタイムアウト [s]
@@ -309,7 +310,7 @@ private:
     // カメラが前方中心から右に180mmオフセット→目標cx_normを左にシフト
     // cx_offset = 0.5 * camera_offset_m / (depth_m * tan(hfov/2))
     // tan_hfov_half: カメラの水平FOVの半角タンジェント（90°→1.0、60°→0.577）
-    static constexpr float camera_offset_right_m = 0.180f;
+    static constexpr float camera_offset_right_m = 0.290f;
     static constexpr float camera_tan_hfov_half = 1.0f; // 要調整（90°FOV想定）
     // カメラサーボ定数
     static constexpr int camera_servo_idx = SERVO1;      // ★使用するサーボ番号
@@ -730,6 +731,8 @@ private:
         constexpr float dt = 0.01f;
 
         if (cube_detected_) {
+            // 新しい検出に切り替わるタイミングでPID内部状態をクリアして、
+            // スキャン中の履歴がCUBE_ALIGNに持ち越されないようにする。
             pid_cube_yaw_.reset();
             pid_cube_dist_.reset();
             pid_cube_lat_.reset();
@@ -757,9 +760,10 @@ private:
     }
 
     // cube_detectionを使ったキューブへの平行接近シーケンス（PID制御）
-    // YAW PID  : face_yaw_deg → 0 [rad]（キューブ正面に向く）
-    // 距離PID  : depth_m → cube_approach_target_m [m]（目標距離まで前進）
-    // 横方向PID: cx_norm → 0.5（画像中央にキューブを合わせる）
+    // 制御順序:
+    // 1) 距離PID  : depth_m → cube_approach_target_m [m]（目標距離まで前進）
+    // 2) 横方向PID: cx_norm → cx_target（画像上の横位置を合わせる）
+    // 3) YAW PID  : face_yaw_deg → 0 [rad]（最後に向きを仕上げる）
     // サーボ追跡: cy_norm → 0.5（カメラがキューブを捉え続けるよう垂直角調整）
     void cube_alignment_sequence() {
         constexpr float dt = 0.01f;
@@ -779,7 +783,7 @@ private:
             return;
         }
 
-        // 検出途切れ: 横移動のみ停止、前進は継続（ドリフト防止＆停止しすぎ防止）
+        // 検出途切れ: 安全のため移動を停止
         if (!cube_detected_) {
 
             pkt.setMD(MD5, 0);
@@ -791,13 +795,10 @@ private:
             return;
         }
 
-        // カメラオフセット補正: launchパラメータ use_camera_offset=true で有効化
-        float cx_target = 0.5f;
-        if (this->get_parameter("use_camera_offset").as_bool()) {
-            const float cx_offset = 0.5f * camera_offset_right_m /
-                                    (std::max(cube_depth_m_, 0.1f) * camera_tan_hfov_half);
-            cx_target = std::clamp(0.5f - cx_offset, 0.0f, 1.0f);
-        }
+        // カメラオフセット補正: 右290mmオフセットを常に適用
+        const float cx_offset = 0.5f * camera_offset_right_m /
+                                (std::max(cube_depth_m_, 0.1f) * camera_tan_hfov_half);
+        const float cx_target = std::clamp(0.5f - cx_offset, 0.0f, 1.0f);
 
         const float yaw_rad = cube_yaw_deg_ * static_cast<float>(M_PI) / 180.0f;
         const float lat_error = cube_cx_norm_ - cx_target;
@@ -818,6 +819,7 @@ private:
             return;
         }
 
+        // 仕上げYAWへ移るための前提条件（距離・横位置の粗合わせ完了）
         const bool dist_ready = std::abs(dist_error) < cube_distance_threshold;
         const bool lat_ready = std::abs(lat_error) < cube_lateral_threshold;
 
@@ -828,9 +830,12 @@ private:
         float wz = 0.0f;
 
         if (!(dist_ready && lat_ready)) {
+            // YAWは最後に行うため、この段階では積分蓄積を避ける。
             pid_cube_yaw_.reset();
             vx = pid_cube_dist_.update(cube_depth_m_, dt);
 
+            // 画像右側にキューブがある(cube_cx_norm_ > target)ときに
+            // ロボットが右へ移動するよう符号を反転している。
             pid_cube_lat_.set_target(cx_target);
             vy = -pid_cube_lat_.update(cube_cx_norm_, dt);
         } else {
@@ -838,6 +843,7 @@ private:
             vy = 0.0f;
 
             // ── YAW制御 ───────────────────────────────────────────
+            // PID出力の回転正方向と機体の回転正方向が逆のため符号を反転。
             wz = -pid_cube_yaw_.update(yaw_rad, dt);
             if (std::abs(yaw_rad) < cube_yaw_deadband_rad) {
                 wz = 0.0f;
@@ -873,6 +879,7 @@ private:
         v3 /= max_v;
         v4 /= max_v;
 
+        // align_duty_max を100%基準とした duty 指令へ変換して送信。
         pkt.setMD(MD5, static_cast<int16_t>(v1 * align_duty_max));
         pkt.setMD(MD6, static_cast<int16_t>(v2 * align_duty_max));
         pkt.setMD(MD7, static_cast<int16_t>(v3 * align_duty_max));

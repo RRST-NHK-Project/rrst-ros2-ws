@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <string>
 #include <unordered_map>
@@ -60,6 +61,7 @@ namespace r2_planner {
         rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr state_pose_sub_;
         rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr state_mode_sub_;
         rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr state_odom_reset_sub_;
+        rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr state_wait_sub_;
         rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mff_path_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr mff_path_advance_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr auto_send_enabled_sub_;
@@ -85,11 +87,14 @@ namespace r2_planner {
         std::unordered_map<int32_t, int32_t> state_mode_targets_;
         std::unordered_map<int32_t, bool> state_rotate_only_targets_;
         std::unordered_map<int32_t, bool> state_odom_reset_targets_;
+        std::unordered_map<int32_t, int32_t> state_wait_ms_overrides_;
         std::vector<int32_t> mff_path_;
         size_t mff_path_index_{0};
         int32_t mff_heading_deg_{0};
         bool auto_send_enabled_{true};
         int32_t fallback_drive_mode_on_unset_{0};
+        int32_t auto_transition_default_wait_ms_{3000};
+        std::chrono::steady_clock::time_point state_entered_at_{std::chrono::steady_clock::now()};
 
         void onCommand(const std_msgs::msg::Int32MultiArray::SharedPtr msg);
         void onState(const std_msgs::msg::Int32::SharedPtr msg);
@@ -101,6 +106,7 @@ namespace r2_planner {
         void onStatePose(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
         void onStateMode(const std_msgs::msg::Int32MultiArray::SharedPtr msg);
         void onStateOdomReset(const std_msgs::msg::Int32MultiArray::SharedPtr msg);
+        void onStateWait(const std_msgs::msg::Int32MultiArray::SharedPtr msg);
         void onMffPath(const std_msgs::msg::Int32MultiArray::SharedPtr msg);
         void onMffPathAdvance(const std_msgs::msg::Bool::SharedPtr msg);
         void onAutoSendEnabled(const std_msgs::msg::Bool::SharedPtr msg);
