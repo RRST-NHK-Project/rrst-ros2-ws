@@ -6,10 +6,10 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <iostream>
 #include <thread>
 #include <vector>
-#include <cstdint>
 
 // ROS
 #include "rclcpp/rclcpp.hpp"
@@ -138,8 +138,24 @@ private:
     static constexpr int32_t STATE_HEAD_HAND_GATTAI_WAITING = 2;
     static constexpr int32_t STATE_HEAD_HAND_GATTAI_ASSEMBLY = 3;
 
+    static constexpr int32_t STATE_KFS_HAND_INIT = 6;
+    static constexpr int32_t STATE_KFS_PICK_WAITING = 7;
+    static constexpr int32_t STATE_PICK_UP = 8;
+    static constexpr int32_t STATE_PICK_MIDDLE = 9;
+    static constexpr int32_t STATE_PICK_DOWN = 10;
+    static constexpr int32_t STATE_KFS_HOLD = 11;
+    static constexpr int32_t STATE_KFS_MOVE = 12;
+    static constexpr int32_t STATE_TTR_SHOOT_MIDDLE = 13;
+
+    enum class TargetHeight {
+        UP,
+        MIDDLE,
+        DOWN
+    };
+
     int32_t current_planner_state_ = 0;
     std::string current_state_name_ = "";
+    TargetHeight target_height_ = TargetHeight::DOWN;
 
     // モーター1回転あたりのエンコーダのカウント数
     static constexpr double COUNTS_PER_ROTATION = 355.0;
@@ -156,6 +172,22 @@ private:
             return STATE_HEAD_HAND_GATTAI_WAITING;
         if (state_name == "HEAD_HAND_GATTAI_ASSEMBLY")
             return STATE_HEAD_HAND_GATTAI_ASSEMBLY;
+        if (state_name == "KFS_HAND_INIT")
+            return STATE_KFS_HAND_INIT;
+        if (state_name == "KFS_PICK_WAITING")
+            return STATE_KFS_PICK_WAITING;
+        if (state_name == "PICK_UP")
+            return STATE_PICK_UP;
+        if (state_name == "PICK_MIDDLE")
+            return STATE_PICK_MIDDLE;
+        if (state_name == "PICK_DOWN")
+            return STATE_PICK_DOWN;
+        if (state_name == "KFS_HOLD")
+            return STATE_KFS_HOLD;
+        if (state_name == "KFS_MOVE")
+            return STATE_KFS_MOVE;
+        if (state_name == "TTR_SHOOT_MIDDLE")
+            return STATE_TTR_SHOOT_MIDDLE;
         return -1;
     }
 
@@ -200,6 +232,44 @@ private:
         return raw_speed;
     }
 
+    void reset_hand_outputs() {
+        data_[9] = 0;  // SERVO1
+        data_[17] = 0; // TR1
+        data_[18] = 0; // TR2
+    }
+
+    void set_home_values() {
+        data_[9] = 0;
+        data_[17] = 0; // シリンダー縮める
+        data_[18] = 0; // ハンド開く
+    }
+
+    void set_ready_values() {
+        data_[9] = (target_height_ == TargetHeight::UP) ? 45 : 90;
+        data_[17] = 1; // シリンダー伸ばす
+        data_[18] = 0;
+    }
+
+    void set_pick_values() {
+        data_[17] = 1;
+        data_[18] = 1; // ハンド閉じる
+    }
+
+    void set_hold_values() {
+        data_[17] = 1;
+        data_[18] = 1;
+    }
+
+    void set_moving_values() {
+        data_[17] = 1;
+        data_[18] = 1;
+    }
+
+    void set_shoot_values() {
+        data_[17] = 1;
+        data_[18] = 1;
+    }
+
     // =====================================================================
     // 状態別モーター制御（タイマーコールバック毎周期呼び出し）
     // =====================================================================
@@ -207,6 +277,10 @@ private:
         int16_t micro1_sw = g_micro1_sw.load();
         int64_t abs_coord = g_abs_coord.load();
         double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
+
+        // 状態ごとに明示的に値を作り直し、残留値を防ぐ
+        data_[1] = 0; // MD1
+        reset_hand_outputs();
 
         switch (state_code) {
         case STATE_HEAD_HAND_INIT:
@@ -256,20 +330,51 @@ private:
             }
             break;
 
+        case STATE_KFS_HAND_INIT:
+            set_home_values();
+            break;
+        case STATE_KFS_PICK_WAITING:
+            set_ready_values();
+            break;
+        case STATE_PICK_UP:
+            target_height_ = TargetHeight::UP;
+            set_ready_values();
+            set_pick_values();
+            break;
+        case STATE_PICK_MIDDLE:
+            target_height_ = TargetHeight::MIDDLE;
+            set_ready_values();
+            set_pick_values();
+            break;
+        case STATE_PICK_DOWN:
+            target_height_ = TargetHeight::DOWN;
+            set_ready_values();
+            set_pick_values();
+            break;
+        case STATE_KFS_HOLD:
+            set_hold_values();
+            break;
+        case STATE_KFS_MOVE:
+            set_moving_values();
+            break;
+        case STATE_TTR_SHOOT_MIDDLE:
+            set_shoot_values();
+            break;
+
         default:
-            // 未知の状態では安全のため停止
-            data_[1] = 0;
+            // ハンド非関連・未知状態では安全側
+            set_home_values();
             break;
         }
 
         // デバッグログ
         RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-            "【MotionCtrl】状態=%d, 回転数=%.3f, 始発SW=%d, MD1出力=%d",
-            state_code, rot_units, (int)micro1_sw, data_[1]);
+                             "【MotionCtrl】状態=%d, 回転数=%.3f, 始発SW=%d, MD1=%d, SERVO1=%d, TR1=%d, TR2=%d",
+                             state_code, rot_units, (int)micro1_sw, data_[1], data_[9], data_[17], data_[18]);
     }
 
     // =====================================================================
-    // 状態遷移コールバック群 
+    // 状態遷移コールバック群
     // =====================================================================
     void task_state_callback(const std_msgs::msg::Int32::SharedPtr msg) {
         const int32_t next_state = msg->data;
@@ -278,6 +383,7 @@ private:
         }
 
         current_planner_state_ = next_state;
+        apply_state_to_packet(current_planner_state_);
         RCLCPP_INFO(get_logger(), "task_state -> %ld", static_cast<long>(current_planner_state_));
     }
 
@@ -292,6 +398,7 @@ private:
         }
 
         current_planner_state_ = next_state;
+        apply_state_to_packet(current_planner_state_);
         RCLCPP_INFO(get_logger(), "task_status.state -> %ld", static_cast<long>(current_planner_state_));
     }
 
@@ -306,7 +413,11 @@ private:
         }
 
         current_state_name_ = next_state_name;
-        current_planner_state_ = state_code_from_name(current_state_name_);
+        const int32_t mapped_state = state_code_from_name(current_state_name_);
+        if (mapped_state >= 0) {
+            current_planner_state_ = mapped_state;
+            apply_state_to_packet(current_planner_state_);
+        }
 
         RCLCPP_INFO(get_logger(), "task_status_text.state -> %s", current_state_name_.c_str());
     }
@@ -365,7 +476,7 @@ private:
         int16_t micro2_sw = g_micro2_sw.load();
 
         static const int NORMAL_SPEED = 130;
-        static const int SLOW_SPEED   = 100;
+        static const int SLOW_SPEED = 100;
 
         int64_t abs_coord = g_abs_coord.load();
         double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
@@ -379,7 +490,7 @@ private:
         }
         bool in_slow_zone = is_fork_slow;
 
-        int fwd_speed = in_slow_zone ?  SLOW_SPEED :  NORMAL_SPEED;
+        int fwd_speed = in_slow_zone ? SLOW_SPEED : NORMAL_SPEED;
         int rev_speed = in_slow_zone ? -SLOW_SPEED : -NORMAL_SPEED;
 
         if (micro2_sw == 1) {
@@ -405,9 +516,9 @@ private:
         }
 
         RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-            "【フォーク制御】回転数=%.2f, 減速=%s, 始発SW=%d, 終点SW=%d, 出力=%d",
-            rot_units, in_slow_zone ? "ON" : "OFF",
-            micro2_sw, micro1_sw, data_[2]);
+                             "【フォーク制御】回転数=%.2f, 減速=%s, 始発SW=%d, 終点SW=%d, 出力=%d",
+                             rot_units, in_slow_zone ? "ON" : "OFF",
+                             micro2_sw, micro1_sw, data_[2]);
 
         // デバッグ用
         RCLCPP_INFO(
@@ -457,7 +568,7 @@ private:
         // マイクロスイッチの値を更新
         g_micro1_sw = msg->data[10]; // 上端スイッチ(micro1)
         g_micro2_sw = msg->data[9];  // 下端スイッチ(micro2)
-        g_enc1_val  = msg->data[1];  // エンコーダ1
+        g_enc1_val = msg->data[1];   // エンコーダ1
 
         // =============================================================
         // 座標調査・ラップアラウンド計算
@@ -500,34 +611,35 @@ private:
 
         if (diff != 0) {
             RCLCPP_INFO(get_logger(),
-                "\n--- ROTATION DEBUG ---\n"
-                "  生値の変化 : %d -> %d (diff: %d)\n"
-                "  デジタルラップ : %d 回\n"
-                "  絶対カウント   : %ld\n"
-                "  現在回転数     : %.3f 回転 (1周355)\n"
-                "----------------------",
-                (int)current_enc1 - diff, (int)current_enc1, diff,
-                (int)r_count, abs_coord, rot);
+                        "\n--- ROTATION DEBUG ---\n"
+                        "  生値の変化 : %d -> %d (diff: %d)\n"
+                        "  デジタルラップ : %d 回\n"
+                        "  絶対カウント   : %ld\n"
+                        "  現在回転数     : %.3f 回転 (1周355)\n"
+                        "----------------------",
+                        (int)current_enc1 - diff, (int)current_enc1, diff,
+                        (int)r_count, abs_coord, rot);
         }
 
         // --- 通信デバッグ追加 ---
         static uint64_t packet_count = 0;
         packet_count++;
 
-        static int16_t l9=0, l10=0;
+        static int16_t l9 = 0, l10 = 0;
         if (msg->data[9] != l9 || msg->data[10] != l10) {
             RCLCPP_INFO(get_logger(), "SW Changed! [下(9):%d, 上(10):%d]",
                         msg->data[9], msg->data[10]);
-            l9 = msg->data[9]; l10 = msg->data[10];
+            l9 = msg->data[9];
+            l10 = msg->data[10];
         }
 
         RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
-            "RX Heartbeat (Total:%lu) | Dump: [%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d]",
-            packet_count,
-            msg->data[0], msg->data[1], msg->data[2], msg->data[3],
-            msg->data[4], msg->data[5], msg->data[6], msg->data[7],
-            msg->data[8], msg->data[9], msg->data[10], msg->data[11],
-            msg->data[12], msg->data[13], msg->data[14], msg->data[15]);
+                             "RX Heartbeat (Total:%lu) | Dump: [%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d]",
+                             packet_count,
+                             msg->data[0], msg->data[1], msg->data[2], msg->data[3],
+                             msg->data[4], msg->data[5], msg->data[6], msg->data[7],
+                             msg->data[8], msg->data[9], msg->data[10], msg->data[11],
+                             msg->data[12], msg->data[13], msg->data[14], msg->data[15]);
     }
 
     uint8_t device_id_;
