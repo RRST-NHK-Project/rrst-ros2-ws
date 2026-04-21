@@ -125,8 +125,8 @@ public:
         // 初期状態を適用
         apply_state_to_packet(current_planner_state_);
 
-        RCLCPP_INFO(get_logger(),
-                    "serial_tx_%d started.", device_id_);
+        // RCLCPP_INFO(get_logger(),
+        //             "serial_tx_%d started.", device_id_);
     }
 
 private:
@@ -270,6 +270,66 @@ private:
         data_[18] = 1;
     }
 
+    static const char *target_height_to_string(TargetHeight h) {
+        switch (h) {
+        case TargetHeight::UP:
+            return "UP";
+        case TargetHeight::MIDDLE:
+            return "MIDDLE";
+        case TargetHeight::DOWN:
+        default:
+            return "DOWN";
+        }
+    }
+
+    void log_current_operation_state(const char *source, bool throttled = false) {
+        const int16_t micro1_sw = g_micro1_sw.load();
+        const int16_t micro2_sw = g_micro2_sw.load();
+        const int64_t abs_coord = g_abs_coord.load();
+        const double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
+
+        const std::string state_name = current_state_name_.empty()
+                                           ? std::string("STATE_") + std::to_string(current_planner_state_)
+                                           : current_state_name_;
+
+        if (throttled) {
+            RCLCPP_INFO_THROTTLE(
+                get_logger(), *get_clock(), 1000,
+                "[MotionCtrlState:%s] state=%s(%ld), height=%s, rot=%.3f, sw_up=%d, sw_down=%d, MD1=%d, MD2=%d, SERVO1=%d, SERVO2=%d, TR1=%d, TR2=%d",
+                source,
+                state_name.c_str(),
+                static_cast<long>(current_planner_state_),
+                target_height_to_string(target_height_),
+                rot_units,
+                static_cast<int>(micro1_sw),
+                static_cast<int>(micro2_sw),
+                static_cast<int>(data_[1]),
+                static_cast<int>(data_[2]),
+                static_cast<int>(data_[9]),
+                static_cast<int>(data_[10]),
+                static_cast<int>(data_[17]),
+                static_cast<int>(data_[18]));
+            return;
+        }
+
+        RCLCPP_INFO(
+            get_logger(),
+            "[MotionCtrlState:%s] state=%s(%ld), height=%s, rot=%.3f, sw_up=%d, sw_down=%d, MD1=%d, MD2=%d, SERVO1=%d, SERVO2=%d, TR1=%d, TR2=%d",
+            source,
+            state_name.c_str(),
+            static_cast<long>(current_planner_state_),
+            target_height_to_string(target_height_),
+            rot_units,
+            static_cast<int>(micro1_sw),
+            static_cast<int>(micro2_sw),
+            static_cast<int>(data_[1]),
+            static_cast<int>(data_[2]),
+            static_cast<int>(data_[9]),
+            static_cast<int>(data_[10]),
+            static_cast<int>(data_[17]),
+            static_cast<int>(data_[18]));
+    }
+
     // =====================================================================
     // 状態別モーター制御（タイマーコールバック毎周期呼び出し）
     // =====================================================================
@@ -367,10 +427,8 @@ private:
             break;
         }
 
-        // デバッグログ
-        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-                             "【MotionCtrl】状態=%d, 回転数=%.3f, 始発SW=%d, MD1=%d, SERVO1=%d, TR1=%d, TR2=%d",
-                             state_code, rot_units, (int)micro1_sw, data_[1], data_[9], data_[17], data_[18]);
+        // 現在の動作状態を定期表示
+        log_current_operation_state("apply", true);
     }
 
     // =====================================================================
@@ -384,6 +442,7 @@ private:
 
         current_planner_state_ = next_state;
         apply_state_to_packet(current_planner_state_);
+        log_current_operation_state("task_state");
         RCLCPP_INFO(get_logger(), "task_state -> %ld", static_cast<long>(current_planner_state_));
     }
 
@@ -399,6 +458,7 @@ private:
 
         current_planner_state_ = next_state;
         apply_state_to_packet(current_planner_state_);
+        log_current_operation_state("task_status");
         RCLCPP_INFO(get_logger(), "task_status.state -> %ld", static_cast<long>(current_planner_state_));
     }
 
@@ -417,6 +477,7 @@ private:
         if (mapped_state >= 0) {
             current_planner_state_ = mapped_state;
             apply_state_to_packet(current_planner_state_);
+            log_current_operation_state("task_status_text");
         }
 
         RCLCPP_INFO(get_logger(), "task_status_text.state -> %s", current_state_name_.c_str());
@@ -515,17 +576,17 @@ private:
             }
         }
 
-        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-                             "【フォーク制御】回転数=%.2f, 減速=%s, 始発SW=%d, 終点SW=%d, 出力=%d",
-                             rot_units, in_slow_zone ? "ON" : "OFF",
-                             micro2_sw, micro1_sw, data_[2]);
+        // RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
+        //                      "【フォーク制御】回転数=%.2f, 減速=%s, 始発SW=%d, 終点SW=%d, 出力=%d",
+        //                      rot_units, in_slow_zone ? "ON" : "OFF",
+        //                      micro2_sw, micro1_sw, data_[2]);
 
         // デバッグ用
-        RCLCPP_INFO(
-            get_logger(),
-            "data_[1-4]=[%d,%d,%d,%d], data_[9-12]=[%d,%d,%d,%d]",
-            data_[1], data_[2], data_[3], data_[4],
-            data_[9], data_[10], data_[11], data_[12]);
+        // RCLCPP_INFO(
+        //     get_logger(),
+        //     "data_[1-4]=[%d,%d,%d,%d], data_[9-12]=[%d,%d,%d,%d]",
+        //     data_[1], data_[2], data_[3], data_[4],
+        //     data_[9], data_[10], data_[11], data_[12]);
 
         // 配列操作ここまで
     }
@@ -543,25 +604,26 @@ private:
 
         if (micro2_sw == 1 && data_[2] > 0) {
             data_[2] = 0;
-            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】始発リミット到達！モーターの正回転を即時遮断しました！");
+            // RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】始発リミット到達！モーターの正回転を即時遮断しました！");
         }
 
         if (micro1_sw == 1 && data_[2] < 0) {
             data_[2] = 0;
-            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】終点リミット到達！モーターの逆回転を即時遮断しました！");
+            // RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】終点リミット到達！モーターの逆回転を即時遮断しました！");
         }
 
         msg.data = data_;
         publisher_->publish(msg);
+        log_current_operation_state("publish", true);
     }
 
     void
     sensor_callback(
         const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
         if (msg->data.size() < RX16NUM) {
-            RCLCPP_WARN(this->get_logger(),
-                        "serial_rx_%d: data too short (%zu)",
-                        device_id_, msg->data.size());
+            // RCLCPP_WARN(this->get_logger(),
+            //             "serial_rx_%d: data too short (%zu)",
+            //             device_id_, msg->data.size());
             return;
         }
 
@@ -600,7 +662,7 @@ private:
         // 始発スイッチ押下時に座標をゼロリセット
         if (msg->data[9] != 0) {
             g_zero_offset.store(total_encoder);
-            RCLCPP_INFO(get_logger(), "[COORD RESET!] 始発スイッチ押下により座標0へオフセット設定");
+            // RCLCPP_INFO(get_logger(), "[COORD RESET!] 始発スイッチ押下により座標0へオフセット設定");
         }
 
         int64_t zero_offset = g_zero_offset.load();
@@ -610,15 +672,15 @@ private:
         double rot = (double)abs_coord / COUNTS_PER_ROTATION;
 
         if (diff != 0) {
-            RCLCPP_INFO(get_logger(),
-                        "\n--- ROTATION DEBUG ---\n"
-                        "  生値の変化 : %d -> %d (diff: %d)\n"
-                        "  デジタルラップ : %d 回\n"
-                        "  絶対カウント   : %ld\n"
-                        "  現在回転数     : %.3f 回転 (1周355)\n"
-                        "----------------------",
-                        (int)current_enc1 - diff, (int)current_enc1, diff,
-                        (int)r_count, abs_coord, rot);
+            // RCLCPP_INFO(get_logger(),
+            //             "\n--- ROTATION DEBUG ---\n"
+            //             "  生値の変化 : %d -> %d (diff: %d)\n"
+            //             "  デジタルラップ : %d 回\n"
+            //             "  絶対カウント   : %ld\n"
+            //             "  現在回転数     : %.3f 回転 (1周355)\n"
+            //             "----------------------",
+            //             (int)current_enc1 - diff, (int)current_enc1, diff,
+            //             (int)r_count, abs_coord, rot);
         }
 
         // --- 通信デバッグ追加 ---
@@ -627,19 +689,19 @@ private:
 
         static int16_t l9 = 0, l10 = 0;
         if (msg->data[9] != l9 || msg->data[10] != l10) {
-            RCLCPP_INFO(get_logger(), "SW Changed! [下(9):%d, 上(10):%d]",
-                        msg->data[9], msg->data[10]);
+            // RCLCPP_INFO(get_logger(), "SW Changed! [下(9):%d, 上(10):%d]",
+            //             msg->data[9], msg->data[10]);
             l9 = msg->data[9];
             l10 = msg->data[10];
         }
 
-        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
-                             "RX Heartbeat (Total:%lu) | Dump: [%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d]",
-                             packet_count,
-                             msg->data[0], msg->data[1], msg->data[2], msg->data[3],
-                             msg->data[4], msg->data[5], msg->data[6], msg->data[7],
-                             msg->data[8], msg->data[9], msg->data[10], msg->data[11],
-                             msg->data[12], msg->data[13], msg->data[14], msg->data[15]);
+        // RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
+        //                      "RX Heartbeat (Total:%lu) | Dump: [%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d]",
+        //                      packet_count,
+        //                      msg->data[0], msg->data[1], msg->data[2], msg->data[3],
+        //                      msg->data[4], msg->data[5], msg->data[6], msg->data[7],
+        //                      msg->data[8], msg->data[9], msg->data[10], msg->data[11],
+        //                      msg->data[12], msg->data[13], msg->data[14], msg->data[15]);
     }
 
     uint8_t device_id_;
