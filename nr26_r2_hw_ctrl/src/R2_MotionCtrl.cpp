@@ -18,6 +18,8 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include <std_msgs/msg/int32.hpp>
 #include <std_msgs/msg/int32_multi_array.hpp>
 #include <std_msgs/msg/string.hpp>
+#include "include/PacketController.hpp"
+PacketController pkt;
 
 // 以下マイコンに合わせて設定
 #define TARGET_DEVICE_ID 7 // 宛先マイコンのID
@@ -48,8 +50,8 @@ public:
         : Node("hardware_control_" + std::to_string(device_id)),
           device_id_(device_id) {
 
-        // 配列を0で初期化
-        data_.assign(TX16NUM, 0);
+        // SERVO3初期値
+        pkt.setServo(SERVO3, 150);
         /*
         マイコンに送信される配列"data_"
         debug: 機能未割り当て, MD: モータードライバー, TR: トランジスタ
@@ -153,7 +155,7 @@ private:
         DOWN
     };
 
-    int32_t current_planner_state_ = 0;
+    int32_t current_planner_state_ = -1;
     std::string current_state_name_ = "";
     TargetHeight target_height_ = TargetHeight::DOWN;
 
@@ -233,41 +235,52 @@ private:
     }
 
     void reset_hand_outputs() {
-        data_[9] = 0;  // SERVO1
-        data_[17] = 0; // TR1
-        data_[18] = 0; // TR2
+        pkt.setServo(SERVO1, 230);
+        pkt.setServo(SERVO3, 140);
+        pkt.setMD(MD1, 0);
+        pkt.setTR(TR1, false);
     }
 
     void set_home_values() {
-        data_[9] = 0;
-        data_[17] = 0; // シリンダー縮める
-        data_[18] = 0; // ハンド開く
+        pkt.setServo(SERVO1, 230);
+        pkt.setServo(SERVO3, 140);
+        pkt.setMD(MD1, 0);
+        pkt.setTR(TR1, false); // シリンダー縮める
     }
 
     void set_ready_values() {
-        data_[9] = (target_height_ == TargetHeight::UP) ? 45 : 90;
-        data_[17] = 1; // シリンダー伸ばす
-        data_[18] = 0;
+        pkt.setServo(SERVO1, 130);
+        pkt.setServo(SERVO3, 180);
+        pkt.setMD(MD1, 0);
+        pkt.setTR(TR1, true); // シリンダー伸ばす
     }
 
     void set_pick_values() {
-        data_[17] = 1;
-        data_[18] = 1; // ハンド閉じる
+        pkt.setServo(SERVO1, 70);
+        pkt.setServo(SERVO3, 70);
+        pkt.setMD(MD1, 255); // ダイアフラムで吸う
+        pkt.setTR(TR1, true);
     }
 
     void set_hold_values() {
-        data_[17] = 1;
-        data_[18] = 1;
+        pkt.setServo(SERVO1, 70);
+        pkt.setServo(SERVO3, 70);
+        pkt.setMD(MD1, 255);
+        pkt.setTR(TR1, true);
     }
 
     void set_moving_values() {
-        data_[17] = 1;
-        data_[18] = 1;
+        pkt.setServo(SERVO1, 240);
+        pkt.setServo(SERVO3, 205);
+        pkt.setMD(MD1, 255);
+        pkt.setTR(TR1, false);
     }
 
     void set_shoot_values() {
-        data_[17] = 1;
-        data_[18] = 1;
+        pkt.setServo(SERVO1, 240);
+        pkt.setServo(SERVO3, 205);
+        pkt.setMD(MD1, 255);
+        pkt.setTR(TR1, false);
     }
 
     static const char *target_height_to_string(TargetHeight h) {
@@ -303,12 +316,12 @@ private:
                 rot_units,
                 static_cast<int>(micro1_sw),
                 static_cast<int>(micro2_sw),
-                static_cast<int>(data_[1]),
-                static_cast<int>(data_[2]),
-                static_cast<int>(data_[9]),
-                static_cast<int>(data_[10]),
-                static_cast<int>(data_[17]),
-                static_cast<int>(data_[18]));
+                static_cast<int>(pkt[MD1]),
+                static_cast<int>(pkt[MD2]),
+                static_cast<int>(pkt[SERVO1]),
+                static_cast<int>(pkt[SERVO2]),
+                static_cast<int>(pkt[TR1]),
+                static_cast<int>(pkt[TR2]));
             return;
         }
 
@@ -322,12 +335,12 @@ private:
             rot_units,
             static_cast<int>(micro1_sw),
             static_cast<int>(micro2_sw),
-            static_cast<int>(data_[1]),
-            static_cast<int>(data_[2]),
-            static_cast<int>(data_[9]),
-            static_cast<int>(data_[10]),
-            static_cast<int>(data_[17]),
-            static_cast<int>(data_[18]));
+            static_cast<int>(pkt[MD1]),
+            static_cast<int>(pkt[MD2]),
+            static_cast<int>(pkt[SERVO1]),
+            static_cast<int>(pkt[SERVO2]),
+            static_cast<int>(pkt[TR1]),
+            static_cast<int>(pkt[TR2]));
     }
 
     // =====================================================================
@@ -339,7 +352,7 @@ private:
         double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
 
         // 状態ごとに明示的に値を作り直し、残留値を防ぐ
-        data_[1] = 0; // MD1
+        pkt.setMD(MD1, 0);
         reset_hand_outputs();
 
         switch (state_code) {
@@ -347,9 +360,9 @@ private:
             // モーターを速度30で回し続ける（正回転＝始発方向へ）
             // マイクロスイッチ（始発）が押されたとき → モーター停止
             if (micro1_sw == 1) {
-                data_[1] = 0;
+                pkt.setMD(MD2, 0);
             } else {
-                data_[1] = apply_direction_limit(30);
+                pkt.setMD(MD2, apply_direction_limit(30));
             }
             break;
 
@@ -357,9 +370,9 @@ private:
             // モーターを速度-30で回し続ける（逆回転）
             // rot_unitsが7.0になったとき → モーター即停止
             if (rot_units >= 7.0) {
-                data_[1] = 0;
+                pkt.setMD(MD2, 0);
             } else {
-                data_[1] = apply_direction_limit(-30);
+                pkt.setMD(MD2, apply_direction_limit(-30));
             }
             break;
 
@@ -367,9 +380,9 @@ private:
             // モーターを速度30で回し続ける（正回転＝始発方向へ）
             // マイクロスイッチ（始発）が押されたとき → モーター停止
             if (micro1_sw == 1) {
-                data_[1] = 0;
+                pkt.setMD(MD2, 0);
             } else {
-                data_[1] = apply_direction_limit(30);
+                pkt.setMD(MD2, apply_direction_limit(30));
             }
             break;
 
@@ -379,14 +392,11 @@ private:
             // 回転数が0になったとき → モーター停止
             // この監視状態は終了指示か別状態への移行まで維持
             if (micro1_sw == 1) {
-                // 始発SWが押されていれば既にrot_units=0相当なので停止
-                data_[1] = 0;
+                pkt.setMD(MD2, 0);
             } else if (std::abs(rot_units) < 0.05) {
-                // rot_unitsがほぼ0（許容誤差内）→ 停止
-                data_[1] = 0;
+                pkt.setMD(MD2, 0);
             } else {
-                // rot_unitsを0に近づけるため、正回転方向（始発方向）に速度10で回す
-                data_[1] = apply_direction_limit(10);
+                pkt.setMD(MD2, apply_direction_limit(10));
             }
             break;
 
@@ -422,8 +432,7 @@ private:
             break;
 
         default:
-            // ハンド非関連・未知状態では安全側
-            set_home_values();
+            // 未初期化(-1)または未知状態では何もしない（手動操作を優先）
             break;
         }
 
@@ -463,7 +472,7 @@ private:
     }
 
     void camera_servo_callback(const std_msgs::msg::Int32::SharedPtr msg) {
-        data_[10] = static_cast<int16_t>(std::clamp(msg->data, 0, 270));
+        pkt.setServo(SERVO2, msg->data);
     }
 
     void task_status_text_callback(const std_msgs::msg::String::SharedPtr msg) {
@@ -556,23 +565,23 @@ private:
 
         if (micro2_sw == 1) {
             if (R1 == 1) {
-                data_[2] = rev_speed;
+                pkt.setMD(MD2, rev_speed);
             } else {
-                data_[2] = 0;
+                pkt.setMD(MD2, 0);
             }
         } else if (micro1_sw == 1 || rot_units >= 7.0) {
             if (L1 == 1) {
-                data_[2] = fwd_speed;
+                pkt.setMD(MD2, fwd_speed);
             } else {
-                data_[2] = 0;
+                pkt.setMD(MD2, 0);
             }
         } else {
             if (L1 == 1) {
-                data_[2] = fwd_speed;
+                pkt.setMD(MD2, fwd_speed);
             } else if (R1 == 1) {
-                data_[2] = rev_speed;
+                pkt.setMD(MD2, rev_speed);
             } else {
-                data_[2] = 0;
+                pkt.setMD(MD2, 0);
             }
         }
 
@@ -602,17 +611,17 @@ private:
         int16_t micro1_sw = g_micro1_sw.load();
         int16_t micro2_sw = g_micro2_sw.load();
 
-        if (micro2_sw == 1 && data_[2] > 0) {
-            data_[2] = 0;
+        if (micro2_sw == 1 && pkt[MD2] > 0) {
+            pkt.setMD(MD2, 0);
             // RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】始発リミット到達！モーターの正回転を即時遮断しました！");
         }
 
-        if (micro1_sw == 1 && data_[2] < 0) {
-            data_[2] = 0;
+        if (micro1_sw == 1 && pkt[MD2] < 0) {
+            pkt.setMD(MD2, 0);
             // RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】終点リミット到達！モーターの逆回転を即時遮断しました！");
         }
 
-        msg.data = data_;
+        msg.data = pkt.toVector();
         publisher_->publish(msg);
         log_current_operation_state("publish", true);
     }
@@ -715,7 +724,6 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr camera_servo_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
-    std::vector<int16_t> data_;
 };
 
 int main(int argc, char *argv[]) {
