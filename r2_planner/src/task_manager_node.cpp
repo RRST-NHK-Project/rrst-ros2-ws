@@ -93,6 +93,7 @@ namespace r2_planner {
         declare_parameter<std::string>("state_pose_topic", "r2/task_state_pose");
         declare_parameter<std::string>("state_mode_topic", "r2/task_state_mode");
         declare_parameter<std::string>("state_odom_reset_topic", "r2/task_state_odom_reset");
+        declare_parameter<std::string>("state_wait_topic", "r2/task_state_wait_ms");
         declare_parameter<std::string>("auto_send_enabled_topic", "r2/task_auto_send_enabled");
         declare_parameter<bool>("initial_auto_send_enabled", true);
         declare_parameter<std::string>("status_topic", "r2/task_status");
@@ -114,6 +115,7 @@ namespace r2_planner {
         status_.transition_mode_code = static_cast<int32_t>(get_parameter("initial_transition_mode").as_int());
 
         const auto auto_transition_period_ms = get_parameter("auto_transition_period_ms").as_int();
+        auto_transition_default_wait_ms_ = static_cast<int32_t>(std::max<long>(0, auto_transition_period_ms));
 
         const auto command_topic = get_parameter("command_topic").as_string();
         const auto state_topic = get_parameter("state_topic").as_string();
@@ -124,6 +126,7 @@ namespace r2_planner {
         const auto state_pose_topic = get_parameter("state_pose_topic").as_string();
         const auto state_mode_topic = get_parameter("state_mode_topic").as_string();
         const auto state_odom_reset_topic = get_parameter("state_odom_reset_topic").as_string();
+        const auto state_wait_topic = get_parameter("state_wait_topic").as_string();
         const auto auto_send_enabled_topic = get_parameter("auto_send_enabled_topic").as_string();
         const auto status_topic = get_parameter("status_topic").as_string();
         const auto status_text_topic = get_parameter("status_text_topic").as_string();
@@ -182,6 +185,10 @@ namespace r2_planner {
             state_odom_reset_topic, rclcpp::QoS(10),
             std::bind(&TaskManagerNode::onStateOdomReset, this, std::placeholders::_1));
 
+        state_wait_sub_ = create_subscription<std_msgs::msg::Int32MultiArray>(
+            state_wait_topic, rclcpp::QoS(10),
+            std::bind(&TaskManagerNode::onStateWait, this, std::placeholders::_1));
+
         mff_path_sub_ = create_subscription<std_msgs::msg::Int32MultiArray>(
             mff_path_topic, rclcpp::QoS(10),
             std::bind(&TaskManagerNode::onMffPath, this, std::placeholders::_1));
@@ -223,7 +230,7 @@ namespace r2_planner {
             [this]() { publishStatus(false); });
 
         auto_transition_timer_ = create_wall_timer(
-            std::chrono::milliseconds(std::max<long>(200, auto_transition_period_ms)),
+            std::chrono::milliseconds(50),
             [this]() { advanceAutoTransition(); });
 
         publishStatus(true);
@@ -490,8 +497,43 @@ namespace r2_planner {
                     stateDisplayName(state_code).c_str(), static_cast<long>(state_code));
     }
 
+    void TaskManagerNode::onStateWait(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        const auto &data = msg->data;
+        if (data.size() < 1) {
+            RCLCPP_WARN(get_logger(), "Ignoring state wait update with no state code");
+            return;
+        }
+
+        const int32_t state_code = data[0];
+        const bool enabled = data.size() >= 3 ? data[2] > 0 : (data.size() >= 2 && data[1] >= 0);
+
+        if (!enabled) {
+            // Treat "unset" as 200ms to ensure stable transition without a long wait.
+            state_wait_ms_overrides_[state_code] = 200;
+            RCLCPP_INFO(get_logger(), "Updated state wait override: state=%s(%ld) wait=200ms (unset)",
+                        stateDisplayName(state_code).c_str(), static_cast<long>(state_code));
+            return;
+        }
+
+        if (data.size() < 2) {
+            RCLCPP_WARN(get_logger(), "Ignoring state wait update: state=%ld missing wait_ms", static_cast<long>(state_code));
+            return;
+        }
+
+        const int32_t wait_ms_raw = data[1];
+        const int32_t wait_ms = std::clamp(wait_ms_raw, 0, 600000);
+        state_wait_ms_overrides_[state_code] = wait_ms;
+
+        RCLCPP_INFO(get_logger(), "Updated state wait override: state=%s(%ld) wait=%ldms",
+                    stateDisplayName(state_code).c_str(), static_cast<long>(state_code), static_cast<long>(wait_ms));
+    }
+
     void TaskManagerNode::setState(int32_t state_code) {
+        const bool changed = status_.state_code != state_code;
         status_.state_code = state_code;
+        if (changed) {
+            state_entered_at_ = std::chrono::steady_clock::now();
+        }
         publishStateSideEffects(state_code);
     }
 
@@ -526,7 +568,11 @@ namespace r2_planner {
             RCLCPP_WARN(get_logger(), "Ignoring invalid transition mode: %ld", static_cast<long>(transition_mode_code));
             return;
         }
+        const bool was_auto = status_.transition_mode_code == kTransitionAuto;
         status_.transition_mode_code = transition_mode_code;
+        if (!was_auto && status_.transition_mode_code == kTransitionAuto) {
+            state_entered_at_ = std::chrono::steady_clock::now();
+        }
     }
 
     int32_t TaskManagerNode::nextStateCode(int32_t current_state_code) const {
@@ -549,6 +595,19 @@ namespace r2_planner {
 
     void TaskManagerNode::advanceAutoTransition() {
         if (status_.transition_mode_code != kTransitionAuto) {
+            return;
+        }
+
+        int32_t wait_ms = auto_transition_default_wait_ms_;
+        auto wait_it = state_wait_ms_overrides_.find(status_.state_code);
+        if (wait_it != state_wait_ms_overrides_.end()) {
+            wait_ms = std::max<int32_t>(0, wait_it->second);
+        }
+
+        const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                    std::chrono::steady_clock::now() - state_entered_at_)
+                                    .count();
+        if (elapsed_ms < wait_ms) {
             return;
         }
 
