@@ -17,7 +17,6 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            r2_md,
             r2_mc,
             r2_sc,
         ]
