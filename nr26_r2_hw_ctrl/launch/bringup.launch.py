@@ -4,10 +4,6 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
 
-    joy_node = Node(
-        package="joy", executable="joy_node", name="joy_node", output="screen"
-    )
-
     r2_md = Node(
         package="nr26_r2_hw_ctrl", executable="r2_md", name="r2_md", output="screen"
     )
@@ -25,7 +21,6 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            joy_node,
             r2_md,
             r2_mc,
             r2_sc,
