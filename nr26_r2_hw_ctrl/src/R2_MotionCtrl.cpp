@@ -426,7 +426,7 @@ private:
             if (micro1_sw == 1) {
                 pkt.setMD(MD2, 0);
             } else {
-                pkt.setMD(MD2, apply_direction_limit(60));
+                pkt.setMD(MD2, apply_direction_limit(130));
             }
             break;
 
@@ -436,7 +436,7 @@ private:
             if (rot_units >= 7.0) {
                 pkt.setMD(MD2, 0);
             } else {
-                pkt.setMD(MD2, apply_direction_limit(-60));
+                pkt.setMD(MD2, apply_direction_limit(-150));
             }
             break;
 
@@ -446,7 +446,7 @@ private:
             if (micro1_sw == 1) {
                 pkt.setMD(MD2, 0);
             } else {
-                pkt.setMD(MD2, apply_direction_limit(30));
+                pkt.setMD(MD2, apply_direction_limit(130));
             }
             break;
 
