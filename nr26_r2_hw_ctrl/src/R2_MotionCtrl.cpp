@@ -270,51 +270,58 @@ private:
     }
 
     void reset_hand_outputs() {
-        pkt.setServo(SERVO1, 230);
-        pkt.setServo(SERVO3, 140);
+        pkt.setServo(SERVO1, 200);
+        pkt.setServo(SERVO3, 190);
+        pkt.setServo(SERVO4, 0);
         pkt.setMD(MD1, 0);
         pkt.setTR(TR1, false);
     }
 
     void set_home_values() {
-        pkt.setServo(SERVO1, 230);
-        pkt.setServo(SERVO3, 140);
+        pkt.setServo(SERVO1, 200);
+        pkt.setServo(SERVO3, 190);
+        pkt.setServo(SERVO4, 0);
         pkt.setMD(MD1, 0);
         pkt.setTR(TR1, false); // シリンダー縮める
     }
 
     void set_ready_values() {
-        pkt.setServo(SERVO1, 130);
-        pkt.setServo(SERVO3, 180);
+        pkt.setServo(SERVO1, 23);
+        pkt.setServo(SERVO3, 190);
+        pkt.setServo(SERVO4, 0);
         pkt.setMD(MD1, 0);
         pkt.setTR(TR1, true); // シリンダー伸ばす
     }
 
     void set_pick_values() {
-        pkt.setServo(SERVO1, 70);
-        pkt.setServo(SERVO3, 70);
+        pkt.setServo(SERVO1, 13);
+        pkt.setServo(SERVO3, 84);
+        pkt.setServo(SERVO4, 0);
         pkt.setMD(MD1, 255); // ダイアフラムで吸う
         pkt.setTR(TR1, true);
     }
 
     void set_hold_values() {
-        pkt.setServo(SERVO1, 70);
-        pkt.setServo(SERVO3, 70);
-        pkt.setMD(MD1, 255);
-        pkt.setTR(TR1, true);
-    }
-
-    void set_moving_values() {
-        pkt.setServo(SERVO1, 240);
-        pkt.setServo(SERVO3, 205);
+        pkt.setServo(SERVO1, 200);
+        pkt.setServo(SERVO3, 194);
+        pkt.setServo(SERVO4, 0);
         pkt.setMD(MD1, 255);
         pkt.setTR(TR1, false);
     }
 
+    void set_moving_values() {
+        pkt.setServo(SERVO1, 200);
+        pkt.setServo(SERVO3, 194);
+        pkt.setServo(SERVO4, 0);
+        pkt.setMD(MD1, 0);
+        pkt.setTR(TR1, false);
+    }
+
     void set_shoot_values() {
-        pkt.setServo(SERVO1, 240);
-        pkt.setServo(SERVO3, 205);
-        pkt.setMD(MD1, 255);
+        pkt.setServo(SERVO1, 200);
+        pkt.setServo(SERVO3, 194);
+        pkt.setServo(SERVO4, 50);
+        pkt.setMD(MD1, 0);
         pkt.setTR(TR1, false);
     }
 
@@ -432,8 +439,8 @@ private:
 
         case STATE_HEAD_HAND_PICK_UP_SETTING:
             // モーターを速度-30で回し続ける（逆回転）
-            // rot_unitsが7.0になったとき → モーター即停止
-            if (rot_units >= 7.0) {
+            // rot_unitsが7.4 になったとき → モーター即停止
+            if (rot_units >= 7.4) {
                 pkt.setMD(MD2, 0);
             } else {
                 pkt.setMD(MD2, apply_direction_limit(-150));
