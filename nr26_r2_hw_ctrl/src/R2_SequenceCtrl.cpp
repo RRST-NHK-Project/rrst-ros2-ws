@@ -147,9 +147,13 @@ public:
 
         const double turn_sec = (std::abs(turn_deg) / 90.0) * turn_sec_per_90deg_;
         turn_end_time_ = this->now() + rclcpp::Duration::from_seconds(turn_sec);
+        // 角度PID用: 目標yawを絶対角度で保存（CW = yaw減少）
+        turn_target_yaw_ = odom_yaw_ - static_cast<double>(turn_deg) * M_PI / 180.0;
+        pid_angle_.reset();
         mode_ = StepMode::MFF_TURN;
 
-        RCLCPP_INFO(get_logger(), "MFF turn started: %ld deg (%.2f s)", static_cast<long>(turn_deg), turn_sec);
+        RCLCPP_INFO(get_logger(), "MFF turn started: %ld deg (%.2f s, target_yaw=%.3f rad)",
+                    static_cast<long>(turn_deg), turn_sec, turn_target_yaw_);
         return true;
     }
 
@@ -436,6 +440,7 @@ private:
     // 純粋回転のみでは壁角度計測が不安定になるため、wall_angle_approach_thrより大きく設定する
     // （前進+回転の複合動作を早めに開始することで安定した計測を得る）
     static constexpr float arena_angle_approach_thr = 0.50f; // arena整列で前進を開始する角度閾値 [rad]
+    static constexpr double turn_yaw_done_thr_ = 0.05;       // 旋回完了閾値 [rad]（約3度）
 
     StepMode mode_ = StepMode::NONE;
     bool mff_mode_enabled_ = false;
@@ -452,6 +457,7 @@ private:
     double turn_accumulated_rad_ = 0.0; // 旋回開始からの累積回転量 [rad]（絶対値で判定）
     double turn_target_rad_ = 0.0;      // 旋回目標角度 [rad]（絶対値）
     bool turn_accumulating_ = false;    // 累積中フラグ
+    double turn_target_yaw_ = 0.0;      // 旋回目標yaw角度 [rad]（絶対角度、角度PID用）
     int16_t arena_left_mm_ = 0;         // 左側距離 [mm]（ld19_eight_direction_distance の left）
     bool arena_left_valid_ = false;
     int16_t arena_front_mm_ = 0; // 前方距離 [mm]（ld19_eight_direction_distance の front）
@@ -511,8 +517,11 @@ private:
         // タイムアウト（odom が使えない場合のフォールバック、余裕を1.5倍で設定）
         const double turn_sec = (std::abs(deg_cw) / 90.0) * turn_sec_per_90deg_ * 1.5;
         turn_end_time_ = this->now() + rclcpp::Duration::from_seconds(turn_sec);
-        RCLCPP_INFO(get_logger(), "ARENA turn: %ld deg (target=%.3f rad, timeout=%.1f s)",
-                    static_cast<long>(deg_cw), turn_target_rad_, turn_sec);
+        // 角度PID用: 目標yawを絶対角度で保存（CW = yaw減少）
+        turn_target_yaw_ = odom_yaw_ - static_cast<double>(deg_cw) * M_PI / 180.0;
+        pid_angle_.reset();
+        RCLCPP_INFO(get_logger(), "ARENA turn: %ld deg (target=%.3f rad, target_yaw=%.3f rad, timeout=%.1f s)",
+                    static_cast<long>(deg_cw), turn_target_rad_, turn_target_yaw_, turn_sec);
     }
 
     // ARENA_WALK用: 旋回完了判定
@@ -952,20 +961,42 @@ private:
     }
 
     void mff_turn_sequence() {
-        if (this->now() >= turn_end_time_) {
+        constexpr float dt = 0.01f;
+
+        // yaw誤差の計算（[-π, π]に正規化）
+        double yaw_error = turn_target_yaw_ - odom_yaw_;
+        if (yaw_error > M_PI)
+            yaw_error -= 2.0 * M_PI;
+        if (yaw_error < -M_PI)
+            yaw_error += 2.0 * M_PI;
+
+        // 完了条件: yaw誤差が閾値以内 OR タイムアウト
+        const bool timeout = (this->now() >= turn_end_time_);
+        if (std::abs(yaw_error) < turn_yaw_done_thr_ || timeout) {
             pkt.setMD(MD5, 0);
             pkt.setMD(MD6, 0);
             pkt.setMD(MD7, 0);
             pkt.setMD(MD8, 0);
             mode_ = StepMode::NONE;
-            RCLCPP_INFO(get_logger(), "MFF turn finished.");
+            RCLCPP_INFO(get_logger(), "MFF turn finished. yaw_error=%.3f rad%s",
+                        yaw_error, timeout ? " (timeout)" : "");
             return;
         }
 
-        pkt.setMD(MD5, static_cast<int16_t>(turn_v1_ * align_duty_max));
-        pkt.setMD(MD6, static_cast<int16_t>(turn_v2_ * align_duty_max));
-        pkt.setMD(MD7, static_cast<int16_t>(turn_v3_ * align_duty_max));
-        pkt.setMD(MD8, static_cast<int16_t>(turn_v4_ * align_duty_max));
+        // 角度PID: yaw_error（target - current）→ wz
+        // yaw_error < 0（CW方向残り）→ PID error > 0 → wz > 0 → CW回転
+        const float wz = pid_angle_.update(static_cast<float>(yaw_error), dt);
+
+        // メカナム純回転（vx=0, vy=0）: 向き補正込みで全輪同duty
+        const int16_t duty = static_cast<int16_t>(wz * align_duty_max);
+        pkt.setMD(MD5, duty);
+        pkt.setMD(MD6, duty);
+        pkt.setMD(MD7, duty);
+        pkt.setMD(MD8, duty);
+
+        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
+                             "MFF turn: yaw=%.3f target=%.3f error=%.3f wz=%.3f duty=%d",
+                             odom_yaw_, turn_target_yaw_, yaw_error, wz, duty);
     }
 
     // キューブ探索シーケンス: サーボを往復スキャンしてキューブを探す
