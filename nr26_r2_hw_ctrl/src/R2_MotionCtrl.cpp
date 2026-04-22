@@ -743,7 +743,7 @@ private:
         int64_t total_encoder = (int64_t)r_count * ENCODER_MAX + (int64_t)current_enc1;
 
         // 始発スイッチ押下時に座標をゼロリセット
-        if (msg->data[9] != 0) {
+        if (msg->data[10] != 0) {
             g_zero_offset.store(total_encoder);
             // RCLCPP_INFO(get_logger(), "[COORD RESET!] 始発スイッチ押下により座標0へオフセット設定");
         }
