@@ -103,12 +103,12 @@ private:
         // コントローラーの入力を取得、使わない入力はコメントアウト推奨
         // float LS_X = -1 * msg->axes[0];
         // float LS_Y = msg->axes[1];
-        // float RS_X = -1 * msg->axes[3];
+        float RS_X = -1 * msg->axes[3];
         // float RS_Y = msg->axes[4];
 
-        // bool CROSS = msg->buttons[0];
+        bool CROSS = msg->buttons[0];
         // bool CIRCLE = msg->buttons[1];
-        // bool TRIANGLE = msg->buttons[2];
+        bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
@@ -123,7 +123,7 @@ private:
         // float R2_DIGITAL = (-1 * msg->axes[5] + 1) / 2;
 
         // bool L2 = msg->buttons[6];
-        // bool R2 = msg->buttons[7];
+        bool R2 = msg->buttons[7];
 
         // bool SHARE = msg->buttons[8];
         // bool OPTION = msg->buttons[9];
@@ -148,6 +148,128 @@ private:
         //     data_[9], data_[10], data_[11], data_[12]);
 
         // 配列操作ここまで
+        // =================================================================
+        // CROSS:「スピア固定回転機構」※動作未確認
+        // ボタンを一回押すごとにサーボモーターを回転させる
+        // マガジンと同時に同じ角度動き、走行時は、微角度動き、固定をする。
+        // =================================================================
+
+        static int MAG2_SERVO_ANGLE[] = {270, 233, 187, 139, 93, 49, 4};
+        static int MAG_CAT_SERVO_ANGLE[] = {267, 230, 184, 136, 90, 46, 1};
+        static int cross_pre = 0;
+        static int CROSS_PUSH_COUNT = 0;
+        static int CROSS_PUSH_MAX = 31;
+        
+        if (CROSS == 1 && cross_pre == 0) {
+            CROSS_PUSH_COUNT = (CROSS_PUSH_COUNT + 1) % CROSS_PUSH_MAX;
+        }
+        if (CROSS_PUSH_COUNT == 0) {
+            data_[16] = 270;
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1) {
+                data_[16] = MAG_CAT_SERVO_ANGLE[1];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 1) {
+            data_[16] = MAG2_SERVO_ANGLE[1];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1) {
+                data_[16] = MAG_CAT_SERVO_ANGLE[1];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 2) {
+            data_[16] = MAG2_SERVO_ANGLE[2];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1) {
+                data_[16] = MAG_CAT_SERVO_ANGLE[2];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 3) {
+            data_[16] = MAG2_SERVO_ANGLE[3];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1) {
+                data_[16] = MAG_CAT_SERVO_ANGLE[3];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 6) {
+            data_[16] = MAG2_SERVO_ANGLE[4];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1) {
+                data_[16] = MAG_CAT_SERVO_ANGLE[4];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 10) {
+            data_[16] = MAG2_SERVO_ANGLE[6];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1) {
+                data_[16] = MAG_CAT_SERVO_ANGLE[6];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 14) {
+            data_[16] = MAG2_SERVO_ANGLE[5];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1) {
+                data_[16] = MAG_CAT_SERVO_ANGLE[5];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 18) {
+            data_[16] = MAG2_SERVO_ANGLE[6];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1) {
+                data_[16] = MAG_CAT_SERVO_ANGLE[6];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 20) {
+            data_[16] = MAG2_SERVO_ANGLE[5];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1) {
+                data_[16] = MAG_CAT_SERVO_ANGLE[5];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 22) {
+            data_[16] = MAG2_SERVO_ANGLE[6];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1) {
+                data_[16] = MAG_CAT_SERVO_ANGLE[6];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 24) {
+            data_[16] = MAG2_SERVO_ANGLE[3];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1) {
+                data_[16] = MAG_CAT_SERVO_ANGLE[3];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 27) {
+            data_[16] = MAG2_SERVO_ANGLE[4];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1) {
+                data_[16] = MAG_CAT_SERVO_ANGLE[4];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 30) {
+            data_[16] = MAG2_SERVO_ANGLE[5];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1) {
+                data_[16] = MAG_CAT_SERVO_ANGLE[5];
+            }
+        }
+
+        // =================================================================
+        // TRIANGLE:「スタッフ回収機構」
+        // ラック上のスタッフを掴んでマガジンに装填する機構
+        // =================================================================
+
+        static int triangle_pre = 0;
+        static int triangle_count = 0;
+        static int triangle_max = 3;
+        
+        if (TRIANGLE == 1 && triangle_pre == 0) {
+            triangle_count = (triangle_count + 1) % triangle_max;
+        }
+        if (triangle_count == 0) {
+            data_[14] = 0;
+            data_[13] = 10;
+        }
+        if (triangle_count == 1) {
+            data_[13] = 0;
+        }
+        if (triangle_count == 2) {
+            data_[14] = 90;
+        }
+
+        triangle_pre = TRIANGLE;
+
+
+
+
     }
 
     // publish
