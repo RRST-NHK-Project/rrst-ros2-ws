@@ -1255,19 +1255,35 @@ private:
             }
             break;
 
-        // ── Step5: 時計回り90度旋回 ─────────────────────────────────
-        case ArenaWalkState::AW5_TURN:
-            if (arena_turn_reached()) {
+        // ── Step5: 時計回り90度旋回（odom PID） ─────────────────────────
+        case ArenaWalkState::AW5_TURN: {
+            constexpr float dt = 0.01f;
+            double yaw_error = turn_target_yaw_ - odom_yaw_;
+            if (yaw_error > M_PI)
+                yaw_error -= 2.0 * M_PI;
+            if (yaw_error < -M_PI)
+                yaw_error += 2.0 * M_PI;
+
+            const bool timeout = (this->now() >= turn_end_time_);
+            if (std::abs(yaw_error) < turn_yaw_done_thr_ || timeout) {
                 move_stop();
+                turn_accumulating_ = false;
                 next_arena(ArenaWalkState::AW8_FORWARD);
-                RCLCPP_INFO(get_logger(), "ARENA Step5: turn done -> forward to wall.");
+                RCLCPP_INFO(get_logger(), "ARENA Step5: turn done (yaw_err=%.3f rad%s) -> forward.",
+                            yaw_error, timeout ? " timeout" : "");
             } else {
-                pkt.setMD(MD5, static_cast<int16_t>(turn_v1_ * align_duty_max));
-                pkt.setMD(MD6, static_cast<int16_t>(turn_v2_ * align_duty_max));
-                pkt.setMD(MD7, static_cast<int16_t>(turn_v3_ * align_duty_max));
-                pkt.setMD(MD8, static_cast<int16_t>(turn_v4_ * align_duty_max));
+                const float wz = pid_angle_.update(static_cast<float>(yaw_error), dt);
+                const int16_t duty = static_cast<int16_t>(wz * align_duty_max);
+                pkt.setMD(MD5, duty);
+                pkt.setMD(MD6, duty);
+                pkt.setMD(MD7, duty);
+                pkt.setMD(MD8, duty);
+                RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
+                                     "ARENA Step5: yaw=%.3f target=%.3f error=%.3f duty=%d",
+                                     odom_yaw_, turn_target_yaw_, yaw_error, duty);
             }
             break;
+        }
 
         // ── Step6: left距離を保持しながら前進して壁を検出（1000mm） ───────
         case ArenaWalkState::AW8_FORWARD:
@@ -1275,13 +1291,13 @@ private:
                 state_executed_ = true;
             }
             arena_drive_with_left_hold(forward_speed, false);
-            if (lidar_value > 0 && lidar_value < arena_wall_detect_far_mm) {
+            if (arena_front_valid_ && arena_front_mm_ > 0 && arena_front_mm_ < arena_wall_detect_far_mm) {
                 move_stop();
                 pid_angle_.reset();
                 pid_distance_.reset();
                 pid_distance_.set_target(arena_approach_target_mm);
                 next_arena(ArenaWalkState::AW8_ALIGN);
-                RCLCPP_INFO(get_logger(), "ARENA Step8: wall at %d mm -> align.", lidar_value);
+                RCLCPP_INFO(get_logger(), "ARENA Step6: wall at %d mm (ld19 front) -> align.", arena_front_mm_);
             }
             break;
 
