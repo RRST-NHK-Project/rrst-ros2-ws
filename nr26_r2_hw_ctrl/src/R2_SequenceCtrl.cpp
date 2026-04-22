@@ -70,6 +70,11 @@ public:
         this->declare_parameter("use_camera_offset", false);
         last_cube_update_ = rclcpp::Time(0, 0, get_clock()->get_clock_type());
 
+        // 段差シーケンス完了通知パブリッシャー
+        // 1 = 段差上り完了, -1 = 段差下り完了
+        step_complete_pub_ = this->create_publisher<std_msgs::msg::Int32>(
+            "r2_mff_step_complete", rclcpp::QoS(10));
+
         timer_ = this->create_wall_timer(
             10ms,
             std::bind(&SequenceControl::loop, this));
@@ -373,6 +378,7 @@ private:
     StepDownState state_down_ = StepDownState::IDLE;
 
     rclcpp::TimerBase::SharedPtr timer_;
+    rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr step_complete_pub_;
     rclcpp::Time state_start_time_;
     bool state_executed_ = false; // 各状態での処理の実行状況を保存
 
@@ -622,6 +628,12 @@ private:
             }
             mode_ = StepMode::NONE;
             state_up_ = StepUpState::IDLE;
+            {
+                std_msgs::msg::Int32 msg;
+                msg.data = 1; // 段差上り完了
+                step_complete_pub_->publish(msg);
+                RCLCPP_INFO(get_logger(), "STEP_UP complete. Published r2_mff_step_complete=1");
+            }
             break;
         }
     }
@@ -705,6 +717,12 @@ private:
             }
             mode_ = StepMode::NONE;
             state_down_ = StepDownState::IDLE;
+            {
+                std_msgs::msg::Int32 msg;
+                msg.data = -1; // 段差下り完了
+                step_complete_pub_->publish(msg);
+                RCLCPP_INFO(get_logger(), "STEP_DOWN complete. Published r2_mff_step_complete=-1");
+            }
             break;
         }
     }
