@@ -124,6 +124,11 @@ public:
             "/r2/camera_servo_angle", 10,
             std::bind(&HardWareControl::camera_servo_callback, this, std::placeholders::_1));
 
+        // GUIから直接モードが送られる場合の直接受信（rosbridge互換: best_effort）
+        transition_mode_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+            "r2/task_transition_mode", rclcpp::QoS(10).best_effort(),
+            std::bind(&HardWareControl::transition_mode_callback, this, std::placeholders::_1));
+
         // 初期状態を適用
         apply_state_to_packet(current_planner_state_);
 
@@ -502,6 +507,11 @@ private:
         RCLCPP_DEBUG(get_logger(), "task_state ignored (state-by-name mode): %ld", static_cast<long>(msg->data));
     }
 
+    void transition_mode_callback(const std_msgs::msg::Int32::SharedPtr msg) {
+        // GUIから直接モードを受信（task_manager_node経由より確実）
+        update_drive_mode(msg->data, "transition_mode_direct");
+    }
+
     void task_status_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
         if (msg->data.empty()) {
             return;
@@ -772,6 +782,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr status_sub_;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr status_text_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr camera_servo_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr transition_mode_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
 };
 
