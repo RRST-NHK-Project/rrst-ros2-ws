@@ -223,6 +223,12 @@ public:
         arena_left_valid_ = valid;
     }
 
+    // ld19_eight_direction_distance の front 値 [mm] を更新
+    void set_front_distance_mm(int16_t value_mm, bool valid) {
+        arena_front_mm_ = value_mm;
+        arena_front_valid_ = valid;
+    }
+
     // wall角度を更新する関数
     void set_wall_angle(double angle) {
         wall_angle = angle;
@@ -448,6 +454,8 @@ private:
     bool turn_accumulating_ = false;    // 累積中フラグ
     int16_t arena_left_mm_ = 0;         // 左側距離 [mm]（ld19_eight_direction_distance の left）
     bool arena_left_valid_ = false;
+    int16_t arena_front_mm_ = 0; // 前方距離 [mm]（ld19_eight_direction_distance の front）
+    bool arena_front_valid_ = false;
 
     StepUpState state_up_ = StepUpState::IDLE;
     StepDownState state_down_ = StepDownState::IDLE;
@@ -1197,13 +1205,13 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if (lidar_value > 0 && lidar_value < arena_wall_detect_mm) {
+            if (arena_front_valid_ && arena_front_mm_ > 0 && arena_front_mm_ < arena_wall_detect_mm) {
                 move_stop();
                 pid_angle_.reset();
                 pid_distance_.reset();
                 pid_distance_.set_target(arena_approach_target_mm);
                 next_arena(ArenaWalkState::AW4_ALIGN);
-                RCLCPP_INFO(get_logger(), "ARENA Step4: wall at %d mm -> align.", lidar_value);
+                RCLCPP_INFO(get_logger(), "ARENA Step4: wall at %d mm (ld19 front) -> align.", arena_front_mm_);
             }
             break;
 
@@ -1802,9 +1810,19 @@ private:
     void ld19_eight_dir_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
         if (msg->data.size() < 3) {
             seq_->set_left_distance_mm(0, false);
+            seq_->set_front_distance_mm(0, false);
             return;
         }
 
+        // front (index 0)
+        const float front_m = msg->data[0];
+        if (!std::isfinite(front_m) || front_m <= 0.0f) {
+            seq_->set_front_distance_mm(0, false);
+        } else {
+            seq_->set_front_distance_mm(static_cast<int16_t>(front_m * 1000.0f), true);
+        }
+
+        // left (index 2)
         const float left_m = msg->data[2];
         if (!std::isfinite(left_m) || left_m <= 0.0f) {
             seq_->set_left_distance_mm(0, false);
