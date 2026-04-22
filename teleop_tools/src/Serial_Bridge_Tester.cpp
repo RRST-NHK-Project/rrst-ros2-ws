@@ -105,7 +105,7 @@ int main(int argc, char *argv[]) {
 
     auto node = rclcpp::Node::make_shared("serial_keyboard_tester");
 
-    uint8_t device_id = 2; // SerialBridgeNode と一致
+    uint8_t device_id = 3; // SerialBridgeNode と一致
     KeyboardInputHandler keyboard_handler(node, device_id);
 
     RCLCPP_INFO(node->get_logger(),

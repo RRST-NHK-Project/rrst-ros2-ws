@@ -154,8 +154,8 @@ private:
         // マガジンと同時に同じ角度動き、走行時は、微角度動き、固定をする。
         // =================================================================
 
-        static int MAG2_SERVO_ANGLE[] = {270, 233, 187, 139, 93, 49, 4};
-        static int MAG_CAT_SERVO_ANGLE[] = {267, 230, 184, 136, 90, 46, 1};
+        static int MAG2_SERVO_ANGLE[] = {270, 226, 182, 136, 88, 42, 5};
+        static int MAG_CAT_SERVO_ANGLE[] = {265, 221, 177, 131, 83, 37, 0};
         static int cross_pre = 0;
         static int CROSS_PUSH_COUNT = 0;
         static int CROSS_PUSH_MAX = 31;
@@ -164,7 +164,7 @@ private:
             CROSS_PUSH_COUNT = (CROSS_PUSH_COUNT + 1) % CROSS_PUSH_MAX;
         }
         if (CROSS_PUSH_COUNT == 0) {
-            data_[9] = 270;
+            data_[9] = 0;
             if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1) {
                 data_[9] = MAG_CAT_SERVO_ANGLE[0];
             }
@@ -357,21 +357,24 @@ private:
 
         static int triangle_pre = 0;
         static int triangle_count = 0;
-        static int triangle_max = 3;
+        static int triangle_max = 4;
         
         if (TRIANGLE == 1 && triangle_pre == 0) {
             triangle_count = (triangle_count + 1) % triangle_max;
         }
         if (triangle_count == 0) {
             data_[10] = 25;
-            data_[11] = 120;
+            data_[11] = 160;
         }
         if (triangle_count == 1) {
             data_[10] = 0;
         }
         if (triangle_count == 2) {
-            data_[11] = 30;
+            data_[11] = 45;
         }
+        if (triangle_count == 3) {
+            data_[10] = 25;
+        }    
 
         triangle_pre = TRIANGLE;
 

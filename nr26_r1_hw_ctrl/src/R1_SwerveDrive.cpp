@@ -35,7 +35,7 @@ int deg = 0;
 int truedeg = 0;
 
 // 速度
-int wheelspeed = 80; // 64;
+int wheelspeed = 30; // 64;
 int yawspeed = 60;   // 32;
 
 // サーボの組み付け時のズレを補正（度数法）
