@@ -520,7 +520,7 @@ private:
         // 角度PID用: 目標yawを絶対角度で保存（CW = yaw減少）
         turn_target_yaw_ = odom_yaw_ - static_cast<double>(deg_cw) * M_PI / 180.0;
         pid_angle_.reset();
-        pid_angle_.set_target(static_cast<float>(turn_target_yaw_)); // R2_AutoDrive方式: targetをPIDに設定
+        // mff_turn_sequence と同じ方式: target=0固定、入力に正規化済み yaw_error を渡す
         RCLCPP_INFO(get_logger(), "ARENA turn: %ld deg (target=%.3f rad, target_yaw=%.3f rad, timeout=%.1f s)",
                     static_cast<long>(deg_cw), turn_target_rad_, turn_target_yaw_, turn_sec);
     }
@@ -1273,9 +1273,8 @@ private:
                 RCLCPP_INFO(get_logger(), "ARENA Step5: turn done (yaw_err=%.3f rad%s) -> forward.",
                             yaw_error, timeout ? " timeout" : "");
             } else {
-                // R2_AutoDrive方式: wz = -pid.update(current_yaw)
-                // pid target = turn_target_yaw_ (arena_setup_turnで設定済み)
-                const float wz = -pid_angle_.update(static_cast<float>(odom_yaw_), dt);
+                // mff_turn_sequence と同じ: target=0、入力は±π正規化済み yaw_error
+                const float wz = pid_angle_.update(static_cast<float>(yaw_error), dt);
                 const int16_t duty = static_cast<int16_t>(wz * align_duty_max);
                 pkt.setMD(MD5, duty);
                 pkt.setMD(MD6, duty);
