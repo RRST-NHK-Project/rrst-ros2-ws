@@ -513,15 +513,10 @@ private:
     }
 
     void task_status_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
-        if (msg->data.empty()) {
-            return;
-        }
-
-        // task_status はモード切替のみ使用し、状態値は task_status_text で受ける
-        if (msg->data.size() >= 4) {
-            const int32_t mode_code = msg->data[3];
-            update_drive_mode(mode_code, "task_status");
-        }
+        // task_status からのモード更新は行わない。
+        // モードは r2/task_transition_mode の直接受信（transition_mode_callback）でのみ管理する。
+        // task_manager_node が古い mode=MANUAL を周期送信し続けると上書きされるため。
+        (void)msg;
     }
 
     void camera_servo_callback(const std_msgs::msg::Int32::SharedPtr msg) {
