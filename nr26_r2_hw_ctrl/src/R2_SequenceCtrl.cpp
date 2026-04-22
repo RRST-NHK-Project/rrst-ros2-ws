@@ -1274,10 +1274,10 @@ private:
             } else {
                 const float wz = pid_angle_.update(static_cast<float>(yaw_error), dt);
                 const int16_t duty = static_cast<int16_t>(wz * align_duty_max);
-                pkt.setMD(MD5, duty);
-                pkt.setMD(MD6, duty);
-                pkt.setMD(MD7, duty);
-                pkt.setMD(MD8, duty);
+                pkt.setMD(MD5, -duty);
+                pkt.setMD(MD6, -duty);
+                pkt.setMD(MD7, -duty);
+                pkt.setMD(MD8, -duty);
                 RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
                                      "ARENA Step5: yaw=%.3f target=%.3f error=%.3f duty=%d",
                                      odom_yaw_, turn_target_yaw_, yaw_error, duty);
