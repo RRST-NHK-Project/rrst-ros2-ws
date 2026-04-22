@@ -1,16 +1,15 @@
 #!/bin/bash
 # ============================================================
-# r2_bringup.sh  —  NR26 R2 一括起動スクリプト
+# r2_bringup_tmux.sh  —  NR26 R2 一括起動 (tmux 分割ペイン版)
 #
 # 起動する launch ファイルをこのスクリプト内の LAUNCHES に列挙する。
 # 形式: "<パッケージ名>/<ファイル名>.launch.py"
 #
 # 既定動作:
-#   Tabby などの端末から実行すると、tmux の分割ペインで
-#   launch ごとに個別起動する。
+#   tmux の分割ペインで launch ごとに個別起動する。
 #
 # オプション:
-#   --bg   従来通りバックグラウンド起動
+#   --bg   バックグラウンド起動
 # ============================================================
 
 # ▼▼▼ 起動する launch ファイルを列挙 ▼▼▼
@@ -76,20 +75,20 @@ fi
 if [[ "$MODE" == "tmux" ]]; then
     SESSION_NAME="r2_bringup_$(date +%Y%m%d_%H%M%S)"
 
-    first_cmd="source \"$SETUP_BASH\"; ros2 launch \"${VALID_PATHS[0]}\""
-    echo "[r2_bringup] 起動: ${VALID_SPECS[0]}"
+    first_cmd="source \"$SETUP_BASH\"; export PYTHONDONTWRITEBYTECODE=1; ros2 launch \"${VALID_PATHS[0]}\""
+    echo "[r2_bringup_tmux] 起動: ${VALID_SPECS[0]}"
     tmux new-session -d -s "$SESSION_NAME" "bash -lc '$first_cmd'"
 
     for ((i = 1; i < ${#VALID_PATHS[@]}; i++)); do
-        cmd="source \"$SETUP_BASH\"; ros2 launch \"${VALID_PATHS[$i]}\""
-        echo "[r2_bringup] 起動: ${VALID_SPECS[$i]}"
+        cmd="source \"$SETUP_BASH\"; export PYTHONDONTWRITEBYTECODE=1; ros2 launch \"${VALID_PATHS[$i]}\""
+        echo "[r2_bringup_tmux] 起動: ${VALID_SPECS[$i]}"
         tmux split-window -t "$SESSION_NAME":0 "bash -lc '$cmd'"
         tmux select-layout -t "$SESSION_NAME":0 tiled >/dev/null
     done
 
     echo ""
-    echo "[r2_bringup] ${#VALID_PATHS[@]} 個のノードグループを tmux ペインで起動しました。"
-    echo "             セッション名: $SESSION_NAME"
+    echo "[r2_bringup_tmux] ${#VALID_PATHS[@]} 個のノードグループを tmux ペインで起動しました。"
+    echo "                  セッション名: $SESSION_NAME"
     echo ""
 
     if [[ -n "${TMUX:-}" ]]; then
@@ -104,7 +103,7 @@ PIDS=()
 
 cleanup() {
     echo ""
-    echo "[r2_bringup] シャットダウン中..."
+    echo "[r2_bringup_tmux] シャットダウン中..."
     for pid in "${PIDS[@]}"; do
         if kill -0 "$pid" 2>/dev/null; then
             kill -SIGINT "$pid" 2>/dev/null
@@ -113,21 +112,21 @@ cleanup() {
     for pid in "${PIDS[@]}"; do
         wait "$pid" 2>/dev/null
     done
-    echo "[r2_bringup] 全ノード停止完了。"
+    echo "[r2_bringup_tmux] 全ノード停止完了。"
     exit 0
 }
 
 trap cleanup SIGINT SIGTERM
 
 for i in "${!VALID_PATHS[@]}"; do
-    echo "[r2_bringup] 起動: ${VALID_SPECS[$i]}"
+    echo "[r2_bringup_tmux] 起動: ${VALID_SPECS[$i]}"
     ros2 launch "${VALID_PATHS[$i]}" &
     PIDS+=($!)
 done
 
 echo ""
-echo "[r2_bringup] ${#PIDS[@]} 個のノードグループを起動しました。"
-echo "             Ctrl+C で全ノードを一括停止します。"
+echo "[r2_bringup_tmux] ${#PIDS[@]} 個のノードグループを起動しました。"
+echo "                  Ctrl+C で全ノードを一括停止します。"
 echo ""
 
 wait
