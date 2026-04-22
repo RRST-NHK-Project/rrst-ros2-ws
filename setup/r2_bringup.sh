@@ -8,12 +8,12 @@
 
 # ▼▼▼ 起動する launch ファイルを列挙 ▼▼▼
 LAUNCHES=(
-    nr26_r2_hw_ctrl/bringup.launch.py
+    r2_planner/task_manager.launch.py
+    wall_detection/wall_detection_with_lidar.launch.py
     realsense_ros2/bringup.launch.py
     cube_detection/cube_detection.launch.py
-    kfs_akaze_detection/kfs_akaze_detection.launch.py
-    kfs_cube_fusion/kfs_cube_fusion.launch.py
-    r2_planner/task_manager.launch.py
+    serial_bridge/serial_bridge.launch.py
+    nr26_r2_hw_ctrl/bringup.launch.py
 )
 # ▲▲▲ ここまで ▲▲▲
 
