@@ -1194,9 +1194,9 @@ private:
         // ── Step3+4: 前進して次の壁を検出 ────────────────────────────
         case ArenaWalkState::AW3_FORWARD:
             if (!state_executed_) {
+                move_forward();
                 state_executed_ = true;
             }
-            arena_drive_with_left_hold(forward_speed, false);
             if (lidar_value > 0 && lidar_value < arena_wall_detect_mm) {
                 move_stop();
                 pid_angle_.reset();
