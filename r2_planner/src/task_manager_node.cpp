@@ -162,7 +162,7 @@ namespace r2_planner {
             std::bind(&TaskManagerNode::onCell, this, std::placeholders::_1));
 
         transition_mode_sub_ = create_subscription<std_msgs::msg::Int32>(
-            transition_mode_topic, rclcpp::QoS(10),
+            transition_mode_topic, rclcpp::QoS(10).best_effort(),
             std::bind(&TaskManagerNode::onTransitionMode, this, std::placeholders::_1));
 
         state_sequence_sub_ = create_subscription<std_msgs::msg::Int32MultiArray>(
@@ -170,7 +170,7 @@ namespace r2_planner {
             std::bind(&TaskManagerNode::onStateSequence, this, std::placeholders::_1));
 
         state_sequence_names_sub_ = create_subscription<std_msgs::msg::String>(
-            "r2/task_state_sequence_names", rclcpp::QoS(10),
+            "r2/task_state_sequence_names", rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local(),
             std::bind(&TaskManagerNode::onStateSequenceNames, this, std::placeholders::_1));
 
         state_pose_sub_ = create_subscription<std_msgs::msg::Float32MultiArray>(
@@ -211,7 +211,7 @@ namespace r2_planner {
             auto_drive_target_topic, rclcpp::QoS(10));
 
         drive_mode_cmd_pub_ = create_publisher<std_msgs::msg::Int32MultiArray>(
-            drive_mode_cmd_topic, rclcpp::QoS(10));
+            drive_mode_cmd_topic, rclcpp::QoS(1).reliable().transient_local());
 
         mff_turn_cmd_pub_ = create_publisher<std_msgs::msg::Int32>(
             mff_turn_cmd_topic, rclcpp::QoS(10));
@@ -290,6 +290,7 @@ namespace r2_planner {
     }
 
     void TaskManagerNode::onTransitionMode(const std_msgs::msg::Int32::SharedPtr msg) {
+        RCLCPP_INFO(get_logger(), "Received transition mode command: %ld", static_cast<long>(msg->data));
         setTransitionMode(msg->data);
         publishStatus(true);
     }

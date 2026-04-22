@@ -270,7 +270,7 @@ private:
         // bool L2 = msg->buttons[6];
         // bool R2 = msg->buttons[7];
 
-        // bool SHARE = msg->buttons[8];
+        bool SHARE = msg->buttons[8];
         // bool OPTION = msg->buttons[9];
         bool PS = msg->buttons[10];
 
@@ -323,7 +323,7 @@ private:
             data_[12] = REUSE_ANGLE;
         }
         // SETに2を合わせる
-            if (CROSS_PUSH_COUNT == 1) {
+        if (CROSS_PUSH_COUNT == 1) {
             data_[9] = MAG_SERVO_ANGLE[1];
         }
         // SETに3を合わせる
@@ -570,29 +570,19 @@ private:
             data_[4] = 0;
         }
 
-        // =================================================================
-        // TRIANGLE:「雨樋機構」
-        // スピアを掴んで持ってくる機構
+        // =================================================================       
+        // SHARE:「スピアヘッド回収ハンドの昇降機構」        
+        // ボタンを押すとスピアヘッド回収ハンド上昇機構のエアシリンダーによって上昇or下降        
         // =================================================================
 
-        static int triangle_pre = 0;
-        static int triangle_count = 0;
-        static int triangle_max = 2;
-        
-        if (TRIANGLE == 1 && triangle_pre == 0) {
-            triangle_count = (triangle_count + 1) % triangle_max;
-        }
-        if (triangle_count == 0) {
-            data_[13] = 0;
-        }
-        if (triangle_count == 1) {
-            data_[13] = 90;
-        }
 
-        triangle_pre = TRIANGLE;
+
+
+
+
 
         // =================================================================       
-        // TRIANGLE:「スピアヘッド回収ハンドの昇降機構」        
+        // PS:「スピアヘッド回収ハンドの昇降機構」        
         // ボタンを押すとスピアヘッド回収ハンド上昇機構のエアシリンダーによって上昇or下降        
         // =================================================================
             
