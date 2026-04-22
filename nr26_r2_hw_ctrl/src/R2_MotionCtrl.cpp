@@ -249,20 +249,21 @@ private:
     // =====================================================================
     // 全体共通: モーター方向制限
     // ・micro1_sw（始発）押下 → 正回転禁止、逆回転のみ許可
-    // ・rot_units >= 7.0 → 逆回転禁止、正回転のみ許可
+    // ・micro2_sw（終点）押下 → 逆回転禁止、正回転のみ許可
     // =====================================================================
     int16_t apply_direction_limit(int16_t raw_speed) {
         int16_t micro1_sw = g_micro1_sw.load();
-        int64_t abs_coord = g_abs_coord.load();
-        double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
+        int16_t micro2_sw = g_micro2_sw.load();
+        // int64_t abs_coord = g_abs_coord.load();
+        // double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
 
         // 始発SW押下時 → 正回転(speed > 0)禁止
         if (micro1_sw == 1 && raw_speed > 0) {
             return 0;
         }
 
-        // rot_units >= 7.0 → 逆回転(speed < 0)禁止
-        if (rot_units >= 7.0 && raw_speed < 0) {
+        // 終点SW押下時 → 逆回転(speed < 0)禁止
+        if (micro2_sw == 1 && raw_speed < 0) {
             return 0;
         }
 
@@ -419,6 +420,7 @@ private:
     // =====================================================================
     void apply_state_to_packet(int32_t state_code) {
         int16_t micro1_sw = g_micro1_sw.load();
+        int16_t micro2_sw = g_micro2_sw.load();
         int64_t abs_coord = g_abs_coord.load();
         double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
 
@@ -438,10 +440,13 @@ private:
             break;
 
         case STATE_HEAD_HAND_PICK_UP_SETTING:
-            // モーターを速度-30で回し続ける（逆回転）
-            // rot_unitsが7.4 になったとき → モーター即停止
-            if (rot_units >= 7.4) {
+            // モーターを逆回転
+            // micro2_sw が押されたとき → モーター即停止
+            if (micro2_sw == 1) {
                 pkt.setMD(MD2, 0);
+            } else if (rot_units >= 7.0) {
+                // 7.0以上は少し減速させる（例：-100など）
+                pkt.setMD(MD2, apply_direction_limit(-100)); // 減速
             } else {
                 pkt.setMD(MD2, apply_direction_limit(-150));
             }
@@ -625,9 +630,9 @@ private:
 
         // ヒステリシス（遊び）を持たせた減速ゾーン判定（チャタリング防止用）
         static bool is_fork_slow = false;
-        if (rot_units <= 1.0 || rot_units >= 6.0) {
+        if (rot_units >= 7.0) {
             is_fork_slow = true;
-        } else if (rot_units >= 1.5 && rot_units <= 5.5) {
+        } else if (rot_units <= 6.8) {
             is_fork_slow = false;
         }
         bool in_slow_zone = is_fork_slow;
@@ -635,15 +640,17 @@ private:
         int fwd_speed = in_slow_zone ? SLOW_SPEED : NORMAL_SPEED;
         int rev_speed = in_slow_zone ? -SLOW_SPEED : -NORMAL_SPEED;
 
+        // micro1_sw が始発(正回転禁止) = fwd_speed禁止 -> rev_speed(R1)のみ許可
+        // micro2_sw が終点(逆回転禁止) = rev_speed禁止 -> fwd_speed(L1)のみ許可
         if (micro2_sw == 1) {
-            if (R1 == 1) {
-                pkt.setMD(MD2, rev_speed);
+            if (L1 == 1) {
+                pkt.setMD(MD2, fwd_speed);
             } else {
                 pkt.setMD(MD2, 0);
             }
-        } else if (micro1_sw == 1 || rot_units >= 7.0) {
-            if (L1 == 1) {
-                pkt.setMD(MD2, fwd_speed);
+        } else if (micro1_sw == 1) {
+            if (R1 == 1) {
+                pkt.setMD(MD2, rev_speed);
             } else {
                 pkt.setMD(MD2, 0);
             }
@@ -685,12 +692,12 @@ private:
         int16_t micro1_sw = g_micro1_sw.load();
         int16_t micro2_sw = g_micro2_sw.load();
 
-        if (micro2_sw == 1 && pkt[MD2] > 0) {
+        if (micro1_sw == 1 && pkt[MD2] > 0) {
             pkt.setMD(MD2, 0);
             // RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】始発リミット到達！モーターの正回転を即時遮断しました！");
         }
 
-        if (micro1_sw == 1 && pkt[MD2] < 0) {
+        if (micro2_sw == 1 && pkt[MD2] < 0) {
             pkt.setMD(MD2, 0);
             // RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】終点リミット到達！モーターの逆回転を即時遮断しました！");
         }
