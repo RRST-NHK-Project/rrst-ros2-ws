@@ -170,7 +170,7 @@ namespace r2_planner {
             std::bind(&TaskManagerNode::onStateSequence, this, std::placeholders::_1));
 
         state_sequence_names_sub_ = create_subscription<std_msgs::msg::String>(
-            "r2/task_state_sequence_names", rclcpp::QoS(10),
+            "r2/task_state_sequence_names", rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local(),
             std::bind(&TaskManagerNode::onStateSequenceNames, this, std::placeholders::_1));
 
         state_pose_sub_ = create_subscription<std_msgs::msg::Float32MultiArray>(

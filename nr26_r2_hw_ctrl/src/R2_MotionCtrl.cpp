@@ -12,13 +12,13 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include <vector>
 
 // ROS
+#include "include/PacketController.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include <std_msgs/msg/int16_multi_array.hpp>
 #include <std_msgs/msg/int32.hpp>
 #include <std_msgs/msg/int32_multi_array.hpp>
 #include <std_msgs/msg/string.hpp>
-#include "include/PacketController.hpp"
 PacketController pkt;
 
 // 以下マイコンに合わせて設定
@@ -132,6 +132,10 @@ public:
     }
 
 private:
+    // GUIの task_status[3] に合わせる運転モード
+    static constexpr int32_t DRIVE_MODE_MANUAL = 0;
+    static constexpr int32_t DRIVE_MODE_AUTO = 1;
+
     // =====================================================================
     // 状態定義
     // =====================================================================
@@ -156,6 +160,7 @@ private:
     };
 
     int32_t current_planner_state_ = -1;
+    std::atomic<int32_t> current_drive_mode_{DRIVE_MODE_MANUAL};
     std::string current_state_name_ = "";
     TargetHeight target_height_ = TargetHeight::DOWN;
 
@@ -166,6 +171,7 @@ private:
     // 状態名→状態コード変換
     // =====================================================================
     static int32_t state_code_from_name(const std::string &state_name) {
+        // 既存のシーケンス名
         if (state_name == "HEAD_HAND_INIT")
             return STATE_HEAD_HAND_INIT;
         if (state_name == "HEAD_HAND_PICK_UP_SETTING")
@@ -190,6 +196,17 @@ private:
             return STATE_KFS_MOVE;
         if (state_name == "TTR_SHOOT_MIDDLE")
             return STATE_TTR_SHOOT_MIDDLE;
+
+        // GUI既定の状態名（r2/task_status_text の state=...）
+        if (state_name == "WAITING" || state_name == "Waiting")
+            return STATE_HEAD_HAND_INIT;
+        if (state_name == "ENTER_MFF" || state_name == "Enter_MFF" || state_name == "Enter MFF")
+            return STATE_HEAD_HAND_PICK_UP_SETTING;
+        if (state_name == "LEAVE_MFF" || state_name == "Leave_MFF" || state_name == "Leave MFF")
+            return STATE_HEAD_HAND_GATTAI_WAITING;
+        if (state_name == "STAFF_ASSEMBLY" || state_name == "Staff_Assembly" || state_name == "Staff Assembly")
+            return STATE_HEAD_HAND_GATTAI_ASSEMBLY;
+
         return -1;
     }
 
@@ -204,6 +221,14 @@ private:
         }
 
         const auto begin = pos + key.size();
+
+        // r2_planner の "state=... color=... cell=... mode=..." 形式に対応
+        const auto color_pos = status_text.find(" color=", begin);
+        if (color_pos != std::string::npos) {
+            return status_text.substr(begin, color_pos - begin);
+        }
+
+        // フォールバック: 末尾まで、または最初の空白まで
         const auto end = status_text.find(' ', begin);
         if (end == std::string::npos) {
             return status_text.substr(begin);
@@ -343,6 +368,31 @@ private:
             static_cast<int>(pkt[TR2]));
     }
 
+    bool is_manual_mode() const {
+        return current_drive_mode_.load() == DRIVE_MODE_MANUAL;
+    }
+
+    void update_drive_mode(int32_t next_mode, const char *source) {
+        const int32_t prev_mode = current_drive_mode_.load();
+        if (prev_mode == next_mode) {
+            return;
+        }
+
+        current_drive_mode_.store(next_mode);
+        const bool manual = (next_mode == DRIVE_MODE_MANUAL);
+        RCLCPP_INFO(
+            get_logger(),
+            "drive_mode(%s) -> %s(%ld)",
+            source,
+            manual ? "MANUAL" : "AUTO",
+            static_cast<long>(next_mode));
+
+        if (!manual) {
+            apply_state_to_packet(current_planner_state_);
+            log_current_operation_state("drive_mode_switch");
+        }
+    }
+
     // =====================================================================
     // 状態別モーター制御（タイマーコールバック毎周期呼び出し）
     // =====================================================================
@@ -362,7 +412,7 @@ private:
             if (micro1_sw == 1) {
                 pkt.setMD(MD2, 0);
             } else {
-                pkt.setMD(MD2, apply_direction_limit(30));
+                pkt.setMD(MD2, apply_direction_limit(60));
             }
             break;
 
@@ -372,7 +422,7 @@ private:
             if (rot_units >= 7.0) {
                 pkt.setMD(MD2, 0);
             } else {
-                pkt.setMD(MD2, apply_direction_limit(-30));
+                pkt.setMD(MD2, apply_direction_limit(-60));
             }
             break;
 
@@ -444,15 +494,8 @@ private:
     // 状態遷移コールバック群
     // =====================================================================
     void task_state_callback(const std_msgs::msg::Int32::SharedPtr msg) {
-        const int32_t next_state = msg->data;
-        if (next_state == current_planner_state_) {
-            return;
-        }
-
-        current_planner_state_ = next_state;
-        apply_state_to_packet(current_planner_state_);
-        log_current_operation_state("task_state");
-        RCLCPP_INFO(get_logger(), "task_state -> %ld", static_cast<long>(current_planner_state_));
+        // 状態制御は task_status_text の state 名を正とする
+        RCLCPP_DEBUG(get_logger(), "task_state ignored (state-by-name mode): %ld", static_cast<long>(msg->data));
     }
 
     void task_status_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
@@ -460,15 +503,11 @@ private:
             return;
         }
 
-        const int32_t next_state = msg->data[0];
-        if (next_state == current_planner_state_) {
-            return;
+        // task_status はモード切替のみ使用し、状態値は task_status_text で受ける
+        if (msg->data.size() >= 4) {
+            const int32_t mode_code = msg->data[3];
+            update_drive_mode(mode_code, "task_status");
         }
-
-        current_planner_state_ = next_state;
-        apply_state_to_packet(current_planner_state_);
-        log_current_operation_state("task_status");
-        RCLCPP_INFO(get_logger(), "task_status.state -> %ld", static_cast<long>(current_planner_state_));
     }
 
     void camera_servo_callback(const std_msgs::msg::Int32::SharedPtr msg) {
@@ -485,8 +524,10 @@ private:
         const int32_t mapped_state = state_code_from_name(current_state_name_);
         if (mapped_state >= 0) {
             current_planner_state_ = mapped_state;
-            apply_state_to_packet(current_planner_state_);
-            log_current_operation_state("task_status_text");
+            if (!is_manual_mode()) {
+                apply_state_to_packet(current_planner_state_);
+                log_current_operation_state("task_status_text");
+            }
         }
 
         RCLCPP_INFO(get_logger(), "task_status_text.state -> %s", current_state_name_.c_str());
@@ -496,6 +537,9 @@ private:
     // PS4コントローラーコールバック（手動制御用）
     // =====================================================================
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
+        if (!is_manual_mode()) {
+            return;
+        }
 
         // コントローラーの入力を取得、使わない入力はコメントアウト推奨
         // float LS_X = -1 * msg->axes[0];
@@ -605,7 +649,9 @@ private:
         std_msgs::msg::Int16MultiArray msg;
 
         // ★★★ 状態別のモーター制御を毎周期適用 ★★★
-        apply_state_to_packet(current_planner_state_);
+        if (!is_manual_mode()) {
+            apply_state_to_packet(current_planner_state_);
+        }
 
         // ★★★ マイクロスイッチの安全停止を最優先で適用 ★★★
         int16_t micro1_sw = g_micro1_sw.load();
@@ -723,7 +769,6 @@ private:
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr status_text_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr camera_servo_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
-
 };
 
 int main(int argc, char *argv[]) {
