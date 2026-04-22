@@ -329,12 +329,15 @@ private:
         const std::string state_name = current_state_name_.empty()
                                            ? std::string("STATE_") + std::to_string(current_planner_state_)
                                            : current_state_name_;
+        const bool is_manual = is_manual_mode();
+        const char *mode_str = is_manual ? "MANUAL" : "AUTO";
 
         if (throttled) {
             RCLCPP_INFO_THROTTLE(
                 get_logger(), *get_clock(), 1000,
-                "[MotionCtrlState:%s] state=%s(%ld), height=%s, rot=%.3f, sw_up=%d, sw_down=%d, MD1=%d, MD2=%d, SERVO1=%d, SERVO2=%d, TR1=%d, TR2=%d",
+                "[MotionCtrlState:%s] mode=%s, state=%s(%ld), height=%s, rot=%.3f, sw_up=%d, sw_down=%d, MD1=%d, MD2=%d, SERVO1=%d, SERVO2=%d, TR1=%d, TR2=%d",
                 source,
+                mode_str,
                 state_name.c_str(),
                 static_cast<long>(current_planner_state_),
                 target_height_to_string(target_height_),
@@ -352,8 +355,9 @@ private:
 
         RCLCPP_INFO(
             get_logger(),
-            "[MotionCtrlState:%s] state=%s(%ld), height=%s, rot=%.3f, sw_up=%d, sw_down=%d, MD1=%d, MD2=%d, SERVO1=%d, SERVO2=%d, TR1=%d, TR2=%d",
+            "[MotionCtrlState:%s] mode=%s, state=%s(%ld), height=%s, rot=%.3f, sw_up=%d, sw_down=%d, MD1=%d, MD2=%d, SERVO1=%d, SERVO2=%d, TR1=%d, TR2=%d",
             source,
+            mode_str,
             state_name.c_str(),
             static_cast<long>(current_planner_state_),
             target_height_to_string(target_height_),

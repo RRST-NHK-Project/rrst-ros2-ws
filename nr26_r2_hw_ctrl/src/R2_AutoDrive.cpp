@@ -62,7 +62,7 @@ public:
 
         // r2_console からのドライブモードコマンド
         mode_cmd_sub_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
-            "r2_drive_mode_cmd", 10,
+            "r2_drive_mode_cmd", rclcpp::QoS(1).reliable().transient_local(),
             std::bind(&PIDMecanumController::mode_cmd_callback, this, std::placeholders::_1));
 
         // ArUco追従入力

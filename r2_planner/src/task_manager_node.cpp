@@ -211,7 +211,7 @@ namespace r2_planner {
             auto_drive_target_topic, rclcpp::QoS(10));
 
         drive_mode_cmd_pub_ = create_publisher<std_msgs::msg::Int32MultiArray>(
-            drive_mode_cmd_topic, rclcpp::QoS(10));
+            drive_mode_cmd_topic, rclcpp::QoS(1).reliable().transient_local());
 
         mff_turn_cmd_pub_ = create_publisher<std_msgs::msg::Int32>(
             mff_turn_cmd_topic, rclcpp::QoS(10));
