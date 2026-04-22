@@ -290,6 +290,7 @@ namespace r2_planner {
     }
 
     void TaskManagerNode::onTransitionMode(const std_msgs::msg::Int32::SharedPtr msg) {
+        RCLCPP_INFO(get_logger(), "Received transition mode command: %ld", static_cast<long>(msg->data));
         setTransitionMode(msg->data);
         publishStatus(true);
     }
