@@ -197,8 +197,10 @@ public:
     void set_odom_yaw(double yaw) {
         double delta = yaw - odom_yaw_;
         // [-π, π] に正規化してラップアラウンドを除去
-        if (delta > M_PI)  delta -= 2.0 * M_PI;
-        if (delta < -M_PI) delta += 2.0 * M_PI;
+        if (delta > M_PI)
+            delta -= 2.0 * M_PI;
+        if (delta < -M_PI)
+            delta += 2.0 * M_PI;
         if (turn_accumulating_) {
             turn_accumulated_rad_ += delta;
         }
@@ -213,6 +215,12 @@ public:
     // lidar値を更新する関数
     void set_lidar_value(int16_t value) {
         lidar_value = value;
+    }
+
+    // ld19_eight_direction_distance の left 値 [mm] を更新
+    void set_left_distance_mm(int16_t value_mm, bool valid) {
+        arena_left_mm_ = value_mm;
+        arena_left_valid_ = valid;
     }
 
     // wall角度を更新する関数
@@ -398,30 +406,30 @@ private:
         IDLE,
         AW1_FORWARD,   // Step1: 前進して壁を検出
         AW1_ALIGN,     // Step1: 壁整列（遠距離版）
-        AW2_MOVE_LEFT,  // Step2: 壁を確認しながら左移動
-        AW2_TURN_CCW,   // Step2後: 反時計回り90度旋回
-        AW2_ALIGN,      // Step2後: 壁整列PID (目標350mm, 完了400mm)
-        AW2_TURN_CW,    // Step2後: 時計回り90度旋回
-        AW3_FORWARD,    // Step3+4: 前進して次の壁を検出
-        AW4_ALIGN,      // Step4: 壁整列（遠距離版）
+        AW2_MOVE_LEFT, // Step2: 壁を確認しながら左移動
+        AW2_MOVE_PLUS, // Step2+: left距離が400mmになるまで左移動
+        AW3_FORWARD,   // Step3+4: 前進して次の壁を検出
+        AW4_ALIGN,     // Step4: 壁整列（遠距離版）
         AW5_TURN,      // Step5: 時計回り90度旋回
-        AW6_ALIGN,     // Step6: 壁との平行整列
-        AW7_TURN,      // Step7: 時計回り180度旋回
-        AW8_FORWARD,   // Step8: 前進して壁を検出
+        AW8_FORWARD,   // Step6: 前進して壁を検出（left 400mm保持）
         AW8_ALIGN,     // Step8: 壁整列（遠距離版）
         DONE
     };
 
     // ARENA_WALK用定数
-    static constexpr int arena_wall_detect_mm = 700;            // 壁検出開始距離 Step1/3 [mm]
-    static constexpr int arena_wall_detect_far_mm = 1000;       // 壁検出開始距離 Step8 [mm]
-    static constexpr float arena_approach_target_mm = 350.0f;   // 壁整列PID目標距離 [mm]
-    static constexpr int arena_align_done_mm = 400;             // 壁整列完了閾値 [mm]
-    static constexpr int arena_wall_lost_mm = 1000;             // 壁消失とみなす距離 [mm]
-    static constexpr int arena_lateral_duty = 60;               // 横移動デューティ
+    static constexpr int arena_wall_detect_mm = 700;          // 壁検出開始距離 Step1/3 [mm]
+    static constexpr int arena_wall_detect_far_mm = 1000;     // 壁検出開始距離 Step8 [mm]
+    static constexpr float arena_approach_target_mm = 350.0f; // 壁整列PID目標距離 [mm]
+    static constexpr int arena_align_done_mm = 400;           // 壁整列完了閾値 [mm]
+    static constexpr int arena_wall_lost_mm = 1000;           // 壁消失とみなす距離 [mm]
+    static constexpr int arena_lateral_duty = 60;             // 横移動デューティ
+    static constexpr int arena_left_target_mm = 400;          // 左壁キープ目標距離 [mm]
+    static constexpr int arena_left_tolerance_mm = 20;        // 左壁キープ許容幅 [mm]
+    static constexpr float arena_left_hold_kp = 0.20f;        // 左壁距離補正ゲイン [duty/mm]
+    static constexpr int arena_left_hold_max_duty = 40;       // 左壁補正の最大duty
     // 純粋回転のみでは壁角度計測が不安定になるため、wall_angle_approach_thrより大きく設定する
     // （前進+回転の複合動作を早めに開始することで安定した計測を得る）
-    static constexpr float arena_angle_approach_thr = 0.50f;    // arena整列で前進を開始する角度閾値 [rad]
+    static constexpr float arena_angle_approach_thr = 0.50f; // arena整列で前進を開始する角度閾値 [rad]
 
     StepMode mode_ = StepMode::NONE;
     bool mff_mode_enabled_ = false;
@@ -434,10 +442,12 @@ private:
     static constexpr double turn_sec_per_90deg_ = 3.00;
 
     // オドメトリベース旋回用
-    double odom_yaw_ = 0.0;            // 現在のyaw [rad]（odom_xy_yawから更新）
+    double odom_yaw_ = 0.0;             // 現在のyaw [rad]（odom_xy_yawから更新）
     double turn_accumulated_rad_ = 0.0; // 旋回開始からの累積回転量 [rad]（絶対値で判定）
-    double turn_target_rad_ = 0.0;     // 旋回目標角度 [rad]（絶対値）
+    double turn_target_rad_ = 0.0;      // 旋回目標角度 [rad]（絶対値）
     bool turn_accumulating_ = false;    // 累積中フラグ
+    int16_t arena_left_mm_ = 0;         // 左側距離 [mm]（ld19_eight_direction_distance の left）
+    bool arena_left_valid_ = false;
 
     StepUpState state_up_ = StepUpState::IDLE;
     StepDownState state_down_ = StepDownState::IDLE;
@@ -473,11 +483,14 @@ private:
     void arena_setup_turn(int32_t deg_cw) {
         const float wz = (deg_cw > 0) ? turn_speed_norm_ : -turn_speed_norm_;
         float v1 = wz;
-        float v2 = -wz; v2 *= -1.0f;
-        float v3 = -wz; v3 *= -1.0f;
+        float v2 = -wz;
+        v2 *= -1.0f;
+        float v3 = -wz;
+        v3 *= -1.0f;
         float v4 = wz;
         float max_v = std::max(std::max(fabsf(v1), fabsf(v2)), std::max(fabsf(v3), fabsf(v4)));
-        if (max_v < 1.0f) max_v = 1.0f;
+        if (max_v < 1.0f)
+            max_v = 1.0f;
         turn_v1_ = v1 / max_v;
         turn_v2_ = v2 / max_v;
         turn_v3_ = v3 / max_v;
@@ -491,7 +504,7 @@ private:
         const double turn_sec = (std::abs(deg_cw) / 90.0) * turn_sec_per_90deg_ * 1.5;
         turn_end_time_ = this->now() + rclcpp::Duration::from_seconds(turn_sec);
         RCLCPP_INFO(get_logger(), "ARENA turn: %ld deg (target=%.3f rad, timeout=%.1f s)",
-            static_cast<long>(deg_cw), turn_target_rad_, turn_sec);
+                    static_cast<long>(deg_cw), turn_target_rad_, turn_sec);
     }
 
     // ARENA_WALK用: 旋回完了判定
@@ -506,7 +519,7 @@ private:
         }
         const double turned = std::abs(turn_accumulated_rad_);
         RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
-            "ARENA turn: accumulated=%.3f rad / target=%.3f rad", turned, turn_target_rad_);
+                             "ARENA turn: accumulated=%.3f rad / target=%.3f rad", turned, turn_target_rad_);
         if (turned >= turn_target_rad_) {
             turn_accumulating_ = false;
             return true;
@@ -521,13 +534,19 @@ private:
         constexpr float dt = 0.01f;
 
         if (lidar_value <= 0) {
-            pkt.setMD(MD5, 0); pkt.setMD(MD6, 0); pkt.setMD(MD7, 0); pkt.setMD(MD8, 0);
+            pkt.setMD(MD5, 0);
+            pkt.setMD(MD6, 0);
+            pkt.setMD(MD7, 0);
+            pkt.setMD(MD8, 0);
             RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500, "ARENA_ALIGN: Waiting for LiDAR...");
             return false;
         }
 
         if (std::abs(wall_angle) < wall_angle_threshold && lidar_value < arena_align_done_mm) {
-            pkt.setMD(MD5, 0); pkt.setMD(MD6, 0); pkt.setMD(MD7, 0); pkt.setMD(MD8, 0);
+            pkt.setMD(MD5, 0);
+            pkt.setMD(MD6, 0);
+            pkt.setMD(MD7, 0);
+            pkt.setMD(MD8, 0);
             return true;
         }
 
@@ -556,9 +575,40 @@ private:
         pkt.setMD(MD8, static_cast<int16_t>(v4 * align_duty_max));
 
         RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
-            "ARENA_ALIGN: angle=%.4f rad, dist=%d mm | vx=%.3f wz=%.3f",
-            wall_angle, lidar_value, vx, wz);
+                             "ARENA_ALIGN: angle=%.4f rad, dist=%d mm | vx=%.3f wz=%.3f",
+                             wall_angle, lidar_value, vx, wz);
         return false;
+    }
+
+    // 前進しながら left 距離を target に保持する（forward_duty=0 で横移動のみ）
+    void arena_drive_with_left_hold(int forward_duty, bool left_only) {
+        int left_cmd = 0;
+        if (arena_left_valid_) {
+            const int error_mm = static_cast<int>(arena_left_mm_) - arena_left_target_mm;
+            const float raw = arena_left_hold_kp * static_cast<float>(error_mm);
+            left_cmd = static_cast<int>(std::round(raw));
+            left_cmd = std::clamp(left_cmd, -arena_left_hold_max_duty, arena_left_hold_max_duty);
+            if (left_only) {
+                left_cmd = std::max(left_cmd, 0);
+            }
+        } else if (left_only) {
+            left_cmd = arena_lateral_duty;
+        }
+
+        int md5 = -forward_duty - left_cmd;
+        int md6 = forward_duty + left_cmd;
+        int md7 = forward_duty - left_cmd;
+        int md8 = -forward_duty + left_cmd;
+
+        md5 = std::clamp(md5, -100, 100);
+        md6 = std::clamp(md6, -100, 100);
+        md7 = std::clamp(md7, -100, 100);
+        md8 = std::clamp(md8, -100, 100);
+
+        pkt.setMD(MD5, static_cast<int16_t>(md5));
+        pkt.setMD(MD6, static_cast<int16_t>(md6));
+        pkt.setMD(MD7, static_cast<int16_t>(md7));
+        pkt.setMD(MD8, static_cast<int16_t>(md8));
     }
 
     // 機構関数
@@ -1075,15 +1125,14 @@ private:
     }
 
     // アリーナ走行シーケンス
-    // Step1: 前進→壁検出→整列（遠距離）
-    // Step2: 左移動（壁が消えるまで）
-    // Step3+4: 前進→新しい壁検出→整列（遠距離）
+    // Step1: 前進→壁検出(700mm)→整列
+    // Step2: 左移動で壁消失検出(lidar=0 or >1000mm)
+    // Step2+: left距離が400mmになるまで左移動
+    // Step3+4: left=400mmを保持しながら前進→壁検出(700mm)→整列
     // Step5: 時計回り90度旋回
-    // Step6: 壁との平行整列
-    // Step7: 時計回り180度旋回
-    // Step8: 前進→壁検出→整列（遠距離）
+    // Step6: left=400mmを保持しながら前進→壁検出(1000mm)
+    // Step8: 壁整列→完了
     void arena_walk_sequence() {
-        auto now_time = now();
         switch (state_arena_) {
         case ArenaWalkState::IDLE:
             break;
@@ -1116,68 +1165,38 @@ private:
         // vy < 0（左方向）: MD5=-lat, MD6=+lat, MD7=-lat, MD8=+lat
         case ArenaWalkState::AW2_MOVE_LEFT:
             if (!state_executed_) {
-                pkt.setMD(MD5, -arena_lateral_duty);
-                pkt.setMD(MD6,  arena_lateral_duty);
-                pkt.setMD(MD7, -arena_lateral_duty);
-                pkt.setMD(MD8,  arena_lateral_duty);
                 state_executed_ = true;
             }
+            arena_drive_with_left_hold(0, true);
             if (lidar_value <= 0 || lidar_value > arena_wall_lost_mm) {
                 move_stop();
-                arena_setup_turn(-90);
-                next_arena(ArenaWalkState::AW2_TURN_CCW);
-                RCLCPP_INFO(get_logger(), "ARENA Step2: wall lost -> CCW 90 deg turn.");
+                next_arena(ArenaWalkState::AW2_MOVE_PLUS);
+                RCLCPP_INFO(get_logger(), "ARENA Step2: wall lost -> move plus by left distance.");
             }
             RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-                "ARENA Step2: moving left, lidar=%d mm", lidar_value);
+                                 "ARENA Step2: moving left, lidar=%d mm", lidar_value);
             break;
 
-        // ── Step2後: 反時計回り90度旋回 ──────────────────────────────
-        case ArenaWalkState::AW2_TURN_CCW:
-            if (arena_turn_reached()) {
-                move_stop();
-                pid_angle_.reset();
-                pid_distance_.reset();
-                pid_distance_.set_target(arena_approach_target_mm);
-                next_arena(ArenaWalkState::AW2_ALIGN);
-                RCLCPP_INFO(get_logger(), "ARENA Step2: CCW turn done -> wall align.");
-            } else {
-                pkt.setMD(MD5, static_cast<int16_t>(turn_v1_ * align_duty_max));
-                pkt.setMD(MD6, static_cast<int16_t>(turn_v2_ * align_duty_max));
-                pkt.setMD(MD7, static_cast<int16_t>(turn_v3_ * align_duty_max));
-                pkt.setMD(MD8, static_cast<int16_t>(turn_v4_ * align_duty_max));
-            }
-            break;
-
-        // ── Step2後: 壁整列PID ────────────────────────────────────────
-        case ArenaWalkState::AW2_ALIGN:
-            if (arena_wall_align()) {
-                RCLCPP_INFO(get_logger(), "ARENA Step2: aligned -> CW 90 deg turn.");
-                arena_setup_turn(90);
-                next_arena(ArenaWalkState::AW2_TURN_CW);
-            }
-            break;
-
-        // ── Step2後: 時計回り90度旋回 ────────────────────────────────
-        case ArenaWalkState::AW2_TURN_CW:
-            if (arena_turn_reached()) {
+        // ── Step2+: left距離が400mmになるまで左移動 ───────────────────
+        case ArenaWalkState::AW2_MOVE_PLUS:
+            arena_drive_with_left_hold(0, true);
+            if (arena_left_valid_ &&
+                std::abs(static_cast<int>(arena_left_mm_) - arena_left_target_mm) <= arena_left_tolerance_mm) {
                 move_stop();
                 next_arena(ArenaWalkState::AW3_FORWARD);
-                RCLCPP_INFO(get_logger(), "ARENA Step2: CW turn done -> forward.");
-            } else {
-                pkt.setMD(MD5, static_cast<int16_t>(turn_v1_ * align_duty_max));
-                pkt.setMD(MD6, static_cast<int16_t>(turn_v2_ * align_duty_max));
-                pkt.setMD(MD7, static_cast<int16_t>(turn_v3_ * align_duty_max));
-                pkt.setMD(MD8, static_cast<int16_t>(turn_v4_ * align_duty_max));
+                RCLCPP_INFO(get_logger(), "ARENA Step2+: left distance reached (%d mm) -> forward.", arena_left_mm_);
             }
+            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
+                                 "ARENA Step2+: left_hold=%s left=%d mm target=%d mm",
+                                 arena_left_valid_ ? "valid" : "invalid", arena_left_mm_, arena_left_target_mm);
             break;
 
         // ── Step3+4: 前進して次の壁を検出 ────────────────────────────
         case ArenaWalkState::AW3_FORWARD:
             if (!state_executed_) {
-                move_forward();
                 state_executed_ = true;
             }
+            arena_drive_with_left_hold(forward_speed, false);
             if (lidar_value > 0 && lidar_value < arena_wall_detect_mm) {
                 move_stop();
                 pid_angle_.reset();
@@ -1191,47 +1210,18 @@ private:
         // ── Step4: 壁整列（遠距離版） ────────────────────────────────
         case ArenaWalkState::AW4_ALIGN:
             if (arena_wall_align()) {
-                RCLCPP_INFO(get_logger(), "ARENA Step4: aligned -> CCW 90 deg turn.");
-                arena_setup_turn(-90);
+                RCLCPP_INFO(get_logger(), "ARENA Step4: aligned -> CW 90 deg turn.");
+                arena_setup_turn(90);
                 next_arena(ArenaWalkState::AW5_TURN);
             }
             break;
 
-        // ── Step5: 反時計回り90度旋回 ────────────────────────────────
+        // ── Step5: 時計回り90度旋回 ─────────────────────────────────
         case ArenaWalkState::AW5_TURN:
             if (arena_turn_reached()) {
                 move_stop();
-                pid_angle_.reset();
-                pid_distance_.reset();
-                pid_distance_.set_target(arena_approach_target_mm);
-                next_arena(ArenaWalkState::AW6_ALIGN);
-                RCLCPP_INFO(get_logger(), "ARENA Step5: turn done -> wall align.");
-            } else {
-                pkt.setMD(MD5, static_cast<int16_t>(turn_v1_ * align_duty_max));
-                pkt.setMD(MD6, static_cast<int16_t>(turn_v2_ * align_duty_max));
-                pkt.setMD(MD7, static_cast<int16_t>(turn_v3_ * align_duty_max));
-                pkt.setMD(MD8, static_cast<int16_t>(turn_v4_ * align_duty_max));
-            }
-            break;
-
-        // ── Step6: 壁との平行整列 ────────────────────────────────────
-        case ArenaWalkState::AW6_ALIGN:
-            if (arena_wall_align()) {
-                RCLCPP_INFO(get_logger(), "ARENA Step6: aligned -> CW 180 deg turn.");
-                arena_setup_turn(180);
-                next_arena(ArenaWalkState::AW7_TURN);
-            }
-            break;
-
-        // ── Step7: 時計回り180度旋回 ─────────────────────────────────
-        case ArenaWalkState::AW7_TURN:
-            if (arena_turn_reached()) {
-                move_stop();
-                pid_angle_.reset();
-                pid_distance_.reset();
-                pid_distance_.set_target(arena_approach_target_mm);
                 next_arena(ArenaWalkState::AW8_FORWARD);
-                RCLCPP_INFO(get_logger(), "ARENA Step7: turn done -> forward to wall.");
+                RCLCPP_INFO(get_logger(), "ARENA Step5: turn done -> forward to wall.");
             } else {
                 pkt.setMD(MD5, static_cast<int16_t>(turn_v1_ * align_duty_max));
                 pkt.setMD(MD6, static_cast<int16_t>(turn_v2_ * align_duty_max));
@@ -1240,12 +1230,12 @@ private:
             }
             break;
 
-        // ── Step8: 前進して壁を検出（1000mm） ───────────────────────────
+        // ── Step6: left距離を保持しながら前進して壁を検出（1000mm） ───────
         case ArenaWalkState::AW8_FORWARD:
             if (!state_executed_) {
-                move_forward();
                 state_executed_ = true;
             }
+            arena_drive_with_left_hold(forward_speed, false);
             if (lidar_value > 0 && lidar_value < arena_wall_detect_far_mm) {
                 move_stop();
                 pid_angle_.reset();
@@ -1433,6 +1423,11 @@ public:
             "odom_xy_yaw",
             10,
             std::bind(&HardWareControl::odom_callback, this, std::placeholders::_1));
+
+        ld19_eight_dir_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+            "/ld19/eight_direction_distance",
+            rclcpp::SensorDataQoS(),
+            std::bind(&HardWareControl::ld19_eight_dir_callback, this, std::placeholders::_1));
 
         odom_reset_pub_ = this->create_publisher<std_msgs::msg::Bool>(
             "odom_reset", 10);
@@ -1798,8 +1793,26 @@ private:
 
     // odom_xy_yaw: [x, y, yaw, vx, vy, wz]
     void odom_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
-        if (msg->data.size() < 3) return;
+        if (msg->data.size() < 3)
+            return;
         seq_->set_odom_yaw(static_cast<double>(msg->data[2]));
+    }
+
+    // /ld19/eight_direction_distance: [front, front_left, left, rear_left, rear, rear_right, right, front_right]
+    void ld19_eight_dir_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
+        if (msg->data.size() < 3) {
+            seq_->set_left_distance_mm(0, false);
+            return;
+        }
+
+        const float left_m = msg->data[2];
+        if (!std::isfinite(left_m) || left_m <= 0.0f) {
+            seq_->set_left_distance_mm(0, false);
+            return;
+        }
+
+        const int16_t left_mm = static_cast<int16_t>(left_m * 1000.0f);
+        seq_->set_left_distance_mm(left_mm, true);
     }
     uint8_t device_id_;
 
@@ -1820,6 +1833,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr cube_align_cmd_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr arena_walk_cmd_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr odom_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr ld19_eight_dir_sub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr odom_reset_pub_;
     rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr camera_servo_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
