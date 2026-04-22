@@ -30,6 +30,7 @@ L1、R1で回転しようとすると前進、後進してしまう
 #include "std_msgs/msg/int16_multi_array.hpp"
 #include "std_msgs/msg/int32.hpp"
 #include "std_msgs/msg/int32_multi_array.hpp"
+#include "std_msgs/msg/string.hpp"
 
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "sensor_msgs/point_cloud2_iterator.hpp"
@@ -1036,6 +1037,13 @@ public:
             10,
             std::bind(&HardWareControl::mode_cmd_callback, this, std::placeholders::_1));
 
+        // r2_autodrive から公開される現在モード文字列（MFF/ARENA）でも
+        // SequenceCtrl の有効/無効を切り替えられる受信口を追加
+        drive_mode_text_sub_ = this->create_subscription<std_msgs::msg::String>(
+            "r2_drive_mode",
+            rclcpp::QoS(1).reliable().transient_local(),
+            std::bind(&HardWareControl::drive_mode_text_callback, this, std::placeholders::_1));
+
         cube_detect_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
             "/cube_detection/info",
             rclcpp::SensorDataQoS(),
@@ -1361,7 +1369,12 @@ private:
         }
 
         const int32_t mode_code = msg->data[0];
-        seq_->set_mff_mode_enabled(mode_code == 4);
+        seq_->set_mff_mode_enabled(mode_code == 4 || mode_code == 5);
+    }
+
+    void drive_mode_text_callback(const std_msgs::msg::String::SharedPtr msg) {
+        const auto &mode = msg->data;
+        seq_->set_mff_mode_enabled(mode == "MFF" || mode == "ARENA");
     }
 
     // /cube_detection/info [flag, cx_norm, cy_norm, w_norm, h_norm, depth_m, score, area, face_yaw_deg]
@@ -1399,6 +1412,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr step_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr turn_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mode_cmd_sub_;
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr drive_mode_text_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr cube_detect_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr cube_align_cmd_sub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr odom_reset_pub_;

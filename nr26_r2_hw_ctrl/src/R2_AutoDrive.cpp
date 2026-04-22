@@ -122,6 +122,7 @@ private:
         ARUCO,
         PLANE,
         MFF,
+        ARENA,
     };
 
     // ROS
@@ -202,6 +203,8 @@ private:
             return "PLANE";
         case DriveMode::MFF:
             return "MFF";
+        case DriveMode::ARENA:
+            return "ARENA";
         }
         return "MANUAL";
     }
@@ -286,6 +289,25 @@ private:
         publish_packet();
     }
 
+    void enter_arena_mode() {
+        if (!has_target_cmd_) {
+            target_x_ = X_;
+            target_y_ = Y_;
+            target_yaw_ = yaw_;
+        }
+
+        pid_x_.set_target(target_x_);
+        pid_y_.set_target(target_y_);
+        pid_yaw_.set_target(target_yaw_);
+        pid_x_.reset();
+        pid_y_.reset();
+        pid_yaw_.reset();
+
+        drive_mode_ = DriveMode::ARENA;
+        stop_motors();
+        publish_mode();
+    }
+
     // odom（状態更新のみ）
     void odom_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
         if (msg->data.size() < 3)
@@ -322,7 +344,7 @@ private:
         pid_y_.reset();
         pid_yaw_.reset();
 
-        if (drive_mode_ != DriveMode::AUTO) {
+        if (drive_mode_ != DriveMode::AUTO && drive_mode_ != DriveMode::ARENA) {
             drive_mode_ = DriveMode::AUTO;
             stop_motors();
             publish_mode();
@@ -340,8 +362,8 @@ private:
         }
 
         int32_t mode_code = msg->data[0];
-        if (mode_code < 0 || mode_code > 4) {
-            RCLCPP_WARN(this->get_logger(), "Invalid mode code: %ld (valid: 0-4)", static_cast<long>(mode_code));
+        if (mode_code < 0 || mode_code > 5) {
+            RCLCPP_WARN(this->get_logger(), "Invalid mode code: %ld (valid: 0-5)", static_cast<long>(mode_code));
             return;
         }
 
@@ -374,6 +396,12 @@ private:
             if (drive_mode_ != DriveMode::MFF) {
                 enter_mff_mode();
                 RCLCPP_INFO(this->get_logger(), "Mode changed: MFF (by mode command)");
+            }
+            break;
+        case 5:
+            if (drive_mode_ != DriveMode::ARENA) {
+                enter_arena_mode();
+                RCLCPP_INFO(this->get_logger(), "Mode changed: ARENA (by mode command)");
             }
             break;
         }

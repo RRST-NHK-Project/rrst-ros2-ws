@@ -387,8 +387,8 @@ namespace r2_planner {
         }
 
         const int32_t mode_code = data[1];
-        if (mode_code < 0 || mode_code > 4) {
-            RCLCPP_WARN(get_logger(), "Ignoring invalid mode code %ld for state=%s(%ld) (valid: 0-4)",
+        if (mode_code < 0 || mode_code > 5) {
+            RCLCPP_WARN(get_logger(), "Ignoring invalid mode code %ld for state=%s(%ld) (valid: 0-5)",
                         static_cast<long>(mode_code), stateDisplayName(state_code).c_str(), static_cast<long>(state_code));
             return;
         }
@@ -775,7 +775,7 @@ namespace r2_planner {
 
         std_msgs::msg::Int32MultiArray mode_msg;
         if (it == state_mode_targets_.end()) {
-            if (fallback_drive_mode_on_unset_ < 0 || fallback_drive_mode_on_unset_ > 4) {
+            if (fallback_drive_mode_on_unset_ < 0 || fallback_drive_mode_on_unset_ > 5) {
                 RCLCPP_WARN(get_logger(), "publishAutoDriveModeForState: no mode target for state=%s(%ld), fallback invalid (%ld), skipping", stateDisplayName(state_code).c_str(), static_cast<long>(state_code), static_cast<long>(fallback_drive_mode_on_unset_));
                 return;
             }
