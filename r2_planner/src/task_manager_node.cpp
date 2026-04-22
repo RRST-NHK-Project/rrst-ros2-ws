@@ -474,6 +474,15 @@ namespace r2_planner {
         publishMffTransitionCommands(from_cell, to_cell);
         setCell(to_cell);
         mff_path_index_ = current_index + 1;
+
+        // 出口マス（1X=16, 2X=17, 3X=18）到達時にMFF離脱へ自動遷移
+        constexpr int32_t kMffExitCellMin = 16;
+        constexpr int32_t kMffExitCellMax = 18;
+        if (to_cell >= kMffExitCellMin && to_cell <= kMffExitCellMax) {
+            RCLCPP_INFO(get_logger(), "MFF exit cell reached (cell=%ld): transitioning to Leave MFF", static_cast<long>(to_cell));
+            setState(kStateMffLeave);
+        }
+
         publishStatus(true);
     }
 
@@ -536,6 +545,15 @@ namespace r2_planner {
             state_entered_at_ = std::chrono::steady_clock::now();
         }
         publishStateSideEffects(state_code);
+        // publishStateSideEffects の後で current_drive_mode_ を確定させる
+        // （publishAutoDriveModeForState による上書きを防ぐため）
+        if (state_code == kStateMffEnter) {
+            current_drive_mode_ = 4;
+            RCLCPP_INFO(get_logger(), "Entering MFF state: current_drive_mode_=4, auto transition blocked");
+        } else if (state_code == kStateMffLeave) {
+            current_drive_mode_ = 0;
+            RCLCPP_INFO(get_logger(), "Leaving MFF state: current_drive_mode_=0, auto transition resumed");
+        }
     }
 
     void TaskManagerNode::publishStateSideEffects(int32_t state_code) {
@@ -596,6 +614,12 @@ namespace r2_planner {
 
     void TaskManagerNode::advanceAutoTransition() {
         if (status_.transition_mode_code != kTransitionAuto) {
+            return;
+        }
+
+        // MFFモード（drive_mode_code=4）アクティブ中は自動遷移をブロック
+        if (current_drive_mode_ == 4) {
+            RCLCPP_DEBUG(get_logger(), "Auto transition blocked: in MFF mode (current_drive_mode_=%ld)", static_cast<long>(current_drive_mode_));
             return;
         }
 
@@ -752,6 +776,7 @@ namespace r2_planner {
         std_msgs::msg::Int32MultiArray mode_msg;
         if (it == state_mode_targets_.end()) {
             if (fallback_drive_mode_on_unset_ < 0 || fallback_drive_mode_on_unset_ > 4) {
+                RCLCPP_WARN(get_logger(), "publishAutoDriveModeForState: no mode target for state=%s(%ld), fallback invalid (%ld), skipping", stateDisplayName(state_code).c_str(), static_cast<long>(state_code), static_cast<long>(fallback_drive_mode_on_unset_));
                 return;
             }
             mode_msg.data = {fallback_drive_mode_on_unset_, 0};
@@ -759,14 +784,16 @@ namespace r2_planner {
             const bool rotate_only = (rotate_it != state_rotate_only_targets_.end() && rotate_it->second);
             mode_msg.data = {it->second, rotate_only ? 1 : 0};
         }
+        current_drive_mode_ = mode_msg.data[0];
         drive_mode_cmd_pub_->publish(mode_msg);
 
         RCLCPP_INFO(
             get_logger(),
-            "Published auto drive mode for state=%s(%ld): mode=%ld rotate_only=%s",
+            "Published auto drive mode for state=%s(%ld): mode=%ld (current_drive_mode_=%ld) rotate_only=%s",
             stateDisplayName(state_code).c_str(),
             static_cast<long>(state_code),
             static_cast<long>(mode_msg.data[0]),
+            static_cast<long>(current_drive_mode_),
             mode_msg.data.size() > 1 && mode_msg.data[1] ? "true" : "false");
     }
 
