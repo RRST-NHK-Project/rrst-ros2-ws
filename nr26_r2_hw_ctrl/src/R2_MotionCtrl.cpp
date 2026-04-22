@@ -129,6 +129,11 @@ public:
             "r2/task_transition_mode", rclcpp::QoS(10).best_effort(),
             std::bind(&HardWareControl::transition_mode_callback, this, std::placeholders::_1));
 
+        // task_manager_node 経由のドライブモードコマンド（r2_auto と同じ経路、transient_local）
+        drive_mode_cmd_sub_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
+            "r2_drive_mode_cmd", rclcpp::QoS(1).reliable().transient_local(),
+            std::bind(&HardWareControl::drive_mode_cmd_callback, this, std::placeholders::_1));
+
         // 初期状態を適用
         apply_state_to_packet(current_planner_state_);
 
@@ -512,6 +517,13 @@ private:
         update_drive_mode(msg->data, "transition_mode_direct");
     }
 
+    void drive_mode_cmd_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        // task_manager_node 経由のモードコマンド（r2_drive_mode_cmd[0] がモードコード）
+        if (msg->data.empty())
+            return;
+        update_drive_mode(msg->data[0], "drive_mode_cmd");
+    }
+
     void task_status_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
         // task_status からのモード更新は行わない。
         // モードは r2/task_transition_mode の直接受信（transition_mode_callback）でのみ管理する。
@@ -778,6 +790,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr status_text_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr camera_servo_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr transition_mode_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr drive_mode_cmd_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
 };
 
