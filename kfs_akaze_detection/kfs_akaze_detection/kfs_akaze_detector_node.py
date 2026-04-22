@@ -24,6 +24,8 @@ class KfsAkazeDetectorNode(Node):
         self.declare_parameter("query_scale", 0.5)
         self.declare_parameter("match_ratio", 0.87)
         self.declare_parameter("minimum_good_matches", 14)
+        self.declare_parameter("minimum_inlier_ratio", 0.6)
+        self.declare_parameter("minimum_template_coverage", 0.28)
         self.declare_parameter("output_topic", "/kfs_akaze_detection/result")
         self.declare_parameter("detected_topic", "/kfs_akaze_detection/detected")
         self.declare_parameter("debug_image_topic", "/kfs_akaze_detection/debug_image")
@@ -39,6 +41,12 @@ class KfsAkazeDetectorNode(Node):
         self.match_ratio = float(self.get_parameter("match_ratio").value)
         self.minimum_good_matches = int(
             self.get_parameter("minimum_good_matches").value
+        )
+        self.minimum_inlier_ratio = float(
+            self.get_parameter("minimum_inlier_ratio").value
+        )
+        self.minimum_template_coverage = float(
+            self.get_parameter("minimum_template_coverage").value
         )
         self.output_topic = str(self.get_parameter("output_topic").value)
         self.detected_topic = str(self.get_parameter("detected_topic").value)
@@ -173,6 +181,29 @@ class KfsAkazeDetectorNode(Node):
                 detected=False, match_count=len(good)
             ), self._draw_debug(query_gray)
 
+        inlier_flags = inlier_mask.ravel().astype(bool)
+        inliers = int(np.sum(inlier_flags))
+        if inliers < self.minimum_good_matches:
+            return KfsDetectionResult(
+                detected=False, match_count=len(good)
+            ), self._draw_debug(query_gray)
+
+        inlier_ratio = float(inliers) / float(len(good))
+        if inlier_ratio < self.minimum_inlier_ratio:
+            return KfsDetectionResult(
+                detected=False, match_count=len(good), inlier_ratio=inlier_ratio
+            ), self._draw_debug(query_gray)
+
+        template_inlier_points = dst_pts[inlier_flags].reshape(-1, 2)
+        template_h, template_w = self.template_gray.shape[:2]
+        template_coverage = self._compute_point_coverage(
+            template_inlier_points, template_w, template_h
+        )
+        if template_coverage < self.minimum_template_coverage:
+            return KfsDetectionResult(
+                detected=False, match_count=len(good), inlier_ratio=inlier_ratio
+            ), self._draw_debug(query_gray)
+
         center_query = np.array(
             [[[query_gray.shape[1] * 0.5, query_gray.shape[0] * 0.5]]], dtype=np.float32
         )
@@ -197,9 +228,6 @@ class KfsAkazeDetectorNode(Node):
         yaw_deg = float(np.degrees(np.arctan2(probe_vec[1], probe_vec[0])))
         scale = float(vec_norm / probe_len)
 
-        inliers = int(np.sum(inlier_mask))
-        inlier_ratio = float(inliers) / float(len(good))
-
         result = KfsDetectionResult(
             detected=True,
             map_x=float(center_map[0]),
@@ -210,7 +238,6 @@ class KfsAkazeDetectorNode(Node):
             inlier_ratio=inlier_ratio,
         )
 
-        template_h, template_w = self.template_gray.shape[:2]
         template_corners = np.float32(
             [
                 [[0.0, 0.0]],
@@ -235,6 +262,25 @@ class KfsAkazeDetectorNode(Node):
             inlier_ratio=inlier_ratio,
         )
         return result, debug
+
+    @staticmethod
+    def _compute_point_coverage(
+        points: np.ndarray, full_width: int, full_height: int
+    ) -> float:
+        if points.size == 0 or full_width <= 0 or full_height <= 0:
+            return 0.0
+
+        min_xy = np.min(points, axis=0)
+        max_xy = np.max(points, axis=0)
+        span_x = float(max_xy[0] - min_xy[0])
+        span_y = float(max_xy[1] - min_xy[1])
+
+        if span_x <= 0.0 or span_y <= 0.0:
+            return 0.0
+
+        covered_area = span_x * span_y
+        full_area = float(full_width * full_height)
+        return covered_area / full_area
 
     def _draw_debug(
         self,

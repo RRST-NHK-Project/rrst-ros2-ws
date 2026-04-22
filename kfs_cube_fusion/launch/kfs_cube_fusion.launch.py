@@ -25,6 +25,8 @@ def _launch_setup(context, *args, **kwargs):
                     "query_scale": 0.5,
                     "match_ratio": 0.87,
                     "minimum_good_matches": 12,
+                    "minimum_inlier_ratio": 0.6,
+                    "minimum_template_coverage": 0.28,
                     "max_matches_to_use": 80,
                     "central_window_px": 40,
                     "depth_band_mm": 180.0,

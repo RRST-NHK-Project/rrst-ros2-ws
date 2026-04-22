@@ -41,6 +41,8 @@ class KfsCubeFusionNode(Node):
         self.declare_parameter("query_scale", 0.5)
         self.declare_parameter("match_ratio", 0.87)
         self.declare_parameter("minimum_good_matches", 12)
+        self.declare_parameter("minimum_inlier_ratio", 0.6)
+        self.declare_parameter("minimum_template_coverage", 0.28)
         self.declare_parameter("max_matches_to_use", 80)
         self.declare_parameter("central_window_px", 40)
         self.declare_parameter("depth_band_mm", 180.0)
@@ -61,6 +63,12 @@ class KfsCubeFusionNode(Node):
         self.match_ratio = float(self.get_parameter("match_ratio").value)
         self.minimum_good_matches = int(
             self.get_parameter("minimum_good_matches").value
+        )
+        self.minimum_inlier_ratio = float(
+            self.get_parameter("minimum_inlier_ratio").value
+        )
+        self.minimum_template_coverage = float(
+            self.get_parameter("minimum_template_coverage").value
         )
         self.max_matches_to_use = int(self.get_parameter("max_matches_to_use").value)
         self.central_window_px = int(self.get_parameter("central_window_px").value)
@@ -342,10 +350,23 @@ class KfsCubeFusionNode(Node):
         homography, mask = cv2.findHomography(
             template_points, query_points, cv2.RANSAC, 5.0
         )
-        if homography is None:
+        if homography is None or mask is None:
             return None
 
-        if mask is not None and int(mask.sum()) < self.minimum_good_matches:
+        inlier_flags = mask.ravel().astype(bool)
+        inlier_count = int(np.sum(inlier_flags))
+        if inlier_count < self.minimum_good_matches:
+            return None
+
+        inlier_ratio = float(inlier_count) / float(len(good_matches))
+        if inlier_ratio < self.minimum_inlier_ratio:
+            return None
+
+        template_inlier_points = template_points[inlier_flags].reshape(-1, 2)
+        template_coverage = self._compute_point_coverage(
+            template_inlier_points, self.template_w, self.template_h
+        )
+        if template_coverage < self.minimum_template_coverage:
             return None
 
         template_center = np.array(
@@ -372,10 +393,26 @@ class KfsCubeFusionNode(Node):
             center_x,
             center_y,
             0.0,
-            int(mask.sum()) if mask is not None else len(good_matches),
+            inlier_count,
             cube_center_x,
             cube_center_y,
         )
+
+    @staticmethod
+    def _compute_point_coverage(
+        points: np.ndarray, full_width: int, full_height: int
+    ) -> float:
+        if points.size == 0 or full_width <= 0 or full_height <= 0:
+            return 0.0
+
+        min_xy = np.min(points, axis=0)
+        max_xy = np.max(points, axis=0)
+        span_x = float(max_xy[0] - min_xy[0])
+        span_y = float(max_xy[1] - min_xy[1])
+        if span_x <= 0.0 or span_y <= 0.0:
+            return 0.0
+
+        return (span_x * span_y) / float(full_width * full_height)
 
     def _sample_depth_mm(
         self, depth_mm: np.ndarray, center_x: float, center_y: float

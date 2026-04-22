@@ -21,6 +21,8 @@ def generate_launch_description() -> LaunchDescription:
                         "query_scale": 0.5,
                         "match_ratio": 0.87,
                         "minimum_good_matches": 14,
+                        "minimum_inlier_ratio": 0.6,
+                        "minimum_template_coverage": 0.28,
                         "depth_info_topic": "/kfs_akaze_detection/depth_observation",
                         "enable_depth_adapter": True,
                         "output_topic": "/kfs_akaze_detection/result",
