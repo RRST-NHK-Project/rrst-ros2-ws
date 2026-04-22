@@ -490,7 +490,7 @@ private:
 
         static int circle_pre = 0;
         static int CIRCLE_PUSH_COUNT = 0;
-        static int CIRCLE_PUSH_MAX = 4;
+        static int CIRCLE_PUSH_MAX = 5;
 
         static int r1_pre = 0;
         static int R1_PUSH_COUNT = 0;
@@ -710,11 +710,7 @@ private:
 
         // モーター1回転あたりのエンコーダのカウント数
         // 実験結果により、1回転 = 8000 カウント に設定
-<<<<<<< HEAD
-        static const double COUNTS_PER_ROTATION = 8192.0;
-=======
         static const double COUNTS_PER_ROTATION = 360;
->>>>>>> 17d001b (現状その二)
 
         // 符号付き16bitの飛躍(-32768〜32767)は、差分累積(g_abs_coord)により計算・解決済み
         // ※上昇時（エンコーダ減少）に diff がマイナスになるため、「- diff」の計算によって絶対座標は増加（0→50）する
