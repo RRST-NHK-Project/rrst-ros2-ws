@@ -139,7 +139,7 @@ private:
         g_abs_coord.store(abs_coord);
 
         // ★ここで 8000 で割ることで「物理的な1回転」を算出します
-        double rot = (double)abs_coord / 8197.0;
+        double rot = (double)abs_coord / 8192.0;
 
         // 以下リアルタイムで数値取るデバックログ　重いとき消すこと推奨
         if (diff != 0)
@@ -699,7 +699,7 @@ private:
 
         // モーター1回転あたりのエンコーダのカウント数
         // 実験結果により、1回転 = 8000 カウント に設定
-        static const double COUNTS_PER_ROTATION = 8197.0;
+        static const double COUNTS_PER_ROTATION = 8192.0;
 
         // 符号付き16bitの飛躍(-32768〜32767)は、差分累積(g_abs_coord)により計算・解決済み
         // ※上昇時（エンコーダ減少）に diff がマイナスになるため、「- diff」の計算によって絶対座標は増加（0→50）する
