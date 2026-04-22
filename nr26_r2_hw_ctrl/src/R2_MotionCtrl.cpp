@@ -642,13 +642,13 @@ private:
 
         // micro1_sw が始発(正回転禁止) = fwd_speed禁止 -> rev_speed(R1)のみ許可
         // micro2_sw が終点(逆回転禁止) = rev_speed禁止 -> fwd_speed(L1)のみ許可
-        if (micro2_sw == 1) {
+        if (micro1_sw == 1) {
             if (L1 == 1) {
                 pkt.setMD(MD2, fwd_speed);
             } else {
                 pkt.setMD(MD2, 0);
             }
-        } else if (micro1_sw == 1) {
+        } else if (micro2_sw == 1) {
             if (R1 == 1) {
                 pkt.setMD(MD2, rev_speed);
             } else {
