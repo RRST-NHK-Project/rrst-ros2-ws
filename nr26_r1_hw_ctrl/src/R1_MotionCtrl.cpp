@@ -145,14 +145,14 @@ private:
         if (diff != 0)
         {
             // RCLCPP_INFO(get_logger(),
-            //     "\n--- ROTATION DEBUG ---\n"
-            //     "  生値の変化 : %d -> %d (diff: %d)\n"
-            //     "  デジタルラップ : %d 回\n"
-            //     "  絶対カウント   : %ld\n"
-            //     "  現在回転数     : %.3f 回転 (1周8000)\n"
-            //     "----------------------",
-            //     (int)current_enc1 - diff, (int)current_enc1, diff,
-            //     (int)r_count, abs_coord, rot);
+            //             "\n--- ROTATION DEBUG ---\n"
+            //             "  生値の変化 : %d -> %d (diff: %d)\n"
+            //             "  デジタルラップ : %d 回\n"
+            //             "  絶対カウント   : %ld\n"
+            //             "  現在回転数     : %.3f 回転 (1周8000)\n"
+            //             "----------------------",
+            //             (int)current_enc1 - diff, (int)current_enc1, diff,
+            //             (int)r_count, abs_coord, rot);
         }
 
         // --- 通信デバッグ追加 ---
@@ -163,8 +163,8 @@ private:
         static int16_t l9 = 0, l10 = 0, l11 = 0, l12 = 0;
         if (msg->data[9] != l9 || msg->data[10] != l10 || msg->data[11] != l11 || msg->data[12] != l12)
         {
-            RCLCPP_INFO(get_logger(), "SW Changed! [下(9):%d, 上(10):%d, 外(11):%d, 内(12):%d]",
-                        msg->data[9], msg->data[10], msg->data[11], msg->data[12]);
+            // RCLCPP_INFO(get_logger(), "SW Changed! [下(9):%d, 上(10):%d, 外(11):%d, 内(12):%d]",
+            //             msg->data[9], msg->data[10], msg->data[11], msg->data[12]);
             l9 = msg->data[9];
             l10 = msg->data[10];
             l11 = msg->data[11];
@@ -172,13 +172,13 @@ private:
         }
 
         // 定期ダンプに受信件数を追加
-        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
-                             "RX Heartbeat (Total:%lu) | Dump: [%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d]",
-                             packet_count,
-                             msg->data[0], msg->data[1], msg->data[2], msg->data[3],
-                             msg->data[4], msg->data[5], msg->data[6], msg->data[7],
-                             msg->data[8], msg->data[9], msg->data[10], msg->data[11],
-                             msg->data[12], msg->data[13], msg->data[14], msg->data[15]);
+        // RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
+        //                      "RX Heartbeat (Total:%lu) | Dump: [%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d]",
+        //                      packet_count,
+        //                      msg->data[0], msg->data[1], msg->data[2], msg->data[3],
+        //                      msg->data[4], msg->data[5], msg->data[6], msg->data[7],
+        //                      msg->data[8], msg->data[9], msg->data[10], msg->data[11],
+        //                      msg->data[12], msg->data[13], msg->data[14], msg->data[15]);
 
         // SW3, SW4専用の明示的なデバッグ
         RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
@@ -283,7 +283,7 @@ private:
         // float L2_DIGITAL = (-1 * msg->axes[2] + 1) / 2;
         // float R2_DIGITAL = (-1 * msg->axes[5] + 1) / 2;
 
-        // bool L2 = msg->buttons[6];
+        bool L2 = msg->buttons[6];
         // bool R2 = msg->buttons[7];
 
         bool SHARE = msg->buttons[8];
@@ -306,12 +306,12 @@ private:
         int16_t micro4_sw = g_micro4_sw.load();
 
         // 制御ノード側のデバッグログ
-        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-                             "【制御ノード表示】SW状態: 上=%d (%s), 下=%d (%s), 外=%d (%s), 内=%d (%s)",
-                             micro1_sw, micro1_sw ? "停止" : "通常",
-                             micro2_sw, micro2_sw ? "停止" : "通常",
-                             micro3_sw, micro3_sw ? "停止" : "通常",
-                             micro4_sw, micro4_sw ? "停止" : "通常");
+        // RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
+        //                      "【制御ノード表示】SW状態: 上=%d (%s), 下=%d (%s), 外=%d (%s), 内=%d (%s)",
+        //                      micro1_sw, micro1_sw ? "停止" : "通常",
+        //                      micro2_sw, micro2_sw ? "停止" : "通常",
+        //                      micro3_sw, micro3_sw ? "停止" : "通常",
+        //                      micro4_sw, micro4_sw ? "停止" : "通常");
 
         // 以降、配列data_を操作する
         // =================================================================
@@ -490,7 +490,11 @@ private:
 
         static int circle_pre = 0;
         static int CIRCLE_PUSH_COUNT = 0;
-        static int CIRCLE_PUSH_MAX = 7;
+        static int CIRCLE_PUSH_MAX = 4;
+
+        static int r1_pre = 0;
+        static int R1_PUSH_COUNT = 0;
+        static int R1_PUSH_MAX = 2;
 
         static int MOVE_SPEED = 100;
         static int VACUUM_SPEED = 250;
@@ -502,8 +506,8 @@ private:
         if (CIRCLE_PUSH_COUNT == 0)
         {
             data_[1] = 0;
+            data_[3] = 0;
             data_[4] = 0;
-            data_[17] = 0;
         }
         if (CIRCLE_PUSH_COUNT == 1)
         {
@@ -527,16 +531,23 @@ private:
             data_[1] = 0;
             data_[3] = 0;
         }
-        if (CIRCLE_PUSH_COUNT == 5)
+
+        circle_pre = CIRCLE;
+
+        if (R1 == 1 && r1_pre == 0)
+        {
+            R1_PUSH_COUNT = (R1_PUSH_COUNT + 1) % R1_PUSH_MAX;
+            data_[17] = 0;
+        }
+        if (R1_PUSH_COUNT == 1)
         {
             data_[17] = 1;
         }
-        if (CIRCLE_PUSH_COUNT == 6)
+        if (R1_PUSH_COUNT == 2)
         {
             data_[17] = 0;
         }
-
-        circle_pre = CIRCLE;
+        r1_pre = R1;
 
         // =================================================================
         // 元CIRCLE:「棒ホールド機構」※CROSSと統合済み
@@ -699,7 +710,11 @@ private:
 
         // モーター1回転あたりのエンコーダのカウント数
         // 実験結果により、1回転 = 8000 カウント に設定
+<<<<<<< HEAD
         static const double COUNTS_PER_ROTATION = 8192.0;
+=======
+        static const double COUNTS_PER_ROTATION = 360;
+>>>>>>> 17d001b (現状その二)
 
         // 符号付き16bitの飛躍(-32768〜32767)は、差分累積(g_abs_coord)により計算・解決済み
         // ※上昇時（エンコーダ減少）に diff がマイナスになるため、「- diff」の計算によって絶対座標は増加（0→50）する
@@ -726,7 +741,7 @@ private:
         if (micro2_sw == 1)
         {
             // ★上端制限(micro2_sw): これ以上上に行かないように正回転(L1)を禁止し、逆回転(R1)のみ許可
-            if (R1 == 1)
+            if (L1 == 1)
             {
                 data_[2] = rev_speed;
             }
@@ -738,7 +753,7 @@ private:
         else if (micro1_sw == 1)
         {
             // ★下端制限(micro1_sw): これ以上下に行かないように逆回転(R1)を禁止し、正回転(L1)のみ許可
-            if (L1 == 1)
+            if (L2 == 1)
             {
                 data_[2] = fwd_speed;
             }
@@ -750,11 +765,11 @@ private:
         else
         {
             // マイクロスイッチに触れていない通常の範囲
-            if (L1 == 1)
+            if (L2 == 1)
             {
                 data_[2] = fwd_speed; // 上昇方向
             }
-            else if (R1 == 1)
+            else if (L1 == 1)
             {
                 data_[2] = rev_speed; // 下降方向
             }
