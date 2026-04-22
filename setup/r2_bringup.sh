@@ -4,6 +4,13 @@
 #
 # 起動する launch ファイルをこのスクリプト内の LAUNCHES に列挙する。
 # 形式: "<パッケージ名>/<ファイル名>.launch.py"
+#
+# 既定動作:
+#   Tabby などの端末から実行すると、tmux の分割ペインで
+#   launch ごとに個別起動する。
+#
+# オプション:
+#   --bg   従来通りバックグラウンド起動
 # ============================================================
 
 # ▼▼▼ 起動する launch ファイルを列挙 ▼▼▼
@@ -22,6 +29,11 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WS_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 SETUP_BASH="$WS_ROOT/install/setup.bash"
+MODE="tmux"
+
+if [[ "${1:-}" == "--bg" ]]; then
+    MODE="bg"
+fi
 
 if [[ ! -f "$SETUP_BASH" ]]; then
     echo "[ERROR] install/setup.bash が見つかりません: $SETUP_BASH"
@@ -31,6 +43,62 @@ fi
 
 # shellcheck disable=SC1090
 source "$SETUP_BASH"
+
+VALID_SPECS=()
+VALID_PATHS=()
+
+for spec in "${LAUNCHES[@]}"; do
+    pkg=$(echo "$spec" | cut -d'/' -f1)
+    file=$(echo "$spec" | cut -d'/' -f2-)
+    launch_path=$(find "$WS_ROOT/src" -path "*/${pkg}/launch/${file}" 2>/dev/null | head -1)
+
+    if [[ -z "$launch_path" ]]; then
+        echo "[WARN] launch ファイルが見つかりません: $spec (スキップ)"
+        continue
+    fi
+
+    VALID_SPECS+=("$spec")
+    VALID_PATHS+=("$launch_path")
+done
+
+if [[ ${#VALID_PATHS[@]} -eq 0 ]]; then
+    echo "[ERROR] 起動できる launch ファイルがありませんでした。"
+    exit 1
+fi
+
+if [[ "$MODE" == "tmux" ]]; then
+    if ! command -v tmux >/dev/null 2>&1; then
+        echo "[WARN] tmux が見つからないため、バックグラウンド起動にフォールバックします。"
+        MODE="bg"
+    fi
+fi
+
+if [[ "$MODE" == "tmux" ]]; then
+    SESSION_NAME="r2_bringup_$(date +%Y%m%d_%H%M%S)"
+
+    first_cmd="source \"$SETUP_BASH\"; ros2 launch \"${VALID_PATHS[0]}\""
+    echo "[r2_bringup] 起動: ${VALID_SPECS[0]}"
+    tmux new-session -d -s "$SESSION_NAME" "bash -lc '$first_cmd'"
+
+    for ((i = 1; i < ${#VALID_PATHS[@]}; i++)); do
+        cmd="source \"$SETUP_BASH\"; ros2 launch \"${VALID_PATHS[$i]}\""
+        echo "[r2_bringup] 起動: ${VALID_SPECS[$i]}"
+        tmux split-window -t "$SESSION_NAME":0 "bash -lc '$cmd'"
+        tmux select-layout -t "$SESSION_NAME":0 tiled >/dev/null
+    done
+
+    echo ""
+    echo "[r2_bringup] ${#VALID_PATHS[@]} 個のノードグループを tmux ペインで起動しました。"
+    echo "             セッション名: $SESSION_NAME"
+    echo ""
+
+    if [[ -n "${TMUX:-}" ]]; then
+        tmux switch-client -t "$SESSION_NAME"
+    else
+        tmux attach -t "$SESSION_NAME"
+    fi
+    exit 0
+fi
 
 PIDS=()
 
@@ -51,25 +119,11 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM
 
-for spec in "${LAUNCHES[@]}"; do
-    pkg=$(echo "$spec" | cut -d'/' -f1)
-    file=$(echo "$spec" | cut -d'/' -f2-)
-    launch_path=$(find "$WS_ROOT/src" -path "*/${pkg}/launch/${file}" 2>/dev/null | head -1)
-
-    if [[ -z "$launch_path" ]]; then
-        echo "[WARN] launch ファイルが見つかりません: $spec (スキップ)"
-        continue
-    fi
-
-    echo "[r2_bringup] 起動: $spec"
-    ros2 launch "$launch_path" &
+for i in "${!VALID_PATHS[@]}"; do
+    echo "[r2_bringup] 起動: ${VALID_SPECS[$i]}"
+    ros2 launch "${VALID_PATHS[$i]}" &
     PIDS+=($!)
 done
-
-if [[ ${#PIDS[@]} -eq 0 ]]; then
-    echo "[ERROR] 起動できる launch ファイルがありませんでした。"
-    exit 1
-fi
 
 echo ""
 echo "[r2_bringup] ${#PIDS[@]} 個のノードグループを起動しました。"
