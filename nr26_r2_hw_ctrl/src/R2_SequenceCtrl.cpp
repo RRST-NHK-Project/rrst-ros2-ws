@@ -518,7 +518,7 @@ private:
     double turn_target_yaw_ = 0.0;      // 旋回目標yaw角度 [rad]（絶対角度、角度PID用）
     bool last_completed_step_was_down_ = false;
     bool use_rear_trigger_for_step_down_ = false;
-    int16_t arena_left_mm_ = 0;         // 左側距離 [mm]（ld19_eight_direction_distance の left）
+    int16_t arena_left_mm_ = 0; // 左側距離 [mm]（ld19_eight_direction_distance の left）
     bool arena_left_valid_ = false;
     int16_t arena_front_mm_ = 0; // 前方距離 [mm]（ld19_eight_direction_distance の front）
     bool arena_front_valid_ = false;
