@@ -99,6 +99,7 @@ namespace r2_planner {
         declare_parameter<std::string>("status_topic", "r2/task_status");
         declare_parameter<std::string>("status_text_topic", "r2/task_status_text");
         declare_parameter<std::string>("auto_drive_target_topic", "r2_autodrive_cmd");
+        declare_parameter<std::string>("autodrive_complete_topic", "r2/autodrive_complete");
         declare_parameter<std::string>("drive_mode_cmd_topic", "r2_drive_mode_cmd");
         declare_parameter<std::string>("mff_path_topic", "r2/task_mff_path");
         declare_parameter<std::string>("mff_path_advance_topic", "r2/task_mff_path_advance");
@@ -131,6 +132,7 @@ namespace r2_planner {
         const auto status_topic = get_parameter("status_topic").as_string();
         const auto status_text_topic = get_parameter("status_text_topic").as_string();
         const auto auto_drive_target_topic = get_parameter("auto_drive_target_topic").as_string();
+        const auto autodrive_complete_topic = get_parameter("autodrive_complete_topic").as_string();
         const auto drive_mode_cmd_topic = get_parameter("drive_mode_cmd_topic").as_string();
         const auto mff_path_topic = get_parameter("mff_path_topic").as_string();
         const auto mff_path_advance_topic = get_parameter("mff_path_advance_topic").as_string();
@@ -204,6 +206,10 @@ namespace r2_planner {
         arena_walk_complete_sub_ = create_subscription<std_msgs::msg::Bool>(
             "r2/arena_walk_complete", rclcpp::QoS(10),
             std::bind(&TaskManagerNode::onArenaWalkComplete, this, std::placeholders::_1));
+
+        autodrive_complete_sub_ = create_subscription<std_msgs::msg::Bool>(
+            autodrive_complete_topic, rclcpp::QoS(10),
+            std::bind(&TaskManagerNode::onAutodriveComplete, this, std::placeholders::_1));
 
         status_pub_ = create_publisher<std_msgs::msg::Int32MultiArray>(
             status_topic, rclcpp::QoS(1).reliable().transient_local());
@@ -349,16 +355,18 @@ namespace r2_planner {
         target.x = data[1];
         target.y = data[2];
         target.yaw_rad = data[3];
+        target.wait_for_autodrive_complete = data.size() >= 6 ? data[5] >= 0.5F : false;
 
         state_pose_targets_[state_code] = target;
         RCLCPP_INFO(
             get_logger(),
-            "Updated state pose target: state=%s(%ld) x=%.3f y=%.3f yaw=%.3f",
+            "Updated state pose target: state=%s(%ld) x=%.3f y=%.3f yaw=%.3f wait_autodrive=%s",
             stateDisplayName(state_code).c_str(),
             static_cast<long>(state_code),
             static_cast<double>(target.x),
             static_cast<double>(target.y),
-            static_cast<double>(target.yaw_rad));
+            static_cast<double>(target.yaw_rad),
+            target.wait_for_autodrive_complete ? "true" : "false");
     }
 
     void TaskManagerNode::onStateMode(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
@@ -413,6 +421,20 @@ namespace r2_planner {
     void TaskManagerNode::onAutoSendEnabled(const std_msgs::msg::Bool::SharedPtr msg) {
         auto_send_enabled_ = msg->data;
         RCLCPP_INFO(get_logger(), "Auto send on state transition: %s", auto_send_enabled_ ? "ENABLED" : "DISABLED");
+    }
+
+    void TaskManagerNode::onAutodriveComplete(const std_msgs::msg::Bool::SharedPtr msg) {
+        if (!msg->data) {
+            return;
+        }
+
+        has_autodrive_complete_event_ = true;
+        last_autodrive_complete_at_ = std::chrono::steady_clock::now();
+
+        RCLCPP_INFO(get_logger(),
+                    "Received autodrive completion flag: r2/autodrive_complete=true (state=%s(%ld))",
+                    stateDisplayName(status_.state_code).c_str(),
+                    static_cast<long>(status_.state_code));
     }
 
     void TaskManagerNode::onArenaWalkComplete(const std_msgs::msg::Bool::SharedPtr msg) {
@@ -657,6 +679,14 @@ namespace r2_planner {
         return *it;
     }
 
+    bool TaskManagerNode::shouldWaitForAutodriveComplete(int32_t state_code) const {
+        auto it = state_pose_targets_.find(state_code);
+        if (it == state_pose_targets_.end()) {
+            return false;
+        }
+        return it->second.enabled && it->second.wait_for_autodrive_complete;
+    }
+
     void TaskManagerNode::advanceAutoTransition() {
         if (status_.transition_mode_code != kTransitionAuto) {
             return;
@@ -668,6 +698,18 @@ namespace r2_planner {
                          "Auto transition blocked: in sequence mode (current_drive_mode_=%ld)",
                          static_cast<long>(current_drive_mode_));
             return;
+        }
+
+        if (shouldWaitForAutodriveComplete(status_.state_code)) {
+            const bool has_fresh_complete =
+                has_autodrive_complete_event_ && last_autodrive_complete_at_ >= state_entered_at_;
+            if (!has_fresh_complete) {
+                RCLCPP_DEBUG_THROTTLE(get_logger(), *get_clock(), 500,
+                                      "Auto transition blocked: waiting autodrive completion flag for state=%s(%ld)",
+                                      stateDisplayName(status_.state_code).c_str(),
+                                      static_cast<long>(status_.state_code));
+                return;
+            }
         }
 
         int32_t wait_ms = auto_transition_default_wait_ms_;

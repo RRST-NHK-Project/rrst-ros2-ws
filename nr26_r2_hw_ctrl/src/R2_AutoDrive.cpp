@@ -14,6 +14,7 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
+#include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int16_multi_array.hpp"
@@ -49,6 +50,10 @@ public:
         // GUI表示用モード配信
         mode_pub_ = this->create_publisher<std_msgs::msg::String>(
             "r2_drive_mode", rclcpp::QoS(1).transient_local().reliable());
+
+        // AUTO目標到達完了フラッグ
+        autodrive_complete_pub_ = this->create_publisher<std_msgs::msg::Bool>(
+            "r2/autodrive_complete", rclcpp::QoS(10));
 
         // PS4入力
         joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
@@ -101,6 +106,9 @@ public:
         this->declare_parameter("aruco_camera_offset_x_m", -0.1735);
         this->declare_parameter("aruco_camera_offset_y_m", 0.0);
         this->declare_parameter("enable_ps4_mode_toggle", false);
+        this->declare_parameter("auto_complete_pos_thresh_m", 0.05);
+        this->declare_parameter("auto_complete_yaw_thresh_rad", 0.10);
+        this->declare_parameter("auto_complete_hold_sec", 0.30);
         aruco_target_forward_ = static_cast<float>(this->get_parameter("aruco_target_forward_m").as_double());
         aruco_target_lateral_ = static_cast<float>(this->get_parameter("aruco_target_lateral_m").as_double());
         aruco_target_yaw_ = static_cast<float>(this->get_parameter("aruco_target_yaw_rad").as_double());
@@ -108,7 +116,12 @@ public:
         aruco_camera_offset_x_ = static_cast<float>(this->get_parameter("aruco_camera_offset_x_m").as_double());
         aruco_camera_offset_y_ = static_cast<float>(this->get_parameter("aruco_camera_offset_y_m").as_double());
         enable_ps4_mode_toggle_ = this->get_parameter("enable_ps4_mode_toggle").as_bool();
+        auto_complete_pos_thresh_m_ = static_cast<float>(this->get_parameter("auto_complete_pos_thresh_m").as_double());
+        auto_complete_yaw_thresh_rad_ = static_cast<float>(this->get_parameter("auto_complete_yaw_thresh_rad").as_double());
+        auto_complete_hold_sec_ = static_cast<float>(this->get_parameter("auto_complete_hold_sec").as_double());
         last_aruco_update_ = this->get_clock()->now();
+        auto_goal_in_range_since_ = rclcpp::Time(0, 0, get_clock()->get_clock_type());
+        reset_auto_complete_tracking(true);
         publish_mode();
 
         RCLCPP_INFO(this->get_logger(), "PS4 mode toggle (OPTION): %s",
@@ -137,6 +150,7 @@ private:
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr mode_pub_;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr autodrive_complete_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     // PID
@@ -191,6 +205,34 @@ private:
     float aruco_horizontal_deadband_m_ = 0.02f;
     bool enable_ps4_mode_toggle_ = false;
 
+    // AUTO/PLANE 到達完了判定
+    float auto_complete_pos_thresh_m_ = 0.05f;
+    float auto_complete_yaw_thresh_rad_ = 0.10f;
+    float auto_complete_hold_sec_ = 0.30f;
+    bool auto_goal_in_range_ = false;
+    bool auto_complete_published_ = false;
+    rclcpp::Time auto_goal_in_range_since_;
+
+    static float normalize_angle_rad(float angle) {
+        while (angle > static_cast<float>(M_PI))
+            angle -= static_cast<float>(2.0 * M_PI);
+        while (angle < static_cast<float>(-M_PI))
+            angle += static_cast<float>(2.0 * M_PI);
+        return angle;
+    }
+
+    void reset_auto_complete_tracking(bool publish_false) {
+        auto_goal_in_range_ = false;
+        auto_complete_published_ = false;
+        auto_goal_in_range_since_ = rclcpp::Time(0, 0, get_clock()->get_clock_type());
+
+        if (publish_false && autodrive_complete_pub_) {
+            std_msgs::msg::Bool msg;
+            msg.data = false;
+            autodrive_complete_pub_->publish(msg);
+        }
+    }
+
     static std::string drive_mode_to_string(DriveMode mode) {
         switch (mode) {
         case DriveMode::MANUAL:
@@ -244,6 +286,7 @@ private:
         pid_x_.reset();
         pid_y_.reset();
         pid_yaw_.reset();
+        reset_auto_complete_tracking(false);
 
         drive_mode_ = DriveMode::AUTO;
         stop_motors();
@@ -275,6 +318,7 @@ private:
         pid_x_.reset();
         pid_y_.reset();
         pid_yaw_.reset();
+        reset_auto_complete_tracking(false);
 
         drive_mode_ = DriveMode::PLANE;
         stop_motors();
@@ -336,6 +380,7 @@ private:
         target_y_ = msg->data[1];
         target_yaw_ = msg->data[2];
         has_target_cmd_ = true;
+        reset_auto_complete_tracking(true);
 
         pid_x_.set_target(target_x_);
         pid_y_.set_target(target_y_);
@@ -620,6 +665,42 @@ private:
         }
 
         const float dt = PUBLISH_RATE_MS / 1000.0f;
+
+        // 目標到達判定（AUTO/PLANE）
+        const float pos_error = std::hypot(target_x_ - X_, target_y_ - Y_);
+        const float yaw_error = std::fabs(normalize_angle_rad(target_yaw_ - yaw_));
+        const bool in_goal_range =
+            pos_error <= auto_complete_pos_thresh_m_ &&
+            yaw_error <= auto_complete_yaw_thresh_rad_;
+
+        if (in_goal_range) {
+            if (!auto_goal_in_range_) {
+                auto_goal_in_range_ = true;
+                auto_goal_in_range_since_ = this->get_clock()->now();
+            }
+
+            const double in_range_sec =
+                (this->get_clock()->now() - auto_goal_in_range_since_).seconds();
+
+            if (in_range_sec >= static_cast<double>(auto_complete_hold_sec_)) {
+                if (!auto_complete_published_) {
+                    std_msgs::msg::Bool complete_msg;
+                    complete_msg.data = true;
+                    autodrive_complete_pub_->publish(complete_msg);
+                    auto_complete_published_ = true;
+                    RCLCPP_INFO(this->get_logger(),
+                                "AUTO target reached. Published r2/autodrive_complete=true (pos_err=%.3f m, yaw_err=%.3f rad)",
+                                pos_error, yaw_error);
+                }
+
+                stop_motors();
+                publish_packet();
+                return;
+            }
+        } else {
+            auto_goal_in_range_ = false;
+            auto_goal_in_range_since_ = rclcpp::Time(0, 0, get_clock()->get_clock_type());
+        }
 
         // PID計算
         vx_ = pid_x_.update(X_, dt);

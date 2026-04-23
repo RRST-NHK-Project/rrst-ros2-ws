@@ -32,6 +32,7 @@ namespace r2_planner {
             float x{0.0F};
             float y{0.0F};
             float yaw_rad{0.0F};
+            bool wait_for_autodrive_complete{false};
         };
 
         static constexpr int32_t kColorUnknown = -1;
@@ -66,6 +67,7 @@ namespace r2_planner {
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr mff_path_advance_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr auto_send_enabled_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arena_walk_complete_sub_;
+        rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr autodrive_complete_sub_;
 
         rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr status_pub_;
         rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_text_pub_;
@@ -98,6 +100,8 @@ namespace r2_planner {
         int32_t current_drive_mode_{0};
         int32_t auto_transition_default_wait_ms_{3000};
         std::chrono::steady_clock::time_point state_entered_at_{std::chrono::steady_clock::now()};
+        bool has_autodrive_complete_event_{false};
+        std::chrono::steady_clock::time_point last_autodrive_complete_at_{};
 
         void onCommand(const std_msgs::msg::Int32MultiArray::SharedPtr msg);
         void onState(const std_msgs::msg::Int32::SharedPtr msg);
@@ -114,6 +118,7 @@ namespace r2_planner {
         void onMffPathAdvance(const std_msgs::msg::Bool::SharedPtr msg);
         void onAutoSendEnabled(const std_msgs::msg::Bool::SharedPtr msg);
         void onArenaWalkComplete(const std_msgs::msg::Bool::SharedPtr msg);
+        void onAutodriveComplete(const std_msgs::msg::Bool::SharedPtr msg);
 
         void setState(int32_t state_code);
         void setColor(int32_t color_code);
@@ -122,6 +127,7 @@ namespace r2_planner {
         void publishStateSideEffects(int32_t state_code);
         void advanceAutoTransition();
         int32_t nextStateCode(int32_t current_state_code) const;
+        bool shouldWaitForAutodriveComplete(int32_t state_code) const;
         static std::vector<int32_t> normalizedStateSequence(const std::vector<int32_t> &sequence);
         void publishAutoDriveTargetForState(int32_t state_code);
         void publishAutoDriveModeForState(int32_t state_code);
