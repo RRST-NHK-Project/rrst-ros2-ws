@@ -256,11 +256,6 @@ namespace r2_planner {
             return;
         }
 
-        if (status_.transition_mode_code == kTransitionAuto) {
-            RCLCPP_WARN(get_logger(), "Ignoring direct task command while auto transition mode is active");
-            return;
-        }
-
         setState(msg->data[0]);
 
         if (msg->data.size() >= 2) {
@@ -276,8 +271,10 @@ namespace r2_planner {
 
     void TaskManagerNode::onState(const std_msgs::msg::Int32::SharedPtr msg) {
         if (status_.transition_mode_code == kTransitionAuto) {
-            RCLCPP_WARN(get_logger(), "Ignoring manual state update while auto transition mode is active");
-            return;
+            RCLCPP_INFO(get_logger(),
+                        "State synchronized while AUTO mode is active: %s(%ld)",
+                        stateDisplayName(msg->data).c_str(),
+                        static_cast<long>(msg->data));
         }
         setState(msg->data);
         publishStatus(true);
