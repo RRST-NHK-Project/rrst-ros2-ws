@@ -97,6 +97,12 @@ public:
 
     // 壁調整シーケンス開始（PIDで角度・距離を整えてから段差上りへ自動移行）
     void start_wall_alignment() {
+        // 段差下り中はWALL_ALIGNを明示的に無効化
+        if (mode_ == StepMode::STEP_DOWN) {
+            RCLCPP_WARN(get_logger(), "WALL_ALIGN disabled during STEP_DOWN.");
+            return;
+        }
+
         if (mode_ != StepMode::NONE) {
             RCLCPP_WARN(get_logger(), "Sequence busy. WALL_ALIGN ignored.");
             return;
@@ -181,6 +187,11 @@ public:
     // シーケンス実行中の判定
     bool is_busy() const {
         return mode_ != StepMode::NONE;
+    }
+
+    // MFFターン実行中かを返す（コマンド受理条件の判定に使用）
+    bool is_turn_active() const {
+        return mode_ == StepMode::MFF_TURN;
     }
 
     bool is_mff_mode_enabled() const {
@@ -1471,6 +1482,11 @@ public:
             10,
             std::bind(&HardWareControl::turn_callback, this, std::placeholders::_1));
 
+        mff_status_sub_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
+            "r2/task_mff_status",
+            rclcpp::QoS(1).reliable().transient_local(),
+            std::bind(&HardWareControl::mff_status_callback, this, std::placeholders::_1));
+
         mode_cmd_sub_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
             "r2_drive_mode_cmd",
             10,
@@ -1535,6 +1551,25 @@ private:
     int32_t pending_step_cmd_ = 0;
     int32_t pending_turn_deg_ = 0;
     bool has_pending_turn_ = false;
+    int32_t preview_from_cell_ = 0;
+    int32_t preview_to_cell_ = 0;
+    int32_t preview_turn_deg_ = 0;
+    int32_t preview_step_cmd_ = 0;
+    unsigned long long preview_generation_ = 0;
+    unsigned long long accepted_step_generation_ = 0;
+    unsigned long long accepted_turn_generation_ = 0;
+
+    void clear_pending_commands(const char *reason) {
+        const bool had_pending = has_pending_turn_ || (pending_step_cmd_ != 0);
+        pending_step_cmd_ = 0;
+        pending_turn_deg_ = 0;
+        has_pending_turn_ = false;
+        accepted_step_generation_ = 0;
+        accepted_turn_generation_ = 0;
+        if (had_pending) {
+            RCLCPP_INFO(get_logger(), "Cleared pending MFF commands (%s).", reason);
+        }
+    }
 
     void publish_odom_reset() {
         std_msgs::msg::Bool reset_msg;
@@ -1551,6 +1586,8 @@ private:
             // 壁調整なしで直接段差上り（角度・距離に関係なく実行）
             seq_->start_step_up();
         } else if (cmd == -1) {
+            // 段差下り開始時はWALL_ALIGN/TURNの保留を明示的に破棄
+            clear_pending_commands("start STEP_DOWN");
             seq_->start_step_down();
         }
     }
@@ -1590,6 +1627,8 @@ private:
         }
 
         if (DOWN && !last_down) {
+            // 段差下り開始時はWALL_ALIGN/TURNの保留を明示的に破棄
+            clear_pending_commands("PS4 DOWN -> STEP_DOWN");
             seq_->start_step_down();
         }
 
@@ -1673,6 +1712,7 @@ private:
         }
 
         if (!seq_->is_mff_mode_enabled() && !seq_->is_arena_mode_enabled()) {
+            clear_pending_commands("sequence mode disabled");
             return;
         }
 
@@ -1790,6 +1830,29 @@ private:
         seq_->set_wall_angle(msg->data);
     }
 
+    void mff_status_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        if (msg->data.size() < 4) {
+            return;
+        }
+
+        const int32_t from_cell = msg->data[0];
+        const int32_t to_cell = msg->data[1];
+        const int32_t turn_deg = msg->data[2];
+        const int32_t step_cmd = msg->data[3];
+
+        if (preview_generation_ == 0 ||
+            preview_from_cell_ != from_cell ||
+            preview_to_cell_ != to_cell ||
+            preview_turn_deg_ != turn_deg ||
+            preview_step_cmd_ != step_cmd) {
+            preview_from_cell_ = from_cell;
+            preview_to_cell_ = to_cell;
+            preview_turn_deg_ = turn_deg;
+            preview_step_cmd_ = step_cmd;
+            ++preview_generation_;
+        }
+    }
+
     void step_callback(const std_msgs::msg::Int32::SharedPtr msg) {
         if (!seq_->is_mff_mode_enabled()) {
             return;
@@ -1800,12 +1863,43 @@ private:
             return;
         }
 
-        if (seq_->is_busy()) {
-            pending_step_cmd_ = cmd;
+        if (preview_generation_ == 0 || preview_step_cmd_ != cmd) {
+            RCLCPP_WARN(this->get_logger(),
+                        "Ignoring step cmd %ld: preview mismatch (from=%ld to=%ld step=%ld gen=%llu).",
+                        static_cast<long>(cmd),
+                        static_cast<long>(preview_from_cell_),
+                        static_cast<long>(preview_to_cell_),
+                        static_cast<long>(preview_step_cmd_),
+                        preview_generation_);
             return;
         }
 
-        dispatch_step_command(cmd);
+        if (accepted_step_generation_ == preview_generation_) {
+            return;
+        }
+
+        // busy中は「MFF_TURN実行中」に限ってSTEPを保留受理する。
+        // STEP/WALL_ALIGN中の追加STEPは連鎖実行の原因になるため破棄する。
+        if (seq_->is_busy() && !seq_->is_turn_active()) {
+            RCLCPP_WARN(this->get_logger(),
+                        "Ignoring step cmd while sequence busy (cmd=%ld).",
+                        static_cast<long>(cmd));
+            return;
+        }
+
+        // 自動遷移では setCell が advance 発火時点（ロボット移動前）に更新されるため、
+        // 古い step_complete 等でもう1回 advance が発火すると「次のマスのstep_cmd」が
+        // 到着し、ターン中の pending_step_cmd_ を上書きしてしまう。
+        // pending が既にある場合は上書きせず先着の値を優先する。
+        if (pending_step_cmd_ != 0) {
+            RCLCPP_WARN(this->get_logger(),
+                        "Ignoring step cmd %ld: already pending %ld (possible stale advance).",
+                        static_cast<long>(cmd), static_cast<long>(pending_step_cmd_));
+            return;
+        }
+
+        pending_step_cmd_ = cmd;
+        accepted_step_generation_ = preview_generation_;
     }
 
     void turn_callback(const std_msgs::msg::Int32::SharedPtr msg) {
@@ -1818,11 +1912,33 @@ private:
             return;
         }
 
-        publish_odom_reset();
-        if (!seq_->start_mff_turn(turn_deg)) {
-            pending_turn_deg_ = turn_deg;
-            has_pending_turn_ = true;
+        if (preview_generation_ == 0 || preview_turn_deg_ != turn_deg) {
+            RCLCPP_WARN(this->get_logger(),
+                        "Ignoring turn cmd %ld: preview mismatch (from=%ld to=%ld turn=%ld gen=%llu).",
+                        static_cast<long>(turn_deg),
+                        static_cast<long>(preview_from_cell_),
+                        static_cast<long>(preview_to_cell_),
+                        static_cast<long>(preview_turn_deg_),
+                        preview_generation_);
+            return;
         }
+
+        if (accepted_turn_generation_ == preview_generation_) {
+            return;
+        }
+
+        // TURNは各プレビュー遷移につき1回だけ受理する。
+        // 常時publish時の重複受信で再旋回しないよう、busy中・保留中は追加TURNを破棄する。
+        if (seq_->is_busy() || has_pending_turn_) {
+            RCLCPP_WARN(this->get_logger(),
+                        "Ignoring turn cmd while sequence busy (deg=%ld).",
+                        static_cast<long>(turn_deg));
+            return;
+        }
+
+        pending_turn_deg_ = turn_deg;
+        has_pending_turn_ = true;
+        accepted_turn_generation_ = preview_generation_;
     }
 
     void mode_cmd_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
@@ -1833,11 +1949,15 @@ private:
         const int32_t mode_code = msg->data[0];
         if (mode_code == 4) {
             seq_->set_mff_mode_enabled(true);
+            // モード切替時に古い保留コマンドを残さない
+            clear_pending_commands("mode_cmd -> MFF");
         } else if (mode_code == 5) {
             seq_->set_arena_mode_enabled(true);
+            clear_pending_commands("mode_cmd -> ARENA");
         } else {
             seq_->set_mff_mode_enabled(false);
             seq_->set_arena_mode_enabled(false);
+            clear_pending_commands("mode_cmd -> OTHER");
         }
     }
 
@@ -1935,6 +2055,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sdm15_sub4_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr step_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr turn_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mff_status_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mode_cmd_sub_;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr drive_mode_text_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr cube_detect_sub_;

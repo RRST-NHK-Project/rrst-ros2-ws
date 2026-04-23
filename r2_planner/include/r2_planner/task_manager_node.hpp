@@ -27,6 +27,15 @@ namespace r2_planner {
             int32_t transition_mode_code{0};
         };
 
+        struct MffTransitionPreview {
+            int32_t from_cell{0};
+            int32_t to_cell{0};
+            int32_t turn_deg{0};
+            int32_t step_cmd{0};
+            int32_t predicted_heading_deg{0};
+            bool valid{false};
+        };
+
         struct StatePoseTarget {
             bool enabled{false};
             float x{0.0F};
@@ -132,7 +141,8 @@ namespace r2_planner {
         void publishAutoDriveTargetForState(int32_t state_code);
         void publishAutoDriveModeForState(int32_t state_code);
         void publishOdomResetForState(int32_t state_code);
-        void publishMffTransitionCommands(int32_t from_cell, int32_t to_cell);
+        bool buildMffTransitionPreview(MffTransitionPreview &preview) const;
+        void publishMffPreviewCommands();
         void publishMffRuntimeStatus(bool force = false);
         void applyStateNameSequenceMapping();
         std::vector<std::string> parseStateNameSequence(const std::string &names_text) const;

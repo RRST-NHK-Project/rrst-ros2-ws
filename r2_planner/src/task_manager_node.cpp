@@ -240,7 +240,11 @@ namespace r2_planner {
 
         publish_timer_ = create_wall_timer(
             std::chrono::milliseconds(200),
-            [this]() { publishStatus(false); });
+            [this]() {
+                publishStatus(false);
+                publishMffRuntimeStatus(true);
+                publishMffPreviewCommands();
+            });
 
         auto_transition_timer_ = create_wall_timer(
             std::chrono::milliseconds(50),
@@ -512,6 +516,7 @@ namespace r2_planner {
         }
         RCLCPP_INFO(get_logger(), "Updated MFF path (%zu): %s", mff_path_.size(), oss.str().c_str());
         publishMffRuntimeStatus(true);
+        publishMffPreviewCommands();
     }
 
     void TaskManagerNode::onMffPathAdvance(const std_msgs::msg::Bool::SharedPtr msg) {
@@ -538,7 +543,13 @@ namespace r2_planner {
         const int32_t from_cell = mff_path_[current_index];
         const int32_t to_cell = mff_path_[current_index + 1];
 
-        publishMffTransitionCommands(from_cell, to_cell);
+        int32_t target_heading_deg = mff_heading_deg_;
+        int32_t turn_deg = 0;
+        int32_t step_cmd = 0;
+        if (computeMffTransition(from_cell, to_cell, mff_heading_deg_, target_heading_deg, turn_deg, step_cmd)) {
+            mff_heading_deg_ = normalizeHeadingDeg(target_heading_deg);
+        }
+
         setCell(to_cell);
         mff_path_index_ = current_index + 1;
 
@@ -551,6 +562,7 @@ namespace r2_planner {
         }
 
         publishStatus(true);
+        publishMffPreviewCommands();
     }
 
     void TaskManagerNode::onStateOdomReset(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
@@ -906,27 +918,61 @@ namespace r2_planner {
             static_cast<long>(state_code));
     }
 
-    void TaskManagerNode::publishMffTransitionCommands(int32_t from_cell, int32_t to_cell) {
+    bool TaskManagerNode::buildMffTransitionPreview(MffTransitionPreview &preview) const {
+        preview = {};
+        preview.from_cell = status_.mff_cell;
+        preview.predicted_heading_deg = mff_heading_deg_;
+
+        if (mff_path_.empty()) {
+            return false;
+        }
+
+        size_t current_index = mff_path_index_;
+        const auto it = std::find(mff_path_.begin(), mff_path_.end(), status_.mff_cell);
+        if (it != mff_path_.end()) {
+            current_index = static_cast<size_t>(std::distance(mff_path_.begin(), it));
+        }
+
+        if (current_index + 1 >= mff_path_.size()) {
+            return false;
+        }
+
+        preview.to_cell = mff_path_[current_index + 1];
         int32_t target_heading_deg = mff_heading_deg_;
-        int32_t turn_deg = 0;
-        int32_t step_cmd = 0;
-        if (!computeMffTransition(from_cell, to_cell, mff_heading_deg_, target_heading_deg, turn_deg, step_cmd)) {
+        if (!computeMffTransition(
+                preview.from_cell,
+                preview.to_cell,
+                mff_heading_deg_,
+                target_heading_deg,
+                preview.turn_deg,
+                preview.step_cmd)) {
+            preview.to_cell = 0;
+            preview.turn_deg = 0;
+            preview.step_cmd = 0;
+            preview.predicted_heading_deg = mff_heading_deg_;
+            return false;
+        }
+
+        preview.predicted_heading_deg = normalizeHeadingDeg(target_heading_deg);
+        preview.valid = true;
+        return true;
+    }
+
+    void TaskManagerNode::publishMffPreviewCommands() {
+        if (!mff_turn_cmd_pub_ || !mff_step_cmd_pub_) {
             return;
         }
-        mff_heading_deg_ = normalizeHeadingDeg(target_heading_deg);
+
+        MffTransitionPreview preview;
+        buildMffTransitionPreview(preview);
 
         std_msgs::msg::Int32 turn_msg;
-        turn_msg.data = turn_deg;
+        turn_msg.data = preview.valid ? preview.turn_deg : 0;
         mff_turn_cmd_pub_->publish(turn_msg);
 
         std_msgs::msg::Int32 step_msg;
-        step_msg.data = step_cmd;
+        step_msg.data = preview.valid ? preview.step_cmd : 0;
         mff_step_cmd_pub_->publish(step_msg);
-
-        RCLCPP_INFO(get_logger(),
-                    "Published MFF transition commands: %ld -> %ld, turn=%ld deg, step=%ld",
-                    static_cast<long>(from_cell), static_cast<long>(to_cell),
-                    static_cast<long>(turn_deg), static_cast<long>(step_cmd));
     }
 
     bool TaskManagerNode::computeMffTransition(
@@ -1007,40 +1053,18 @@ namespace r2_planner {
             return;
         }
 
-        int32_t next_cell = 0;
-        int32_t next_turn_deg = 0;
-        int32_t next_step_cmd = 0;
-        int32_t predicted_heading_deg = mff_heading_deg_;
-
-        if (!mff_path_.empty()) {
-            size_t current_index = mff_path_index_;
-            const auto it = std::find(mff_path_.begin(), mff_path_.end(), status_.mff_cell);
-            if (it != mff_path_.end()) {
-                current_index = static_cast<size_t>(std::distance(mff_path_.begin(), it));
-            }
-
-            if (current_index + 1 < mff_path_.size()) {
-                next_cell = mff_path_[current_index + 1];
-                int32_t target_heading_deg = mff_heading_deg_;
-                if (!computeMffTransition(status_.mff_cell, next_cell, mff_heading_deg_, target_heading_deg, next_turn_deg, next_step_cmd)) {
-                    next_cell = 0;
-                    next_turn_deg = 0;
-                    next_step_cmd = 0;
-                } else {
-                    predicted_heading_deg = normalizeHeadingDeg(target_heading_deg);
-                }
-            }
-        }
+        MffTransitionPreview preview;
+        buildMffTransitionPreview(preview);
 
         std_msgs::msg::Int32MultiArray mff_status_msg;
         // [current_cell, next_cell, next_turn_deg, next_step_cmd, current_heading_deg, predicted_heading_deg]
         mff_status_msg.data = {
             status_.mff_cell,
-            next_cell,
-            next_turn_deg,
-            next_step_cmd,
+            preview.valid ? preview.to_cell : 0,
+            preview.valid ? preview.turn_deg : 0,
+            preview.valid ? preview.step_cmd : 0,
             mff_heading_deg_,
-            predicted_heading_deg,
+            preview.predicted_heading_deg,
         };
         mff_status_pub_->publish(mff_status_msg);
     }
