@@ -217,6 +217,9 @@ namespace r2_planner {
         drive_mode_cmd_pub_ = create_publisher<std_msgs::msg::Int32MultiArray>(
             drive_mode_cmd_topic, rclcpp::QoS(1).reliable().transient_local());
 
+        arena_walk_cmd_pub_ = create_publisher<std_msgs::msg::Int32>(
+            "/r2_arena_walk_cmd", rclcpp::QoS(10));
+
         mff_turn_cmd_pub_ = create_publisher<std_msgs::msg::Int32>(
             mff_turn_cmd_topic, rclcpp::QoS(10));
 
@@ -416,11 +419,41 @@ namespace r2_planner {
         if (!msg->data) {
             return;
         }
-        RCLCPP_INFO(get_logger(), "Arena walk complete received -> publishing AUTO drive mode.");
-        std_msgs::msg::Int32MultiArray mode_msg;
-        mode_msg.data = {1, 0}; // AUTO mode
+
+        if (status_.transition_mode_code != kTransitionAuto) {
+            RCLCPP_INFO(get_logger(),
+                        "Arena walk complete received, but transition mode is not AUTO. Ignored.");
+            return;
+        }
+
+        // ARENAモード中のみ、完了フラッグで次状態へ進める
+        if (current_drive_mode_ != 5) {
+            RCLCPP_INFO(get_logger(),
+                        "Arena walk complete received, but current_drive_mode_=%ld (not ARENA=5). Ignored.",
+                        static_cast<long>(current_drive_mode_));
+            return;
+        }
+
+        const int32_t next_state = nextStateCode(status_.state_code);
+        if (next_state == status_.state_code) {
+            RCLCPP_INFO(get_logger(),
+                        "Arena walk complete received, but next state is same as current (%s(%ld)).",
+                        stateDisplayName(status_.state_code).c_str(),
+                        static_cast<long>(status_.state_code));
+            return;
+        }
+
+        RCLCPP_INFO(get_logger(),
+                    "Arena walk complete received: %s(%ld) -> %s(%ld)",
+                    stateDisplayName(status_.state_code).c_str(),
+                    static_cast<long>(status_.state_code),
+                    stateDisplayName(next_state).c_str(),
+                    static_cast<long>(next_state));
+
+        // ブロック解除後に状態遷移。setState内で次状態のモードが再設定される。
         current_drive_mode_ = 1;
-        drive_mode_cmd_pub_->publish(mode_msg);
+        setState(next_state);
+        publishStatus(true);
     }
 
     void TaskManagerNode::onMffPath(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
@@ -629,9 +662,11 @@ namespace r2_planner {
             return;
         }
 
-        // MFFモード（drive_mode_code=4）アクティブ中は自動遷移をブロック
-        if (current_drive_mode_ == 4) {
-            RCLCPP_DEBUG(get_logger(), "Auto transition blocked: in MFF mode (current_drive_mode_=%ld)", static_cast<long>(current_drive_mode_));
+        // MFF/ARENAモード（drive_mode_code=4/5）アクティブ中は自動遷移をブロック
+        if (current_drive_mode_ == 4 || current_drive_mode_ == 5) {
+            RCLCPP_DEBUG(get_logger(),
+                         "Auto transition blocked: in sequence mode (current_drive_mode_=%ld)",
+                         static_cast<long>(current_drive_mode_));
             return;
         }
 
@@ -796,8 +831,17 @@ namespace r2_planner {
             const bool rotate_only = (rotate_it != state_rotate_only_targets_.end() && rotate_it->second);
             mode_msg.data = {it->second, rotate_only ? 1 : 0};
         }
+        const int32_t prev_drive_mode = current_drive_mode_;
         current_drive_mode_ = mode_msg.data[0];
         drive_mode_cmd_pub_->publish(mode_msg);
+
+        // ARENAモードへ遷移したタイミングでSequenceCtrlのアリーナ走行を起動する
+        if (current_drive_mode_ == 5 && prev_drive_mode != 5 && arena_walk_cmd_pub_) {
+            std_msgs::msg::Int32 arena_start_msg;
+            arena_start_msg.data = 1;
+            arena_walk_cmd_pub_->publish(arena_start_msg);
+            RCLCPP_INFO(get_logger(), "Published arena walk start command to /r2_arena_walk_cmd.");
+        }
 
         RCLCPP_INFO(
             get_logger(),
