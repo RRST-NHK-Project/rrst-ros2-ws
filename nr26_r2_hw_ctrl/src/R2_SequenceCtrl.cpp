@@ -998,7 +998,7 @@ private:
                 all_down();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > 0.5)
+            if ((now_time - state_start_time_).seconds() > 2.0)
                 next_down(StepDownState::DONE);
             break;
 
