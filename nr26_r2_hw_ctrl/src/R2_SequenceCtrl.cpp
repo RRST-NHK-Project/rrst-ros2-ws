@@ -1692,7 +1692,7 @@ private:
         std_msgs::msg::Int16MultiArray msg;
         msg.data = pkt.toVector();
         publisher_->publish(msg);
-        print_data();
+        // print_data();
 
         // カメラサーボ角度をDevice7（R2_HandCtrl）へ通知
         std_msgs::msg::Int32 servo_msg;
@@ -1848,8 +1848,13 @@ private:
         } else if (mode == "ARENA") {
             seq_->set_arena_mode_enabled(true);
         } else {
-            seq_->set_mff_mode_enabled(false);
-            seq_->set_arena_mode_enabled(false);
+            // 非MFF/ARENA文字列での無効化は行わない。
+            // GUI/Plannerの状態遷移では r2_autodrive 側が一時的に AUTO をpublishすることがあり、
+            // ここで無効化すると step/turn コマンド受信前にシーケンスが落ちて不安定になる。
+            // モード解除は mode_cmd_callback (r2_drive_mode_cmd) を正とする。
+            RCLCPP_DEBUG(this->get_logger(),
+                         "drive_mode_text=%s received: keep current sequence enable state (authority=mode_cmd)",
+                         mode.c_str());
         }
     }
 
