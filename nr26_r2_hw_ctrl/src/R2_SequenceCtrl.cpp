@@ -196,9 +196,41 @@ public:
             pkt.setMD(MD6, 0);
             pkt.setMD(MD7, 0);
             pkt.setMD(MD8, 0);
+        } else {
+            // MFF有効時はアリーナモードを無効化
+            arena_mode_enabled_ = false;
         }
 
         RCLCPP_INFO(get_logger(), "Sequence mode: %s", mff_mode_enabled_ ? "MFF ENABLED" : "MFF DISABLED");
+    }
+
+    bool is_arena_mode_enabled() const {
+        return arena_mode_enabled_;
+    }
+
+    void set_arena_mode_enabled(bool enabled) {
+        if (arena_mode_enabled_ == enabled) {
+            return;
+        }
+
+        arena_mode_enabled_ = enabled;
+
+        if (!arena_mode_enabled_) {
+            mode_ = StepMode::NONE;
+            state_up_ = StepUpState::IDLE;
+            state_down_ = StepDownState::IDLE;
+            state_arena_ = ArenaWalkState::IDLE;
+            state_executed_ = false;
+            pkt.setMD(MD5, 0);
+            pkt.setMD(MD6, 0);
+            pkt.setMD(MD7, 0);
+            pkt.setMD(MD8, 0);
+        } else {
+            // アリーナモード有効時はMFFモードを無効化
+            mff_mode_enabled_ = false;
+        }
+
+        RCLCPP_INFO(get_logger(), "Sequence mode: %s", arena_mode_enabled_ ? "ARENA ENABLED" : "ARENA DISABLED");
     }
 
     // odom_xy_yaw からyawを更新する関数（累積回転量を更新）
@@ -444,6 +476,7 @@ private:
 
     StepMode mode_ = StepMode::NONE;
     bool mff_mode_enabled_ = false;
+    bool arena_mode_enabled_ = false;
     rclcpp::Time turn_end_time_;
     float turn_v1_ = 0.0f;
     float turn_v2_ = 0.0f;
@@ -1263,7 +1296,7 @@ private:
     }
 
     void loop() {
-        if (!mff_mode_enabled_) {
+        if (!mff_mode_enabled_ && !arena_mode_enabled_) {
             return;
         }
 
@@ -1474,7 +1507,7 @@ private:
     }
 
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
-        if (!seq_->is_mff_mode_enabled()) {
+        if (!seq_->is_mff_mode_enabled() && !seq_->is_arena_mode_enabled()) {
             return;
         }
 
@@ -1590,7 +1623,7 @@ private:
             camera_servo_pub_->publish(servo_msg);
         }
 
-        if (!seq_->is_mff_mode_enabled()) {
+        if (!seq_->is_mff_mode_enabled() && !seq_->is_arena_mode_enabled()) {
             return;
         }
 
@@ -1749,12 +1782,26 @@ private:
         }
 
         const int32_t mode_code = msg->data[0];
-        seq_->set_mff_mode_enabled(mode_code == 4 || mode_code == 5);
+        if (mode_code == 4) {
+            seq_->set_mff_mode_enabled(true);
+        } else if (mode_code == 5) {
+            seq_->set_arena_mode_enabled(true);
+        } else {
+            seq_->set_mff_mode_enabled(false);
+            seq_->set_arena_mode_enabled(false);
+        }
     }
 
     void drive_mode_text_callback(const std_msgs::msg::String::SharedPtr msg) {
         const auto &mode = msg->data;
-        seq_->set_mff_mode_enabled(mode == "MFF" || mode == "ARENA");
+        if (mode == "MFF") {
+            seq_->set_mff_mode_enabled(true);
+        } else if (mode == "ARENA") {
+            seq_->set_arena_mode_enabled(true);
+        } else {
+            seq_->set_mff_mode_enabled(false);
+            seq_->set_arena_mode_enabled(false);
+        }
     }
 
     // /cube_detection/info [flag, cx_norm, cy_norm, w_norm, h_norm, depth_m, score, area, face_yaw_deg]
@@ -1780,7 +1827,7 @@ private:
     }
 
     void arena_walk_cmd_callback(const std_msgs::msg::Int32::SharedPtr msg) {
-        if (!seq_->is_mff_mode_enabled()) {
+        if (!seq_->is_arena_mode_enabled()) {
             return;
         }
         if (msg->data == 1) {
