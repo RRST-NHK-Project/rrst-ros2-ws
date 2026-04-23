@@ -429,7 +429,7 @@ private:
         if (triangle_count == 0)
         {
             data_[10] = 25;
-            data_[11] = 160;
+            data_[11] = 165;
         }
         if (triangle_count == 1)
         {

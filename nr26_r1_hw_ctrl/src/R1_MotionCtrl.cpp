@@ -326,7 +326,7 @@ private:
         static int BAR_RELE_ANGLE = 245;
         static int cross_pre = 0;
         static int CROSS_PUSH_COUNT = 0;
-        static int CROSS_PUSH_MAX = 31;
+        static int CROSS_PUSH_MAX = 32;
         static int REUSE_ANGLE = 8;
         static int EJECT_ANGLE = 90;
 
@@ -463,19 +463,22 @@ private:
         if (CROSS_PUSH_COUNT == 27) // 1開放
         {
             data_[9] = MAG_SERVO_ANGLE[4];
+        }
+        if (CROSS_PUSH_COUNT == 28) // 1入れる
+        {
             data_[12] = EJECT_ANGLE;
             data_[10] = BAR_HOLD_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 28) // 固定
+        if (CROSS_PUSH_COUNT == 29) // 固定
         {
             data_[10] = BAR_PUSH_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 29) // 2に戻す
+        if (CROSS_PUSH_COUNT == 30) // 2に戻す
         {
             data_[10] = BAR_RELE_ANGLE;
         }
         // RELEASEに2を合わせる
-        if (CROSS_PUSH_COUNT == 30) // 2開放
+        if (CROSS_PUSH_COUNT == 31) // 2開放
         {
             data_[9] = MAG_SERVO_ANGLE[5];
             data_[12] = EJECT_ANGLE;
