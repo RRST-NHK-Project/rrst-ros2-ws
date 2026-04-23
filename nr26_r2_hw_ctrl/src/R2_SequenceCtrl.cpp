@@ -180,8 +180,12 @@ public:
             RCLCPP_WARN(get_logger(), "Sequence busy. STEP_DOWN ignored.");
             return; // 実行中なら無視
         }
+        use_rear_trigger_for_step_down_ = last_completed_step_was_down_;
         mode_ = StepMode::STEP_DOWN;
         next_down(StepDownState::FIRST_FORWARD);
+        RCLCPP_INFO(get_logger(),
+                    "STEP_DOWN started. first_trigger=%s",
+                    use_rear_trigger_for_step_down_ ? "rear sensor < down_dis" : "front sensors > down_dis");
     }
 
     // シーケンス実行中の判定
@@ -512,6 +516,8 @@ private:
     double turn_target_rad_ = 0.0;      // 旋回目標角度 [rad]（絶対値）
     bool turn_accumulating_ = false;    // 累積中フラグ
     double turn_target_yaw_ = 0.0;      // 旋回目標yaw角度 [rad]（絶対角度、角度PID用）
+    bool last_completed_step_was_down_ = false;
+    bool use_rear_trigger_for_step_down_ = false;
     int16_t arena_left_mm_ = 0;         // 左側距離 [mm]（ld19_eight_direction_distance の left）
     bool arena_left_valid_ = false;
     int16_t arena_front_mm_ = 0; // 前方距離 [mm]（ld19_eight_direction_distance の front）
@@ -920,6 +926,7 @@ private:
             }
             mode_ = StepMode::NONE;
             state_up_ = StepUpState::IDLE;
+            last_completed_step_was_down_ = false;
             {
                 std_msgs::msg::Int32 msg;
                 msg.data = 1; // 段差上り完了
@@ -942,7 +949,11 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if (sdm15_value_[2] > down_dis || sdm15_value_[3] > down_dis) // 前のセンサーで障害物がなくなったら
+            if (use_rear_trigger_for_step_down_) {
+                if (sdm15_value_[0] < down_dis) {
+                    next_down(StepDownState::FRONT_UP);
+                }
+            } else if (sdm15_value_[2] > down_dis || sdm15_value_[3] > down_dis) // 前のセンサーで障害物がなくなったら
             {
                 next_down(StepDownState::FRONT_UP);
             }
@@ -1009,6 +1020,8 @@ private:
             }
             mode_ = StepMode::NONE;
             state_down_ = StepDownState::IDLE;
+            last_completed_step_was_down_ = true;
+            use_rear_trigger_for_step_down_ = false;
             {
                 std_msgs::msg::Int32 msg;
                 msg.data = -1; // 段差下り完了
