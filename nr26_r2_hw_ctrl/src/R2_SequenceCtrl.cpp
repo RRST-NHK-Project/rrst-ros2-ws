@@ -236,6 +236,8 @@ public:
         } else {
             // アリーナモード有効時はMFFモードを無効化
             mff_mode_enabled_ = false;
+            // モード切替直後にARENAシーケンスを自動開始
+            start_arena_walk();
         }
 
         RCLCPP_INFO(get_logger(), "Sequence mode: %s", arena_mode_enabled_ ? "ARENA ENABLED" : "ARENA DISABLED");
