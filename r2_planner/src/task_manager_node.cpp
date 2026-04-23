@@ -201,6 +201,10 @@ namespace r2_planner {
             auto_send_enabled_topic, rclcpp::QoS(10),
             std::bind(&TaskManagerNode::onAutoSendEnabled, this, std::placeholders::_1));
 
+        arena_walk_complete_sub_ = create_subscription<std_msgs::msg::Bool>(
+            "r2/arena_walk_complete", rclcpp::QoS(10),
+            std::bind(&TaskManagerNode::onArenaWalkComplete, this, std::placeholders::_1));
+
         status_pub_ = create_publisher<std_msgs::msg::Int32MultiArray>(
             status_topic, rclcpp::QoS(1).reliable().transient_local());
 
@@ -409,6 +413,17 @@ namespace r2_planner {
     void TaskManagerNode::onAutoSendEnabled(const std_msgs::msg::Bool::SharedPtr msg) {
         auto_send_enabled_ = msg->data;
         RCLCPP_INFO(get_logger(), "Auto send on state transition: %s", auto_send_enabled_ ? "ENABLED" : "DISABLED");
+    }
+
+    void TaskManagerNode::onArenaWalkComplete(const std_msgs::msg::Bool::SharedPtr msg) {
+        if (!msg->data) {
+            return;
+        }
+        RCLCPP_INFO(get_logger(), "Arena walk complete received -> publishing AUTO drive mode.");
+        std_msgs::msg::Int32MultiArray mode_msg;
+        mode_msg.data = {1, 0}; // AUTO mode
+        current_drive_mode_ = 1;
+        drive_mode_cmd_pub_->publish(mode_msg);
     }
 
     void TaskManagerNode::onMffPath(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {

@@ -76,6 +76,18 @@ public:
         step_complete_pub_ = this->create_publisher<std_msgs::msg::Int32>(
             "r2_mff_step_complete", rclcpp::QoS(10));
 
+        // アリーナ走行完了通知パブリッシャー（r2_planner と GUI へ通知）
+        arena_walk_complete_pub_ = this->create_publisher<std_msgs::msg::Bool>(
+            "r2/arena_walk_complete", rclcpp::QoS(10));
+
+        // オドメトリリセットパブリッシャー
+        odom_reset_pub_ = this->create_publisher<std_msgs::msg::Bool>(
+            "odom_reset", rclcpp::QoS(10));
+
+        // 自動走行目標パブリッシャー（ARENA完了後に目標0,0,0を送信）
+        autodrive_target_pub_ = this->create_publisher<std_msgs::msg::Float32MultiArray>(
+            "r2_autodrive_cmd", rclcpp::QoS(10));
+
         timer_ = this->create_wall_timer(
             10ms,
             std::bind(&SequenceControl::loop, this));
@@ -192,9 +204,41 @@ public:
             pkt.setMD(MD6, 0);
             pkt.setMD(MD7, 0);
             pkt.setMD(MD8, 0);
+        } else {
+            // MFF有効時はアリーナモードを無効化
+            arena_mode_enabled_ = false;
         }
 
         RCLCPP_INFO(get_logger(), "Sequence mode: %s", mff_mode_enabled_ ? "MFF ENABLED" : "MFF DISABLED");
+    }
+
+    bool is_arena_mode_enabled() const {
+        return arena_mode_enabled_;
+    }
+
+    void set_arena_mode_enabled(bool enabled) {
+        if (arena_mode_enabled_ == enabled) {
+            return;
+        }
+
+        arena_mode_enabled_ = enabled;
+
+        if (!arena_mode_enabled_) {
+            mode_ = StepMode::NONE;
+            state_up_ = StepUpState::IDLE;
+            state_down_ = StepDownState::IDLE;
+            state_arena_ = ArenaWalkState::IDLE;
+            state_executed_ = false;
+            pkt.setMD(MD5, 0);
+            pkt.setMD(MD6, 0);
+            pkt.setMD(MD7, 0);
+            pkt.setMD(MD8, 0);
+        } else {
+            // アリーナモード有効時はMFFモードを無効化
+            mff_mode_enabled_ = false;
+        }
+
+        RCLCPP_INFO(get_logger(), "Sequence mode: %s", arena_mode_enabled_ ? "ARENA ENABLED" : "ARENA DISABLED");
     }
 
     // odom_xy_yaw からyawを更新する関数（累積回転量を更新）
@@ -414,29 +458,25 @@ private:
     // 状態管理（アリーナ走行）
     enum class ArenaWalkState {
         IDLE,
-        AW1_FORWARD,   // Step1: 前進して壁を検出
-        AW1_ALIGN,     // Step1: 壁整列（遠距離版）
-        AW2_MOVE_LEFT, // Step2: 壁を確認しながら左移動
-        AW2_MOVE_PLUS, // Step2+: left距離が400mmになるまで左移動
-        AW3_FORWARD,   // Step3+4: 前進して次の壁を検出
-        AW4_ALIGN,     // Step4: 壁整列（遠距離版）
-        AW5_TURN,      // Step5: 時計回り90度旋回
-        AW8_FORWARD,   // Step6: 前進して壁を検出（left 400mm保持）
-        AW8_ALIGN,     // Step8: 壁整列（遠距離版）
+        AW1_FORWARD,        // Step1: 前進して壁を検出
+        AW1_ALIGN,          // Step1: 壁整列（遠距離版）
+        AW2_MOVE_LEFT,      // Step2: 左移動して前方壁の切れ目を検出 → そのまま左壁寄せへ
+        AW2_LEFT_APPROACH,  // Step2: ld19左方向500mmまで左移動 → 停止
+        AW2_FRONT_APPROACH, // Step2: ld19前方2000mmまで前進 → オドメトリリセット・自動モードへ
         DONE
     };
 
     // ARENA_WALK用定数
-    static constexpr int arena_wall_detect_mm = 700;          // 壁検出開始距離 Step1/3 [mm]
-    static constexpr int arena_wall_detect_far_mm = 1000;     // 壁検出開始距離 Step8 [mm]
+    static constexpr int arena_wall_detect_mm = 700;          // 壁検出距離閾値 [mm]
     static constexpr float arena_approach_target_mm = 350.0f; // 壁整列PID目標距離 [mm]
     static constexpr int arena_align_done_mm = 400;           // 壁整列完了閾値 [mm]
-    static constexpr int arena_wall_lost_mm = 1000;           // 壁消失とみなす距離 [mm]
     static constexpr int arena_lateral_duty = 60;             // 横移動デューティ
-    static constexpr int arena_left_target_mm = 400;          // 左壁キープ目標距離 [mm]
-    static constexpr int arena_left_tolerance_mm = 20;        // 左壁キープ許容幅 [mm]
+    static constexpr int arena_left_target_mm = 400;          // 左壁距離補正目標 [mm]（arena_drive_with_left_hold用）
     static constexpr float arena_left_hold_kp = 0.20f;        // 左壁距離補正ゲイン [duty/mm]
-    static constexpr int arena_left_hold_max_duty = 40;       // 左壁補正の最大duty
+    static constexpr int arena_left_hold_max_duty = 40;       // 左壁補正最大duty
+    static constexpr int arena_wall_edge_delta_mm = 100;      // 壁切れ目検出閾値：基準値からこの値以上増加で切れ目と判定 [mm]
+    static constexpr int arena_left_approach_mm = 500;        // 左壁寄せ目標距離 [mm]（ld19 left）
+    static constexpr int arena_front_approach_mm = 2000;      // 前方寄せ目標距離 [mm]（ld19 front）
     // 純粋回転のみでは壁角度計測が不安定になるため、wall_angle_approach_thrより大きく設定する
     // （前進+回転の複合動作を早めに開始することで安定した計測を得る）
     static constexpr float arena_angle_approach_thr = 0.50f; // arena整列で前進を開始する角度閾値 [rad]
@@ -444,6 +484,7 @@ private:
 
     StepMode mode_ = StepMode::NONE;
     bool mff_mode_enabled_ = false;
+    bool arena_mode_enabled_ = false;
     rclcpp::Time turn_end_time_;
     float turn_v1_ = 0.0f;
     float turn_v2_ = 0.0f;
@@ -462,6 +503,7 @@ private:
     bool arena_left_valid_ = false;
     int16_t arena_front_mm_ = 0; // 前方距離 [mm]（ld19_eight_direction_distance の front）
     bool arena_front_valid_ = false;
+    int16_t arena_wall_edge_ref_mm_ = 0; // 壁切れ目検出用基準距離 [mm]
 
     StepUpState state_up_ = StepUpState::IDLE;
     StepDownState state_down_ = StepDownState::IDLE;
@@ -469,6 +511,9 @@ private:
 
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr step_complete_pub_;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr arena_walk_complete_pub_;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr odom_reset_pub_;
+    rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr autodrive_target_pub_;
     rclcpp::Time state_start_time_;
     bool state_executed_ = false; // 各状態での処理の実行状況を保存
 
@@ -1201,113 +1246,88 @@ private:
             }
             break;
 
-        // ── Step2: 壁を確認しながら左移動 ────────────────────────────
-        // vy < 0（左方向）: MD5=-lat, MD6=+lat, MD7=-lat, MD8=+lat
+        // ── Step2: 左移動して前方壁の切れ目を検出 ────────────────────
         case ArenaWalkState::AW2_MOVE_LEFT:
             if (!state_executed_) {
+                // 左移動開始時の前方距離を基準値として記録
+                arena_wall_edge_ref_mm_ = lidar_value;
+                pkt.setMD(MD5, -arena_lateral_duty);
+                pkt.setMD(MD6, arena_lateral_duty);
+                pkt.setMD(MD7, -arena_lateral_duty);
+                pkt.setMD(MD8, arena_lateral_duty);
                 state_executed_ = true;
             }
-            arena_drive_with_left_hold(0, true);
-            if (lidar_value <= 0 || lidar_value > arena_wall_lost_mm) {
-                move_stop();
-                next_arena(ArenaWalkState::AW2_MOVE_PLUS);
-                RCLCPP_INFO(get_logger(), "ARENA Step2: wall lost -> move plus by left distance.");
+            // 前方距離が基準値から100mm以上増加、またはlidar無効 → 壁切れ目と判定
+            if (lidar_value <= 0 ||
+                lidar_value > static_cast<int>(arena_wall_edge_ref_mm_) + arena_wall_edge_delta_mm) {
+                next_arena(ArenaWalkState::AW2_LEFT_APPROACH);
+                RCLCPP_INFO(get_logger(),
+                            "ARENA Step2: wall edge detected (lidar=%d mm, ref=%d mm) -> left approach.",
+                            lidar_value, static_cast<int>(arena_wall_edge_ref_mm_));
             }
             RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-                                 "ARENA Step2: moving left, lidar=%d mm", lidar_value);
+                                 "ARENA Step2: moving left, lidar=%d mm (ref=%d mm)",
+                                 lidar_value, static_cast<int>(arena_wall_edge_ref_mm_));
             break;
 
-        // ── Step2+: left距離が400mmになるまで左移動 ───────────────────
-        case ArenaWalkState::AW2_MOVE_PLUS:
-            arena_drive_with_left_hold(0, true);
-            if (arena_left_valid_ &&
-                std::abs(static_cast<int>(arena_left_mm_) - arena_left_target_mm) <= arena_left_tolerance_mm) {
+        case ArenaWalkState::AW2_LEFT_APPROACH:
+            if (!state_executed_) {
+                // 左方向へ移動開始
+                pkt.setMD(MD5, static_cast<int16_t>(-arena_lateral_duty));
+                pkt.setMD(MD6, static_cast<int16_t>(arena_lateral_duty));
+                pkt.setMD(MD7, static_cast<int16_t>(-arena_lateral_duty));
+                pkt.setMD(MD8, static_cast<int16_t>(arena_lateral_duty));
+                state_executed_ = true;
+            }
+            // ld19 左距離が有効かつ目標距離以下で停止 → 前方寄せへ
+            if (arena_left_valid_ && arena_left_mm_ <= arena_left_approach_mm) {
                 move_stop();
-                next_arena(ArenaWalkState::AW3_FORWARD);
-                RCLCPP_INFO(get_logger(), "ARENA Step2+: left distance reached (%d mm) -> forward.", arena_left_mm_);
+                next_arena(ArenaWalkState::AW2_FRONT_APPROACH);
+                RCLCPP_INFO(get_logger(),
+                            "ARENA Step2: left approach done (left=%d mm) -> front approach.",
+                            static_cast<int>(arena_left_mm_));
             }
             RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-                                 "ARENA Step2+: left_hold=%s left=%d mm target=%d mm",
-                                 arena_left_valid_ ? "valid" : "invalid", arena_left_mm_, arena_left_target_mm);
+                                 "ARENA Step2: left approach, left=%s %d mm (target<=%d mm)",
+                                 arena_left_valid_ ? "valid" : "invalid",
+                                 static_cast<int>(arena_left_mm_), arena_left_approach_mm);
             break;
 
-        // ── Step3+4: 前進して次の壁を検出 ────────────────────────────
-        case ArenaWalkState::AW3_FORWARD:
+        case ArenaWalkState::AW2_FRONT_APPROACH:
             if (!state_executed_) {
                 move_forward();
                 state_executed_ = true;
             }
-            if (arena_front_valid_ && arena_front_mm_ > 0 && arena_front_mm_ < arena_wall_detect_mm) {
+            // ld19 前方距離が有効かつ目標距離以下で停止
+            if (arena_front_valid_ && arena_front_mm_ <= arena_front_approach_mm) {
                 move_stop();
-                pid_angle_.reset();
-                pid_distance_.reset();
-                pid_distance_.set_target(arena_approach_target_mm);
-                next_arena(ArenaWalkState::AW4_ALIGN);
-                RCLCPP_INFO(get_logger(), "ARENA Step4: wall at %d mm (ld19 front) -> align.", arena_front_mm_);
-            }
-            break;
-
-        // ── Step4: 壁整列（遠距離版） ────────────────────────────────
-        case ArenaWalkState::AW4_ALIGN:
-            if (arena_wall_align()) {
-                RCLCPP_INFO(get_logger(), "ARENA Step4: aligned -> CCW 90 deg turn.");
-                arena_setup_turn(-90);
-                next_arena(ArenaWalkState::AW5_TURN);
-            }
-            break;
-
-        // ── Step5: 時計回り90度旋回（odom PID） ─────────────────────────
-        case ArenaWalkState::AW5_TURN: {
-            constexpr float dt = 0.01f;
-            double yaw_error = turn_target_yaw_ - odom_yaw_;
-            if (yaw_error > M_PI)
-                yaw_error -= 2.0 * M_PI;
-            if (yaw_error < -M_PI)
-                yaw_error += 2.0 * M_PI;
-
-            const bool timeout = (this->now() >= turn_end_time_);
-            if (std::abs(yaw_error) < turn_yaw_done_thr_ || timeout) {
-                move_stop();
-                turn_accumulating_ = false;
-                next_arena(ArenaWalkState::AW8_FORWARD);
-                RCLCPP_INFO(get_logger(), "ARENA Step5: turn done (yaw_err=%.3f rad%s) -> forward.",
-                            yaw_error, timeout ? " timeout" : "");
-            } else {
-                // mff_turn_sequence と同じ: target=0、入力は±π正規化済み yaw_error
-                const float wz = pid_angle_.update(static_cast<float>(yaw_error), dt);
-                const int16_t duty = static_cast<int16_t>(wz * align_duty_max);
-                pkt.setMD(MD5, duty);
-                pkt.setMD(MD6, duty);
-                pkt.setMD(MD7, duty);
-                pkt.setMD(MD8, duty);
-                RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
-                                     "ARENA Step5: yaw=%.3f target=%.3f error=%.3f wz=%.3f duty=%d",
-                                     odom_yaw_, turn_target_yaw_, yaw_error, wz, duty);
-            }
-            break;
-        }
-
-        // ── Step6: left距離を保持しながら前進して壁を検出（1000mm） ───────
-        case ArenaWalkState::AW8_FORWARD:
-            if (!state_executed_) {
-                state_executed_ = true;
-            }
-            arena_drive_with_left_hold(forward_speed, false);
-            if (arena_front_valid_ && arena_front_mm_ > 0 && arena_front_mm_ < arena_wall_detect_far_mm) {
-                move_stop();
-                pid_angle_.reset();
-                pid_distance_.reset();
-                pid_distance_.set_target(arena_approach_target_mm);
-                next_arena(ArenaWalkState::AW8_ALIGN);
-                RCLCPP_INFO(get_logger(), "ARENA Step6: wall at %d mm (ld19 front) -> align.", arena_front_mm_);
-            }
-            break;
-
-        // ── Step8: 壁整列（遠距離版） ────────────────────────────────
-        case ArenaWalkState::AW8_ALIGN:
-            if (arena_wall_align()) {
+                // オドメトリリセット
+                {
+                    std_msgs::msg::Bool reset_msg;
+                    reset_msg.data = true;
+                    odom_reset_pub_->publish(reset_msg);
+                }
+                // 自動走行目標を x=0, y=0, yaw=0 に設定
+                {
+                    std_msgs::msg::Float32MultiArray target_msg;
+                    target_msg.data = {0.0f, 0.0f, 0.0f};
+                    autodrive_target_pub_->publish(target_msg);
+                }
+                // アリーナ走行完了通知（自動モードへ切り替えトリガー）
+                {
+                    std_msgs::msg::Bool complete_msg;
+                    complete_msg.data = true;
+                    arena_walk_complete_pub_->publish(complete_msg);
+                }
                 next_arena(ArenaWalkState::DONE);
+                RCLCPP_INFO(get_logger(),
+                            "ARENA Step2: front approach done (front=%d mm) -> odom reset, target(0,0,0), arena_walk_complete.",
+                            static_cast<int>(arena_front_mm_));
             }
+            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
+                                 "ARENA Step2: front approach, front=%s %d mm (target<=%d mm)",
+                                 arena_front_valid_ ? "valid" : "invalid",
+                                 static_cast<int>(arena_front_mm_), arena_front_approach_mm);
             break;
 
         case ArenaWalkState::DONE:
@@ -1323,7 +1343,7 @@ private:
     }
 
     void loop() {
-        if (!mff_mode_enabled_) {
+        if (!mff_mode_enabled_ && !arena_mode_enabled_) {
             return;
         }
 
@@ -1534,7 +1554,7 @@ private:
     }
 
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
-        if (!seq_->is_mff_mode_enabled()) {
+        if (!seq_->is_mff_mode_enabled() && !seq_->is_arena_mode_enabled()) {
             return;
         }
 
@@ -1650,7 +1670,7 @@ private:
             camera_servo_pub_->publish(servo_msg);
         }
 
-        if (!seq_->is_mff_mode_enabled()) {
+        if (!seq_->is_mff_mode_enabled() && !seq_->is_arena_mode_enabled()) {
             return;
         }
 
@@ -1809,12 +1829,26 @@ private:
         }
 
         const int32_t mode_code = msg->data[0];
-        seq_->set_mff_mode_enabled(mode_code == 4 || mode_code == 5);
+        if (mode_code == 4) {
+            seq_->set_mff_mode_enabled(true);
+        } else if (mode_code == 5) {
+            seq_->set_arena_mode_enabled(true);
+        } else {
+            seq_->set_mff_mode_enabled(false);
+            seq_->set_arena_mode_enabled(false);
+        }
     }
 
     void drive_mode_text_callback(const std_msgs::msg::String::SharedPtr msg) {
         const auto &mode = msg->data;
-        seq_->set_mff_mode_enabled(mode == "MFF" || mode == "ARENA");
+        if (mode == "MFF") {
+            seq_->set_mff_mode_enabled(true);
+        } else if (mode == "ARENA") {
+            seq_->set_arena_mode_enabled(true);
+        } else {
+            seq_->set_mff_mode_enabled(false);
+            seq_->set_arena_mode_enabled(false);
+        }
     }
 
     // /cube_detection/info [flag, cx_norm, cy_norm, w_norm, h_norm, depth_m, score, area, face_yaw_deg]
@@ -1840,7 +1874,7 @@ private:
     }
 
     void arena_walk_cmd_callback(const std_msgs::msg::Int32::SharedPtr msg) {
-        if (!seq_->is_mff_mode_enabled()) {
+        if (!seq_->is_arena_mode_enabled()) {
             return;
         }
         if (msg->data == 1) {

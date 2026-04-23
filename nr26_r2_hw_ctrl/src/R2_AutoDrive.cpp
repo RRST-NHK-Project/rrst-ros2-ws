@@ -614,6 +614,11 @@ private:
             return;
         }
 
+        if (drive_mode_ == DriveMode::ARENA) {
+            // ARENAモード中はSequenceCtrlが主系のため制御しない
+            return;
+        }
+
         const float dt = PUBLISH_RATE_MS / 1000.0f;
 
         // PID計算

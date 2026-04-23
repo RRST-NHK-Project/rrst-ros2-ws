@@ -65,6 +65,7 @@ namespace r2_planner {
         rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mff_path_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr mff_path_advance_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr auto_send_enabled_sub_;
+        rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arena_walk_complete_sub_;
 
         rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr status_pub_;
         rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_text_pub_;
@@ -111,6 +112,7 @@ namespace r2_planner {
         void onMffPath(const std_msgs::msg::Int32MultiArray::SharedPtr msg);
         void onMffPathAdvance(const std_msgs::msg::Bool::SharedPtr msg);
         void onAutoSendEnabled(const std_msgs::msg::Bool::SharedPtr msg);
+        void onArenaWalkComplete(const std_msgs::msg::Bool::SharedPtr msg);
 
         void setState(int32_t state_code);
         void setColor(int32_t color_code);
