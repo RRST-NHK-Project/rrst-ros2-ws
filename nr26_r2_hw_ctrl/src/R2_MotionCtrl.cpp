@@ -175,7 +175,11 @@ private:
     TargetHeight target_height_ = TargetHeight::DOWN;
 
     // モーター1回転あたりのエンコーダのカウント数
-    static constexpr double COUNTS_PER_ROTATION = 355.0;
+    static constexpr double COUNTS_PER_ROTATION = 360.0;
+
+    // モノレール速度設定
+    static constexpr int NORMAL_SPEED = 100; // 通常速度
+    static constexpr int SLOW_SPEED = 50;    // 減速後速度
 
     // =====================================================================
     // 状態名→状態コード変換
@@ -247,15 +251,14 @@ private:
     }
 
     // =====================================================================
-    // 全体共通: モーター方向制限
+    // 全体共通: モーター方向制限 + 減速ゾーン適用
     // ・micro1_sw（始発）押下 → 正回転禁止、逆回転のみ許可
     // ・micro2_sw（終点）押下 → 逆回転禁止、正回転のみ許可
+    // ・回転数 0.5以下 or 7.0以上 → 減速（SLOW_SPEED）
     // =====================================================================
     int16_t apply_direction_limit(int16_t raw_speed) {
         int16_t micro1_sw = g_micro1_sw.load();
         int16_t micro2_sw = g_micro2_sw.load();
-        // int64_t abs_coord = g_abs_coord.load();
-        // double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
 
         // 始発SW押下時 → 正回転(speed > 0)禁止
         if (micro1_sw == 1 && raw_speed > 0) {
@@ -265,6 +268,19 @@ private:
         // 終点SW押下時 → 逆回転(speed < 0)禁止
         if (micro2_sw == 1 && raw_speed < 0) {
             return 0;
+        }
+
+        // 回転数に基づく減速ゾーン適用
+        int64_t abs_coord = g_abs_coord.load();
+        double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
+
+        if (rot_units <= 0.5 || rot_units >= 7.0) {
+            // 減速ゾーン: 速度の絶対値をSLOW_SPEED以下に制限
+            if (raw_speed > SLOW_SPEED) {
+                return SLOW_SPEED;
+            } else if (raw_speed < -SLOW_SPEED) {
+                return -SLOW_SPEED;
+            }
         }
 
         return raw_speed;
@@ -430,49 +446,44 @@ private:
 
         switch (state_code) {
         case STATE_HEAD_HAND_INIT:
-            // モーターを速度30で回し続ける（正回転＝始発方向へ）
+            // 始発方向へ正回転で戻す
             // マイクロスイッチ（始発）が押されたとき → モーター停止
             if (micro1_sw == 1) {
                 pkt.setMD(MD2, 0);
             } else {
-                pkt.setMD(MD2, apply_direction_limit(130));
+                pkt.setMD(MD2, apply_direction_limit(NORMAL_SPEED));
             }
             break;
 
         case STATE_HEAD_HAND_PICK_UP_SETTING:
-            // モーターを逆回転
+            // 終点方向へ逆回転
             // micro2_sw が押されたとき → モーター即停止
             if (micro2_sw == 1) {
                 pkt.setMD(MD2, 0);
-            } else if (rot_units >= 7.0) {
-                // 7.0以上は少し減速させる（例：-100など）
-                pkt.setMD(MD2, apply_direction_limit(-100)); // 減速
             } else {
-                pkt.setMD(MD2, apply_direction_limit(-150));
+                // apply_direction_limitが減速ゾーン(7.0以上)を自動適用
+                pkt.setMD(MD2, apply_direction_limit(-NORMAL_SPEED));
             }
             break;
 
         case STATE_HEAD_HAND_GATTAI_WAITING:
-            // モーターを速度30で回し続ける（正回転＝始発方向へ）
+            // 始発方向へ正回転で戻す
             // マイクロスイッチ（始発）が押されたとき → モーター停止
             if (micro1_sw == 1) {
                 pkt.setMD(MD2, 0);
             } else {
-                pkt.setMD(MD2, apply_direction_limit(130));
+                pkt.setMD(MD2, apply_direction_limit(NORMAL_SPEED));
             }
             break;
 
         case STATE_HEAD_HAND_GATTAI_ASSEMBLY:
-            // 回転数が0でない限り、回転数を0にするべくモーターを速度10で回転
-            // （始発SWによるリセットも含む）
-            // 回転数が0になったとき → モーター停止
-            // この監視状態は終了指示か別状態への移行まで維持
+            // 回転数が0.05未満になるまで始発方向へ戻す
             if (micro1_sw == 1) {
                 pkt.setMD(MD2, 0);
             } else if (std::abs(rot_units) < 0.05) {
                 pkt.setMD(MD2, 0);
             } else {
-                pkt.setMD(MD2, apply_direction_limit(10));
+                pkt.setMD(MD2, apply_direction_limit(SLOW_SPEED));
             }
             break;
 
@@ -615,33 +626,38 @@ private:
         // 以降、配列data_を操作する
 
         // =================================================================
-        // L1,R1:「フォークリフト上下」
+        // L1,R1:「モノレール制御」
         // 絶対座標に基づく減速 + マイクロスイッチによる方向制限
+        //
+        // 座標: 始発スイッチ押下で 0 にリセット
+        //   回転数 <= 0.5 or >= 7.0 → 減速 (SLOW_SPEED=50)
+        //   それ以外 → 通常速度 (NORMAL_SPEED=100)
+        //   micro1_sw（始発）押下 → 正回転禁止、逆回転のみ許可
+        //   micro2_sw（終点）押下 → 逆回転禁止、正回転のみ許可
         // =================================================================
 
         int16_t micro1_sw = g_micro1_sw.load();
         int16_t micro2_sw = g_micro2_sw.load();
 
-        static const int NORMAL_SPEED = 130;
-        static const int SLOW_SPEED = 100;
-
         int64_t abs_coord = g_abs_coord.load();
         double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
 
         // ヒステリシス（遊び）を持たせた減速ゾーン判定（チャタリング防止用）
-        static bool is_fork_slow = false;
-        if (rot_units >= 7.0) {
-            is_fork_slow = true;
-        } else if (rot_units <= 6.8) {
-            is_fork_slow = false;
+        // 始発付近 (0〜0.5回転) または 終点付近 (7.0〜7.5回転) で減速
+        static bool is_monorail_slow = false;
+        if (rot_units <= 0.5 || rot_units >= 7.0) {
+            is_monorail_slow = true;
+        } else if (rot_units >= 0.7 && rot_units <= 6.8) {
+            is_monorail_slow = false; // ヒステリシスにより、ゾーンから少し離れるまで通常速度に戻さない
         }
-        bool in_slow_zone = is_fork_slow;
+        bool in_slow_zone = is_monorail_slow;
 
-        int fwd_speed = in_slow_zone ? SLOW_SPEED : NORMAL_SPEED;
-        int rev_speed = in_slow_zone ? -SLOW_SPEED : -NORMAL_SPEED;
+        // 回転方向に応じた速度を決定
+        int fwd_speed = in_slow_zone ? SLOW_SPEED : NORMAL_SPEED;   // 正回転（始発→終点）の速度
+        int rev_speed = in_slow_zone ? -SLOW_SPEED : -NORMAL_SPEED; // 逆回転（終点→始発）の速度
 
-        // micro1_sw が始発(正回転禁止) = fwd_speed禁止 -> rev_speed(R1)のみ許可
-        // micro2_sw が終点(逆回転禁止) = rev_speed禁止 -> fwd_speed(L1)のみ許可
+        // micro1_sw が始発(正回転禁止) → rev_speed(R1で逆回転)のみ許可
+        // micro2_sw が終点(逆回転禁止) → fwd_speed(L1で正回転)のみ許可
         if (micro1_sw == 1) {
             if (L1 == 1) {
                 pkt.setMD(MD2, fwd_speed);
@@ -655,6 +671,7 @@ private:
                 pkt.setMD(MD2, 0);
             }
         } else {
+            // マイクロスイッチに触れていない通常の範囲
             if (L1 == 1) {
                 pkt.setMD(MD2, fwd_speed);
             } else if (R1 == 1) {
@@ -749,10 +766,11 @@ private:
 
         int64_t total_encoder = (int64_t)r_count * ENCODER_MAX + (int64_t)current_enc1;
 
-        // 始発スイッチ押下時に座標をゼロリセット
+        // 始発スイッチ(micro1_sw = data[10])押下時に座標をゼロリセット
         if (msg->data[10] != 0) {
             g_zero_offset.store(total_encoder);
-            // RCLCPP_INFO(get_logger(), "[COORD RESET!] 始発スイッチ押下により座標0へオフセット設定");
+            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
+                                 "[COORD RESET!] 始発スイッチ押下により座標0へオフセット設定");
         }
 
         int64_t zero_offset = g_zero_offset.load();
