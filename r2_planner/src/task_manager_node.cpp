@@ -520,14 +520,7 @@ namespace r2_planner {
         }
 
         if (mff_path_.size() < 2) {
-            if (status_.state_code == kStateMffEnter) {
-                RCLCPP_WARN(get_logger(),
-                            "MFF path advance received in MFF_ENTER, but path has fewer than 2 cells. Forcing transition to MFF_LEAVE.");
-                setState(kStateMffLeave);
-                publishStatus(true);
-            } else {
-                RCLCPP_WARN(get_logger(), "Ignoring MFF path advance: path has fewer than 2 cells");
-            }
+            RCLCPP_WARN(get_logger(), "Ignoring MFF path advance: path has fewer than 2 cells");
             return;
         }
 
@@ -538,14 +531,7 @@ namespace r2_planner {
         }
 
         if (current_index + 1 >= mff_path_.size()) {
-            if (status_.state_code == kStateMffEnter) {
-                RCLCPP_INFO(get_logger(),
-                            "MFF path advance received at end of path during MFF_ENTER. Transitioning to MFF_LEAVE.");
-                setState(kStateMffLeave);
-                publishStatus(true);
-            } else {
-                RCLCPP_INFO(get_logger(), "MFF path advance ignored: already at end of path");
-            }
+            RCLCPP_INFO(get_logger(), "MFF path advance ignored: already at end of path");
             return;
         }
 
@@ -706,7 +692,8 @@ namespace r2_planner {
             return;
         }
 
-        // MFF/ARENAモード（drive_mode_code=4/5）アクティブ中は自動遷移をブロック
+        // MFF/ARENAモード（drive_mode_code=4/5）中は自動遷移をロックする。
+        // MFFは出口マス到達時(onMffPathAdvance)のみ遷移、ARENAは完了フラグ(onArenaWalkComplete)で遷移する。
         if (current_drive_mode_ == 4 || current_drive_mode_ == 5) {
             RCLCPP_DEBUG(get_logger(),
                          "Auto transition blocked: in sequence mode (current_drive_mode_=%ld)",
