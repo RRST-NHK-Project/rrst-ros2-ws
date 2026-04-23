@@ -76,6 +76,10 @@ public:
         step_complete_pub_ = this->create_publisher<std_msgs::msg::Int32>(
             "r2_mff_step_complete", rclcpp::QoS(10));
 
+        // アリーナ走行完了通知パブリッシャー（r2_planner と GUI へ通知）
+        arena_walk_complete_pub_ = this->create_publisher<std_msgs::msg::Bool>(
+            "r2/arena_walk_complete", rclcpp::QoS(10));
+
         timer_ = this->create_wall_timer(
             10ms,
             std::bind(&SequenceControl::loop, this));
@@ -418,11 +422,7 @@ private:
         AW1_ALIGN,     // Step1: 壁整列（遠距離版）
         AW2_MOVE_LEFT, // Step2: 壁を確認しながら左移動
         AW2_MOVE_PLUS, // Step2+: left距離が400mmになるまで左移動
-        AW3_FORWARD,   // Step3+4: 前進して次の壁を検出
-        AW4_ALIGN,     // Step4: 壁整列（遠距離版）
-        AW5_TURN,      // Step5: 時計回り90度旋回
-        AW8_FORWARD,   // Step6: 前進して壁を検出（left 400mm保持）
-        AW8_ALIGN,     // Step8: 壁整列（遠距離版）
+        AW3_FORWARD,   // Step3: 前進して次の壁を検出 → 自動モードへ切替
         DONE
     };
 
@@ -469,6 +469,7 @@ private:
 
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr step_complete_pub_;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr arena_walk_complete_pub_;
     rclcpp::Time state_start_time_;
     bool state_executed_ = false; // 各状態での処理の実行状況を保存
 
@@ -1231,7 +1232,7 @@ private:
                                  arena_left_valid_ ? "valid" : "invalid", arena_left_mm_, arena_left_target_mm);
             break;
 
-        // ── Step3+4: 前進して次の壁を検出 ────────────────────────────
+        // ── Step3: 前進して次の壁を検出 → 自動モードへ切替 ──────────────
         case ArenaWalkState::AW3_FORWARD:
             if (!state_executed_) {
                 move_forward();
@@ -1239,74 +1240,13 @@ private:
             }
             if (arena_front_valid_ && arena_front_mm_ > 0 && arena_front_mm_ < arena_wall_detect_mm) {
                 move_stop();
-                pid_angle_.reset();
-                pid_distance_.reset();
-                pid_distance_.set_target(arena_approach_target_mm);
-                next_arena(ArenaWalkState::AW4_ALIGN);
-                RCLCPP_INFO(get_logger(), "ARENA Step4: wall at %d mm (ld19 front) -> align.", arena_front_mm_);
-            }
-            break;
-
-        // ── Step4: 壁整列（遠距離版） ────────────────────────────────
-        case ArenaWalkState::AW4_ALIGN:
-            if (arena_wall_align()) {
-                RCLCPP_INFO(get_logger(), "ARENA Step4: aligned -> CCW 90 deg turn.");
-                arena_setup_turn(-90);
-                next_arena(ArenaWalkState::AW5_TURN);
-            }
-            break;
-
-        // ── Step5: 時計回り90度旋回（odom PID） ─────────────────────────
-        case ArenaWalkState::AW5_TURN: {
-            constexpr float dt = 0.01f;
-            double yaw_error = turn_target_yaw_ - odom_yaw_;
-            if (yaw_error > M_PI)
-                yaw_error -= 2.0 * M_PI;
-            if (yaw_error < -M_PI)
-                yaw_error += 2.0 * M_PI;
-
-            const bool timeout = (this->now() >= turn_end_time_);
-            if (std::abs(yaw_error) < turn_yaw_done_thr_ || timeout) {
-                move_stop();
-                turn_accumulating_ = false;
-                next_arena(ArenaWalkState::AW8_FORWARD);
-                RCLCPP_INFO(get_logger(), "ARENA Step5: turn done (yaw_err=%.3f rad%s) -> forward.",
-                            yaw_error, timeout ? " timeout" : "");
-            } else {
-                // mff_turn_sequence と同じ: target=0、入力は±π正規化済み yaw_error
-                const float wz = pid_angle_.update(static_cast<float>(yaw_error), dt);
-                const int16_t duty = static_cast<int16_t>(wz * align_duty_max);
-                pkt.setMD(MD5, duty);
-                pkt.setMD(MD6, duty);
-                pkt.setMD(MD7, duty);
-                pkt.setMD(MD8, duty);
-                RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
-                                     "ARENA Step5: yaw=%.3f target=%.3f error=%.3f wz=%.3f duty=%d",
-                                     odom_yaw_, turn_target_yaw_, yaw_error, wz, duty);
-            }
-            break;
-        }
-
-        // ── Step6: left距離を保持しながら前進して壁を検出（1000mm） ───────
-        case ArenaWalkState::AW8_FORWARD:
-            if (!state_executed_) {
-                state_executed_ = true;
-            }
-            arena_drive_with_left_hold(forward_speed, false);
-            if (arena_front_valid_ && arena_front_mm_ > 0 && arena_front_mm_ < arena_wall_detect_far_mm) {
-                move_stop();
-                pid_angle_.reset();
-                pid_distance_.reset();
-                pid_distance_.set_target(arena_approach_target_mm);
-                next_arena(ArenaWalkState::AW8_ALIGN);
-                RCLCPP_INFO(get_logger(), "ARENA Step6: wall at %d mm (ld19 front) -> align.", arena_front_mm_);
-            }
-            break;
-
-        // ── Step8: 壁整列（遠距離版） ────────────────────────────────
-        case ArenaWalkState::AW8_ALIGN:
-            if (arena_wall_align()) {
+                {
+                    std_msgs::msg::Bool complete_msg;
+                    complete_msg.data = true;
+                    arena_walk_complete_pub_->publish(complete_msg);
+                }
                 next_arena(ArenaWalkState::DONE);
+                RCLCPP_INFO(get_logger(), "ARENA Step3: wall at %d mm -> published arena_walk_complete.", arena_front_mm_);
             }
             break;
 
