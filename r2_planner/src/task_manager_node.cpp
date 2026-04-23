@@ -612,15 +612,8 @@ namespace r2_planner {
             state_entered_at_ = std::chrono::steady_clock::now();
         }
         publishStateSideEffects(state_code);
-        // publishStateSideEffects の後で current_drive_mode_ を確定させる
-        // （publishAutoDriveModeForState による上書きを防ぐため）
-        if (state_code == kStateMffEnter) {
-            current_drive_mode_ = 4;
-            RCLCPP_INFO(get_logger(), "Entering MFF state: current_drive_mode_=4, auto transition blocked");
-        } else if (state_code == kStateMffLeave) {
-            current_drive_mode_ = 0;
-            RCLCPP_INFO(get_logger(), "Leaving MFF state: current_drive_mode_=0, auto transition resumed");
-        }
+        // current_drive_mode_ は publishAutoDriveModeForState() で更新される実modeを使用する。
+        // 状態コード固定で上書きすると、Enter MFFなどで mode=1 のときも誤ってMFFロックされる。
     }
 
     void TaskManagerNode::publishStateSideEffects(int32_t state_code) {
