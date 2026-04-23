@@ -520,7 +520,14 @@ namespace r2_planner {
         }
 
         if (mff_path_.size() < 2) {
-            RCLCPP_WARN(get_logger(), "Ignoring MFF path advance: path has fewer than 2 cells");
+            if (status_.state_code == kStateMffEnter) {
+                RCLCPP_WARN(get_logger(),
+                            "MFF path advance received in MFF_ENTER, but path has fewer than 2 cells. Forcing transition to MFF_LEAVE.");
+                setState(kStateMffLeave);
+                publishStatus(true);
+            } else {
+                RCLCPP_WARN(get_logger(), "Ignoring MFF path advance: path has fewer than 2 cells");
+            }
             return;
         }
 
@@ -531,7 +538,14 @@ namespace r2_planner {
         }
 
         if (current_index + 1 >= mff_path_.size()) {
-            RCLCPP_INFO(get_logger(), "MFF path advance ignored: already at end of path");
+            if (status_.state_code == kStateMffEnter) {
+                RCLCPP_INFO(get_logger(),
+                            "MFF path advance received at end of path during MFF_ENTER. Transitioning to MFF_LEAVE.");
+                setState(kStateMffLeave);
+                publishStatus(true);
+            } else {
+                RCLCPP_INFO(get_logger(), "MFF path advance ignored: already at end of path");
+            }
             return;
         }
 
