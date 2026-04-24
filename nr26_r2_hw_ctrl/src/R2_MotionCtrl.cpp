@@ -170,6 +170,9 @@ private:
     };
 
     int32_t current_planner_state_ = -1;
+    int32_t prev_applied_state_ = -2;
+    int hold_seq_step_ = 0;
+    int hold_wait_count_ = 0;
     std::atomic<int32_t> current_drive_mode_{DRIVE_MODE_MANUAL};
     std::string current_state_name_ = "";
     TargetHeight target_height_ = TargetHeight::DOWN;
@@ -303,31 +306,31 @@ private:
     }
 
     void set_ready_values() {
-        pkt.setServo(SERVO1, 23);
-        pkt.setServo(SERVO3, 190);
+        pkt.setServo(SERVO1, 45);
+        pkt.setServo(SERVO3, 183);
         pkt.setServo(SERVO4, 0);
         pkt.setMD(MD1, 0);
         pkt.setTR(TR1, true); // シリンダー伸ばす
     }
 
     void set_pick_values() {
-        pkt.setServo(SERVO1, 13);
+        pkt.setServo(SERVO1, 30);
         pkt.setServo(SERVO3, 84);
         pkt.setServo(SERVO4, 0);
-        pkt.setMD(MD1, 255); // ダイアフラムで吸う
+        pkt.setMD(MD1, 127); // ダイアフラムで吸う
         pkt.setTR(TR1, true);
     }
 
     void set_hold_values() {
-        pkt.setServo(SERVO1, 200);
-        pkt.setServo(SERVO3, 194);
+        pkt.setServo(SERVO1, 100);
+        pkt.setServo(SERVO3, 140);
         pkt.setServo(SERVO4, 0);
-        pkt.setMD(MD1, 255);
+        pkt.setMD(MD1, 127);
         pkt.setTR(TR1, false);
     }
 
     void set_moving_values() {
-        pkt.setServo(SERVO1, 200);
+        pkt.setServo(SERVO1, 217);
         pkt.setServo(SERVO3, 194);
         pkt.setServo(SERVO4, 0);
         pkt.setMD(MD1, 0);
@@ -336,8 +339,8 @@ private:
 
     void set_shoot_values() {
         pkt.setServo(SERVO1, 200);
-        pkt.setServo(SERVO3, 194);
-        pkt.setServo(SERVO4, 50);
+        pkt.setServo(SERVO3, 150);
+        pkt.setServo(SERVO4, 45);
         pkt.setMD(MD1, 0);
         pkt.setTR(TR1, false);
     }
@@ -448,9 +451,17 @@ private:
             "micro1_sw=%d",
             static_cast<int>(micro1_sw));
 
-        // 状態ごとに明示的に値を作り直し、残留値を防ぐ
-        pkt.setMD(MD1, 0);
-        reset_hand_outputs();
+        // 状態遷移時にシーケンスカウンタをリセット
+        if (state_code != prev_applied_state_) {
+            hold_seq_step_ = 0;
+            prev_applied_state_ = state_code;
+        }
+
+        // 状態ごとに明示的に値を作り直し、残留値を防ぐ（漸進シーケンス中は除く）
+        if (state_code != STATE_KFS_HOLD) {
+            pkt.setMD(MD1, 0);
+            reset_hand_outputs();
+        }
 
         switch (state_code) {
             /*
@@ -553,26 +564,76 @@ private:
             set_ready_values();
             break;
         case STATE_PICK_UP:
-            target_height_ = TargetHeight::UP;
-            set_ready_values();
-            set_pick_values();
-            break;
         case STATE_PICK_MIDDLE:
-            target_height_ = TargetHeight::MIDDLE;
-            set_ready_values();
-            set_pick_values();
-            break;
         case STATE_PICK_DOWN:
-            target_height_ = TargetHeight::DOWN;
+            target_height_ = static_cast<TargetHeight>(state_code - STATE_PICK_UP);
             set_ready_values();
             set_pick_values();
             break;
-        case STATE_KFS_HOLD:
-            set_hold_values();
+        case STATE_KFS_HOLD: {
+            // 段階的シーケンス（20ms周期で呼ばれるごとに進む）
+            // 0: SERVO3 → 194, 1: SERVO1 → 217, 2: TR1=false, 3: MD1=0, 4: SERVO1=200
+            constexpr int STEP = 2;
+            switch (hold_seq_step_) {
+            case 0: {
+                int v = static_cast<int>(pkt[SERVO3]);
+                if (v >= 194) {
+                    hold_seq_step_++;
+                } else {
+                    pkt.setServo(SERVO3, v + STEP <= 194 ? v + STEP : 194);
+                }
+                break;
+            }
+            case 1: {
+                int v = static_cast<int>(pkt[SERVO1]);
+                if (v >= 217) {
+                    hold_seq_step_++;
+                } else {
+                    pkt.setServo(SERVO1, v + STEP <= 217 ? v + STEP : 217);
+                }
+                break;
+            }
+            case 2:
+                pkt.setTR(TR1, false);
+                hold_wait_count_ = 0;
+                hold_seq_step_++;
+                break;
+            case 3: // 4秒待機 (4000ms / 20ms = 200ティック)
+                if (++hold_wait_count_ >= 200) {
+                    hold_seq_step_++;
+                }
+                break;
+            case 4:
+                pkt.setMD(MD1, 0);
+                hold_seq_step_++;
+                break;
+            case 5: { // SERVO3 → 150 (徐々に下げる)
+                int v = static_cast<int>(pkt[SERVO3]);
+                if (v <= 150) {
+                    hold_seq_step_++;
+                } else {
+                    pkt.setServo(SERVO3, v - STEP >= 150 ? v - STEP : 150);
+                }
+                break;
+            }
+            case 6: { // SERVO1 → 200 (徐々に下げる)
+                int v = static_cast<int>(pkt[SERVO1]);
+                if (v <= 200) {
+                    hold_seq_step_++;
+                } else {
+                    pkt.setServo(SERVO1, v - STEP >= 200 ? v - STEP : 200);
+                }
+                break;
+            }
+            default:
+                pkt.setServo(SERVO1, 200);
+                pkt.setServo(SERVO3, 150);
+                pkt.setMD(MD1, 0);
+                pkt.setTR(TR1, false);
+                break;
+            }
             break;
-        case STATE_KFS_MOVE:
-            set_moving_values();
-            break;
+        }
         case STATE_TTR_SHOOT_MIDDLE:
             set_shoot_values();
             break;
@@ -758,6 +819,43 @@ private:
         //     data_[1], data_[2], data_[3], data_[4],
         //     data_[9], data_[10], data_[11], data_[12]);
 
+        // UP/DOWN: シーケンス順送り/戻し（押した瞬間だけ反応）
+        static const int32_t SEQUENCE[] = {
+            STATE_KFS_HAND_INIT,
+            STATE_KFS_PICK_WAITING,
+            STATE_PICK_UP,
+            STATE_PICK_MIDDLE,
+            STATE_PICK_DOWN,
+            STATE_KFS_HOLD,
+            STATE_TTR_SHOOT_MIDDLE,
+        };
+        static constexpr int SEQ_LEN = 7;
+        static bool last_up = false;
+        static bool last_down = false;
+
+        auto seq_idx = [&]() -> int {
+            for (int i = 0; i < SEQ_LEN; ++i)
+                if (SEQUENCE[i] == current_planner_state_) return i;
+            return -1;
+        };
+
+        if (UP && !last_up) {
+            int i = seq_idx();
+            i = (i < 0) ? 0 : (i + 1 < SEQ_LEN ? i + 1 : SEQ_LEN - 1);
+            current_planner_state_ = SEQUENCE[i];
+            apply_state_to_packet(current_planner_state_);
+            log_current_operation_state("up_btn");
+        }
+        if (DOWN && !last_down) {
+            int i = seq_idx();
+            i = (i < 0) ? 0 : (i - 1 >= 0 ? i - 1 : 0);
+            current_planner_state_ = SEQUENCE[i];
+            apply_state_to_packet(current_planner_state_);
+            log_current_operation_state("down_btn");
+        }
+        last_up = UP;
+        last_down = DOWN;
+
         // 配列操作ここまで
     }
 
@@ -766,7 +864,8 @@ private:
         std_msgs::msg::Int16MultiArray msg;
 
         // ★★★ 状態別のモーター制御を毎周期適用 ★★★
-        if (!is_manual_mode()) {
+        // STATE_KFS_HOLD は漸進シーケンスのためマニュアルモードでも毎周期適用
+        if (!is_manual_mode() || current_planner_state_ == STATE_KFS_HOLD) {
             apply_state_to_packet(current_planner_state_);
         }
 
