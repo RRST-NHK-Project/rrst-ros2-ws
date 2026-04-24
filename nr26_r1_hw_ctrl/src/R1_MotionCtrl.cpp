@@ -22,7 +22,7 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 
 // 以下マイコンに合わせて設定
 #define OUTPUT_DEVICE_ID 2 // 出力マイコン（モーター制御）のID
-#define INPUT_DEVICE_ID  3 // 入力マイコン（マイクロスイッチやエンコーダ）のID
+#define INPUT_DEVICE_ID 3  // 入力マイコン（マイクロスイッチやエンコーダ）のID
 #define TX16NUM 24         // 送信データ数
 #define RX16NUM 17         // 受信データ数
 
@@ -54,10 +54,12 @@ std::atomic<int64_t> g_abs_coord{0};          // 最終的な高さ座標(下端
 // =================================================================
 // SwitchInputノード: ID=3のESP32からマイクロスイッチの状態を受信する
 // =================================================================
-class SwitchInput : public rclcpp::Node {
+class SwitchInput : public rclcpp::Node
+{
 public:
     SwitchInput()
-        : Node("switch_input_" + std::to_string(INPUT_DEVICE_ID)) {
+        : Node("switch_input_" + std::to_string(INPUT_DEVICE_ID))
+    {
 
         sw_sub_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
             "serial_rx_" + std::to_string(INPUT_DEVICE_ID),
@@ -69,12 +71,14 @@ public:
     }
 
 private:
-    void sw_callback(const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
+    void sw_callback(const std_msgs::msg::Int16MultiArray::SharedPtr msg)
+    {
         // SW4 (data[12]) まで使用するため、サイズチェックを13以上に変更
-        if (msg->data.size() < 13) {
+        if (msg->data.size() < 13)
+        {
             RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000,
-                        "serial_rx_%d: データが短すぎます (%zu)",
-                        INPUT_DEVICE_ID, msg->data.size());
+                                 "serial_rx_%d: データが短すぎます (%zu)",
+                                 INPUT_DEVICE_ID, msg->data.size());
             return;
         }
 
@@ -84,20 +88,21 @@ private:
         g_micro2_sw = msg->data[9];  // 下端スイッチ(micro2)
         g_micro3_sw = msg->data[11];
         g_micro4_sw = msg->data[12];
-        g_enc1_val  = msg->data[1];
+        g_enc1_val = msg->data[1];
 
         // =============================================================
         // 座標調査・ラップアラウンド計算実装
         // =============================================================
         int16_t current_enc1 = msg->data[1];
 
-        if (!g_coord_initialized.load()) {
+        if (!g_coord_initialized.load())
+        {
             g_last_enc1_val.store(current_enc1);
             g_coord_initialized.store(true);
         }
 
         // =====================================================================
-        // 【重要】エンコーダの「飛躍（16bitハードの限界）」は 32768 または 65536 
+        // 【重要】エンコーダの「飛躍（16bitハードの限界）」は 32768 または 65536
         // （「1周=8000」は機械的な回転数であり、デジタル的なラップアラウンド値とは別）
         // =====================================================================
         const int HALF_ENCODER = 16384;    // デジタルデータの飛躍値の半分
@@ -106,9 +111,12 @@ private:
         int diff = (int)current_enc1 - (int)g_last_enc1_val.load();
         int32_t r_count = g_rotation_count.load();
 
-        if (diff > HALF_ENCODER) {
+        if (diff > HALF_ENCODER)
+        {
             r_count--;
-        } else if (diff < -HALF_ENCODER) {
+        }
+        else if (diff < -HALF_ENCODER)
+        {
             r_count++;
         }
 
@@ -119,7 +127,8 @@ private:
         int64_t total_encoder = (int64_t)r_count * ENCODER_MAX + (int64_t)current_enc1;
 
         // 下端スイッチ(data[9])で座標リセット用のオフセットを設定
-        if (msg->data[9] != 0) {
+        if (msg->data[9] != 0)
+        {
             g_zero_offset.store(total_encoder);
             RCLCPP_INFO(get_logger(), "[COORD RESET!] 下端ボタン押下により座標0へオフセット設定");
         }
@@ -130,46 +139,50 @@ private:
         g_abs_coord.store(abs_coord);
 
         // ★ここで 8000 で割ることで「物理的な1回転」を算出します
-        double rot = (double)abs_coord / 8000.0; 
+        double rot = (double)abs_coord / 8192.0;
 
         // 以下リアルタイムで数値取るデバックログ　重いとき消すこと推奨
-        if (diff != 0) {
-            RCLCPP_INFO(get_logger(), 
-                "\n--- ROTATION DEBUG ---\n"
-                "  生値の変化 : %d -> %d (diff: %d)\n"
-                "  デジタルラップ : %d 回\n"
-                "  絶対カウント   : %ld\n"
-                "  現在回転数     : %.3f 回転 (1周8000)\n"
-                "----------------------", 
-                (int)current_enc1 - diff, (int)current_enc1, diff, 
-                (int)r_count, abs_coord, rot);
+        if (diff != 0)
+        {
+            // RCLCPP_INFO(get_logger(),
+            //             "\n--- ROTATION DEBUG ---\n"
+            //             "  生値の変化 : %d -> %d (diff: %d)\n"
+            //             "  デジタルラップ : %d 回\n"
+            //             "  絶対カウント   : %ld\n"
+            //             "  現在回転数     : %.3f 回転 (1周8000)\n"
+            //             "----------------------",
+            //             (int)current_enc1 - diff, (int)current_enc1, diff,
+            //             (int)r_count, abs_coord, rot);
         }
-
 
         // --- 通信デバッグ追加 ---
         static uint64_t packet_count = 0;
         packet_count++;
 
         // 状態変化時のみ即時表示
-        static int16_t l9=0, l10=0, l11=0, l12=0;
-        if (msg->data[9] != l9 || msg->data[10] != l10 || msg->data[11] != l11 || msg->data[12] != l12) {
-            RCLCPP_INFO(get_logger(), "SW Changed! [下(9):%d, 上(10):%d, 外(11):%d, 内(12):%d]", 
-                        msg->data[9], msg->data[10], msg->data[11], msg->data[12]);
-            l9 = msg->data[9]; l10 = msg->data[10]; l11 = msg->data[11]; l12 = msg->data[12];
+        static int16_t l9 = 0, l10 = 0, l11 = 0, l12 = 0;
+        if (msg->data[9] != l9 || msg->data[10] != l10 || msg->data[11] != l11 || msg->data[12] != l12)
+        {
+            // RCLCPP_INFO(get_logger(), "SW Changed! [下(9):%d, 上(10):%d, 外(11):%d, 内(12):%d]",
+            //             msg->data[9], msg->data[10], msg->data[11], msg->data[12]);
+            l9 = msg->data[9];
+            l10 = msg->data[10];
+            l11 = msg->data[11];
+            l12 = msg->data[12];
         }
 
         // 定期ダンプに受信件数を追加
-        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000, 
-            "RX Heartbeat (Total:%lu) | Dump: [%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d]",
-            packet_count,
-            msg->data[0], msg->data[1], msg->data[2], msg->data[3], 
-            msg->data[4], msg->data[5], msg->data[6], msg->data[7], 
-            msg->data[8], msg->data[9], msg->data[10], msg->data[11], 
-            msg->data[12], msg->data[13], msg->data[14], msg->data[15]);
+        // RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
+        //                      "RX Heartbeat (Total:%lu) | Dump: [%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d]",
+        //                      packet_count,
+        //                      msg->data[0], msg->data[1], msg->data[2], msg->data[3],
+        //                      msg->data[4], msg->data[5], msg->data[6], msg->data[7],
+        //                      msg->data[8], msg->data[9], msg->data[10], msg->data[11],
+        //                      msg->data[12], msg->data[13], msg->data[14], msg->data[15]);
 
         // SW3, SW4専用の明示的なデバッグ
         RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
-            "【通信確認】SW3(外側):%d, SW4(内側):%d", msg->data[11], msg->data[12]);
+                             "【通信確認】SW3(外側):%d, SW4(内側):%d", msg->data[11], msg->data[12]);
     }
 
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sw_sub_;
@@ -178,10 +191,12 @@ private:
 // =================================================================
 // HardWareControlノード: ID=2のESP32へモーター指令を送信する
 // =================================================================
-class HardWareControl : public rclcpp::Node {
+class HardWareControl : public rclcpp::Node
+{
 public:
     HardWareControl()
-        : Node("hardware_control_" + std::to_string(OUTPUT_DEVICE_ID)) {
+        : Node("hardware_control_" + std::to_string(OUTPUT_DEVICE_ID))
+    {
 
         // 配列を0で初期化
         data_.assign(TX16NUM, 0);
@@ -243,7 +258,8 @@ public:
     }
 
 private:
-    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
+    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg)
+    {
 
         // コントローラーの入力を取得、使わない入力はコメントアウト推奨
         // float LS_X = -1 * msg->axes[0];
@@ -267,7 +283,7 @@ private:
         // float L2_DIGITAL = (-1 * msg->axes[2] + 1) / 2;
         // float R2_DIGITAL = (-1 * msg->axes[5] + 1) / 2;
 
-        // bool L2 = msg->buttons[6];
+        bool L2 = msg->buttons[6];
         // bool R2 = msg->buttons[7];
 
         bool SHARE = msg->buttons[8];
@@ -284,18 +300,18 @@ private:
         // static bool share_latch = false;
 
         // マイクロスイッチの状態をグローバル変数から取得
-        int16_t micro1_sw = g_micro1_sw.load(); 
-        int16_t micro2_sw = g_micro2_sw.load(); 
-        int16_t micro3_sw = g_micro3_sw.load(); 
-        int16_t micro4_sw = g_micro4_sw.load(); 
+        int16_t micro1_sw = g_micro1_sw.load();
+        int16_t micro2_sw = g_micro2_sw.load();
+        int16_t micro3_sw = g_micro3_sw.load();
+        int16_t micro4_sw = g_micro4_sw.load();
 
         // 制御ノード側のデバッグログ
-        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-            "【制御ノード表示】SW状態: 上=%d (%s), 下=%d (%s), 外=%d (%s), 内=%d (%s)", 
-            micro1_sw, micro1_sw ? "停止" : "通常",
-            micro2_sw, micro2_sw ? "停止" : "通常",
-            micro3_sw, micro3_sw ? "停止" : "通常",
-            micro4_sw, micro4_sw ? "停止" : "通常");
+        // RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
+        //                      "【制御ノード表示】SW状態: 上=%d (%s), 下=%d (%s), 外=%d (%s), 内=%d (%s)",
+        //                      micro1_sw, micro1_sw ? "停止" : "通常",
+        //                      micro2_sw, micro2_sw ? "停止" : "通常",
+        //                      micro3_sw, micro3_sw ? "停止" : "通常",
+        //                      micro4_sw, micro4_sw ? "停止" : "通常");
 
         // 以降、配列data_を操作する
         // =================================================================
@@ -304,131 +320,202 @@ private:
         // スピアをマガジンに込めた後、装填し、使用後排莢
         // =================================================================
 
-        static int MAG_SERVO_ANGLE[] = {270, 233, 187, 139, 93, 49, 4};
+        static int MAG_SERVO_ANGLE[] = {270, 233, 187, 139, 99, 55, 4};
         static int BAR_PUSH_ANGLE = 10;
         static int BAR_HOLD_ANGLE = 43;
         static int BAR_RELE_ANGLE = 245;
         static int cross_pre = 0;
         static int CROSS_PUSH_COUNT = 0;
-        static int CROSS_PUSH_MAX = 31;
+        static int CROSS_PUSH_MAX = 42;
         static int REUSE_ANGLE = 8;
         static int EJECT_ANGLE = 90;
 
-        if (CROSS == 1 && cross_pre == 0) {
+        if (CROSS == 1 && cross_pre == 0)
+        {
             CROSS_PUSH_COUNT = (CROSS_PUSH_COUNT + 1) % CROSS_PUSH_MAX;
         }
         // SETに1を合わせる
-        if (CROSS_PUSH_COUNT == 0) {
+        if (CROSS_PUSH_COUNT == 0) // 1本目格納
+        {
             data_[9] = 270;
             data_[12] = REUSE_ANGLE;
         }
         // SETに2を合わせる
-        if (CROSS_PUSH_COUNT == 1) {
+        if (CROSS_PUSH_COUNT == 1) // 2本目格納
+        {
             data_[9] = MAG_SERVO_ANGLE[1];
         }
-        // SETに3を合わせる
-        if (CROSS_PUSH_COUNT == 2) {
-            data_[9] = MAG_SERVO_ANGLE[2];
-        }
-        // SETに4を合わせる＆SHOOTに1を合わせる
-        if (CROSS_PUSH_COUNT == 3) {
+        if (CROSS_PUSH_COUNT == 3) // 1本目装填
+        {
             data_[9] = MAG_SERVO_ANGLE[3];
             data_[10] = BAR_HOLD_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 4) {
+        if (CROSS_PUSH_COUNT == 4) // 1固定
+        {
             data_[10] = BAR_PUSH_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 5) {
+        if (CROSS_PUSH_COUNT == 5) // 一本目マガジンに戻す
+        {
             data_[10] = BAR_RELE_ANGLE;
         }
         // SHOOTに2を合わせる
-        if (CROSS_PUSH_COUNT == 6) {
+        if (CROSS_PUSH_COUNT == 6) // 2準備
+        {
             data_[9] = MAG_SERVO_ANGLE[4];
         }
-        if (CROSS_PUSH_COUNT == 7) {
+        if (CROSS_PUSH_COUNT == 7) // 2入る
+        {
             data_[10] = BAR_HOLD_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 8) {
+        if (CROSS_PUSH_COUNT == 8) // 2固定
+        {
             data_[10] = BAR_PUSH_ANGLE;
         }
-         if (CROSS_PUSH_COUNT == 9) {
+        if (CROSS_PUSH_COUNT == 9) // 2戻す
+        {
             data_[10] = BAR_RELE_ANGLE;
         }
-        // SHOOTに4を合わせる
-        if (CROSS_PUSH_COUNT == 10) {
-            data_[9] = MAG_SERVO_ANGLE[6];
+        // SETに3を合わせる
+        if (CROSS_PUSH_COUNT == 10) // 3本目格納
+        {
+            data_[9] = MAG_SERVO_ANGLE[2];
         }
-        if (CROSS_PUSH_COUNT == 11) {
-            data_[10] = BAR_HOLD_ANGLE;
-        }
-        if (CROSS_PUSH_COUNT == 12) {
-            data_[10] = BAR_PUSH_ANGLE;
-        }
-         if (CROSS_PUSH_COUNT == 13) {
-            data_[10] = BAR_RELE_ANGLE;
-        }
-        // SHOOTに3を合わせる
-        if (CROSS_PUSH_COUNT == 14) {
-            data_[9] = MAG_SERVO_ANGLE[5];
-        }
-        if (CROSS_PUSH_COUNT == 15) {
-            data_[10] = BAR_HOLD_ANGLE;
-        }
-        if (CROSS_PUSH_COUNT == 16) {
-            data_[10] = BAR_PUSH_ANGLE;
-        }
-         if (CROSS_PUSH_COUNT == 17) {
-            data_[10] = BAR_RELE_ANGLE;
-        }
-        // SHOOTに4を合わせる＆RELEASEに3を合わせる
-        if (CROSS_PUSH_COUNT == 18) {
-            data_[9] = MAG_SERVO_ANGLE[6];
-            data_[12] = EJECT_ANGLE;
-            data_[10] = BAR_HOLD_ANGLE;
-        }
-        if (CROSS_PUSH_COUNT == 19) {
-            data_[10] = BAR_PUSH_ANGLE;
-            data_[12] = REUSE_ANGLE;
-        }
-        // SHOOTに3を合わせる
-        if (CROSS_PUSH_COUNT == 20) {
-            data_[9] = MAG_SERVO_ANGLE[5];
-        }
-        if (CROSS_PUSH_COUNT == 21) {
-            data_[10] = BAR_RELE_ANGLE;
-        }
-        if (CROSS_PUSH_COUNT == 22) {
-            data_[9] = MAG_SERVO_ANGLE[6];
-            data_[12] = EJECT_ANGLE;
-        }
-        if (CROSS_PUSH_COUNT == 23) {
-            data_[12] = REUSE_ANGLE;
-        }
-        // SHOOTに1を合わせる
-        if (CROSS_PUSH_COUNT == 24) {
+        // SETに4を合わせる＆SHOOTに1を合わせる
+        if (CROSS_PUSH_COUNT == 11) // 4本目格納,一本目移動
+        {
             data_[9] = MAG_SERVO_ANGLE[3];
             data_[10] = BAR_HOLD_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 25) {
+        if (CROSS_PUSH_COUNT == 12) // 1固定
+        {
             data_[10] = BAR_PUSH_ANGLE;
         }
-         if (CROSS_PUSH_COUNT == 26) {
+        if (CROSS_PUSH_COUNT == 13) // 一本目マガジンに戻す
+        {
+            data_[10] = BAR_RELE_ANGLE;
+        }
+        // SHOOTに2を合わせる
+        if (CROSS_PUSH_COUNT == 14) // 2準備
+        {
+            data_[9] = MAG_SERVO_ANGLE[4];
+        }
+        if (CROSS_PUSH_COUNT == 15) // 2入る
+        {
+            data_[10] = BAR_HOLD_ANGLE;
+        }
+        if (CROSS_PUSH_COUNT == 16) // 2固定
+        {
+            data_[10] = BAR_PUSH_ANGLE;
+        }
+        if (CROSS_PUSH_COUNT == 17) // 2戻す
+        {
+            data_[10] = BAR_RELE_ANGLE;
+        }
+        // SHOOTに4を合わせる
+        if (CROSS_PUSH_COUNT == 18) // 4準備
+        {
+            data_[9] = MAG_SERVO_ANGLE[6];
+        }
+        if (CROSS_PUSH_COUNT == 19) // 4入る
+        {
+            data_[10] = BAR_HOLD_ANGLE;
+        }
+        if (CROSS_PUSH_COUNT == 20) // 4固定
+        {
+            data_[10] = BAR_PUSH_ANGLE;
+        }
+        if (CROSS_PUSH_COUNT == 21) // 4戻す
+        {
+            data_[10] = BAR_RELE_ANGLE;
+        }
+        // SHOOTに3を合わせる
+        if (CROSS_PUSH_COUNT == 22) // 3準備
+        {
+            data_[9] = MAG_SERVO_ANGLE[5];
+        }
+        if (CROSS_PUSH_COUNT == 23) // 3入る
+        {
+            data_[10] = BAR_HOLD_ANGLE;
+        }
+        if (CROSS_PUSH_COUNT == 24) // 3固定
+        {
+            data_[10] = BAR_PUSH_ANGLE;
+        }
+        if (CROSS_PUSH_COUNT == 25) // 3戻す
+        {
+            data_[10] = BAR_RELE_ANGLE;
+        }
+        // SHOOTに4を合わせる＆RELEASEに3を合わせる
+        if (CROSS_PUSH_COUNT == 26) // 4入れる
+        {
+            data_[9] = MAG_SERVO_ANGLE[6];
+            data_[10] = BAR_HOLD_ANGLE;
+        }
+        if (CROSS_PUSH_COUNT == 27) // 3落とす
+        {
+            data_[12] = EJECT_ANGLE;
+        }
+        if (CROSS_PUSH_COUNT == 28) // 4固定
+        {
+            data_[10] = BAR_PUSH_ANGLE;
+            data_[12] = REUSE_ANGLE;
+        }
+        // SHOOTに3を合わせる
+        if (CROSS_PUSH_COUNT == 29) // 空いた3準備
+        {
+            data_[9] = MAG_SERVO_ANGLE[5];
+        }
+        if (CROSS_PUSH_COUNT == 30) // 3に入れる
+        {
+            data_[10] = BAR_RELE_ANGLE;
+        }
+        if (CROSS_PUSH_COUNT == 31) // 4本目開放
+        {
+            data_[9] = MAG_SERVO_ANGLE[6];
+        }
+        if (CROSS_PUSH_COUNT == 32) // 4固定
+        {
+            data_[12] = EJECT_ANGLE;
+        }
+        if (CROSS_PUSH_COUNT == 33) // 開放閉じる
+        {
+            data_[12] = REUSE_ANGLE;
+        }
+        // SHOOTに1を合わせる
+        if (CROSS_PUSH_COUNT == 34) //
+        {
+            data_[9] = MAG_SERVO_ANGLE[3];
+            data_[10] = BAR_HOLD_ANGLE;
+        }
+        if (CROSS_PUSH_COUNT == 35)
+        {
+            data_[10] = BAR_PUSH_ANGLE;
+        }
+        if (CROSS_PUSH_COUNT == 36) // 固定
+        {
             data_[10] = BAR_RELE_ANGLE;
         }
         // RELEASEに1を合わせる＆SHOOTに2を合わせる
-        if (CROSS_PUSH_COUNT == 27) {
+        if (CROSS_PUSH_COUNT == 37) // 1開放
+        {
             data_[9] = MAG_SERVO_ANGLE[4];
+        }
+        if (CROSS_PUSH_COUNT == 38) // 1入れる
+        {
             data_[12] = EJECT_ANGLE;
             data_[10] = BAR_HOLD_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 28) {
+        if (CROSS_PUSH_COUNT == 39) // 固定
+        {
             data_[10] = BAR_PUSH_ANGLE;
         }
-         if (CROSS_PUSH_COUNT == 29) {
+        if (CROSS_PUSH_COUNT == 40) // 2に戻す
+        {
             data_[10] = BAR_RELE_ANGLE;
         }
         // RELEASEに2を合わせる
-        if (CROSS_PUSH_COUNT == 30) {
+        if (CROSS_PUSH_COUNT == 41) // 2開放
+        {
             data_[9] = MAG_SERVO_ANGLE[5];
             data_[12] = EJECT_ANGLE;
         }
@@ -442,43 +529,64 @@ private:
 
         static int circle_pre = 0;
         static int CIRCLE_PUSH_COUNT = 0;
-        static int CIRCLE_PUSH_MAX = 7;
+        static int CIRCLE_PUSH_MAX = 5;
+
+        static int r1_pre = 0;
+        static int R1_PUSH_COUNT = 0;
+        static int R1_PUSH_MAX = 2;
 
         static int MOVE_SPEED = 100;
         static int VACUUM_SPEED = 250;
 
-        if (CIRCLE == 1 && circle_pre == 0) {
+        if (CIRCLE == 1 && circle_pre == 0)
+        {
             CIRCLE_PUSH_COUNT = (CIRCLE_PUSH_COUNT + 1) % CIRCLE_PUSH_MAX;
         }
-        if (CIRCLE_PUSH_COUNT == 0) {
+        if (CIRCLE_PUSH_COUNT == 0)
+        {
             data_[1] = 0;
+            data_[3] = 0;
             data_[4] = 0;
-            data_[17] = 0;
         }
-        if (CIRCLE_PUSH_COUNT == 1) {
-            data_[1] = MOVE_SPEED - 70; // ハンド取り出し時速度を遅くするため-50
-            if (micro3_sw == 1) data_[1] = 0; // 外側SWで停止
-        }                       
-        if (CIRCLE_PUSH_COUNT == 2) {
+        if (CIRCLE_PUSH_COUNT == 1)
+        {
+            data_[1] = MOVE_SPEED - 50; // ハンド取り出し時速度を遅くするため-50
+            if (micro3_sw == 1)
+                data_[1] = 0; // 外側SWで停止
+        }
+        if (CIRCLE_PUSH_COUNT == 2)
+        {
             data_[1] = 0;
             data_[3] = VACUUM_SPEED;
         }
-        if (CIRCLE_PUSH_COUNT == 3) {
+        if (CIRCLE_PUSH_COUNT == 3)
+        {
             data_[1] = MOVE_SPEED * -1;
-            if (micro4_sw == 1) data_[1] = 0; // 内側SWで停止
+            if (micro4_sw == 1)
+                data_[1] = 0; // 内側SWで停止
         }
-        if (CIRCLE_PUSH_COUNT == 4) {
+        if (CIRCLE_PUSH_COUNT == 4)
+        {
             data_[1] = 0;
-            data_[3] = 0;             
+            data_[3] = 0;
         }
-        if (CIRCLE_PUSH_COUNT == 5) {
-            data_[17] = 1;
-        }
-        if (CIRCLE_PUSH_COUNT == 6) {
-            data_[17] = 0;
-        }   
 
         circle_pre = CIRCLE;
+
+        if (R1 == 1 && r1_pre == 0)
+        {
+            R1_PUSH_COUNT = (R1_PUSH_COUNT + 1) % R1_PUSH_MAX;
+            data_[17] = 0;
+        }
+        if (R1_PUSH_COUNT == 1)
+        {
+            data_[17] = 1;
+        }
+        if (R1_PUSH_COUNT == 2)
+        {
+            data_[17] = 0;
+        }
+        r1_pre = R1;
 
         // =================================================================
         // 元CIRCLE:「棒ホールド機構」※CROSSと統合済み
@@ -545,13 +653,16 @@ private:
         static int SQUARE_PUSH_COUNT = 0;
         static int SQUARE_PUSH_MAX = 2;
 
-        if (SQUARE == 1 && square_pre == 0) {
+        if (SQUARE == 1 && square_pre == 0)
+        {
             SQUARE_PUSH_COUNT = (SQUARE_PUSH_COUNT + 1) % SQUARE_PUSH_MAX;
         }
-        if (SQUARE_PUSH_COUNT == 0) {
+        if (SQUARE_PUSH_COUNT == 0)
+        {
             data_[11] = BAR_BTM_ANGLE;
         }
-        if (SQUARE_PUSH_COUNT == 1) {
+        if (SQUARE_PUSH_COUNT == 1)
+        {
             data_[11] = BAR_BTM_HOLD_ANGLE;
         }
 
@@ -562,44 +673,64 @@ private:
         // ボタンを押し続けると槍を押し上げるモーターが回転し続ける
         // =================================================================
 
-        if (UP==1) {
+        if (UP == 1)
+        {
             data_[4] = -120;
-        } else if (DOWN==1) {
+        }
+        else if (DOWN == 1)
+        {
             data_[4] = 120;
-        } else {
+        }
+        else
+        {
             data_[4] = 0;
         }
 
-        // =================================================================       
-        // SHARE:「スピアヘッド回収ハンドの昇降機構」        
-        // ボタンを押すとスピアヘッド回収ハンド上昇機構のエアシリンダーによって上昇or下降        
+        // =================================================================
+        // SHARE:「足」
+        // ボタンを押すとエアシリンダーによって足が生える
         // =================================================================
 
+        static int share_pre = 0;
+        static int share_count = 0;
+        static int share_max = 2;
 
+        if (SHARE == 1 && share_pre == 0)
+        {
+            share_count = (share_count + 1) % share_max;
+        }
+        if (share_count == 0)
+        {
+            data_[19] = 0;
+        }
+        if (share_count == 1)
+        {
+            data_[19] = 1;
+        }
+        share_pre = SHARE;
 
-
-
-
-
-        // =================================================================       
-        // PS:「スピアヘッド回収ハンドの昇降機構」        
-        // ボタンを押すとスピアヘッド回収ハンド上昇機構のエアシリンダーによって上昇or下降        
         // =================================================================
-            
-        static int ps_pre = 0;        
-        static int ps_count = 0;        
+        // PS:「スピアヘッド回収ハンドの昇降機構」
+        // ボタンを押すとスピアヘッド回収ハンド上昇機構のエアシリンダーによって上昇or下降
+        // =================================================================
+
+        static int ps_pre = 0;
+        static int ps_count = 0;
         static int ps_max = 2;
-                
-        if (PS == 1 && ps_pre == 0) {            
-        ps_count = (ps_count + 1) % ps_max;        
+
+        if (PS == 1 && ps_pre == 0)
+        {
+            ps_count = (ps_count + 1) % ps_max;
         }
-        if (ps_count == 0) {            
-                data_[18] = 0;        
-        }        
-        if (ps_count == 1) {            
-                data_[18] = 1;        
+        if (ps_count == 0)
+        {
+            data_[18] = 0;
         }
-                
+        if (ps_count == 1)
+        {
+            data_[18] = 1;
+        }
+
         ps_pre = PS;
 
         // =================================================================
@@ -614,61 +745,80 @@ private:
         // =================================================================
 
         static const int NORMAL_SPEED = 100; // 通常速度
-        static const int SLOW_SPEED   = 30;  // 減速後速度
+        static const int SLOW_SPEED = 30;    // 減速後速度
 
         // モーター1回転あたりのエンコーダのカウント数
         // 実験結果により、1回転 = 8000 カウント に設定
-        static const double COUNTS_PER_ROTATION = 8000.0;
+        static const double COUNTS_PER_ROTATION = 360;
 
         // 符号付き16bitの飛躍(-32768〜32767)は、差分累積(g_abs_coord)により計算・解決済み
         // ※上昇時（エンコーダ減少）に diff がマイナスになるため、「- diff」の計算によって絶対座標は増加（0→50）する
-        int64_t abs_coord = g_abs_coord.load(); 
+        int64_t abs_coord = g_abs_coord.load();
         double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
 
         // ヒステリシス（遊び）を持たせた減速ゾーン判定（チャタリング防止用）
         // 下端付近 (0〜3回転) または 上端付近 (47〜50回転) で減速
         static bool is_fork_slow = false;
-        if (rot_units <= 3.0 || rot_units >= 47.0) {
+        if (rot_units <= 3.0 || rot_units >= 47.0)
+        {
             is_fork_slow = true;
-        } else if (rot_units >= 4.0 && rot_units <= 46.0) {
+        }
+        else if (rot_units >= 4.0 && rot_units <= 46.0)
+        {
             is_fork_slow = false; // ヒステリシスにより、ゾーンから少し離れるまで通常速度に戻さない
         }
         bool in_slow_zone = is_fork_slow;
 
         // 回転方向に応じた速度を決定
-        int fwd_speed = in_slow_zone ?  SLOW_SPEED :  NORMAL_SPEED;  // 正回転(上昇)の速度
-        int rev_speed = in_slow_zone ? -SLOW_SPEED : -NORMAL_SPEED;  // 逆回転(下降)の速度
+        int fwd_speed = in_slow_zone ? SLOW_SPEED : NORMAL_SPEED;   // 正回転(上昇)の速度
+        int rev_speed = in_slow_zone ? -SLOW_SPEED : -NORMAL_SPEED; // 逆回転(下降)の速度
 
-        if (micro2_sw == 1) {
+        if (micro2_sw == 1)
+        {
             // ★上端制限(micro2_sw): これ以上上に行かないように正回転(L1)を禁止し、逆回転(R1)のみ許可
-            if (R1 == 1) {
+            if (L1 == 1)
+            {
                 data_[2] = rev_speed;
-            } else {
+            }
+            else
+            {
                 data_[2] = 0;
             }
-        } else if (micro1_sw == 1) {
+        }
+        else if (micro1_sw == 1)
+        {
             // ★下端制限(micro1_sw): これ以上下に行かないように逆回転(R1)を禁止し、正回転(L1)のみ許可
-            if (L1 == 1) {
+            if (L2 == 1)
+            {
                 data_[2] = fwd_speed;
-            } else {
+            }
+            else
+            {
                 data_[2] = 0;
             }
-        } else {
+        }
+        else
+        {
             // マイクロスイッチに触れていない通常の範囲
-            if (L1 == 1) {
+            if (L2 == 1)
+            {
                 data_[2] = fwd_speed; // 上昇方向
-            } else if (R1 == 1) {
+            }
+            else if (L1 == 1)
+            {
                 data_[2] = rev_speed; // 下降方向
-            } else {
+            }
+            else
+            {
                 data_[2] = 0;
             }
         }
 
         // フォークリフト制御のデバックログ
-        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-            "【フォーク制御】回転数=%.2f, 減速=%s, 上端SW=%d, 下端SW=%d, 出力=%d",
-            rot_units, in_slow_zone ? "ON" : "OFF",
-            micro2_sw, micro1_sw, data_[2]);
+        // RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
+        //                      "【フォーク制御】回転数=%.2f, 減速=%s, 上端SW=%d, 下端SW=%d, 出力=%d",
+        //                      rot_units, in_slow_zone ? "ON" : "OFF",
+        //                      micro2_sw, micro1_sw, data_[2]);
 
         // =================================================================
         // LR
@@ -701,23 +851,26 @@ private:
     }
 
     // publish
-    void publisher_timer_callback() {
+    void publisher_timer_callback()
+    {
         std_msgs::msg::Int16MultiArray msg;
 
         // ★★★ コントローラーの操作が無い時でも、マイクロスイッチの安全停止を最優先で適用する ★★★
         // （PS4コントローラーのイベントが来ない間も常に制限をかけるため、ここに記述する）
-        int16_t micro1_sw = g_micro1_sw.load(); 
-        int16_t micro2_sw = g_micro2_sw.load(); 
+        int16_t micro1_sw = g_micro1_sw.load();
+        int16_t micro2_sw = g_micro2_sw.load();
 
         // 上昇中（data_[2] が正の値）かつ 上端スイッチが押されている場合
-        if (micro2_sw == 1 && data_[2] > 0) {
+        if (micro2_sw == 1 && data_[2] > 0)
+        {
             data_[2] = 0;
             // 重い場合以下のデバックのコメントアウト可
             RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】上端リミット到達！モーターの上昇を即時遮断しました！");
         }
-        
+
         // 下降中（data_[2] が負の値）かつ 下端スイッチが押されている場合
-        if (micro1_sw == 1 && data_[2] < 0) {
+        if (micro1_sw == 1 && data_[2] < 0)
+        {
             data_[2] = 0;
             // 重い場合以下のデバックのコメントアウト可
             RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】下端リミット到達！モーターの下降を即時遮断しました！");
@@ -739,36 +892,36 @@ private:
     //         return;
     //     }
 
-        // int16_t ENC1 = msg->data[1];
-        // int16_t ENC2 = msg->data[2];
-        // int16_t ENC3 = msg->data[3];
-        // int16_t ENC4 = msg->data[4];
-        // int16_t ENC5 = msg->data[5];
-        // int16_t ENC6 = msg->data[6];
-        // int16_t ENC7 = msg->data[7];
-        // int16_t ENC8 = msg->data[8];
+    // int16_t ENC1 = msg->data[1];
+    // int16_t ENC2 = msg->data[2];
+    // int16_t ENC3 = msg->data[3];
+    // int16_t ENC4 = msg->data[4];
+    // int16_t ENC5 = msg->data[5];
+    // int16_t ENC6 = msg->data[6];
+    // int16_t ENC7 = msg->data[7];
+    // int16_t ENC8 = msg->data[8];
 
-        // int16_t SW1 = msg->data[9];
-        // int16_t SW2 = msg->data[10];
-        // int16_t SW3 = msg->data[11];
-        // int16_t SW4 = msg->data[12];
-        // int16_t SW5 = msg->data[13];
-        // int16_t SW6 = msg->data[14];
-        // int16_t SW7 = msg->data[15];
-        // int16_t SW8 = msg->data[16];
+    // int16_t SW1 = msg->data[9];
+    // int16_t SW2 = msg->data[10];
+    // int16_t SW3 = msg->data[11];
+    // int16_t SW4 = msg->data[12];
+    // int16_t SW5 = msg->data[13];
+    // int16_t SW6 = msg->data[14];
+    // int16_t SW7 = msg->data[15];
+    // int16_t SW8 = msg->data[16];
 
-        // 以降、受信データを使った処理を記述
-        // エンコーダースイッチの状態を保存（モーター制御で使用）
-        // micro1_sw_ = SW1;
-        // micro2_sw_ = SW2;
+    // 以降、受信データを使った処理を記述
+    // エンコーダースイッチの状態を保存（モーター制御で使用）
+    // micro1_sw_ = SW1;
+    // micro2_sw_ = SW2;
 
-        // デバッグ: マイクロスイッチの受信値を確認
-        // RCLCPP_INFO(get_logger(),
-        //             "[マイクロSW] 上(L1禁止用)=%s  下(R1禁止用)=%s",
-        //             micro1_sw_ ? "★押されている" : "　押されていない",
-        //             micro2_sw_ ? "★押されている" : "　押されていない");
+    // デバッグ: マイクロスイッチの受信値を確認
+    // RCLCPP_INFO(get_logger(),
+    //             "[マイクロSW] 上(L1禁止用)=%s  下(R1禁止用)=%s",
+    //             micro1_sw_ ? "★押されている" : "　押されていない",
+    //             micro2_sw_ ? "★押されている" : "　押されていない");
 
-        // 受信データ処理ここまで
+    // 受信データ処理ここまで
     // }
 
     uint8_t device_id_;
@@ -780,13 +933,15 @@ private:
     std::vector<int16_t> data_;
 };
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     rclcpp::init(argc, argv);
 
     // figletでノード名を表示
     std::string figletout = "figlet R1 Motion Ctrl";
     int result = std::system(figletout.c_str());
-    if (result != 0) {
+    if (result != 0)
+    {
         std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
                   << std::endl;
         std::cerr << "Please install 'figlet' with the following command:"

@@ -30,6 +30,7 @@ L1、R1で回転しようとすると前進、後進してしまう
 #include "std_msgs/msg/int16_multi_array.hpp"
 #include "std_msgs/msg/int32.hpp"
 #include "std_msgs/msg/int32_multi_array.hpp"
+#include "std_msgs/msg/string.hpp"
 
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "sensor_msgs/point_cloud2_iterator.hpp"
@@ -58,7 +59,7 @@ public:
     SequenceControl()
         : Node("sequence_ctrl_node"),
           pid_angle_(2.0f, 0.0f, 0.1f, 0.6f),
-          pid_distance_(0.0008f, 0.0f, 0.0f, 0.4f),
+          pid_distance_(0.002f, 0.0f, 0.0f, 0.4f),
           pid_cube_yaw_(2.0f, 0.0f, 0.0f, 0.8f),
           pid_cube_dist_(3.0f, 0.0f, 0.0f, 1.0f),
           pid_cube_lat_(1.2f, 0.0f, 0.0f, 0.6f) {
@@ -70,6 +71,23 @@ public:
         this->declare_parameter("use_camera_offset", false);
         last_cube_update_ = rclcpp::Time(0, 0, get_clock()->get_clock_type());
 
+        // 段差シーケンス完了通知パブリッシャー
+        // 1 = 段差上り完了, -1 = 段差下り完了
+        step_complete_pub_ = this->create_publisher<std_msgs::msg::Int32>(
+            "r2_mff_step_complete", rclcpp::QoS(10));
+
+        // アリーナ走行完了通知パブリッシャー（r2_planner と GUI へ通知）
+        arena_walk_complete_pub_ = this->create_publisher<std_msgs::msg::Bool>(
+            "r2/arena_walk_complete", rclcpp::QoS(10));
+
+        // オドメトリリセットパブリッシャー
+        odom_reset_pub_ = this->create_publisher<std_msgs::msg::Bool>(
+            "odom_reset", rclcpp::QoS(10));
+
+        // 自動走行目標パブリッシャー（ARENA完了後に目標0,0,0を送信）
+        autodrive_target_pub_ = this->create_publisher<std_msgs::msg::Float32MultiArray>(
+            "r2_autodrive_cmd", rclcpp::QoS(10));
+
         timer_ = this->create_wall_timer(
             10ms,
             std::bind(&SequenceControl::loop, this));
@@ -79,6 +97,12 @@ public:
 
     // 壁調整シーケンス開始（PIDで角度・距離を整えてから段差上りへ自動移行）
     void start_wall_alignment() {
+        // 段差下り中はWALL_ALIGNを明示的に無効化
+        if (mode_ == StepMode::STEP_DOWN) {
+            RCLCPP_WARN(get_logger(), "WALL_ALIGN disabled during STEP_DOWN.");
+            return;
+        }
+
         if (mode_ != StepMode::NONE) {
             RCLCPP_WARN(get_logger(), "Sequence busy. WALL_ALIGN ignored.");
             return;
@@ -141,9 +165,13 @@ public:
 
         const double turn_sec = (std::abs(turn_deg) / 90.0) * turn_sec_per_90deg_;
         turn_end_time_ = this->now() + rclcpp::Duration::from_seconds(turn_sec);
+        // 角度PID用: 目標yawを絶対角度で保存（CW = yaw減少）
+        turn_target_yaw_ = odom_yaw_ - static_cast<double>(turn_deg) * M_PI / 180.0;
+        pid_angle_.reset();
         mode_ = StepMode::MFF_TURN;
 
-        RCLCPP_INFO(get_logger(), "MFF turn started: %ld deg (%.2f s)", static_cast<long>(turn_deg), turn_sec);
+        RCLCPP_INFO(get_logger(), "MFF turn started: %ld deg (%.2f s, target_yaw=%.3f rad)",
+                    static_cast<long>(turn_deg), turn_sec, turn_target_yaw_);
         return true;
     }
 
@@ -152,13 +180,22 @@ public:
             RCLCPP_WARN(get_logger(), "Sequence busy. STEP_DOWN ignored.");
             return; // 実行中なら無視
         }
+        use_rear_trigger_for_step_down_ = last_completed_step_was_down_;
         mode_ = StepMode::STEP_DOWN;
         next_down(StepDownState::FIRST_FORWARD);
+        RCLCPP_INFO(get_logger(),
+                    "STEP_DOWN started. first_trigger=%s",
+                    use_rear_trigger_for_step_down_ ? "rear sensor < down_dis" : "front sensors > down_dis");
     }
 
     // シーケンス実行中の判定
     bool is_busy() const {
         return mode_ != StepMode::NONE;
+    }
+
+    // MFFターン実行中かを返す（コマンド受理条件の判定に使用）
+    bool is_turn_active() const {
+        return mode_ == StepMode::MFF_TURN;
     }
 
     bool is_mff_mode_enabled() const {
@@ -176,14 +213,63 @@ public:
             mode_ = StepMode::NONE;
             state_up_ = StepUpState::IDLE;
             state_down_ = StepDownState::IDLE;
+            state_arena_ = ArenaWalkState::IDLE;
             state_executed_ = false;
             pkt.setMD(MD5, 0);
             pkt.setMD(MD6, 0);
             pkt.setMD(MD7, 0);
             pkt.setMD(MD8, 0);
+        } else {
+            // MFF有効時はアリーナモードを無効化
+            arena_mode_enabled_ = false;
         }
 
         RCLCPP_INFO(get_logger(), "Sequence mode: %s", mff_mode_enabled_ ? "MFF ENABLED" : "MFF DISABLED");
+    }
+
+    bool is_arena_mode_enabled() const {
+        return arena_mode_enabled_;
+    }
+
+    void set_arena_mode_enabled(bool enabled) {
+        if (arena_mode_enabled_ == enabled) {
+            return;
+        }
+
+        arena_mode_enabled_ = enabled;
+
+        if (!arena_mode_enabled_) {
+            mode_ = StepMode::NONE;
+            state_up_ = StepUpState::IDLE;
+            state_down_ = StepDownState::IDLE;
+            state_arena_ = ArenaWalkState::IDLE;
+            state_executed_ = false;
+            pkt.setMD(MD5, 0);
+            pkt.setMD(MD6, 0);
+            pkt.setMD(MD7, 0);
+            pkt.setMD(MD8, 0);
+        } else {
+            // アリーナモード有効時はMFFモードを無効化
+            mff_mode_enabled_ = false;
+            // モード切替直後にARENAシーケンスを自動開始
+            start_arena_walk();
+        }
+
+        RCLCPP_INFO(get_logger(), "Sequence mode: %s", arena_mode_enabled_ ? "ARENA ENABLED" : "ARENA DISABLED");
+    }
+
+    // odom_xy_yaw からyawを更新する関数（累積回転量を更新）
+    void set_odom_yaw(double yaw) {
+        double delta = yaw - odom_yaw_;
+        // [-π, π] に正規化してラップアラウンドを除去
+        if (delta > M_PI)
+            delta -= 2.0 * M_PI;
+        if (delta < -M_PI)
+            delta += 2.0 * M_PI;
+        if (turn_accumulating_) {
+            turn_accumulated_rad_ += delta;
+        }
+        odom_yaw_ = yaw;
     }
 
     // sdm15の値を更新する関数
@@ -194,6 +280,18 @@ public:
     // lidar値を更新する関数
     void set_lidar_value(int16_t value) {
         lidar_value = value;
+    }
+
+    // ld19_eight_direction_distance の left 値 [mm] を更新
+    void set_left_distance_mm(int16_t value_mm, bool valid) {
+        arena_left_mm_ = value_mm;
+        arena_left_valid_ = valid;
+    }
+
+    // ld19_eight_direction_distance の front 値 [mm] を更新
+    void set_front_distance_mm(int16_t value_mm, bool valid) {
+        arena_front_mm_ = value_mm;
+        arena_front_valid_ = valid;
     }
 
     // wall角度を更新する関数
@@ -214,6 +312,20 @@ public:
             cube_yaw_deg_ = yaw_deg;
             last_cube_update_ = this->now();
         }
+    }
+
+    // アリーナ走行シーケンス開始
+    void start_arena_walk() {
+        if (mode_ != StepMode::NONE) {
+            RCLCPP_WARN(get_logger(), "Sequence busy. ARENA_WALK ignored.");
+            return;
+        }
+        pid_angle_.reset();
+        pid_distance_.reset();
+        pid_distance_.set_target(arena_approach_target_mm);
+        mode_ = StepMode::ARENA_WALK;
+        next_arena(ArenaWalkState::AW1_FORWARD);
+        RCLCPP_INFO(get_logger(), "ARENA_WALK started.");
     }
 
     // キューブへの平行接近PIDシーケンス開始
@@ -328,8 +440,9 @@ private:
         STEP_UP,
         STEP_DOWN,
         MFF_TURN,
-        CUBE_SCAN, // キューブ探索（サーボスキャン）
-        CUBE_ALIGN // cube_detectionを使ったキューブへの平行接近PID
+        CUBE_SCAN,  // キューブ探索（サーボスキャン）
+        CUBE_ALIGN, // cube_detectionを使ったキューブへの平行接近PID
+        ARENA_WALK  // アリーナ走行シーケンス
     };
 
     // 状態管理（上り）
@@ -359,8 +472,36 @@ private:
         DONE
     };
 
+    // 状態管理（アリーナ走行）
+    enum class ArenaWalkState {
+        IDLE,
+        AW1_FORWARD,        // Step1: 前進して壁を検出
+        AW1_ALIGN,          // Step1: 壁整列（遠距離版）
+        AW2_MOVE_LEFT,      // Step2: 左移動して前方壁の切れ目を検出 → そのまま左壁寄せへ
+        AW2_LEFT_APPROACH,  // Step2: ld19左方向500mmまで左移動 → 停止
+        AW2_FRONT_APPROACH, // Step2: ld19前方2000mmまで前進 → オドメトリリセット・自動モードへ
+        DONE
+    };
+
+    // ARENA_WALK用定数
+    static constexpr int arena_wall_detect_mm = 700;          // 壁検出距離閾値 [mm]
+    static constexpr float arena_approach_target_mm = 350.0f; // 壁整列PID目標距離 [mm]
+    static constexpr int arena_align_done_mm = 400;           // 壁整列完了閾値 [mm]
+    static constexpr int arena_lateral_duty = 60;             // 横移動デューティ
+    static constexpr int arena_left_target_mm = 400;          // 左壁距離補正目標 [mm]（arena_drive_with_left_hold用）
+    static constexpr float arena_left_hold_kp = 0.20f;        // 左壁距離補正ゲイン [duty/mm]
+    static constexpr int arena_left_hold_max_duty = 40;       // 左壁補正最大duty
+    static constexpr int arena_wall_edge_delta_mm = 100;      // 壁切れ目検出閾値：基準値からこの値以上増加で切れ目と判定 [mm]
+    static constexpr int arena_left_approach_mm = 500;        // 左壁寄せ目標距離 [mm]（ld19 left）
+    static constexpr int arena_front_approach_mm = 2000;      // 前方寄せ目標距離 [mm]（ld19 front）
+    // 純粋回転のみでは壁角度計測が不安定になるため、wall_angle_approach_thrより大きく設定する
+    // （前進+回転の複合動作を早めに開始することで安定した計測を得る）
+    static constexpr float arena_angle_approach_thr = 0.50f; // arena整列で前進を開始する角度閾値 [rad]
+    static constexpr double turn_yaw_done_thr_ = 0.05;       // 旋回完了閾値 [rad]（約3度）
+
     StepMode mode_ = StepMode::NONE;
     bool mff_mode_enabled_ = false;
+    bool arena_mode_enabled_ = false;
     rclcpp::Time turn_end_time_;
     float turn_v1_ = 0.0f;
     float turn_v2_ = 0.0f;
@@ -369,10 +510,29 @@ private:
     static constexpr float turn_speed_norm_ = 0.5f;
     static constexpr double turn_sec_per_90deg_ = 3.00;
 
+    // オドメトリベース旋回用
+    double odom_yaw_ = 0.0;             // 現在のyaw [rad]（odom_xy_yawから更新）
+    double turn_accumulated_rad_ = 0.0; // 旋回開始からの累積回転量 [rad]（絶対値で判定）
+    double turn_target_rad_ = 0.0;      // 旋回目標角度 [rad]（絶対値）
+    bool turn_accumulating_ = false;    // 累積中フラグ
+    double turn_target_yaw_ = 0.0;      // 旋回目標yaw角度 [rad]（絶対角度、角度PID用）
+    bool last_completed_step_was_down_ = false;
+    bool use_rear_trigger_for_step_down_ = false;
+    int16_t arena_left_mm_ = 0; // 左側距離 [mm]（ld19_eight_direction_distance の left）
+    bool arena_left_valid_ = false;
+    int16_t arena_front_mm_ = 0; // 前方距離 [mm]（ld19_eight_direction_distance の front）
+    bool arena_front_valid_ = false;
+    int16_t arena_wall_edge_ref_mm_ = 0; // 壁切れ目検出用基準距離 [mm]
+
     StepUpState state_up_ = StepUpState::IDLE;
     StepDownState state_down_ = StepDownState::IDLE;
+    ArenaWalkState state_arena_ = ArenaWalkState::IDLE;
 
     rclcpp::TimerBase::SharedPtr timer_;
+    rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr step_complete_pub_;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr arena_walk_complete_pub_;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr odom_reset_pub_;
+    rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr autodrive_target_pub_;
     rclcpp::Time state_start_time_;
     bool state_executed_ = false; // 各状態での処理の実行状況を保存
 
@@ -387,6 +547,150 @@ private:
         state_start_time_ = this->now();
         state_down_ = next;
         state_executed_ = false;
+    }
+
+    void next_arena(ArenaWalkState next) {
+        state_start_time_ = this->now();
+        state_arena_ = next;
+        state_executed_ = false;
+    }
+
+    // ARENA_WALK用: 旋回セットアップ（odomベース＋タイムアウトフォールバック）
+    // deg_cw > 0: 時計回り, deg_cw < 0: 反時計回り
+    // 向き補正（v2*=-1, v3*=-1）込みで全輪同方向になるのが正しい
+    void arena_setup_turn(int32_t deg_cw) {
+        const float wz = (deg_cw > 0) ? turn_speed_norm_ : -turn_speed_norm_;
+        float v1 = wz;
+        float v2 = -wz;
+        v2 *= -1.0f;
+        float v3 = -wz;
+        v3 *= -1.0f;
+        float v4 = wz;
+        float max_v = std::max(std::max(fabsf(v1), fabsf(v2)), std::max(fabsf(v3), fabsf(v4)));
+        if (max_v < 1.0f)
+            max_v = 1.0f;
+        turn_v1_ = v1 / max_v;
+        turn_v2_ = v2 / max_v;
+        turn_v3_ = v3 / max_v;
+        turn_v4_ = v4 / max_v;
+        // 累積量をリセットして計測開始
+        turn_accumulated_rad_ = 0.0;
+        turn_accumulating_ = true;
+        // 絶対値で保持（正負に関わらず「何度回ったか」で判定するため）
+        turn_target_rad_ = std::abs(deg_cw * M_PI / 180.0);
+        // タイムアウト（odom が使えない場合のフォールバック、余裕を1.5倍で設定）
+        const double turn_sec = (std::abs(deg_cw) / 90.0) * turn_sec_per_90deg_ * 1.5;
+        turn_end_time_ = this->now() + rclcpp::Duration::from_seconds(turn_sec);
+        // 角度PID用: 目標yawを絶対角度で保存（CW = yaw減少）
+        turn_target_yaw_ = odom_yaw_ - static_cast<double>(deg_cw) * M_PI / 180.0;
+        pid_angle_.reset();
+        // mff_turn_sequence と同じ方式: target=0固定、入力に正規化済み yaw_error を渡す
+        RCLCPP_INFO(get_logger(), "ARENA turn: %ld deg (target=%.3f rad, target_yaw=%.3f rad, timeout=%.1f s)",
+                    static_cast<long>(deg_cw), turn_target_rad_, turn_target_yaw_, turn_sec);
+    }
+
+    // ARENA_WALK用: 旋回完了判定
+    // 回転方向の符号を問わず「開始から何ラジアン回ったか」の絶対値で判定する。
+    // atan2正規化によるラップアラウンド問題を回避するため累積量を使用。
+    // odom が届かない場合はタイムアウトをフォールバックとして使用。
+    bool arena_turn_reached() {
+        if (this->now() >= turn_end_time_) {
+            turn_accumulating_ = false;
+            RCLCPP_WARN(get_logger(), "ARENA turn: timeout fallback (accumulated=%.3f rad)", turn_accumulated_rad_);
+            return true;
+        }
+        const double turned = std::abs(turn_accumulated_rad_);
+        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
+                             "ARENA turn: accumulated=%.3f rad / target=%.3f rad", turned, turn_target_rad_);
+        if (turned >= turn_target_rad_) {
+            turn_accumulating_ = false;
+            return true;
+        }
+        return false;
+    }
+
+    // ARENA_WALK用: 壁整列PID（遠距離版）
+    // pid_angle_ と pid_distance_ を使用。呼び出し前に reset() と set_target() を済ませること。
+    // 整列完了で true を返す。
+    bool arena_wall_align() {
+        constexpr float dt = 0.01f;
+
+        if (lidar_value <= 0) {
+            pkt.setMD(MD5, 0);
+            pkt.setMD(MD6, 0);
+            pkt.setMD(MD7, 0);
+            pkt.setMD(MD8, 0);
+            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500, "ARENA_ALIGN: Waiting for LiDAR...");
+            return false;
+        }
+
+        if (std::abs(wall_angle) < wall_angle_threshold && lidar_value < arena_align_done_mm) {
+            pkt.setMD(MD5, 0);
+            pkt.setMD(MD6, 0);
+            pkt.setMD(MD7, 0);
+            pkt.setMD(MD8, 0);
+            return true;
+        }
+
+        const float wz = pid_angle_.update(static_cast<float>(wall_angle), dt);
+        float vx = 0.0f;
+        if (std::abs(wall_angle) < arena_angle_approach_thr) {
+            vx = pid_distance_.update(static_cast<float>(lidar_value), dt);
+        } else {
+            pid_distance_.reset();
+            pid_distance_.set_target(arena_approach_target_mm);
+        }
+
+        float v1 = vx + wz;
+        float v2 = -(vx - wz);
+        float v3 = -(vx - wz);
+        float v4 = vx + wz;
+
+        v1 = std::clamp(v1, -1.0f, 1.0f);
+        v2 = std::clamp(v2, -1.0f, 1.0f);
+        v3 = std::clamp(v3, -1.0f, 1.0f);
+        v4 = std::clamp(v4, -1.0f, 1.0f);
+
+        pkt.setMD(MD5, static_cast<int16_t>(v1 * align_duty_max));
+        pkt.setMD(MD6, static_cast<int16_t>(v2 * align_duty_max));
+        pkt.setMD(MD7, static_cast<int16_t>(v3 * align_duty_max));
+        pkt.setMD(MD8, static_cast<int16_t>(v4 * align_duty_max));
+
+        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
+                             "ARENA_ALIGN: angle=%.4f rad, dist=%d mm | vx=%.3f wz=%.3f",
+                             wall_angle, lidar_value, vx, wz);
+        return false;
+    }
+
+    // 前進しながら left 距離を target に保持する（forward_duty=0 で横移動のみ）
+    void arena_drive_with_left_hold(int forward_duty, bool left_only) {
+        int left_cmd = 0;
+        if (arena_left_valid_) {
+            const int error_mm = static_cast<int>(arena_left_mm_) - arena_left_target_mm;
+            const float raw = arena_left_hold_kp * static_cast<float>(error_mm);
+            left_cmd = static_cast<int>(std::round(raw));
+            left_cmd = std::clamp(left_cmd, -arena_left_hold_max_duty, arena_left_hold_max_duty);
+            if (left_only) {
+                left_cmd = std::max(left_cmd, 0);
+            }
+        } else if (left_only) {
+            left_cmd = arena_lateral_duty;
+        }
+
+        int md5 = -forward_duty - left_cmd;
+        int md6 = forward_duty + left_cmd;
+        int md7 = forward_duty - left_cmd;
+        int md8 = -forward_duty + left_cmd;
+
+        md5 = std::clamp(md5, -100, 100);
+        md6 = std::clamp(md6, -100, 100);
+        md7 = std::clamp(md7, -100, 100);
+        md8 = std::clamp(md8, -100, 100);
+
+        pkt.setMD(MD5, static_cast<int16_t>(md5));
+        pkt.setMD(MD6, static_cast<int16_t>(md6));
+        pkt.setMD(MD7, static_cast<int16_t>(md7));
+        pkt.setMD(MD8, static_cast<int16_t>(md8));
     }
 
     // 機構関数
@@ -622,6 +926,13 @@ private:
             }
             mode_ = StepMode::NONE;
             state_up_ = StepUpState::IDLE;
+            last_completed_step_was_down_ = false;
+            {
+                std_msgs::msg::Int32 msg;
+                msg.data = 1; // 段差上り完了
+                step_complete_pub_->publish(msg);
+                RCLCPP_INFO(get_logger(), "STEP_UP complete. Published r2_mff_step_complete=1");
+            }
             break;
         }
     }
@@ -638,7 +949,11 @@ private:
                 move_forward();
                 state_executed_ = true;
             }
-            if (sdm15_value_[2] > down_dis || sdm15_value_[3] > down_dis) // 前のセンサーで障害物がなくなったら
+            if (use_rear_trigger_for_step_down_) {
+                if (sdm15_value_[0] < down_dis) {
+                    next_down(StepDownState::FRONT_UP);
+                }
+            } else if (sdm15_value_[2] > down_dis || sdm15_value_[3] > down_dis) // 前のセンサーで障害物がなくなったら
             {
                 next_down(StepDownState::FRONT_UP);
             }
@@ -694,7 +1009,7 @@ private:
                 all_down();
                 state_executed_ = true;
             }
-            if ((now_time - state_start_time_).seconds() > 0.5)
+            if ((now_time - state_start_time_).seconds() > 2.0)
                 next_down(StepDownState::DONE);
             break;
 
@@ -705,25 +1020,55 @@ private:
             }
             mode_ = StepMode::NONE;
             state_down_ = StepDownState::IDLE;
+            last_completed_step_was_down_ = true;
+            use_rear_trigger_for_step_down_ = false;
+            {
+                std_msgs::msg::Int32 msg;
+                msg.data = -1; // 段差下り完了
+                step_complete_pub_->publish(msg);
+                RCLCPP_INFO(get_logger(), "STEP_DOWN complete. Published r2_mff_step_complete=-1");
+            }
             break;
         }
     }
 
     void mff_turn_sequence() {
-        if (this->now() >= turn_end_time_) {
+        constexpr float dt = 0.01f;
+
+        // yaw誤差の計算（[-π, π]に正規化）
+        double yaw_error = turn_target_yaw_ - odom_yaw_;
+        if (yaw_error > M_PI)
+            yaw_error -= 2.0 * M_PI;
+        if (yaw_error < -M_PI)
+            yaw_error += 2.0 * M_PI;
+
+        // 完了条件: yaw誤差が閾値以内 OR タイムアウト
+        const bool timeout = (this->now() >= turn_end_time_);
+        if (std::abs(yaw_error) < turn_yaw_done_thr_ || timeout) {
             pkt.setMD(MD5, 0);
             pkt.setMD(MD6, 0);
             pkt.setMD(MD7, 0);
             pkt.setMD(MD8, 0);
             mode_ = StepMode::NONE;
-            RCLCPP_INFO(get_logger(), "MFF turn finished.");
+            RCLCPP_INFO(get_logger(), "MFF turn finished. yaw_error=%.3f rad%s",
+                        yaw_error, timeout ? " (timeout)" : "");
             return;
         }
 
-        pkt.setMD(MD5, static_cast<int16_t>(turn_v1_ * align_duty_max));
-        pkt.setMD(MD6, static_cast<int16_t>(turn_v2_ * align_duty_max));
-        pkt.setMD(MD7, static_cast<int16_t>(turn_v3_ * align_duty_max));
-        pkt.setMD(MD8, static_cast<int16_t>(turn_v4_ * align_duty_max));
+        // 角度PID: yaw_error（target - current）→ wz
+        // yaw_error < 0（CW方向残り）→ PID error > 0 → wz > 0 → CW回転
+        const float wz = pid_angle_.update(static_cast<float>(yaw_error), dt);
+
+        // メカナム純回転（vx=0, vy=0）: 向き補正込みで全輪同duty
+        const int16_t duty = static_cast<int16_t>(wz * align_duty_max);
+        pkt.setMD(MD5, duty);
+        pkt.setMD(MD6, duty);
+        pkt.setMD(MD7, duty);
+        pkt.setMD(MD8, duty);
+
+        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
+                             "MFF turn: yaw=%.3f target=%.3f error=%.3f wz=%.3f duty=%d",
+                             odom_yaw_, turn_target_yaw_, yaw_error, wz, duty);
     }
 
     // キューブ探索シーケンス: サーボを往復スキャンしてキューブを探す
@@ -890,8 +1235,141 @@ private:
                              cube_yaw_deg_, cube_depth_m_, cube_cx_norm_, cx_target, cube_cy_norm_, servo_camera_angle_, vx, vy, wz);
     }
 
+    // アリーナ走行シーケンス
+    // Step1: 前進→壁検出(700mm)→整列
+    // Step2: 左移動で壁消失検出(lidar=0 or >1000mm)
+    // Step2+: left距離が400mmになるまで左移動
+    // Step3+4: left=400mmを保持しながら前進→壁検出(700mm)→整列
+    // Step5: 時計回り90度旋回
+    // Step6: left=400mmを保持しながら前進→壁検出(1000mm)
+    // Step8: 壁整列→完了
+    void arena_walk_sequence() {
+        switch (state_arena_) {
+        case ArenaWalkState::IDLE:
+            break;
+
+        // ── Step1: 前進して壁を検出 ──────────────────────────────────
+        case ArenaWalkState::AW1_FORWARD:
+            if (!state_executed_) {
+                move_forward();
+                state_executed_ = true;
+            }
+            if (lidar_value > 0 && lidar_value < arena_wall_detect_mm) {
+                move_stop();
+                pid_angle_.reset();
+                pid_distance_.reset();
+                pid_distance_.set_target(arena_approach_target_mm);
+                next_arena(ArenaWalkState::AW1_ALIGN);
+                RCLCPP_INFO(get_logger(), "ARENA Step1: wall at %d mm -> align.", lidar_value);
+            }
+            break;
+
+        // ── Step1: 壁整列（遠距離版） ────────────────────────────────
+        case ArenaWalkState::AW1_ALIGN:
+            if (arena_wall_align()) {
+                RCLCPP_INFO(get_logger(), "ARENA Step1: aligned -> move left.");
+                next_arena(ArenaWalkState::AW2_MOVE_LEFT);
+            }
+            break;
+
+        // ── Step2: 左移動して前方壁の切れ目を検出 ────────────────────
+        case ArenaWalkState::AW2_MOVE_LEFT:
+            if (!state_executed_) {
+                // 左移動開始時の前方距離を基準値として記録
+                arena_wall_edge_ref_mm_ = lidar_value;
+                pkt.setMD(MD5, -arena_lateral_duty);
+                pkt.setMD(MD6, arena_lateral_duty);
+                pkt.setMD(MD7, -arena_lateral_duty);
+                pkt.setMD(MD8, arena_lateral_duty);
+                state_executed_ = true;
+            }
+            // 前方距離が基準値から100mm以上増加、またはlidar無効 → 壁切れ目と判定
+            if (lidar_value <= 0 ||
+                lidar_value > static_cast<int>(arena_wall_edge_ref_mm_) + arena_wall_edge_delta_mm) {
+                next_arena(ArenaWalkState::AW2_LEFT_APPROACH);
+                RCLCPP_INFO(get_logger(),
+                            "ARENA Step2: wall edge detected (lidar=%d mm, ref=%d mm) -> left approach.",
+                            lidar_value, static_cast<int>(arena_wall_edge_ref_mm_));
+            }
+            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
+                                 "ARENA Step2: moving left, lidar=%d mm (ref=%d mm)",
+                                 lidar_value, static_cast<int>(arena_wall_edge_ref_mm_));
+            break;
+
+        case ArenaWalkState::AW2_LEFT_APPROACH:
+            if (!state_executed_) {
+                // 左方向へ移動開始
+                pkt.setMD(MD5, static_cast<int16_t>(-arena_lateral_duty));
+                pkt.setMD(MD6, static_cast<int16_t>(arena_lateral_duty));
+                pkt.setMD(MD7, static_cast<int16_t>(-arena_lateral_duty));
+                pkt.setMD(MD8, static_cast<int16_t>(arena_lateral_duty));
+                state_executed_ = true;
+            }
+            // ld19 左距離が有効かつ目標距離以下で停止 → 前方寄せへ
+            if (arena_left_valid_ && arena_left_mm_ <= arena_left_approach_mm) {
+                move_stop();
+                next_arena(ArenaWalkState::AW2_FRONT_APPROACH);
+                RCLCPP_INFO(get_logger(),
+                            "ARENA Step2: left approach done (left=%d mm) -> front approach.",
+                            static_cast<int>(arena_left_mm_));
+            }
+            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
+                                 "ARENA Step2: left approach, left=%s %d mm (target<=%d mm)",
+                                 arena_left_valid_ ? "valid" : "invalid",
+                                 static_cast<int>(arena_left_mm_), arena_left_approach_mm);
+            break;
+
+        case ArenaWalkState::AW2_FRONT_APPROACH:
+            if (!state_executed_) {
+                move_forward();
+                state_executed_ = true;
+            }
+            // ld19 前方距離が有効かつ目標距離以下で停止
+            if (arena_front_valid_ && arena_front_mm_ <= arena_front_approach_mm) {
+                move_stop();
+                // オドメトリリセット
+                {
+                    std_msgs::msg::Bool reset_msg;
+                    reset_msg.data = true;
+                    odom_reset_pub_->publish(reset_msg);
+                }
+                // 自動走行目標を x=0, y=0, yaw=0 に設定
+                {
+                    std_msgs::msg::Float32MultiArray target_msg;
+                    target_msg.data = {0.0f, 0.0f, 0.0f};
+                    autodrive_target_pub_->publish(target_msg);
+                }
+                // アリーナ走行完了通知（自動モードへ切り替えトリガー）
+                {
+                    std_msgs::msg::Bool complete_msg;
+                    complete_msg.data = true;
+                    arena_walk_complete_pub_->publish(complete_msg);
+                }
+                next_arena(ArenaWalkState::DONE);
+                RCLCPP_INFO(get_logger(),
+                            "ARENA Step2: front approach done (front=%d mm) -> odom reset, target(0,0,0), arena_walk_complete.",
+                            static_cast<int>(arena_front_mm_));
+            }
+            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
+                                 "ARENA Step2: front approach, front=%s %d mm (target<=%d mm)",
+                                 arena_front_valid_ ? "valid" : "invalid",
+                                 static_cast<int>(arena_front_mm_), arena_front_approach_mm);
+            break;
+
+        case ArenaWalkState::DONE:
+            if (!state_executed_) {
+                move_stop();
+                state_executed_ = true;
+            }
+            mode_ = StepMode::NONE;
+            state_arena_ = ArenaWalkState::IDLE;
+            RCLCPP_INFO(get_logger(), "ARENA_WALK complete.");
+            break;
+        }
+    }
+
     void loop() {
-        if (!mff_mode_enabled_) {
+        if (!mff_mode_enabled_ && !arena_mode_enabled_) {
             return;
         }
 
@@ -931,6 +1409,10 @@ private:
 
         case StepMode::CUBE_ALIGN:
             cube_alignment_sequence();
+            break;
+
+        case StepMode::ARENA_WALK:
+            arena_walk_sequence();
             break;
         }
     }
@@ -1013,10 +1495,22 @@ public:
             10,
             std::bind(&HardWareControl::turn_callback, this, std::placeholders::_1));
 
+        mff_status_sub_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
+            "r2/task_mff_status",
+            rclcpp::QoS(1).reliable().transient_local(),
+            std::bind(&HardWareControl::mff_status_callback, this, std::placeholders::_1));
+
         mode_cmd_sub_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
             "r2_drive_mode_cmd",
             10,
             std::bind(&HardWareControl::mode_cmd_callback, this, std::placeholders::_1));
+
+        // r2_autodrive から公開される現在モード文字列（MFF/ARENA）でも
+        // SequenceCtrl の有効/無効を切り替えられる受信口を追加
+        drive_mode_text_sub_ = this->create_subscription<std_msgs::msg::String>(
+            "r2_drive_mode",
+            rclcpp::QoS(1).reliable().transient_local(),
+            std::bind(&HardWareControl::drive_mode_text_callback, this, std::placeholders::_1));
 
         cube_detect_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
             "/cube_detection/info",
@@ -1027,6 +1521,21 @@ public:
             "/r2_cube_align_cmd",
             10,
             std::bind(&HardWareControl::cube_align_cmd_callback, this, std::placeholders::_1));
+
+        arena_walk_cmd_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+            "/r2_arena_walk_cmd",
+            10,
+            std::bind(&HardWareControl::arena_walk_cmd_callback, this, std::placeholders::_1));
+
+        odom_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+            "odom_xy_yaw",
+            10,
+            std::bind(&HardWareControl::odom_callback, this, std::placeholders::_1));
+
+        ld19_eight_dir_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+            "/ld19/eight_direction_distance",
+            rclcpp::SensorDataQoS(),
+            std::bind(&HardWareControl::ld19_eight_dir_callback, this, std::placeholders::_1));
 
         odom_reset_pub_ = this->create_publisher<std_msgs::msg::Bool>(
             "odom_reset", 10);
@@ -1055,6 +1564,25 @@ private:
     int32_t pending_step_cmd_ = 0;
     int32_t pending_turn_deg_ = 0;
     bool has_pending_turn_ = false;
+    int32_t preview_from_cell_ = 0;
+    int32_t preview_to_cell_ = 0;
+    int32_t preview_turn_deg_ = 0;
+    int32_t preview_step_cmd_ = 0;
+    unsigned long long preview_generation_ = 0;
+    unsigned long long accepted_step_generation_ = 0;
+    unsigned long long accepted_turn_generation_ = 0;
+
+    void clear_pending_commands(const char *reason) {
+        const bool had_pending = has_pending_turn_ || (pending_step_cmd_ != 0);
+        pending_step_cmd_ = 0;
+        pending_turn_deg_ = 0;
+        has_pending_turn_ = false;
+        accepted_step_generation_ = 0;
+        accepted_turn_generation_ = 0;
+        if (had_pending) {
+            RCLCPP_INFO(get_logger(), "Cleared pending MFF commands (%s).", reason);
+        }
+    }
 
     void publish_odom_reset() {
         std_msgs::msg::Bool reset_msg;
@@ -1071,12 +1599,14 @@ private:
             // 壁調整なしで直接段差上り（角度・距離に関係なく実行）
             seq_->start_step_up();
         } else if (cmd == -1) {
+            // 段差下り開始時はWALL_ALIGN/TURNの保留を明示的に破棄
+            clear_pending_commands("start STEP_DOWN");
             seq_->start_step_down();
         }
     }
 
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
-        if (!seq_->is_mff_mode_enabled()) {
+        if (!seq_->is_mff_mode_enabled() && !seq_->is_arena_mode_enabled()) {
             return;
         }
 
@@ -1097,10 +1627,12 @@ private:
         bool R1 = msg->buttons[5];
 
         bool PS = msg->buttons[10];
+        bool OPTIONS = msg->buttons[9]; // OPTIONSボタン：アリーナ走行シーケンス
 
         static bool last_up = false;
         static bool last_down = false;
         static bool last_ps = false;
+        static bool last_options = false;
 
         if (UP && !last_up) {
             // 十字キー上：壁調整PID → 自動段差上り
@@ -1108,6 +1640,8 @@ private:
         }
 
         if (DOWN && !last_down) {
+            // 段差下り開始時はWALL_ALIGN/TURNの保留を明示的に破棄
+            clear_pending_commands("PS4 DOWN -> STEP_DOWN");
             seq_->start_step_down();
         }
 
@@ -1116,9 +1650,15 @@ private:
             seq_->start_cube_align();
         }
 
+        if (OPTIONS && !last_options) {
+            // OPTIONSボタン：アリーナ走行シーケンス
+            seq_->start_arena_walk();
+        }
+
         last_up = UP;
         last_down = DOWN;
         last_ps = PS;
+        last_options = OPTIONS;
 
         if (fabsf(LS_X) < deadzone)
             LS_X = 0;
@@ -1184,7 +1724,8 @@ private:
             camera_servo_pub_->publish(servo_msg);
         }
 
-        if (!seq_->is_mff_mode_enabled()) {
+        if (!seq_->is_mff_mode_enabled() && !seq_->is_arena_mode_enabled()) {
+            clear_pending_commands("sequence mode disabled");
             return;
         }
 
@@ -1204,7 +1745,7 @@ private:
         std_msgs::msg::Int16MultiArray msg;
         msg.data = pkt.toVector();
         publisher_->publish(msg);
-        print_data();
+        // print_data();
 
         // カメラサーボ角度をDevice7（R2_HandCtrl）へ通知
         std_msgs::msg::Int32 servo_msg;
@@ -1302,6 +1843,29 @@ private:
         seq_->set_wall_angle(msg->data);
     }
 
+    void mff_status_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        if (msg->data.size() < 4) {
+            return;
+        }
+
+        const int32_t from_cell = msg->data[0];
+        const int32_t to_cell = msg->data[1];
+        const int32_t turn_deg = msg->data[2];
+        const int32_t step_cmd = msg->data[3];
+
+        if (preview_generation_ == 0 ||
+            preview_from_cell_ != from_cell ||
+            preview_to_cell_ != to_cell ||
+            preview_turn_deg_ != turn_deg ||
+            preview_step_cmd_ != step_cmd) {
+            preview_from_cell_ = from_cell;
+            preview_to_cell_ = to_cell;
+            preview_turn_deg_ = turn_deg;
+            preview_step_cmd_ = step_cmd;
+            ++preview_generation_;
+        }
+    }
+
     void step_callback(const std_msgs::msg::Int32::SharedPtr msg) {
         if (!seq_->is_mff_mode_enabled()) {
             return;
@@ -1312,12 +1876,43 @@ private:
             return;
         }
 
-        if (seq_->is_busy()) {
-            pending_step_cmd_ = cmd;
+        if (preview_generation_ == 0 || preview_step_cmd_ != cmd) {
+            RCLCPP_WARN(this->get_logger(),
+                        "Ignoring step cmd %ld: preview mismatch (from=%ld to=%ld step=%ld gen=%llu).",
+                        static_cast<long>(cmd),
+                        static_cast<long>(preview_from_cell_),
+                        static_cast<long>(preview_to_cell_),
+                        static_cast<long>(preview_step_cmd_),
+                        preview_generation_);
             return;
         }
 
-        dispatch_step_command(cmd);
+        if (accepted_step_generation_ == preview_generation_) {
+            return;
+        }
+
+        // busy中は「MFF_TURN実行中」に限ってSTEPを保留受理する。
+        // STEP/WALL_ALIGN中の追加STEPは連鎖実行の原因になるため破棄する。
+        if (seq_->is_busy() && !seq_->is_turn_active()) {
+            RCLCPP_WARN(this->get_logger(),
+                        "Ignoring step cmd while sequence busy (cmd=%ld).",
+                        static_cast<long>(cmd));
+            return;
+        }
+
+        // 自動遷移では setCell が advance 発火時点（ロボット移動前）に更新されるため、
+        // 古い step_complete 等でもう1回 advance が発火すると「次のマスのstep_cmd」が
+        // 到着し、ターン中の pending_step_cmd_ を上書きしてしまう。
+        // pending が既にある場合は上書きせず先着の値を優先する。
+        if (pending_step_cmd_ != 0) {
+            RCLCPP_WARN(this->get_logger(),
+                        "Ignoring step cmd %ld: already pending %ld (possible stale advance).",
+                        static_cast<long>(cmd), static_cast<long>(pending_step_cmd_));
+            return;
+        }
+
+        pending_step_cmd_ = cmd;
+        accepted_step_generation_ = preview_generation_;
     }
 
     void turn_callback(const std_msgs::msg::Int32::SharedPtr msg) {
@@ -1330,11 +1925,33 @@ private:
             return;
         }
 
-        publish_odom_reset();
-        if (!seq_->start_mff_turn(turn_deg)) {
-            pending_turn_deg_ = turn_deg;
-            has_pending_turn_ = true;
+        if (preview_generation_ == 0 || preview_turn_deg_ != turn_deg) {
+            RCLCPP_WARN(this->get_logger(),
+                        "Ignoring turn cmd %ld: preview mismatch (from=%ld to=%ld turn=%ld gen=%llu).",
+                        static_cast<long>(turn_deg),
+                        static_cast<long>(preview_from_cell_),
+                        static_cast<long>(preview_to_cell_),
+                        static_cast<long>(preview_turn_deg_),
+                        preview_generation_);
+            return;
         }
+
+        if (accepted_turn_generation_ == preview_generation_) {
+            return;
+        }
+
+        // TURNは各プレビュー遷移につき1回だけ受理する。
+        // 常時publish時の重複受信で再旋回しないよう、busy中・保留中は追加TURNを破棄する。
+        if (seq_->is_busy() || has_pending_turn_) {
+            RCLCPP_WARN(this->get_logger(),
+                        "Ignoring turn cmd while sequence busy (deg=%ld).",
+                        static_cast<long>(turn_deg));
+            return;
+        }
+
+        pending_turn_deg_ = turn_deg;
+        has_pending_turn_ = true;
+        accepted_turn_generation_ = preview_generation_;
     }
 
     void mode_cmd_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
@@ -1343,7 +1960,35 @@ private:
         }
 
         const int32_t mode_code = msg->data[0];
-        seq_->set_mff_mode_enabled(mode_code == 4);
+        if (mode_code == 4) {
+            seq_->set_mff_mode_enabled(true);
+            // モード切替時に古い保留コマンドを残さない
+            clear_pending_commands("mode_cmd -> MFF");
+        } else if (mode_code == 5) {
+            seq_->set_arena_mode_enabled(true);
+            clear_pending_commands("mode_cmd -> ARENA");
+        } else {
+            seq_->set_mff_mode_enabled(false);
+            seq_->set_arena_mode_enabled(false);
+            clear_pending_commands("mode_cmd -> OTHER");
+        }
+    }
+
+    void drive_mode_text_callback(const std_msgs::msg::String::SharedPtr msg) {
+        const auto &mode = msg->data;
+        if (mode == "MFF") {
+            seq_->set_mff_mode_enabled(true);
+        } else if (mode == "ARENA") {
+            seq_->set_arena_mode_enabled(true);
+        } else {
+            // 非MFF/ARENA文字列での無効化は行わない。
+            // GUI/Plannerの状態遷移では r2_autodrive 側が一時的に AUTO をpublishすることがあり、
+            // ここで無効化すると step/turn コマンド受信前にシーケンスが落ちて不安定になる。
+            // モード解除は mode_cmd_callback (r2_drive_mode_cmd) を正とする。
+            RCLCPP_DEBUG(this->get_logger(),
+                         "drive_mode_text=%s received: keep current sequence enable state (authority=mode_cmd)",
+                         mode.c_str());
+        }
     }
 
     // /cube_detection/info [flag, cx_norm, cy_norm, w_norm, h_norm, depth_m, score, area, face_yaw_deg]
@@ -1367,6 +2012,49 @@ private:
             seq_->start_cube_align();
         }
     }
+
+    void arena_walk_cmd_callback(const std_msgs::msg::Int32::SharedPtr msg) {
+        if (!seq_->is_arena_mode_enabled()) {
+            return;
+        }
+        if (msg->data == 1) {
+            seq_->start_arena_walk();
+        }
+    }
+
+    // odom_xy_yaw: [x, y, yaw, vx, vy, wz]
+    void odom_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
+        if (msg->data.size() < 3)
+            return;
+        seq_->set_odom_yaw(static_cast<double>(msg->data[2]));
+    }
+
+    // /ld19/eight_direction_distance: [front, front_left, left, rear_left, rear, rear_right, right, front_right]
+    void ld19_eight_dir_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
+        if (msg->data.size() < 3) {
+            seq_->set_left_distance_mm(0, false);
+            seq_->set_front_distance_mm(0, false);
+            return;
+        }
+
+        // front (index 0)
+        const float front_m = msg->data[0];
+        if (!std::isfinite(front_m) || front_m <= 0.0f) {
+            seq_->set_front_distance_mm(0, false);
+        } else {
+            seq_->set_front_distance_mm(static_cast<int16_t>(front_m * 1000.0f), true);
+        }
+
+        // left (index 2)
+        const float left_m = msg->data[2];
+        if (!std::isfinite(left_m) || left_m <= 0.0f) {
+            seq_->set_left_distance_mm(0, false);
+            return;
+        }
+
+        const int16_t left_mm = static_cast<int16_t>(left_m * 1000.0f);
+        seq_->set_left_distance_mm(left_mm, true);
+    }
     uint8_t device_id_;
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
@@ -1380,9 +2068,14 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sdm15_sub4_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr step_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr turn_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mff_status_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mode_cmd_sub_;
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr drive_mode_text_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr cube_detect_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr cube_align_cmd_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr arena_walk_cmd_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr odom_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr ld19_eight_dir_sub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr odom_reset_pub_;
     rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr camera_servo_pub_;
     rclcpp::TimerBase::SharedPtr timer_;

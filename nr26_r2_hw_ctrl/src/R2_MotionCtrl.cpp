@@ -170,12 +170,19 @@ private:
     };
 
     int32_t current_planner_state_ = -1;
+    int32_t prev_applied_state_ = -2;
+    int hold_seq_step_ = 0;
+    int hold_wait_count_ = 0;
     std::atomic<int32_t> current_drive_mode_{DRIVE_MODE_MANUAL};
     std::string current_state_name_ = "";
     TargetHeight target_height_ = TargetHeight::DOWN;
 
     // モーター1回転あたりのエンコーダのカウント数
-    static constexpr double COUNTS_PER_ROTATION = 355.0;
+    static constexpr double COUNTS_PER_ROTATION = 360.0;
+
+    // モノレール速度設定
+    static constexpr int NORMAL_SPEED = 130; // 通常速度
+    static constexpr int SLOW_SPEED = 70;    // 減速後速度
 
     // =====================================================================
     // 状態名→状態コード変換
@@ -247,74 +254,94 @@ private:
     }
 
     // =====================================================================
-    // 全体共通: モーター方向制限
+    // 全体共通: モーター方向制限 + 減速ゾーン適用
     // ・micro1_sw（始発）押下 → 正回転禁止、逆回転のみ許可
-    // ・rot_units >= 7.0 → 逆回転禁止、正回転のみ許可
+    // ・micro2_sw（終点）押下 → 逆回転禁止、正回転のみ許可
+    // ・回転数 0.5以下 or 7.0以上 → 減速（SLOW_SPEED）
     // =====================================================================
     int16_t apply_direction_limit(int16_t raw_speed) {
         int16_t micro1_sw = g_micro1_sw.load();
-        int64_t abs_coord = g_abs_coord.load();
-        double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
+        int16_t micro2_sw = g_micro2_sw.load();
 
         // 始発SW押下時 → 正回転(speed > 0)禁止
         if (micro1_sw == 1 && raw_speed > 0) {
             return 0;
         }
 
-        // rot_units >= 7.0 → 逆回転(speed < 0)禁止
-        if (rot_units >= 7.0 && raw_speed < 0) {
+        // 終点SW押下時 → 逆回転(speed < 0)禁止
+        if (micro2_sw == 1 && raw_speed < 0) {
             return 0;
+        }
+
+        // 回転数に基づく減速ゾーン適用
+        int64_t abs_coord = g_abs_coord.load();
+        double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
+
+        if (rot_units <= 0.5 || rot_units >= 7.0) {
+            // 減速ゾーン: 速度の絶対値をSLOW_SPEED以下に制限
+            if (raw_speed > SLOW_SPEED) {
+                return SLOW_SPEED;
+            } else if (raw_speed < -SLOW_SPEED) {
+                return -SLOW_SPEED;
+            }
         }
 
         return raw_speed;
     }
 
     void reset_hand_outputs() {
-        pkt.setServo(SERVO1, 230);
-        pkt.setServo(SERVO3, 140);
+        pkt.setServo(SERVO1, 200);
+        pkt.setServo(SERVO3, 190);
+        pkt.setServo(SERVO4, 0);
         pkt.setMD(MD1, 0);
         pkt.setTR(TR1, false);
     }
 
     void set_home_values() {
-        pkt.setServo(SERVO1, 230);
-        pkt.setServo(SERVO3, 140);
+        pkt.setServo(SERVO1, 200);
+        pkt.setServo(SERVO3, 190);
+        pkt.setServo(SERVO4, 0);
         pkt.setMD(MD1, 0);
         pkt.setTR(TR1, false); // シリンダー縮める
     }
 
     void set_ready_values() {
-        pkt.setServo(SERVO1, 130);
-        pkt.setServo(SERVO3, 180);
+        pkt.setServo(SERVO1, 45);
+        pkt.setServo(SERVO3, 183);
+        pkt.setServo(SERVO4, 0);
         pkt.setMD(MD1, 0);
         pkt.setTR(TR1, true); // シリンダー伸ばす
     }
 
     void set_pick_values() {
-        pkt.setServo(SERVO1, 70);
-        pkt.setServo(SERVO3, 70);
-        pkt.setMD(MD1, 255); // ダイアフラムで吸う
+        pkt.setServo(SERVO1, 30);
+        pkt.setServo(SERVO3, 84);
+        pkt.setServo(SERVO4, 0);
+        pkt.setMD(MD1, 127); // ダイアフラムで吸う
         pkt.setTR(TR1, true);
     }
 
     void set_hold_values() {
-        pkt.setServo(SERVO1, 70);
-        pkt.setServo(SERVO3, 70);
-        pkt.setMD(MD1, 255);
-        pkt.setTR(TR1, true);
+        pkt.setServo(SERVO1, 100);
+        pkt.setServo(SERVO3, 140);
+        pkt.setServo(SERVO4, 0);
+        pkt.setMD(MD1, 127);
+        pkt.setTR(TR1, false);
     }
 
     void set_moving_values() {
-        pkt.setServo(SERVO1, 240);
-        pkt.setServo(SERVO3, 205);
-        pkt.setMD(MD1, 255);
+        pkt.setServo(SERVO1, 217);
+        pkt.setServo(SERVO3, 194);
+        pkt.setServo(SERVO4, 0);
+        pkt.setMD(MD1, 0);
         pkt.setTR(TR1, false);
     }
 
     void set_shoot_values() {
-        pkt.setServo(SERVO1, 240);
-        pkt.setServo(SERVO3, 205);
-        pkt.setMD(MD1, 255);
+        pkt.setServo(SERVO1, 200);
+        pkt.setServo(SERVO3, 150);
+        pkt.setServo(SERVO4, 45);
+        pkt.setMD(MD1, 0);
         pkt.setTR(TR1, false);
     }
 
@@ -392,14 +419,16 @@ private:
             return;
         }
 
+        (void)source;
+
         current_drive_mode_.store(next_mode);
         const bool manual = (next_mode == DRIVE_MODE_MANUAL);
-        RCLCPP_INFO(
-            get_logger(),
-            "drive_mode(%s) -> %s(%ld)",
-            source,
-            manual ? "MANUAL" : "AUTO",
-            static_cast<long>(next_mode));
+        // RCLCPP_INFO(
+        //     get_logger(),
+        //     "drive_mode(%s) -> %s(%ld)",
+        //     source,
+        //     manual ? "MANUAL" : "AUTO",
+        //     static_cast<long>(next_mode));
 
         if (!manual) {
             apply_state_to_packet(current_planner_state_);
@@ -412,57 +441,121 @@ private:
     // =====================================================================
     void apply_state_to_packet(int32_t state_code) {
         int16_t micro1_sw = g_micro1_sw.load();
+        int16_t micro2_sw = g_micro2_sw.load();
         int64_t abs_coord = g_abs_coord.load();
+
         double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
 
-        // 状態ごとに明示的に値を作り直し、残留値を防ぐ
-        pkt.setMD(MD1, 0);
-        reset_hand_outputs();
+        RCLCPP_INFO_THROTTLE(
+            get_logger(), *get_clock(), 1000,
+            "micro1_sw=%d",
+            static_cast<int>(micro1_sw));
+
+        // 状態遷移時にシーケンスカウンタをリセット
+        if (state_code != prev_applied_state_) {
+            hold_seq_step_ = 0;
+            prev_applied_state_ = state_code;
+        }
+
+        // 状態ごとに明示的に値を作り直し、残留値を防ぐ（漸進シーケンス中は除く）
+        if (state_code != STATE_KFS_HOLD) {
+            pkt.setMD(MD1, 0);
+            reset_hand_outputs();
+        }
 
         switch (state_code) {
+            /*
+             * 旧 HEAD/HAND 制御ロジック。
+             * 以前の速度基準(NORMAL_SPEED / SLOW_SPEED)での実装を比較用に残している。
+             */
+
         case STATE_HEAD_HAND_INIT:
-            // モーターを速度30で回し続ける（正回転＝始発方向へ）
+            // 始発方向へ正回転で戻す
             // マイクロスイッチ（始発）が押されたとき → モーター停止
-            if (micro1_sw == 1) {
-                pkt.setMD(MD2, 0);
+            if (micro1_sw == 0) {
+                pkt.setMD(MD2, apply_direction_limit(NORMAL_SPEED));
             } else {
-                pkt.setMD(MD2, apply_direction_limit(60));
+                pkt.setMD(MD2, 0);
             }
             break;
 
         case STATE_HEAD_HAND_PICK_UP_SETTING:
-            // モーターを速度-30で回し続ける（逆回転）
-            // rot_unitsが7.0になったとき → モーター即停止
-            if (rot_units >= 7.0) {
-                pkt.setMD(MD2, 0);
+            // 終点方向へ逆回転
+            // micro2_sw が押されたとき → モーター即停止
+            if (micro2_sw == 0) {
+                pkt.setMD(MD2, apply_direction_limit(-NORMAL_SPEED));
             } else {
-                pkt.setMD(MD2, apply_direction_limit(-60));
+                // apply_direction_limitが減速ゾーン(7.0以上)を自動適用
+                pkt.setMD(MD2, 0);
             }
             break;
 
         case STATE_HEAD_HAND_GATTAI_WAITING:
-            // モーターを速度30で回し続ける（正回転＝始発方向へ）
+            // 始発方向へ正回転で戻す
             // マイクロスイッチ（始発）が押されたとき → モーター停止
-            if (micro1_sw == 1) {
-                pkt.setMD(MD2, 0);
+            if (micro1_sw == 0) {
+                pkt.setMD(MD2, apply_direction_limit(NORMAL_SPEED));
             } else {
-                pkt.setMD(MD2, apply_direction_limit(30));
+                pkt.setMD(MD2, 0);
             }
             break;
 
         case STATE_HEAD_HAND_GATTAI_ASSEMBLY:
-            // 回転数が0でない限り、回転数を0にするべくモーターを速度10で回転
-            // （始発SWによるリセットも含む）
-            // 回転数が0になったとき → モーター停止
-            // この監視状態は終了指示か別状態への移行まで維持
+            // 回転数が0.05未満になるまで始発方向へ戻す
             if (micro1_sw == 1) {
                 pkt.setMD(MD2, 0);
             } else if (std::abs(rot_units) < 0.05) {
                 pkt.setMD(MD2, 0);
             } else {
-                pkt.setMD(MD2, apply_direction_limit(10));
+                pkt.setMD(MD2, apply_direction_limit(SLOW_SPEED));
             }
             break;
+            // case STATE_HEAD_HAND_INIT:
+            //     // HEAD/HAND の初期化位置へ戻す。
+            //     // 始発スイッチが入るまでは始発方向へ回し続け、押下された瞬間に停止する。
+            //     if (micro1_sw == 1) {
+            //         pkt.setMD(MD2, 0);
+            //     } else {
+            //         // 始発側への移動は正回転。減速ゾーンと方向制限は apply_direction_limit に委譲する。
+            //         pkt.setMD(MD2, apply_direction_limit(130));
+            //     }
+            //     break;
+
+            // case STATE_HEAD_HAND_PICK_UP_SETTING:
+            //     // ピックアップ設定位置まで終点方向へ送る。
+            //     // 7.0 回転に到達するまでは逆回転を維持し、到達したら即停止する。
+            //     if (rot_units >= 7.0) {
+            //         pkt.setMD(MD2, 0);
+            //     } else {
+            //         // 終点側への移動は逆回転。終点付近では apply_direction_limit が減速をかける。
+            //         pkt.setMD(MD2, apply_direction_limit(-150));
+            //     }
+            //     break;
+
+            // case STATE_HEAD_HAND_GATTAI_WAITING:
+            //     // 合体待機位置では再び始発側へ戻して原点合わせを行う。
+            //     // 始発スイッチが押されるまでは正回転を継続し、押下後は停止する。
+            //     if (micro1_sw == 1) {
+            //         pkt.setMD(MD2, 0);
+            //     } else {
+            //         // 初期化時と同じく、始発側への復帰は正回転で行う。
+            //         pkt.setMD(MD2, apply_direction_limit(130));
+            //     }
+            //     break;
+
+            // case STATE_HEAD_HAND_GATTAI_ASSEMBLY:
+            //     // 合体中は原点近傍に維持する。
+            //     // 始発スイッチ押下、または回転量が 0.05 回転未満になったら停止する。
+            //     // それ以外では低速で始発方向へ寄せ続ける。
+            //     if (micro1_sw == 1) {
+            //         pkt.setMD(MD2, 0);
+            //     } else if (std::abs(rot_units) < 0.05) {
+            //         pkt.setMD(MD2, 0);
+            //     } else {
+            //         // 原点への追い込みだけなので、ほかの状態より低い指令値を使う。
+            //         pkt.setMD(MD2, apply_direction_limit(10));
+            //     }
+            //     break;
 
         case STATE_KFS_HAND_INIT:
             set_home_values();
@@ -471,32 +564,86 @@ private:
             set_ready_values();
             break;
         case STATE_PICK_UP:
-            target_height_ = TargetHeight::UP;
-            set_ready_values();
-            set_pick_values();
-            break;
         case STATE_PICK_MIDDLE:
-            target_height_ = TargetHeight::MIDDLE;
-            set_ready_values();
-            set_pick_values();
-            break;
         case STATE_PICK_DOWN:
-            target_height_ = TargetHeight::DOWN;
+            target_height_ = static_cast<TargetHeight>(state_code - STATE_PICK_UP);
             set_ready_values();
             set_pick_values();
             break;
-        case STATE_KFS_HOLD:
-            set_hold_values();
+        case STATE_KFS_HOLD: {
+            // 段階的シーケンス（20ms周期で呼ばれるごとに進む）
+            // 0: SERVO3 → 194, 1: SERVO1 → 217, 2: TR1=false, 3: MD1=0, 4: SERVO1=200
+            constexpr int STEP = 2;
+            switch (hold_seq_step_) {
+            case 0: {
+                int v = static_cast<int>(pkt[SERVO3]);
+                if (v >= 194) {
+                    hold_seq_step_++;
+                } else {
+                    pkt.setServo(SERVO3, v + STEP <= 194 ? v + STEP : 194);
+                }
+                break;
+            }
+            case 1: {
+                int v = static_cast<int>(pkt[SERVO1]);
+                if (v >= 217) {
+                    hold_seq_step_++;
+                } else {
+                    pkt.setServo(SERVO1, v + STEP <= 217 ? v + STEP : 217);
+                }
+                break;
+            }
+            case 2:
+                pkt.setTR(TR1, false);
+                hold_wait_count_ = 0;
+                hold_seq_step_++;
+                break;
+            case 3: // 4秒待機 (4000ms / 20ms = 200ティック)
+                if (++hold_wait_count_ >= 200) {
+                    hold_seq_step_++;
+                }
+                break;
+            case 4:
+                pkt.setMD(MD1, 0);
+                hold_seq_step_++;
+                break;
+            case 5: { // SERVO3 → 150 (徐々に下げる)
+                int v = static_cast<int>(pkt[SERVO3]);
+                if (v <= 150) {
+                    hold_seq_step_++;
+                } else {
+                    pkt.setServo(SERVO3, v - STEP >= 150 ? v - STEP : 150);
+                }
+                break;
+            }
+            case 6: { // SERVO1 → 200 (徐々に下げる)
+                int v = static_cast<int>(pkt[SERVO1]);
+                if (v <= 200) {
+                    hold_seq_step_++;
+                } else {
+                    pkt.setServo(SERVO1, v - STEP >= 200 ? v - STEP : 200);
+                }
+                break;
+            }
+            default:
+                pkt.setServo(SERVO1, 200);
+                pkt.setServo(SERVO3, 150);
+                pkt.setMD(MD1, 0);
+                pkt.setTR(TR1, false);
+                break;
+            }
             break;
-        case STATE_KFS_MOVE:
-            set_moving_values();
-            break;
+        }
         case STATE_TTR_SHOOT_MIDDLE:
             set_shoot_values();
             break;
 
         default:
             // 未初期化(-1)または未知状態では何もしない（手動操作を優先）
+            RCLCPP_INFO_THROTTLE(
+                get_logger(), *get_clock(), 1000,
+                "[MotionCtrlState:apply_default] state=%ld is ignored",
+                static_cast<long>(state_code));
             break;
         }
 
@@ -508,8 +655,10 @@ private:
     // 状態遷移コールバック群
     // =====================================================================
     void task_state_callback(const std_msgs::msg::Int32::SharedPtr msg) {
+        (void)msg;
+
         // 状態制御は task_status_text の state 名を正とする
-        RCLCPP_DEBUG(get_logger(), "task_state ignored (state-by-name mode): %ld", static_cast<long>(msg->data));
+        // RCLCPP_DEBUG(get_logger(), "task_state ignored (state-by-name mode): %ld", static_cast<long>(msg->data));
     }
 
     void transition_mode_callback(const std_msgs::msg::Int32::SharedPtr msg) {
@@ -551,7 +700,7 @@ private:
             }
         }
 
-        RCLCPP_INFO(get_logger(), "task_status_text.state -> %s", current_state_name_.c_str());
+        // RCLCPP_INFO(get_logger(), "task_status_text.state -> %s", current_state_name_.c_str());
     }
 
     // =====================================================================
@@ -603,44 +752,52 @@ private:
         // 以降、配列data_を操作する
 
         // =================================================================
-        // L1,R1:「フォークリフト上下」
+        // L1,R1:「モノレール制御」
         // 絶対座標に基づく減速 + マイクロスイッチによる方向制限
+        //
+        // 座標: 始発スイッチ押下で 0 にリセット
+        //   回転数 <= 0.5 or >= 7.0 → 減速 (SLOW_SPEED=50)
+        //   それ以外 → 通常速度 (NORMAL_SPEED=100)
+        //   micro1_sw（始発）押下 → 正回転禁止、逆回転のみ許可
+        //   micro2_sw（終点）押下 → 逆回転禁止、正回転のみ許可
         // =================================================================
 
         int16_t micro1_sw = g_micro1_sw.load();
         int16_t micro2_sw = g_micro2_sw.load();
 
-        static const int NORMAL_SPEED = 130;
-        static const int SLOW_SPEED = 100;
-
         int64_t abs_coord = g_abs_coord.load();
         double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
 
         // ヒステリシス（遊び）を持たせた減速ゾーン判定（チャタリング防止用）
-        static bool is_fork_slow = false;
-        if (rot_units <= 1.0 || rot_units >= 6.0) {
-            is_fork_slow = true;
-        } else if (rot_units >= 1.5 && rot_units <= 5.5) {
-            is_fork_slow = false;
+        // 始発付近 (0〜0.5回転) または 終点付近 (7.0〜7.5回転) で減速
+        static bool is_monorail_slow = false;
+        if (rot_units <= 0.5 || rot_units >= 7.0) {
+            is_monorail_slow = true;
+        } else if (rot_units >= 0.7 && rot_units <= 6.8) {
+            is_monorail_slow = false; // ヒステリシスにより、ゾーンから少し離れるまで通常速度に戻さない
         }
-        bool in_slow_zone = is_fork_slow;
+        bool in_slow_zone = is_monorail_slow;
 
-        int fwd_speed = in_slow_zone ? SLOW_SPEED : NORMAL_SPEED;
-        int rev_speed = in_slow_zone ? -SLOW_SPEED : -NORMAL_SPEED;
+        // 回転方向に応じた速度を決定
+        int fwd_speed = in_slow_zone ? SLOW_SPEED : NORMAL_SPEED;   // 正回転（始発→終点）の速度
+        int rev_speed = in_slow_zone ? -SLOW_SPEED : -NORMAL_SPEED; // 逆回転（終点→始発）の速度
 
-        if (micro2_sw == 1) {
-            if (R1 == 1) {
-                pkt.setMD(MD2, rev_speed);
-            } else {
-                pkt.setMD(MD2, 0);
-            }
-        } else if (micro1_sw == 1 || rot_units >= 7.0) {
+        // micro1_sw が始発(正回転禁止) → rev_speed(R1で逆回転)のみ許可
+        // micro2_sw が終点(逆回転禁止) → fwd_speed(L1で正回転)のみ許可
+        if (micro1_sw == 1) {
             if (L1 == 1) {
                 pkt.setMD(MD2, fwd_speed);
             } else {
                 pkt.setMD(MD2, 0);
             }
+        } else if (micro2_sw == 1) {
+            if (R1 == 1) {
+                pkt.setMD(MD2, rev_speed);
+            } else {
+                pkt.setMD(MD2, 0);
+            }
         } else {
+            // マイクロスイッチに触れていない通常の範囲
             if (L1 == 1) {
                 pkt.setMD(MD2, fwd_speed);
             } else if (R1 == 1) {
@@ -662,6 +819,57 @@ private:
         //     data_[1], data_[2], data_[3], data_[4],
         //     data_[9], data_[10], data_[11], data_[12]);
 
+        // UP/DOWN: シーケンス順送り/戻し（押した瞬間だけ反応）
+        static const int32_t SEQUENCE[] = {
+            STATE_KFS_HAND_INIT,
+            STATE_KFS_PICK_WAITING,
+            STATE_PICK_UP,
+            STATE_PICK_MIDDLE,
+            STATE_PICK_DOWN,
+            STATE_KFS_HOLD,
+            STATE_TTR_SHOOT_MIDDLE,
+        };
+        static constexpr int SEQ_LEN = 7;
+        static bool last_up = false;
+        static bool last_down = false;
+
+        auto seq_idx = [&]() -> int {
+            for (int i = 0; i < SEQ_LEN; ++i)
+                if (SEQUENCE[i] == current_planner_state_) return i;
+            return -1;
+        };
+
+        if (UP && !last_up) {
+            // PICK状態からは高さ選択完了とみなし直接STATE_KFS_HOLDへ
+            if (current_planner_state_ == STATE_PICK_UP ||
+                current_planner_state_ == STATE_PICK_MIDDLE ||
+                current_planner_state_ == STATE_PICK_DOWN) {
+                current_planner_state_ = STATE_KFS_HOLD;
+            } else {
+                int i = seq_idx();
+                i = (i < 0) ? 0 : (i + 1) % SEQ_LEN;
+                current_planner_state_ = SEQUENCE[i];
+            }
+            apply_state_to_packet(current_planner_state_);
+            log_current_operation_state("up_btn");
+        }
+        if (DOWN && !last_down) {
+            // PICK状態からは直接STATE_KFS_PICK_WAITINGへ
+            if (current_planner_state_ == STATE_PICK_UP ||
+                current_planner_state_ == STATE_PICK_MIDDLE ||
+                current_planner_state_ == STATE_PICK_DOWN) {
+                current_planner_state_ = STATE_KFS_PICK_WAITING;
+            } else {
+                int i = seq_idx();
+                i = (i < 0) ? 0 : (i - 1 >= 0 ? i - 1 : 0);
+                current_planner_state_ = SEQUENCE[i];
+            }
+            apply_state_to_packet(current_planner_state_);
+            log_current_operation_state("down_btn");
+        }
+        last_up = UP;
+        last_down = DOWN;
+
         // 配列操作ここまで
     }
 
@@ -670,7 +878,8 @@ private:
         std_msgs::msg::Int16MultiArray msg;
 
         // ★★★ 状態別のモーター制御を毎周期適用 ★★★
-        if (!is_manual_mode()) {
+        // STATE_KFS_HOLD は漸進シーケンスのためマニュアルモードでも毎周期適用
+        if (!is_manual_mode() || current_planner_state_ == STATE_KFS_HOLD) {
             apply_state_to_packet(current_planner_state_);
         }
 
@@ -678,12 +887,12 @@ private:
         int16_t micro1_sw = g_micro1_sw.load();
         int16_t micro2_sw = g_micro2_sw.load();
 
-        if (micro2_sw == 1 && pkt[MD2] > 0) {
+        if (micro1_sw == 1 && pkt[MD2] > 0) {
             pkt.setMD(MD2, 0);
             // RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】始発リミット到達！モーターの正回転を即時遮断しました！");
         }
 
-        if (micro1_sw == 1 && pkt[MD2] < 0) {
+        if (micro2_sw == 1 && pkt[MD2] < 0) {
             pkt.setMD(MD2, 0);
             // RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500, "【安全装置】終点リミット到達！モーターの逆回転を即時遮断しました！");
         }
@@ -697,16 +906,23 @@ private:
     sensor_callback(
         const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
         if (msg->data.size() < RX16NUM) {
-            // RCLCPP_WARN(this->get_logger(),
-            //             "serial_rx_%d: data too short (%zu)",
-            //             device_id_, msg->data.size());
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                                 "serial_rx_%d: data too short (%zu)",
+                                 device_id_, msg->data.size());
             return;
         }
 
         // マイクロスイッチの値を更新
-        g_micro1_sw = msg->data[10]; // 上端スイッチ(micro1)
-        g_micro2_sw = msg->data[9];  // 下端スイッチ(micro2)
-        g_enc1_val = msg->data[1];   // エンコーダ1
+        g_micro1_sw = msg->data[9];   // 上端スイッチ(micro1)
+        g_micro2_sw = !msg->data[10]; // 下端スイッチ(micro2)
+        g_enc1_val = msg->data[1];    // エンコーダ1
+
+        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
+                             "[sensor_callback] rx_size=%zu micro1(data[10])=%d micro2(data[9])=%d enc1(data[1])=%d",
+                             msg->data.size(),
+                             static_cast<int>(msg->data[9]),
+                             static_cast<int>(msg->data[10]),
+                             static_cast<int>(msg->data[1]));
 
         // =============================================================
         // 座標調査・ラップアラウンド計算
@@ -735,10 +951,11 @@ private:
 
         int64_t total_encoder = (int64_t)r_count * ENCODER_MAX + (int64_t)current_enc1;
 
-        // 始発スイッチ押下時に座標をゼロリセット
+        // 始発スイッチ(micro1_sw = data[9])押下時に座標をゼロリセット
         if (msg->data[9] != 0) {
             g_zero_offset.store(total_encoder);
-            // RCLCPP_INFO(get_logger(), "[COORD RESET!] 始発スイッチ押下により座標0へオフセット設定");
+            // RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
+            //                      "[COORD RESET!] 始発スイッチ押下により座標0へオフセット設定");
         }
 
         int64_t zero_offset = g_zero_offset.load();
@@ -765,8 +982,8 @@ private:
 
         static int16_t l9 = 0, l10 = 0;
         if (msg->data[9] != l9 || msg->data[10] != l10) {
-            // RCLCPP_INFO(get_logger(), "SW Changed! [下(9):%d, 上(10):%d]",
-            //             msg->data[9], msg->data[10]);
+            RCLCPP_INFO(get_logger(), "SW Changed! [micro2(data[9]):%d, micro1(data[10]):%d]",
+                        msg->data[9], msg->data[10]);
             l9 = msg->data[9];
             l10 = msg->data[10];
         }

@@ -99,6 +99,7 @@ namespace r2_planner {
         declare_parameter<std::string>("status_topic", "r2/task_status");
         declare_parameter<std::string>("status_text_topic", "r2/task_status_text");
         declare_parameter<std::string>("auto_drive_target_topic", "r2_autodrive_cmd");
+        declare_parameter<std::string>("autodrive_complete_topic", "r2/autodrive_complete");
         declare_parameter<std::string>("drive_mode_cmd_topic", "r2_drive_mode_cmd");
         declare_parameter<std::string>("mff_path_topic", "r2/task_mff_path");
         declare_parameter<std::string>("mff_path_advance_topic", "r2/task_mff_path_advance");
@@ -131,6 +132,7 @@ namespace r2_planner {
         const auto status_topic = get_parameter("status_topic").as_string();
         const auto status_text_topic = get_parameter("status_text_topic").as_string();
         const auto auto_drive_target_topic = get_parameter("auto_drive_target_topic").as_string();
+        const auto autodrive_complete_topic = get_parameter("autodrive_complete_topic").as_string();
         const auto drive_mode_cmd_topic = get_parameter("drive_mode_cmd_topic").as_string();
         const auto mff_path_topic = get_parameter("mff_path_topic").as_string();
         const auto mff_path_advance_topic = get_parameter("mff_path_advance_topic").as_string();
@@ -201,6 +203,14 @@ namespace r2_planner {
             auto_send_enabled_topic, rclcpp::QoS(10),
             std::bind(&TaskManagerNode::onAutoSendEnabled, this, std::placeholders::_1));
 
+        arena_walk_complete_sub_ = create_subscription<std_msgs::msg::Bool>(
+            "r2/arena_walk_complete", rclcpp::QoS(10),
+            std::bind(&TaskManagerNode::onArenaWalkComplete, this, std::placeholders::_1));
+
+        autodrive_complete_sub_ = create_subscription<std_msgs::msg::Bool>(
+            autodrive_complete_topic, rclcpp::QoS(10),
+            std::bind(&TaskManagerNode::onAutodriveComplete, this, std::placeholders::_1));
+
         status_pub_ = create_publisher<std_msgs::msg::Int32MultiArray>(
             status_topic, rclcpp::QoS(1).reliable().transient_local());
 
@@ -212,6 +222,9 @@ namespace r2_planner {
 
         drive_mode_cmd_pub_ = create_publisher<std_msgs::msg::Int32MultiArray>(
             drive_mode_cmd_topic, rclcpp::QoS(1).reliable().transient_local());
+
+        arena_walk_cmd_pub_ = create_publisher<std_msgs::msg::Int32>(
+            "/r2_arena_walk_cmd", rclcpp::QoS(10));
 
         mff_turn_cmd_pub_ = create_publisher<std_msgs::msg::Int32>(
             mff_turn_cmd_topic, rclcpp::QoS(10));
@@ -227,7 +240,11 @@ namespace r2_planner {
 
         publish_timer_ = create_wall_timer(
             std::chrono::milliseconds(200),
-            [this]() { publishStatus(false); });
+            [this]() {
+                publishStatus(false);
+                publishMffRuntimeStatus(true);
+                publishMffPreviewCommands();
+            });
 
         auto_transition_timer_ = create_wall_timer(
             std::chrono::milliseconds(50),
@@ -252,11 +269,6 @@ namespace r2_planner {
             return;
         }
 
-        if (status_.transition_mode_code == kTransitionAuto) {
-            RCLCPP_WARN(get_logger(), "Ignoring direct task command while auto transition mode is active");
-            return;
-        }
-
         setState(msg->data[0]);
 
         if (msg->data.size() >= 2) {
@@ -272,8 +284,10 @@ namespace r2_planner {
 
     void TaskManagerNode::onState(const std_msgs::msg::Int32::SharedPtr msg) {
         if (status_.transition_mode_code == kTransitionAuto) {
-            RCLCPP_WARN(get_logger(), "Ignoring manual state update while auto transition mode is active");
-            return;
+            RCLCPP_INFO(get_logger(),
+                        "State synchronized while AUTO mode is active: %s(%ld)",
+                        stateDisplayName(msg->data).c_str(),
+                        static_cast<long>(msg->data));
         }
         setState(msg->data);
         publishStatus(true);
@@ -345,16 +359,18 @@ namespace r2_planner {
         target.x = data[1];
         target.y = data[2];
         target.yaw_rad = data[3];
+        target.wait_for_autodrive_complete = data.size() >= 6 ? data[5] >= 0.5F : false;
 
         state_pose_targets_[state_code] = target;
         RCLCPP_INFO(
             get_logger(),
-            "Updated state pose target: state=%s(%ld) x=%.3f y=%.3f yaw=%.3f",
+            "Updated state pose target: state=%s(%ld) x=%.3f y=%.3f yaw=%.3f wait_autodrive=%s",
             stateDisplayName(state_code).c_str(),
             static_cast<long>(state_code),
             static_cast<double>(target.x),
             static_cast<double>(target.y),
-            static_cast<double>(target.yaw_rad));
+            static_cast<double>(target.yaw_rad),
+            target.wait_for_autodrive_complete ? "true" : "false");
     }
 
     void TaskManagerNode::onStateMode(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
@@ -387,8 +403,8 @@ namespace r2_planner {
         }
 
         const int32_t mode_code = data[1];
-        if (mode_code < 0 || mode_code > 4) {
-            RCLCPP_WARN(get_logger(), "Ignoring invalid mode code %ld for state=%s(%ld) (valid: 0-4)",
+        if (mode_code < 0 || mode_code > 5) {
+            RCLCPP_WARN(get_logger(), "Ignoring invalid mode code %ld for state=%s(%ld) (valid: 0-5)",
                         static_cast<long>(mode_code), stateDisplayName(state_code).c_str(), static_cast<long>(state_code));
             return;
         }
@@ -409,6 +425,61 @@ namespace r2_planner {
     void TaskManagerNode::onAutoSendEnabled(const std_msgs::msg::Bool::SharedPtr msg) {
         auto_send_enabled_ = msg->data;
         RCLCPP_INFO(get_logger(), "Auto send on state transition: %s", auto_send_enabled_ ? "ENABLED" : "DISABLED");
+    }
+
+    void TaskManagerNode::onAutodriveComplete(const std_msgs::msg::Bool::SharedPtr msg) {
+        if (!msg->data) {
+            return;
+        }
+
+        has_autodrive_complete_event_ = true;
+        last_autodrive_complete_at_ = std::chrono::steady_clock::now();
+
+        RCLCPP_INFO(get_logger(),
+                    "Received autodrive completion flag: r2/autodrive_complete=true (state=%s(%ld))",
+                    stateDisplayName(status_.state_code).c_str(),
+                    static_cast<long>(status_.state_code));
+    }
+
+    void TaskManagerNode::onArenaWalkComplete(const std_msgs::msg::Bool::SharedPtr msg) {
+        if (!msg->data) {
+            return;
+        }
+
+        if (status_.transition_mode_code != kTransitionAuto) {
+            RCLCPP_INFO(get_logger(),
+                        "Arena walk complete received, but transition mode is not AUTO. Ignored.");
+            return;
+        }
+
+        // ARENAモード中のみ、完了フラッグで次状態へ進める
+        if (current_drive_mode_ != 5) {
+            RCLCPP_INFO(get_logger(),
+                        "Arena walk complete received, but current_drive_mode_=%ld (not ARENA=5). Ignored.",
+                        static_cast<long>(current_drive_mode_));
+            return;
+        }
+
+        const int32_t next_state = nextStateCode(status_.state_code);
+        if (next_state == status_.state_code) {
+            RCLCPP_INFO(get_logger(),
+                        "Arena walk complete received, but next state is same as current (%s(%ld)).",
+                        stateDisplayName(status_.state_code).c_str(),
+                        static_cast<long>(status_.state_code));
+            return;
+        }
+
+        RCLCPP_INFO(get_logger(),
+                    "Arena walk complete received: %s(%ld) -> %s(%ld)",
+                    stateDisplayName(status_.state_code).c_str(),
+                    static_cast<long>(status_.state_code),
+                    stateDisplayName(next_state).c_str(),
+                    static_cast<long>(next_state));
+
+        // ブロック解除後に状態遷移。setState内で次状態のモードが再設定される。
+        current_drive_mode_ = 1;
+        setState(next_state);
+        publishStatus(true);
     }
 
     void TaskManagerNode::onMffPath(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
@@ -445,6 +516,7 @@ namespace r2_planner {
         }
         RCLCPP_INFO(get_logger(), "Updated MFF path (%zu): %s", mff_path_.size(), oss.str().c_str());
         publishMffRuntimeStatus(true);
+        publishMffPreviewCommands();
     }
 
     void TaskManagerNode::onMffPathAdvance(const std_msgs::msg::Bool::SharedPtr msg) {
@@ -471,10 +543,26 @@ namespace r2_planner {
         const int32_t from_cell = mff_path_[current_index];
         const int32_t to_cell = mff_path_[current_index + 1];
 
-        publishMffTransitionCommands(from_cell, to_cell);
+        int32_t target_heading_deg = mff_heading_deg_;
+        int32_t turn_deg = 0;
+        int32_t step_cmd = 0;
+        if (computeMffTransition(from_cell, to_cell, mff_heading_deg_, target_heading_deg, turn_deg, step_cmd)) {
+            mff_heading_deg_ = normalizeHeadingDeg(target_heading_deg);
+        }
+
         setCell(to_cell);
         mff_path_index_ = current_index + 1;
+
+        // 出口マス（1X=16, 2X=17, 3X=18）到達時にMFF離脱へ自動遷移
+        constexpr int32_t kMffExitCellMin = 16;
+        constexpr int32_t kMffExitCellMax = 18;
+        if (to_cell >= kMffExitCellMin && to_cell <= kMffExitCellMax) {
+            RCLCPP_INFO(get_logger(), "MFF exit cell reached (cell=%ld): transitioning to Leave MFF", static_cast<long>(to_cell));
+            setState(kStateMffLeave);
+        }
+
         publishStatus(true);
+        publishMffPreviewCommands();
     }
 
     void TaskManagerNode::onStateOdomReset(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
@@ -536,6 +624,8 @@ namespace r2_planner {
             state_entered_at_ = std::chrono::steady_clock::now();
         }
         publishStateSideEffects(state_code);
+        // current_drive_mode_ は publishAutoDriveModeForState() で更新される実modeを使用する。
+        // 状態コード固定で上書きすると、Enter MFFなどで mode=1 のときも誤ってMFFロックされる。
     }
 
     void TaskManagerNode::publishStateSideEffects(int32_t state_code) {
@@ -594,9 +684,38 @@ namespace r2_planner {
         return *it;
     }
 
+    bool TaskManagerNode::shouldWaitForAutodriveComplete(int32_t state_code) const {
+        auto it = state_pose_targets_.find(state_code);
+        if (it == state_pose_targets_.end()) {
+            return false;
+        }
+        return it->second.enabled && it->second.wait_for_autodrive_complete;
+    }
+
     void TaskManagerNode::advanceAutoTransition() {
         if (status_.transition_mode_code != kTransitionAuto) {
             return;
+        }
+
+        // MFF/ARENAモード（drive_mode_code=4/5）中は自動遷移をロックする。
+        // MFFは出口マス到達時(onMffPathAdvance)のみ遷移、ARENAは完了フラグ(onArenaWalkComplete)で遷移する。
+        if (current_drive_mode_ == 4 || current_drive_mode_ == 5) {
+            RCLCPP_DEBUG(get_logger(),
+                         "Auto transition blocked: in sequence mode (current_drive_mode_=%ld)",
+                         static_cast<long>(current_drive_mode_));
+            return;
+        }
+
+        if (shouldWaitForAutodriveComplete(status_.state_code)) {
+            const bool has_fresh_complete =
+                has_autodrive_complete_event_ && last_autodrive_complete_at_ >= state_entered_at_;
+            if (!has_fresh_complete) {
+                RCLCPP_DEBUG_THROTTLE(get_logger(), *get_clock(), 500,
+                                      "Auto transition blocked: waiting autodrive completion flag for state=%s(%ld)",
+                                      stateDisplayName(status_.state_code).c_str(),
+                                      static_cast<long>(status_.state_code));
+                return;
+            }
         }
 
         int32_t wait_ms = auto_transition_default_wait_ms_;
@@ -751,7 +870,8 @@ namespace r2_planner {
 
         std_msgs::msg::Int32MultiArray mode_msg;
         if (it == state_mode_targets_.end()) {
-            if (fallback_drive_mode_on_unset_ < 0 || fallback_drive_mode_on_unset_ > 4) {
+            if (fallback_drive_mode_on_unset_ < 0 || fallback_drive_mode_on_unset_ > 5) {
+                RCLCPP_WARN(get_logger(), "publishAutoDriveModeForState: no mode target for state=%s(%ld), fallback invalid (%ld), skipping", stateDisplayName(state_code).c_str(), static_cast<long>(state_code), static_cast<long>(fallback_drive_mode_on_unset_));
                 return;
             }
             mode_msg.data = {fallback_drive_mode_on_unset_, 0};
@@ -759,14 +879,25 @@ namespace r2_planner {
             const bool rotate_only = (rotate_it != state_rotate_only_targets_.end() && rotate_it->second);
             mode_msg.data = {it->second, rotate_only ? 1 : 0};
         }
+        const int32_t prev_drive_mode = current_drive_mode_;
+        current_drive_mode_ = mode_msg.data[0];
         drive_mode_cmd_pub_->publish(mode_msg);
+
+        // ARENAモードへ遷移したタイミングでSequenceCtrlのアリーナ走行を起動する
+        if (current_drive_mode_ == 5 && prev_drive_mode != 5 && arena_walk_cmd_pub_) {
+            std_msgs::msg::Int32 arena_start_msg;
+            arena_start_msg.data = 1;
+            arena_walk_cmd_pub_->publish(arena_start_msg);
+            RCLCPP_INFO(get_logger(), "Published arena walk start command to /r2_arena_walk_cmd.");
+        }
 
         RCLCPP_INFO(
             get_logger(),
-            "Published auto drive mode for state=%s(%ld): mode=%ld rotate_only=%s",
+            "Published auto drive mode for state=%s(%ld): mode=%ld (current_drive_mode_=%ld) rotate_only=%s",
             stateDisplayName(state_code).c_str(),
             static_cast<long>(state_code),
             static_cast<long>(mode_msg.data[0]),
+            static_cast<long>(current_drive_mode_),
             mode_msg.data.size() > 1 && mode_msg.data[1] ? "true" : "false");
     }
 
@@ -787,27 +918,61 @@ namespace r2_planner {
             static_cast<long>(state_code));
     }
 
-    void TaskManagerNode::publishMffTransitionCommands(int32_t from_cell, int32_t to_cell) {
+    bool TaskManagerNode::buildMffTransitionPreview(MffTransitionPreview &preview) const {
+        preview = {};
+        preview.from_cell = status_.mff_cell;
+        preview.predicted_heading_deg = mff_heading_deg_;
+
+        if (mff_path_.empty()) {
+            return false;
+        }
+
+        size_t current_index = mff_path_index_;
+        const auto it = std::find(mff_path_.begin(), mff_path_.end(), status_.mff_cell);
+        if (it != mff_path_.end()) {
+            current_index = static_cast<size_t>(std::distance(mff_path_.begin(), it));
+        }
+
+        if (current_index + 1 >= mff_path_.size()) {
+            return false;
+        }
+
+        preview.to_cell = mff_path_[current_index + 1];
         int32_t target_heading_deg = mff_heading_deg_;
-        int32_t turn_deg = 0;
-        int32_t step_cmd = 0;
-        if (!computeMffTransition(from_cell, to_cell, mff_heading_deg_, target_heading_deg, turn_deg, step_cmd)) {
+        if (!computeMffTransition(
+                preview.from_cell,
+                preview.to_cell,
+                mff_heading_deg_,
+                target_heading_deg,
+                preview.turn_deg,
+                preview.step_cmd)) {
+            preview.to_cell = 0;
+            preview.turn_deg = 0;
+            preview.step_cmd = 0;
+            preview.predicted_heading_deg = mff_heading_deg_;
+            return false;
+        }
+
+        preview.predicted_heading_deg = normalizeHeadingDeg(target_heading_deg);
+        preview.valid = true;
+        return true;
+    }
+
+    void TaskManagerNode::publishMffPreviewCommands() {
+        if (!mff_turn_cmd_pub_ || !mff_step_cmd_pub_) {
             return;
         }
-        mff_heading_deg_ = normalizeHeadingDeg(target_heading_deg);
+
+        MffTransitionPreview preview;
+        buildMffTransitionPreview(preview);
 
         std_msgs::msg::Int32 turn_msg;
-        turn_msg.data = turn_deg;
+        turn_msg.data = preview.valid ? preview.turn_deg : 0;
         mff_turn_cmd_pub_->publish(turn_msg);
 
         std_msgs::msg::Int32 step_msg;
-        step_msg.data = step_cmd;
+        step_msg.data = preview.valid ? preview.step_cmd : 0;
         mff_step_cmd_pub_->publish(step_msg);
-
-        RCLCPP_INFO(get_logger(),
-                    "Published MFF transition commands: %ld -> %ld, turn=%ld deg, step=%ld",
-                    static_cast<long>(from_cell), static_cast<long>(to_cell),
-                    static_cast<long>(turn_deg), static_cast<long>(step_cmd));
     }
 
     bool TaskManagerNode::computeMffTransition(
@@ -888,40 +1053,18 @@ namespace r2_planner {
             return;
         }
 
-        int32_t next_cell = 0;
-        int32_t next_turn_deg = 0;
-        int32_t next_step_cmd = 0;
-        int32_t predicted_heading_deg = mff_heading_deg_;
-
-        if (!mff_path_.empty()) {
-            size_t current_index = mff_path_index_;
-            const auto it = std::find(mff_path_.begin(), mff_path_.end(), status_.mff_cell);
-            if (it != mff_path_.end()) {
-                current_index = static_cast<size_t>(std::distance(mff_path_.begin(), it));
-            }
-
-            if (current_index + 1 < mff_path_.size()) {
-                next_cell = mff_path_[current_index + 1];
-                int32_t target_heading_deg = mff_heading_deg_;
-                if (!computeMffTransition(status_.mff_cell, next_cell, mff_heading_deg_, target_heading_deg, next_turn_deg, next_step_cmd)) {
-                    next_cell = 0;
-                    next_turn_deg = 0;
-                    next_step_cmd = 0;
-                } else {
-                    predicted_heading_deg = normalizeHeadingDeg(target_heading_deg);
-                }
-            }
-        }
+        MffTransitionPreview preview;
+        buildMffTransitionPreview(preview);
 
         std_msgs::msg::Int32MultiArray mff_status_msg;
         // [current_cell, next_cell, next_turn_deg, next_step_cmd, current_heading_deg, predicted_heading_deg]
         mff_status_msg.data = {
             status_.mff_cell,
-            next_cell,
-            next_turn_deg,
-            next_step_cmd,
+            preview.valid ? preview.to_cell : 0,
+            preview.valid ? preview.turn_deg : 0,
+            preview.valid ? preview.step_cmd : 0,
             mff_heading_deg_,
-            predicted_heading_deg,
+            preview.predicted_heading_deg,
         };
         mff_status_pub_->publish(mff_status_msg);
     }
