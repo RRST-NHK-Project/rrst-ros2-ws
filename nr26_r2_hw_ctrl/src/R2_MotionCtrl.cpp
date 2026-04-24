@@ -841,7 +841,7 @@ private:
 
         if (UP && !last_up) {
             int i = seq_idx();
-            i = (i < 0) ? 0 : (i + 1 < SEQ_LEN ? i + 1 : SEQ_LEN - 1);
+            i = (i < 0) ? 0 : (i + 1) % SEQ_LEN;
             current_planner_state_ = SEQUENCE[i];
             apply_state_to_packet(current_planner_state_);
             log_current_operation_state("up_btn");
