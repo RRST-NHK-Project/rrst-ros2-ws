@@ -840,16 +840,30 @@ private:
         };
 
         if (UP && !last_up) {
-            int i = seq_idx();
-            i = (i < 0) ? 0 : (i + 1) % SEQ_LEN;
-            current_planner_state_ = SEQUENCE[i];
+            // PICK状態からは高さ選択完了とみなし直接STATE_KFS_HOLDへ
+            if (current_planner_state_ == STATE_PICK_UP ||
+                current_planner_state_ == STATE_PICK_MIDDLE ||
+                current_planner_state_ == STATE_PICK_DOWN) {
+                current_planner_state_ = STATE_KFS_HOLD;
+            } else {
+                int i = seq_idx();
+                i = (i < 0) ? 0 : (i + 1) % SEQ_LEN;
+                current_planner_state_ = SEQUENCE[i];
+            }
             apply_state_to_packet(current_planner_state_);
             log_current_operation_state("up_btn");
         }
         if (DOWN && !last_down) {
-            int i = seq_idx();
-            i = (i < 0) ? 0 : (i - 1 >= 0 ? i - 1 : 0);
-            current_planner_state_ = SEQUENCE[i];
+            // PICK状態からは直接STATE_KFS_PICK_WAITINGへ
+            if (current_planner_state_ == STATE_PICK_UP ||
+                current_planner_state_ == STATE_PICK_MIDDLE ||
+                current_planner_state_ == STATE_PICK_DOWN) {
+                current_planner_state_ = STATE_KFS_PICK_WAITING;
+            } else {
+                int i = seq_idx();
+                i = (i < 0) ? 0 : (i - 1 >= 0 ? i - 1 : 0);
+                current_planner_state_ = SEQUENCE[i];
+            }
             apply_state_to_packet(current_planner_state_);
             log_current_operation_state("down_btn");
         }
