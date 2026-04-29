@@ -1477,6 +1477,10 @@ public:
             rclcpp::QoS(10).best_effort(),
             std::bind(&HardWareControl::transition_mode_callback, this, std::placeholders::_1));
 
+        transition_mode_pub_ = this->create_publisher<std_msgs::msg::Int32>(
+            "r2/task_transition_mode",
+            rclcpp::QoS(10).best_effort());
+
         // r2_autodrive から公開される現在モード文字列（MFF/ARENA）でも
         // SequenceCtrl の有効/無効を切り替えられる受信口を追加
         drive_mode_text_sub_ = this->create_subscription<std_msgs::msg::String>(
@@ -1611,6 +1615,16 @@ private:
         publish_drive_mode_command({DRIVE_MODE_MANUAL, 0});
     }
 
+    void publish_transition_mode_command(bool manual_enabled) {
+        if (!transition_mode_pub_) {
+            return;
+        }
+
+        std_msgs::msg::Int32 msg;
+        msg.data = manual_enabled ? DRIVE_MODE_MANUAL : 1;
+        transition_mode_pub_->publish(msg);
+    }
+
     void set_manual_mode(bool enabled, const char *source) {
         if (manual_mode_ == enabled) {
             return;
@@ -1643,7 +1657,9 @@ private:
         if (msg->buttons.size() > 10) {
             const bool ps = static_cast<bool>(msg->buttons[10]);
             if (ps && !last_ps_btn_) {
-                set_manual_mode(!manual_mode_, "PS_button");
+                const bool next_manual_mode = !manual_mode_;
+                set_manual_mode(next_manual_mode, "PS_button");
+                publish_transition_mode_command(next_manual_mode);
             }
             last_ps_btn_ = ps;
         }
@@ -2123,6 +2139,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mff_status_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mode_cmd_sub_;
     rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr drive_mode_cmd_pub_;
+    rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr transition_mode_pub_;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr drive_mode_text_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr cube_detect_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr cube_align_cmd_sub_;
