@@ -171,7 +171,6 @@ private:
     std::atomic<int32_t> current_drive_mode_{DRIVE_MODE_MANUAL};
     std::string current_state_name_ = "";
     TargetHeight target_height_ = TargetHeight::DOWN;
-    bool last_ps_btn_ = false; // PSボタン前回状態（エッジ検出用）
 
     // モーター1回転あたりのエンコーダのカウント数
     static constexpr double COUNTS_PER_ROTATION = 360.0;
@@ -670,19 +669,8 @@ private:
     // PS4コントローラーコールバック（手動制御用）
     // =====================================================================
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
-        // ── PSボタン: 手動 / 状態管理モードトグル（モードに関わらず常時判定）──
-        if (msg->buttons.size() > 10) {
-            const bool ps = static_cast<bool>(msg->buttons[10]);
-            if (ps && !last_ps_btn_) {
-                const int32_t next_mode =
-                    is_manual_mode() ? DRIVE_MODE_STATE_MANAGEMENT : DRIVE_MODE_MANUAL;
-                update_drive_mode(next_mode, "PS_button");
-                RCLCPP_INFO(get_logger(),
-                            "[PSボタン] 機構ドライブモード切替 -> %s",
-                            next_mode == DRIVE_MODE_MANUAL ? "MANUAL" : "STATE_MANAGEMENT");
-            }
-            last_ps_btn_ = ps;
-        }
+        // PSボタンによるモード切替は r2/task_transition_mode を正とする。
+        // ここでは手動操作だけを扱い、共有モードの反転は SequenceCtrl/GUI からの通知で受ける。
 
         if (!is_manual_mode()) {
             return;
@@ -708,7 +696,6 @@ private:
         // bool L2 = msg->buttons[6];
         // bool R2 = msg->buttons[7];
 
-        // bool SHARE = msg->buttons[8];
         // bool OPTION = msg->buttons[9];
         // bool PS = msg->buttons[10];
 
@@ -717,9 +704,6 @@ private:
 
         // static bool last_option = false;
         // static bool option_latch = false;
-
-        // static bool last_share = false;
-        // static bool share_latch = false;
 
         // 以降、配列data_を操作する
 
