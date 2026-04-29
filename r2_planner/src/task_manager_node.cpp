@@ -164,7 +164,7 @@ namespace r2_planner {
             std::bind(&TaskManagerNode::onCell, this, std::placeholders::_1));
 
         transition_mode_sub_ = create_subscription<std_msgs::msg::Int32>(
-            transition_mode_topic, rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local(),
+            transition_mode_topic, rclcpp::QoS(rclcpp::KeepLast(1)).best_effort().transient_local(),
             std::bind(&TaskManagerNode::onTransitionMode, this, std::placeholders::_1));
 
         state_sequence_sub_ = create_subscription<std_msgs::msg::Int32MultiArray>(

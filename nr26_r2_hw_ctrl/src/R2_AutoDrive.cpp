@@ -71,7 +71,7 @@ public:
             std::bind(&PIDMecanumController::mode_cmd_callback, this, std::placeholders::_1));
 
         transition_mode_sub_ = this->create_subscription<std_msgs::msg::Int32>(
-            "r2/task_transition_mode", rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local(),
+            "r2/task_transition_mode", rclcpp::QoS(rclcpp::KeepLast(1)).best_effort().transient_local(),
             std::bind(&PIDMecanumController::transition_mode_callback, this, std::placeholders::_1));
 
         // ArUco追従入力

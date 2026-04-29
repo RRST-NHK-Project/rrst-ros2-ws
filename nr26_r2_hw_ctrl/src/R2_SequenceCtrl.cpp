@@ -1470,7 +1470,7 @@ public:
             rclcpp::QoS(1).reliable().transient_local());
 
         // r2_plannerの遷移モード（手動/自動）を指示通知で受信
-        const auto transition_mode_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
+        const auto transition_mode_qos = rclcpp::QoS(rclcpp::KeepLast(1)).best_effort().transient_local();
         transition_mode_sub_ = this->create_subscription<std_msgs::msg::Int32>(
             "r2/task_transition_mode",
             transition_mode_qos,

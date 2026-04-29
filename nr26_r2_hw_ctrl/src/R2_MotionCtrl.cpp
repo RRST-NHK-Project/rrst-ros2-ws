@@ -117,7 +117,7 @@ public:
 
         // GUIから直接モードが送られる場合の直接受信（rosbridge互換: best_effort）
         transition_mode_sub_ = this->create_subscription<std_msgs::msg::Int32>(
-            "r2/task_transition_mode", rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local(),
+            "r2/task_transition_mode", rclcpp::QoS(rclcpp::KeepLast(1)).best_effort().transient_local(),
             std::bind(&HardWareControl::transition_mode_callback, this, std::placeholders::_1));
 
         // task_manager_node 経由のドライブモードコマンド（r2_auto と同じ経路、transient_local）
