@@ -1470,14 +1470,15 @@ public:
             rclcpp::QoS(1).reliable().transient_local());
 
         // r2_plannerの遷移モード（手動/自動）を指示通知で受信
+        const auto transition_mode_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
         transition_mode_sub_ = this->create_subscription<std_msgs::msg::Int32>(
             "r2/task_transition_mode",
-            rclcpp::QoS(10).best_effort(),
+            transition_mode_qos,
             std::bind(&HardWareControl::transition_mode_callback, this, std::placeholders::_1));
 
         transition_mode_pub_ = this->create_publisher<std_msgs::msg::Int32>(
             "r2/task_transition_mode",
-            rclcpp::QoS(10).best_effort());
+            transition_mode_qos);
 
         // r2_autodrive から公開される現在モード文字列（MFF/ARENA）でも
         // SequenceCtrl の有効/無効を切り替えられる受信口を追加
@@ -1511,6 +1512,8 @@ public:
 
         camera_servo_pub_ = this->create_publisher<std_msgs::msg::Int32>(
             "/r2/camera_servo_angle", 10);
+
+        publish_transition_mode_command(manual_mode_);
 
         RCLCPP_INFO(get_logger(),
                     "serial_tx_%d started.", device_id_);
