@@ -1607,10 +1607,6 @@ private:
         drive_mode_cmd_pub_->publish(msg);
     }
 
-    void publish_manual_drive_override() {
-        publish_drive_mode_command({DRIVE_MODE_MANUAL, 0});
-    }
-
     void publish_transition_mode_command(bool manual_enabled) {
         if (!transition_mode_pub_) {
             return;
@@ -1636,7 +1632,6 @@ private:
             clear_pending_commands("enter manual mode");
             seq_->set_mff_mode_enabled(false);
             seq_->set_arena_mode_enabled(false);
-            publish_manual_drive_override();
         } else if (has_state_management_drive_mode_cmd_) {
             publish_drive_mode_command(last_state_management_drive_mode_cmd_);
             apply_sequence_mode_from_code(last_state_management_drive_mode_cmd_[0]);
@@ -1773,9 +1768,9 @@ private:
             camera_servo_pub_->publish(servo_msg);
         }
 
-        // 手動モード: 足回りはr2_autoが主系。ここではserial_tx_6へ送らない。
+        // 手動モード: 足回りは r2/task_transition_mode を受けた r2_auto が主系。
+        // ここでは drive_mode_cmd を上書きせず、serial_tx_6 にも送らない。
         if (manual_mode_) {
-            publish_manual_drive_override();
             return;
         }
 
