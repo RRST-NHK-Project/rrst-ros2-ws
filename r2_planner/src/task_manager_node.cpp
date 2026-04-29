@@ -107,7 +107,7 @@ namespace r2_planner {
         declare_parameter<std::string>("mff_step_cmd_topic", "r2_mff_step_cmd");
         declare_parameter<std::string>("mff_status_topic", "r2/task_mff_status");
         declare_parameter<int>("initial_mff_heading_deg", 0);
-        declare_parameter<int>("fallback_drive_mode_on_unset", 0);
+        declare_parameter<int>("fallback_drive_mode_on_unset", 3);
         declare_parameter<std::string>("odom_reset_topic", "odom_reset");
 
         status_.state_code = static_cast<int32_t>(get_parameter("initial_state_code").as_int());
@@ -145,6 +145,10 @@ namespace r2_planner {
         auto_send_enabled_ = get_parameter("initial_auto_send_enabled").as_bool();
 
         state_sequence_ = {kStateWaiting, kStateRackMove, kStateStaffHandTrigger, kStateStaffAssembly, kStateMffEnter, kStateMffLeave};
+        for (const int32_t state_code : state_sequence_) {
+            state_mode_targets_[state_code] = (state_code == kStateMffEnter) ? 4 : 3;
+            state_rotate_only_targets_[state_code] = false;
+        }
         applyStateNameSequenceMapping();
 
         command_sub_ = create_subscription<std_msgs::msg::Int32MultiArray>(

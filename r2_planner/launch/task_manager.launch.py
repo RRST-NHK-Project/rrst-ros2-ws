@@ -34,7 +34,7 @@ def generate_launch_description():
         ("mff_step_cmd_topic", "r2_mff_step_cmd", str),
         ("mff_status_topic", "r2/task_mff_status", str),
         ("initial_mff_heading_deg", "0", int),
-        ("fallback_drive_mode_on_unset", "0", int),
+        ("fallback_drive_mode_on_unset", "3", int),
         ("odom_reset_topic", "odom_reset", str),
     ]
 
