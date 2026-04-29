@@ -421,9 +421,9 @@ private:
             aruco_target_forward_ = msg->data[0];
             aruco_target_lateral_ = msg->data[1];
             aruco_target_yaw_ = msg->data[2];
-            // RCLCPP_INFO(this->get_logger(),
-            //             "Aruco relative target updated forward=%.3f lateral=%.3f yaw=%.3f [rad]",
-            //             aruco_target_forward_, aruco_target_lateral_, aruco_target_yaw_);
+            RCLCPP_INFO(this->get_logger(),
+                        "Aruco relative target updated forward=%.3f lateral=%.3f yaw=%.3f [rad]",
+                        aruco_target_forward_, aruco_target_lateral_, aruco_target_yaw_);
             return;
         }
 
@@ -438,6 +438,9 @@ private:
             RCLCPP_INFO_THROTTLE(
                 this->get_logger(), *this->get_clock(), 1000,
                 "Deferred target command while transition mode is MANUAL");
+            RCLCPP_INFO(this->get_logger(),
+                        "Target updated x=%.3f y=%.3f yaw=%.3f [rad]",
+                        target_x_, target_y_, target_yaw_);
             return;
         }
 
@@ -446,9 +449,9 @@ private:
             RCLCPP_INFO(this->get_logger(), "Mode changed: AUTO (by target command)");
         }
 
-        // RCLCPP_INFO(this->get_logger(),
-        //             "Target updated x=%.3f y=%.3f yaw=%.3f [rad]",
-        //             target_x_, target_y_, target_yaw_);
+        RCLCPP_INFO(this->get_logger(),
+                    "Target updated x=%.3f y=%.3f yaw=%.3f [rad]",
+                    target_x_, target_y_, target_yaw_);
     }
 
     void mode_cmd_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
@@ -537,7 +540,7 @@ private:
 
     void aruco_target_id_callback(const std_msgs::msg::Int32::SharedPtr msg) {
         aruco_target_id_ = msg->data;
-        // RCLCPP_INFO(this->get_logger(), "Aruco target ID updated: %d", aruco_target_id_);
+        RCLCPP_INFO(this->get_logger(), "Aruco target ID updated: %d", aruco_target_id_);
     }
 
     void aruco_camera_offset_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
@@ -547,9 +550,9 @@ private:
 
         aruco_camera_offset_x_ = msg->data[0];
         aruco_camera_offset_y_ = msg->data[1];
-        // RCLCPP_INFO(this->get_logger(),
-        //             "Aruco camera offset updated x=%.3f y=%.3f [m]",
-        //             aruco_camera_offset_x_, aruco_camera_offset_y_);
+        RCLCPP_INFO(this->get_logger(),
+                    "Aruco camera offset updated x=%.3f y=%.3f [m]",
+                    aruco_camera_offset_x_, aruco_camera_offset_y_);
     }
 
     // PS4入力
