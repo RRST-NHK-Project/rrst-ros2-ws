@@ -81,6 +81,9 @@ private:
     };
 
     int32_t current_planner_state_ = 0;
+    int32_t prev_applied_state_ = -2;
+    int hold_seq_step_ = 0;
+    int hold_wait_count_ = 0;
     std::string current_state_name_ = "";
     TargetHeight target_height_ = TargetHeight::DOWN;
 
@@ -170,8 +173,16 @@ private:
     }
 
     void apply_state_to_packet(int32_t state_code) {
-        // 状態ごとに明示的に値を作り直し、残留値を防ぐ
-        reset_hand_outputs();
+        // 状態遷移時にシーケンスカウンタをリセット
+        if (state_code != prev_applied_state_) {
+            hold_seq_step_ = 0;
+            prev_applied_state_ = state_code;
+        }
+
+        // 漸進シーケンス中はリセットしない
+        if (state_code != STATE_KFS_HOLD) {
+            reset_hand_outputs();
+        }
 
         switch (state_code) {
         case STATE_KFS_HAND_INIT:
@@ -195,12 +206,46 @@ private:
             set_ready_values();
             set_pick_values();
             break;
-        case STATE_KFS_HOLD:
-            set_hold_values();
+        case STATE_KFS_HOLD: {
+            // 段階的シーケンス（SERVO1・TR1のみ、20ms周期で進む）
+            // 0: SERVO1→217, 1: TR1=false, 2: 4秒待機, 3: SERVO1→200
+            constexpr int STEP = 2;
+            switch (hold_seq_step_) {
+            case 0: {
+                int v = static_cast<int>(pkt[SERVO1]);
+                if (v >= 217) {
+                    hold_seq_step_++;
+                } else {
+                    pkt.setServo(SERVO1, v + STEP <= 217 ? v + STEP : 217);
+                }
+                break;
+            }
+            case 1:
+                pkt.setTR(TR1, false);
+                hold_wait_count_ = 0;
+                hold_seq_step_++;
+                break;
+            case 2:
+                if (++hold_wait_count_ >= 200) {
+                    hold_seq_step_++;
+                }
+                break;
+            case 3: {
+                int v = static_cast<int>(pkt[SERVO1]);
+                if (v <= 200) {
+                    hold_seq_step_++;
+                } else {
+                    pkt.setServo(SERVO1, v - STEP >= 200 ? v - STEP : 200);
+                }
+                break;
+            }
+            default:
+                pkt.setServo(SERVO1, 200);
+                pkt.setTR(TR1, false);
+                break;
+            }
             break;
-        case STATE_KFS_MOVE:
-            set_moving_values();
-            break;
+        }
         case STATE_TTR_SHOOT_MIDDLE:
             set_shoot_values();
             break;
@@ -255,6 +300,9 @@ private:
     }
 
     void publish_packet() {
+        if (current_planner_state_ == STATE_KFS_HOLD) {
+            apply_state_to_packet(current_planner_state_);
+        }
         std_msgs::msg::Int16MultiArray msg;
         msg.data = pkt.toVector();
         publisher_->publish(msg);

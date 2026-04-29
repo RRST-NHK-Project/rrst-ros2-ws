@@ -173,9 +173,14 @@ private:
     int32_t prev_applied_state_ = -2;
     int hold_seq_step_ = 0;
     int hold_wait_count_ = 0;
+    bool auto_seq_running_ = false;
+    int auto_seq_step_ = 0;
+    int auto_seq_ticks_ = 0;
+    int32_t auto_pick_state_ = STATE_PICK_DOWN;
     std::atomic<int32_t> current_drive_mode_{DRIVE_MODE_MANUAL};
     std::string current_state_name_ = "";
     TargetHeight target_height_ = TargetHeight::DOWN;
+    bool last_ps_btn_ = false; // PSボタン前回状態（エッジ検出用）
 
     // モーター1回転あたりのエンコーダのカウント数
     static constexpr double COUNTS_PER_ROTATION = 360.0;
@@ -315,7 +320,11 @@ private:
 
     void set_pick_values() {
         pkt.setServo(SERVO1, 30);
-        pkt.setServo(SERVO3, 84);
+        if (target_height_ == TargetHeight::UP) {
+            pkt.setServo(SERVO3, 84);
+        } else {
+            pkt.setServo(SERVO3, 30);
+        }
         pkt.setServo(SERVO4, 0);
         pkt.setMD(MD1, 127); // ダイアフラムで吸う
         pkt.setTR(TR1, true);
@@ -564,9 +573,17 @@ private:
             set_ready_values();
             break;
         case STATE_PICK_UP:
+            target_height_ = TargetHeight::UP;
+            set_ready_values();
+            set_pick_values();
+            break;
         case STATE_PICK_MIDDLE:
+            target_height_ = TargetHeight::MIDDLE;
+            set_ready_values();
+            set_pick_values();
+            break;
         case STATE_PICK_DOWN:
-            target_height_ = static_cast<TargetHeight>(state_code - STATE_PICK_UP);
+            target_height_ = TargetHeight::DOWN;
             set_ready_values();
             set_pick_values();
             break;
@@ -707,6 +724,20 @@ private:
     // PS4コントローラーコールバック（手動制御用）
     // =====================================================================
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
+        // ── PSボタン: 手動 / 自動モードトグル（モードに関わらず常時判定）──
+        if (msg->buttons.size() > 10) {
+            const bool ps = static_cast<bool>(msg->buttons[10]);
+            if (ps && !last_ps_btn_) {
+                const int32_t next_mode =
+                    is_manual_mode() ? DRIVE_MODE_AUTO : DRIVE_MODE_MANUAL;
+                update_drive_mode(next_mode, "PS_button");
+                RCLCPP_INFO(get_logger(),
+                            "[PSボタン] 機構ドライブモード切替 -> %s",
+                            next_mode == DRIVE_MODE_MANUAL ? "MANUAL" : "AUTO");
+            }
+            last_ps_btn_ = ps;
+        }
+
         if (!is_manual_mode()) {
             return;
         }
@@ -723,7 +754,7 @@ private:
         bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
-        // bool RIGHT = msg->axes[6] == -1.0;
+        bool RIGHT = msg->axes[6] == -1.0;
         bool UP = msg->axes[7] == 1.0;
         bool DOWN = msg->axes[7] == -1.0;
 
@@ -819,55 +850,28 @@ private:
         //     data_[1], data_[2], data_[3], data_[4],
         //     data_[9], data_[10], data_[11], data_[12]);
 
-        // UP/DOWN: シーケンス順送り/戻し（押した瞬間だけ反応）
-        static const int32_t SEQUENCE[] = {
-            STATE_KFS_HAND_INIT,
-            STATE_KFS_PICK_WAITING,
-            STATE_PICK_UP,
-            STATE_PICK_MIDDLE,
-            STATE_PICK_DOWN,
-            STATE_KFS_HOLD,
-            STATE_TTR_SHOOT_MIDDLE,
-        };
-        static constexpr int SEQ_LEN = 7;
+        // UP/RIGHT/DOWN: PICK高さ選択 → 1秒後に自動でKFS_HOLDシーケンスへ移行
         static bool last_up = false;
+        static bool last_right = false;
         static bool last_down = false;
 
-        auto seq_idx = [&]() -> int {
-            for (int i = 0; i < SEQ_LEN; ++i)
-                if (SEQUENCE[i] == current_planner_state_) return i;
-            return -1;
+        auto start_sequence = [&](int32_t pick_state, const char *label) {
+            auto_pick_state_ = pick_state;
+            auto_seq_step_ = 0;
+            auto_seq_ticks_ = 0;
+            auto_seq_running_ = true;
+            log_current_operation_state(label);
         };
 
-        if (UP && !last_up) {
-            // PICK状態からは高さ選択完了とみなし直接STATE_KFS_HOLDへ
-            if (current_planner_state_ == STATE_PICK_UP ||
-                current_planner_state_ == STATE_PICK_MIDDLE ||
-                current_planner_state_ == STATE_PICK_DOWN) {
-                current_planner_state_ = STATE_KFS_HOLD;
-            } else {
-                int i = seq_idx();
-                i = (i < 0) ? 0 : (i + 1) % SEQ_LEN;
-                current_planner_state_ = SEQUENCE[i];
-            }
-            apply_state_to_packet(current_planner_state_);
-            log_current_operation_state("up_btn");
-        }
-        if (DOWN && !last_down) {
-            // PICK状態からは直接STATE_KFS_PICK_WAITINGへ
-            if (current_planner_state_ == STATE_PICK_UP ||
-                current_planner_state_ == STATE_PICK_MIDDLE ||
-                current_planner_state_ == STATE_PICK_DOWN) {
-                current_planner_state_ = STATE_KFS_PICK_WAITING;
-            } else {
-                int i = seq_idx();
-                i = (i < 0) ? 0 : (i - 1 >= 0 ? i - 1 : 0);
-                current_planner_state_ = SEQUENCE[i];
-            }
-            apply_state_to_packet(current_planner_state_);
-            log_current_operation_state("down_btn");
-        }
+        if (UP && !last_up)
+            start_sequence(STATE_PICK_UP, "up_btn");
+        if (RIGHT && !last_right)
+            start_sequence(STATE_PICK_MIDDLE, "right_btn");
+        if (DOWN && !last_down)
+            start_sequence(STATE_PICK_DOWN, "down_btn");
+
         last_up = UP;
+        last_right = RIGHT;
         last_down = DOWN;
 
         // 配列操作ここまで
@@ -877,9 +881,42 @@ private:
     void publisher_timer_callback() {
         std_msgs::msg::Int16MultiArray msg;
 
+        // 自動シーケンス進行
+        // 0:HAND_INIT(1s) → 1:PICK_WAITING(1s) → 2:PICK_X(1s) → 3:KFS_HOLD(自動)
+        if (auto_seq_running_) {
+            ++auto_seq_ticks_;
+            switch (auto_seq_step_) {
+            case 0:
+                current_planner_state_ = STATE_KFS_HAND_INIT;
+                if (auto_seq_ticks_ >= 50) {
+                    auto_seq_step_++;
+                    auto_seq_ticks_ = 0;
+                }
+                break;
+            case 1:
+                current_planner_state_ = STATE_KFS_PICK_WAITING;
+                if (auto_seq_ticks_ >= 50) {
+                    auto_seq_step_++;
+                    auto_seq_ticks_ = 0;
+                }
+                break;
+            case 2:
+                current_planner_state_ = auto_pick_state_;
+                if (auto_seq_ticks_ >= 50) {
+                    auto_seq_step_++;
+                    auto_seq_ticks_ = 0;
+                }
+                break;
+            case 3:
+                current_planner_state_ = STATE_KFS_HOLD;
+                auto_seq_running_ = false; // KFS_HOLDは既存の毎周期実行機構に委ねる
+                break;
+            }
+        }
+
         // ★★★ 状態別のモーター制御を毎周期適用 ★★★
-        // STATE_KFS_HOLD は漸進シーケンスのためマニュアルモードでも毎周期適用
-        if (!is_manual_mode() || current_planner_state_ == STATE_KFS_HOLD) {
+        // STATE_KFS_HOLD と自動シーケンス実行中はマニュアルモードでも毎周期適用
+        if (!is_manual_mode() || current_planner_state_ == STATE_KFS_HOLD || auto_seq_running_) {
             apply_state_to_packet(current_planner_state_);
         }
 

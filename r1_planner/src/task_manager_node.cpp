@@ -1,0 +1,857 @@
+#include "r1_planner/task_manager_node.hpp"
+
+#include <algorithm>
+#include <array>
+#include <cctype>
+#include <chrono>
+#include <cmath>
+#include <sstream>
+
+namespace {
+    std::string trimCopy(const std::string &text) {
+        const auto begin = std::find_if_not(text.begin(), text.end(), [](unsigned char ch) {
+            return std::isspace(ch) != 0;
+        });
+        const auto end = std::find_if_not(text.rbegin(), text.rend(), [](unsigned char ch) {
+                             return std::isspace(ch) != 0;
+                         }).base();
+
+        if (begin >= end) {
+            return "";
+        }
+        return std::string(begin, end);
+    }
+
+    std::vector<std::string> splitCommaSeparatedNames(const std::string &names_text) {
+        std::vector<std::string> names;
+        std::stringstream ss(names_text);
+        std::string token;
+        while (std::getline(ss, token, ',')) {
+            const auto trimmed = trimCopy(token);
+            if (!trimmed.empty()) {
+                names.push_back(trimmed);
+            }
+        }
+        return names;
+    }
+} // namespace
+
+namespace r1_planner {
+
+    TaskManagerNode::TaskManagerNode()
+        : Node("r1_task_manager") {
+        declare_parameter<int>("initial_state_code", kStateWaiting);
+        declare_parameter<int>("initial_color_code", kColorUnknown);
+        declare_parameter<int>("initial_transition_mode", kTransitionManual);
+        declare_parameter<int>("auto_transition_period_ms", 3000);
+        declare_parameter<std::string>("command_topic", "r1/task_command");
+        declare_parameter<std::string>("state_topic", "r1/task_state");
+        declare_parameter<std::string>("color_topic", "r1/task_color");
+        declare_parameter<std::string>("cell_topic", "r1/task_cell");
+        
+        declare_parameter<std::string>("transition_mode_topic", "r1/task_transition_mode");
+        declare_parameter<std::string>("magazine_action_topic", "r1_magazine_action");
+        declare_parameter<std::string>("state_sequence_topic", "r1/task_state_sequence");
+        declare_parameter<std::string>("state_pose_topic", "r1/task_state_pose");
+        declare_parameter<std::string>("state_mode_topic", "r1/task_state_mode");
+        declare_parameter<std::string>("state_odom_reset_topic", "r1/task_state_odom_reset");
+        declare_parameter<std::string>("state_wait_topic", "r1/task_state_wait_ms");
+        declare_parameter<std::string>("auto_send_enabled_topic", "r1/task_auto_send_enabled");
+        declare_parameter<bool>("initial_auto_send_enabled", true);
+        declare_parameter<std::string>("status_topic", "r1/task_status");
+        declare_parameter<std::string>("status_text_topic", "r1/task_status_text");
+        declare_parameter<std::string>("auto_drive_target_topic", "r1_autodrive_cmd");
+        declare_parameter<std::string>("autodrive_complete_topic", "r1/autodrive_complete");
+        declare_parameter<std::string>("drive_mode_cmd_topic", "r1_drive_mode_cmd");
+        declare_parameter<int>("fallback_drive_mode_on_unset", 0);
+        declare_parameter<std::string>("odom_reset_topic", "odom_reset");
+
+        status_.state_code = static_cast<int32_t>(get_parameter("initial_state_code").as_int());
+        status_.color_code = static_cast<int32_t>(get_parameter("initial_color_code").as_int());
+        status_.transition_mode_code = static_cast<int32_t>(get_parameter("initial_transition_mode").as_int());
+
+        const auto auto_transition_period_ms = get_parameter("auto_transition_period_ms").as_int();
+        auto_transition_default_wait_ms_ = static_cast<int32_t>(std::max<long>(0, auto_transition_period_ms));
+
+        const auto command_topic = get_parameter("command_topic").as_string();
+        const auto state_topic = get_parameter("state_topic").as_string();
+        const auto color_topic = get_parameter("color_topic").as_string();
+        const auto cell_topic = get_parameter("cell_topic").as_string();
+        const auto transition_mode_topic = get_parameter("transition_mode_topic").as_string();
+        const auto magazine_action_topic = get_parameter("magazine_action_topic").as_string();
+        const auto state_sequence_topic = get_parameter("state_sequence_topic").as_string();
+        const auto state_pose_topic = get_parameter("state_pose_topic").as_string();
+        const auto state_mode_topic = get_parameter("state_mode_topic").as_string();
+        const auto state_odom_reset_topic = get_parameter("state_odom_reset_topic").as_string();
+        const auto state_wait_topic = get_parameter("state_wait_topic").as_string();
+        const auto auto_send_enabled_topic = get_parameter("auto_send_enabled_topic").as_string();
+        const auto status_topic = get_parameter("status_topic").as_string();
+        const auto status_text_topic = get_parameter("status_text_topic").as_string();
+        const auto auto_drive_target_topic = get_parameter("auto_drive_target_topic").as_string();
+        const auto autodrive_complete_topic = get_parameter("autodrive_complete_topic").as_string();
+        const auto drive_mode_cmd_topic = get_parameter("drive_mode_cmd_topic").as_string();
+        
+        fallback_drive_mode_on_unset_ = static_cast<int32_t>(get_parameter("fallback_drive_mode_on_unset").as_int());
+        const auto odom_reset_topic = get_parameter("odom_reset_topic").as_string();
+        auto_send_enabled_ = get_parameter("initial_auto_send_enabled").as_bool();
+
+        state_sequence_ = {kStateWaiting, kStateRackMove, kStateStaffHandTrigger, kStateStaffAssembly, kStateMffEnter, kStateMffLeave};
+        applyStateNameSequenceMapping();
+
+        command_sub_ = create_subscription<std_msgs::msg::Int32MultiArray>(
+            command_topic, rclcpp::QoS(10),
+            std::bind(&TaskManagerNode::onCommand, this, std::placeholders::_1));
+
+        state_sub_ = create_subscription<std_msgs::msg::Int32>(
+            state_topic, rclcpp::QoS(10),
+            std::bind(&TaskManagerNode::onState, this, std::placeholders::_1));
+
+        color_sub_ = create_subscription<std_msgs::msg::Int32>(
+            color_topic, rclcpp::QoS(10),
+            std::bind(&TaskManagerNode::onColor, this, std::placeholders::_1));
+
+        // Subscribe to GUI magazine action commands (topic is configurable)
+        magazine_action_sub_ = create_subscription<std_msgs::msg::Int32MultiArray>(
+            magazine_action_topic, rclcpp::QoS(10),
+            std::bind(&TaskManagerNode::onMagazineAction, this, std::placeholders::_1));
+
+        
+
+        transition_mode_sub_ = create_subscription<std_msgs::msg::Int32>(
+            transition_mode_topic, rclcpp::QoS(10).best_effort(),
+            std::bind(&TaskManagerNode::onTransitionMode, this, std::placeholders::_1));
+
+        state_sequence_sub_ = create_subscription<std_msgs::msg::Int32MultiArray>(
+            state_sequence_topic, rclcpp::QoS(10),
+            std::bind(&TaskManagerNode::onStateSequence, this, std::placeholders::_1));
+
+        state_sequence_names_sub_ = create_subscription<std_msgs::msg::String>(
+            "r1/task_state_sequence_names", rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local(),
+            std::bind(&TaskManagerNode::onStateSequenceNames, this, std::placeholders::_1));
+
+        state_pose_sub_ = create_subscription<std_msgs::msg::Float32MultiArray>(
+            state_pose_topic, rclcpp::QoS(10),
+            std::bind(&TaskManagerNode::onStatePose, this, std::placeholders::_1));
+
+        state_mode_sub_ = create_subscription<std_msgs::msg::Int32MultiArray>(
+            state_mode_topic, rclcpp::QoS(10),
+            std::bind(&TaskManagerNode::onStateMode, this, std::placeholders::_1));
+
+        state_odom_reset_sub_ = create_subscription<std_msgs::msg::Int32MultiArray>(
+            state_odom_reset_topic, rclcpp::QoS(10),
+            std::bind(&TaskManagerNode::onStateOdomReset, this, std::placeholders::_1));
+
+        state_wait_sub_ = create_subscription<std_msgs::msg::Int32MultiArray>(
+            state_wait_topic, rclcpp::QoS(10),
+            std::bind(&TaskManagerNode::onStateWait, this, std::placeholders::_1));
+
+        
+
+        auto_send_enabled_sub_ = create_subscription<std_msgs::msg::Bool>(
+            auto_send_enabled_topic, rclcpp::QoS(10),
+            std::bind(&TaskManagerNode::onAutoSendEnabled, this, std::placeholders::_1));
+
+        arena_walk_complete_sub_ = create_subscription<std_msgs::msg::Bool>(
+            "r1/arena_walk_complete", rclcpp::QoS(10),
+            std::bind(&TaskManagerNode::onArenaWalkComplete, this, std::placeholders::_1));
+
+        autodrive_complete_sub_ = create_subscription<std_msgs::msg::Bool>(
+            autodrive_complete_topic, rclcpp::QoS(10),
+            std::bind(&TaskManagerNode::onAutodriveComplete, this, std::placeholders::_1));
+
+        status_pub_ = create_publisher<std_msgs::msg::Int32MultiArray>(
+            status_topic, rclcpp::QoS(1).reliable().transient_local());
+
+        status_text_pub_ = create_publisher<std_msgs::msg::String>(
+            status_text_topic, rclcpp::QoS(1).reliable().transient_local());
+
+        auto_drive_target_pub_ = create_publisher<std_msgs::msg::Float32MultiArray>(
+            auto_drive_target_topic, rclcpp::QoS(10));
+
+        drive_mode_cmd_pub_ = create_publisher<std_msgs::msg::Int32MultiArray>(
+            drive_mode_cmd_topic, rclcpp::QoS(1).reliable().transient_local());
+
+        arena_walk_cmd_pub_ = create_publisher<std_msgs::msg::Int32>(
+            "/r1_arena_walk_cmd", rclcpp::QoS(10));
+
+        
+
+        odom_reset_pub_ = create_publisher<std_msgs::msg::Bool>(
+            odom_reset_topic, rclcpp::QoS(10));
+
+        publish_timer_ = create_wall_timer(
+            std::chrono::milliseconds(200),
+            [this]() {
+                publishStatus(false);
+            });
+
+        auto_transition_timer_ = create_wall_timer(
+            std::chrono::milliseconds(50),
+            [this]() { advanceAutoTransition(); });
+
+        publishStatus(true);
+
+        RCLCPP_INFO(
+            get_logger(),
+            "Task manager ready: state=%s(%ld) color=%s(%ld) mode=%s(%ld)",
+            stateDisplayName(status_.state_code).c_str(),
+            static_cast<long>(status_.state_code),
+            colorName(status_.color_code).c_str(),
+            static_cast<long>(status_.color_code),
+            transitionModeName(status_.transition_mode_code).c_str(),
+            static_cast<long>(status_.transition_mode_code));
+    }
+
+    void TaskManagerNode::onCommand(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        if (msg->data.empty()) {
+            return;
+        }
+
+        setState(msg->data[0]);
+
+        if (msg->data.size() >= 2) {
+            setColor(msg->data[1]);
+        }
+
+        
+
+        publishStatus(true);
+    }
+
+    void TaskManagerNode::onState(const std_msgs::msg::Int32::SharedPtr msg) {
+        if (status_.transition_mode_code == kTransitionAuto) {
+            RCLCPP_INFO(get_logger(),
+                        "State synchronized while AUTO mode is active: %s(%ld)",
+                        stateDisplayName(msg->data).c_str(),
+                        static_cast<long>(msg->data));
+        }
+        setState(msg->data);
+        publishStatus(true);
+    }
+
+    void TaskManagerNode::onMagazineAction(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        const auto &data = msg->data;
+        if (data.size() < 2) {
+            RCLCPP_WARN(get_logger(), "Ignoring r1_magazine_action with insufficient length");
+            return;
+        }
+
+        const int32_t slot = static_cast<int32_t>(data[0]);
+        const int32_t action = static_cast<int32_t>(data[1]);
+
+        if (slot < 1 || slot > 4) {
+            RCLCPP_WARN(get_logger(), "r1_magazine_action: invalid slot %ld", static_cast<long>(slot));
+            return;
+        }
+        if (action < 0 || action > 6) {
+            RCLCPP_WARN(get_logger(), "r1_magazine_action: invalid action %ld", static_cast<long>(action));
+            return;
+        }
+
+        // Store the last action for the slot
+        magazine_action_map_[slot] = action;
+
+        // Publish human-readable status text
+        if (status_text_pub_) {
+            std::ostringstream oss;
+            const char *act = (action == 0) ? "回収" :
+                              (action == 1) ? "使用" :
+                              (action == 2) ? "廃棄" :
+                              (action == 3) ? "ロック" :
+                              (action == 4) ? "ロック解除" :
+                              (action == 5) ? "装填" :
+                              (action == 6) ? "装填解除" : "不明";
+            oss << "Magazine Action: slot=" << slot << " action=" << act;
+            auto msg_out = std::make_shared<std_msgs::msg::String>();
+            msg_out->data = oss.str();
+            status_text_pub_->publish(*msg_out);
+        }
+
+        RCLCPP_INFO(get_logger(), "Received magazine action: slot=%ld action=%ld", static_cast<long>(slot), static_cast<long>(action));
+    }
+
+    void TaskManagerNode::onColor(const std_msgs::msg::Int32::SharedPtr msg) {
+        setColor(msg->data);
+        publishStatus(true);
+    }
+
+    
+
+    void TaskManagerNode::onTransitionMode(const std_msgs::msg::Int32::SharedPtr msg) {
+        RCLCPP_INFO(get_logger(), "Received transition mode command: %ld", static_cast<long>(msg->data));
+        setTransitionMode(msg->data);
+        publishStatus(true);
+    }
+
+    void TaskManagerNode::onStateSequence(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        const auto next_sequence = normalizedStateSequence(msg->data);
+        if (next_sequence.empty()) {
+            RCLCPP_WARN(get_logger(), "Ignoring empty state sequence update");
+            return;
+        }
+
+        state_sequence_ = next_sequence;
+        applyStateNameSequenceMapping();
+        std::ostringstream oss;
+        for (size_t i = 0; i < state_sequence_.size(); ++i) {
+            if (i > 0) {
+                oss << " -> ";
+            }
+            oss << stateDisplayName(state_sequence_[i]);
+        }
+        RCLCPP_INFO(get_logger(), "State sequence updated: %s", oss.str().c_str());
+    }
+
+    void TaskManagerNode::onStateSequenceNames(const std_msgs::msg::String::SharedPtr msg) {
+        pending_state_sequence_names_ = parseStateNameSequence(msg->data);
+        applyStateNameSequenceMapping();
+    }
+
+    void TaskManagerNode::onStatePose(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
+        const auto &data = msg->data;
+        if (data.size() < 2) {
+            RCLCPP_WARN(get_logger(), "Ignoring state pose update with insufficient length");
+            return;
+        }
+
+        const int32_t state_code = static_cast<int32_t>(std::lround(data[0]));
+        const bool enabled = data.size() >= 5 ? data[4] >= 0.5F : true;
+
+        if (!enabled) {
+            state_pose_targets_.erase(state_code);
+            RCLCPP_INFO(get_logger(), "Cleared state pose target: state=%s(%ld)", stateDisplayName(state_code).c_str(), static_cast<long>(state_code));
+            return;
+        }
+
+        if (data.size() < 4) {
+            RCLCPP_WARN(get_logger(), "Ignoring state pose update: state=%ld missing x/y/yaw", static_cast<long>(state_code));
+            return;
+        }
+
+        StatePoseTarget target;
+        target.enabled = true;
+        target.x = data[1];
+        target.y = data[2];
+        target.yaw_rad = data[3];
+        target.wait_for_autodrive_complete = data.size() >= 6 ? data[5] >= 0.5F : false;
+
+        state_pose_targets_[state_code] = target;
+        RCLCPP_INFO(
+            get_logger(),
+            "Updated state pose target: state=%s(%ld) x=%.3f y=%.3f yaw=%.3f wait_autodrive=%s",
+            stateDisplayName(state_code).c_str(),
+            static_cast<long>(state_code),
+            static_cast<double>(target.x),
+            static_cast<double>(target.y),
+            static_cast<double>(target.yaw_rad),
+            target.wait_for_autodrive_complete ? "true" : "false");
+    }
+
+    void TaskManagerNode::onStateMode(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        const auto &data = msg->data;
+        if (data.size() < 1) {
+            RCLCPP_WARN(get_logger(), "Ignoring state mode update with no state code");
+            return;
+        }
+
+        const int32_t state_code = data[0];
+        const bool enabled = data.size() >= 2 && data[1] >= 0;
+        const bool rotate_only = data.size() >= 3 && data[2] != 0;
+
+        if (!enabled) {
+            state_mode_targets_.erase(state_code);
+            state_rotate_only_targets_.erase(state_code);
+            RCLCPP_INFO(get_logger(), "Cleared state mode target: state=%s(%ld)", stateDisplayName(state_code).c_str(), static_cast<long>(state_code));
+
+            if (auto_send_enabled_ && state_code == status_.state_code) {
+                publishAutoDriveModeForState(state_code);
+                RCLCPP_INFO(get_logger(), "Applied fallback mode immediately for current state=%s(%ld)",
+                            stateDisplayName(state_code).c_str(), static_cast<long>(state_code));
+            }
+            return;
+        }
+
+        if (data.size() < 2) {
+            RCLCPP_WARN(get_logger(), "Ignoring state mode update: state=%ld missing mode code", static_cast<long>(state_code));
+            return;
+        }
+
+        const int32_t mode_code = data[1];
+        if (mode_code < 0 || mode_code > 5) {
+            RCLCPP_WARN(get_logger(), "Ignoring invalid mode code %ld for state=%s(%ld) (valid: 0-5)",
+                        static_cast<long>(mode_code), stateDisplayName(state_code).c_str(), static_cast<long>(state_code));
+            return;
+        }
+
+        state_mode_targets_[state_code] = mode_code;
+        state_rotate_only_targets_[state_code] = rotate_only;
+        RCLCPP_INFO(get_logger(), "Updated state mode target: state=%s(%ld) mode=%ld rotate_only=%s",
+                    stateDisplayName(state_code).c_str(), static_cast<long>(state_code), static_cast<long>(mode_code),
+                    rotate_only ? "true" : "false");
+
+        if (auto_send_enabled_ && state_code == status_.state_code) {
+            publishAutoDriveModeForState(state_code);
+            RCLCPP_INFO(get_logger(), "Applied state mode immediately for current state=%s(%ld)",
+                        stateDisplayName(state_code).c_str(), static_cast<long>(state_code));
+        }
+    }
+
+    void TaskManagerNode::onAutoSendEnabled(const std_msgs::msg::Bool::SharedPtr msg) {
+        auto_send_enabled_ = msg->data;
+        RCLCPP_INFO(get_logger(), "Auto send on state transition: %s", auto_send_enabled_ ? "ENABLED" : "DISABLED");
+    }
+
+    void TaskManagerNode::onAutodriveComplete(const std_msgs::msg::Bool::SharedPtr msg) {
+        if (!msg->data) {
+            return;
+        }
+
+        has_autodrive_complete_event_ = true;
+        last_autodrive_complete_at_ = std::chrono::steady_clock::now();
+
+        RCLCPP_INFO(get_logger(),
+                    "Received autodrive completion flag: r1/autodrive_complete=true (state=%s(%ld))",
+                    stateDisplayName(status_.state_code).c_str(),
+                    static_cast<long>(status_.state_code));
+    }
+
+    void TaskManagerNode::onArenaWalkComplete(const std_msgs::msg::Bool::SharedPtr msg) {
+        if (!msg->data) {
+            return;
+        }
+
+        if (status_.transition_mode_code != kTransitionAuto) {
+            RCLCPP_INFO(get_logger(),
+                        "Arena walk complete received, but transition mode is not AUTO. Ignored.");
+            return;
+        }
+
+        // ARENAモード中のみ、完了フラッグで次状態へ進める
+        if (current_drive_mode_ != 5) {
+            RCLCPP_INFO(get_logger(),
+                        "Arena walk complete received, but current_drive_mode_=%ld (not ARENA=5). Ignored.",
+                        static_cast<long>(current_drive_mode_));
+            return;
+        }
+
+        const int32_t next_state = nextStateCode(status_.state_code);
+        if (next_state == status_.state_code) {
+            RCLCPP_INFO(get_logger(),
+                        "Arena walk complete received, but next state is same as current (%s(%ld)).",
+                        stateDisplayName(status_.state_code).c_str(),
+                        static_cast<long>(status_.state_code));
+            return;
+        }
+
+        RCLCPP_INFO(get_logger(),
+                    "Arena walk complete received: %s(%ld) -> %s(%ld)",
+                    stateDisplayName(status_.state_code).c_str(),
+                    static_cast<long>(status_.state_code),
+                    stateDisplayName(next_state).c_str(),
+                    static_cast<long>(next_state));
+
+        // ブロック解除後に状態遷移。setState内で次状態のモードが再設定される。
+        current_drive_mode_ = 1;
+        setState(next_state);
+        publishStatus(true);
+    }
+
+    
+
+    void TaskManagerNode::onStateOdomReset(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        const auto &data = msg->data;
+        if (data.size() < 1) {
+            RCLCPP_WARN(get_logger(), "Ignoring state odom reset update with no state code");
+            return;
+        }
+
+        const int32_t state_code = data[0];
+        const bool enabled = data.size() >= 2 && data[1] > 0;
+
+        if (!enabled) {
+            state_odom_reset_targets_.erase(state_code);
+            RCLCPP_INFO(get_logger(), "Cleared state odom reset target: state=%s(%ld)", stateDisplayName(state_code).c_str(), static_cast<long>(state_code));
+            return;
+        }
+
+        state_odom_reset_targets_[state_code] = true;
+        RCLCPP_INFO(get_logger(), "Updated state odom reset target: state=%s(%ld) enabled=true",
+                    stateDisplayName(state_code).c_str(), static_cast<long>(state_code));
+    }
+
+    void TaskManagerNode::onStateWait(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        const auto &data = msg->data;
+        if (data.size() < 1) {
+            RCLCPP_WARN(get_logger(), "Ignoring state wait update with no state code");
+            return;
+        }
+
+        const int32_t state_code = data[0];
+        const bool enabled = data.size() >= 3 ? data[2] > 0 : (data.size() >= 2 && data[1] >= 0);
+
+        if (!enabled) {
+            // Treat "unset" as 200ms to ensure stable transition without a long wait.
+            state_wait_ms_overrides_[state_code] = 200;
+            RCLCPP_INFO(get_logger(), "Updated state wait override: state=%s(%ld) wait=200ms (unset)",
+                        stateDisplayName(state_code).c_str(), static_cast<long>(state_code));
+            return;
+        }
+
+        if (data.size() < 2) {
+            RCLCPP_WARN(get_logger(), "Ignoring state wait update: state=%ld missing wait_ms", static_cast<long>(state_code));
+            return;
+        }
+
+        const int32_t wait_ms_raw = data[1];
+        const int32_t wait_ms = std::clamp(wait_ms_raw, 0, 600000);
+        state_wait_ms_overrides_[state_code] = wait_ms;
+
+        RCLCPP_INFO(get_logger(), "Updated state wait override: state=%s(%ld) wait=%ldms",
+                    stateDisplayName(state_code).c_str(), static_cast<long>(state_code), static_cast<long>(wait_ms));
+    }
+
+    void TaskManagerNode::setState(int32_t state_code) {
+        const bool changed = status_.state_code != state_code;
+        status_.state_code = state_code;
+        if (changed) {
+            state_entered_at_ = std::chrono::steady_clock::now();
+        }
+        publishStateSideEffects(state_code);
+        // current_drive_mode_ は publishAutoDriveModeForState() で更新される実modeを使用する。
+        // 状態コード固定で上書きすると、Enter MFFなどで mode=1 のときも誤ってMFFロックされる。
+    }
+
+    void TaskManagerNode::publishStateSideEffects(int32_t state_code) {
+        if (!auto_send_enabled_) {
+            return;
+        }
+
+        publishAutoDriveTargetForState(state_code);
+        publishAutoDriveModeForState(state_code);
+        publishOdomResetForState(state_code);
+    }
+
+    void TaskManagerNode::setColor(int32_t color_code) {
+        if (color_code != kColorUnknown && color_code != kColorBlue && color_code != kColorRed) {
+            RCLCPP_WARN(get_logger(), "Ignoring invalid color code: %ld", static_cast<long>(color_code));
+            return;
+        }
+        status_.color_code = color_code;
+    }
+
+    void TaskManagerNode::setTransitionMode(int32_t transition_mode_code) {
+        if (transition_mode_code != kTransitionManual && transition_mode_code != kTransitionAuto) {
+            RCLCPP_WARN(get_logger(), "Ignoring invalid transition mode: %ld", static_cast<long>(transition_mode_code));
+            return;
+        }
+        const bool was_auto = status_.transition_mode_code == kTransitionAuto;
+        status_.transition_mode_code = transition_mode_code;
+        if (!was_auto && status_.transition_mode_code == kTransitionAuto) {
+            state_entered_at_ = std::chrono::steady_clock::now();
+        }
+    }
+
+    int32_t TaskManagerNode::nextStateCode(int32_t current_state_code) const {
+        if (state_sequence_.empty()) {
+            return current_state_code;
+        }
+
+        auto it = std::find(state_sequence_.begin(), state_sequence_.end(), current_state_code);
+        if (it == state_sequence_.end()) {
+            return state_sequence_.front();
+        }
+
+        ++it;
+        if (it == state_sequence_.end()) {
+            return state_sequence_.front();
+        }
+
+        return *it;
+    }
+
+    bool TaskManagerNode::shouldWaitForAutodriveComplete(int32_t state_code) const {
+        auto it = state_pose_targets_.find(state_code);
+        if (it == state_pose_targets_.end()) {
+            return false;
+        }
+        return it->second.enabled && it->second.wait_for_autodrive_complete;
+    }
+
+    void TaskManagerNode::advanceAutoTransition() {
+        if (status_.transition_mode_code != kTransitionAuto) {
+            return;
+        }
+
+        // MFF/ARENAモード（drive_mode_code=4/5）中は自動遷移をロックする。
+        // MFFは出口マス到達時(onMffPathAdvance)のみ遷移、ARENAは完了フラグ(onArenaWalkComplete)で遷移する。
+        if (current_drive_mode_ == 4 || current_drive_mode_ == 5) {
+            RCLCPP_DEBUG(get_logger(),
+                         "Auto transition blocked: in sequence mode (current_drive_mode_=%ld)",
+                         static_cast<long>(current_drive_mode_));
+            return;
+        }
+
+        if (shouldWaitForAutodriveComplete(status_.state_code)) {
+            const bool has_fresh_complete =
+                has_autodrive_complete_event_ && last_autodrive_complete_at_ >= state_entered_at_;
+            if (!has_fresh_complete) {
+                RCLCPP_DEBUG_THROTTLE(get_logger(), *get_clock(), 500,
+                                      "Auto transition blocked: waiting autodrive completion flag for state=%s(%ld)",
+                                      stateDisplayName(status_.state_code).c_str(),
+                                      static_cast<long>(status_.state_code));
+                return;
+            }
+        }
+
+        int32_t wait_ms = auto_transition_default_wait_ms_;
+        auto wait_it = state_wait_ms_overrides_.find(status_.state_code);
+        if (wait_it != state_wait_ms_overrides_.end()) {
+            wait_ms = std::max<int32_t>(0, wait_it->second);
+        }
+
+        const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                    std::chrono::steady_clock::now() - state_entered_at_)
+                                    .count();
+        if (elapsed_ms < wait_ms) {
+            return;
+        }
+
+        const int32_t next_state = nextStateCode(status_.state_code);
+        if (next_state == status_.state_code) {
+            return;
+        }
+
+        setState(next_state);
+        publishStatus(true);
+    }
+
+    std::string TaskManagerNode::stateName(int32_t state_code) {
+        switch (state_code) {
+        case kStateWaiting:
+            return "WAITING";
+        case kStateMffEnter:
+            return "MFF_ENTER";
+        case kStateMffLeave:
+            return "MFF_LEAVE";
+        case kStateStaffAssembly:
+            return "STAFF_ASSEMBLY";
+        case kStateRackMove:
+            return "RACK_MOVE";
+        case kStateStaffHandTrigger:
+            return "STAFF_HAND_TRIGGER";
+        default: {
+            std::ostringstream oss;
+            oss << "STATE_" << state_code;
+            return oss.str();
+        }
+        }
+    }
+
+    std::string TaskManagerNode::stateDisplayName(int32_t state_code) const {
+        auto it = state_name_overrides_.find(state_code);
+        if (it != state_name_overrides_.end() && !it->second.empty()) {
+            return it->second;
+        }
+        return stateName(state_code);
+    }
+
+    std::string TaskManagerNode::colorName(int32_t color_code) {
+        switch (color_code) {
+        case kColorBlue:
+            return "BLUE";
+        case kColorRed:
+            return "RED";
+        case kColorUnknown:
+        default:
+            return "UNKNOWN";
+        }
+    }
+
+    std::string TaskManagerNode::transitionModeName(int32_t transition_mode_code) {
+        switch (transition_mode_code) {
+        case kTransitionManual:
+            return "MANUAL";
+        case kTransitionAuto:
+            return "AUTO";
+        default: {
+            std::ostringstream oss;
+            oss << "MODE_" << transition_mode_code;
+            return oss.str();
+        }
+        }
+    }
+
+    std::string TaskManagerNode::buildStatusText(const TaskStatus &status) const {
+        std::ostringstream oss;
+        oss << "state=" << stateDisplayName(status.state_code)
+            << " color=" << colorName(status.color_code)
+            << " mode=" << transitionModeName(status.transition_mode_code);
+        return oss.str();
+    }
+
+    void TaskManagerNode::applyStateNameSequenceMapping() {
+        state_name_overrides_.clear();
+
+        const auto sequenceSize = state_sequence_.size();
+        for (size_t i = 0; i < sequenceSize; ++i) {
+            const int32_t state_code = state_sequence_[i];
+            if (i < pending_state_sequence_names_.size()) {
+                const auto name = pending_state_sequence_names_[i];
+                if (!name.empty()) {
+                    state_name_overrides_[state_code] = name;
+                }
+            }
+        }
+    }
+
+    std::vector<std::string> TaskManagerNode::parseStateNameSequence(const std::string &names_text) const {
+        return splitCommaSeparatedNames(names_text);
+    }
+
+    bool TaskManagerNode::hasChanged(const TaskStatus &lhs, const TaskStatus &rhs) {
+         return lhs.state_code != rhs.state_code ||
+             lhs.color_code != rhs.color_code ||
+             lhs.transition_mode_code != rhs.transition_mode_code;
+    }
+
+    std::vector<int32_t> TaskManagerNode::normalizedStateSequence(const std::vector<int32_t> &sequence) {
+        std::vector<int32_t> normalized;
+        normalized.reserve(sequence.size());
+
+        for (const auto state_code : sequence) {
+            if (std::find(normalized.begin(), normalized.end(), state_code) == normalized.end()) {
+                normalized.push_back(state_code);
+            }
+        }
+
+        return normalized;
+    }
+
+    void TaskManagerNode::publishAutoDriveTargetForState(int32_t state_code) {
+        auto it = state_pose_targets_.find(state_code);
+        if (it == state_pose_targets_.end() || !it->second.enabled) {
+            return;
+        }
+
+        std_msgs::msg::Float32MultiArray target_msg;
+        target_msg.data = {it->second.x, it->second.y, it->second.yaw_rad};
+        auto_drive_target_pub_->publish(target_msg);
+
+        RCLCPP_INFO(
+            get_logger(),
+            "Published auto drive target for state=%s(%ld): x=%.3f y=%.3f yaw=%.3f",
+            stateDisplayName(state_code).c_str(),
+            static_cast<long>(state_code),
+            static_cast<double>(it->second.x),
+            static_cast<double>(it->second.y),
+            static_cast<double>(it->second.yaw_rad));
+    }
+
+    void TaskManagerNode::publishAutoDriveModeForState(int32_t state_code) {
+        auto it = state_mode_targets_.find(state_code);
+        auto rotate_it = state_rotate_only_targets_.find(state_code);
+
+        std_msgs::msg::Int32MultiArray mode_msg;
+        if (it == state_mode_targets_.end()) {
+            if (fallback_drive_mode_on_unset_ < 0 || fallback_drive_mode_on_unset_ > 5) {
+                RCLCPP_WARN(get_logger(), "publishAutoDriveModeForState: no mode target for state=%s(%ld), fallback invalid (%ld), skipping", stateDisplayName(state_code).c_str(), static_cast<long>(state_code), static_cast<long>(fallback_drive_mode_on_unset_));
+                return;
+            }
+            mode_msg.data = {fallback_drive_mode_on_unset_, 0};
+        } else {
+            const bool rotate_only = (rotate_it != state_rotate_only_targets_.end() && rotate_it->second);
+            mode_msg.data = {it->second, rotate_only ? 1 : 0};
+        }
+        const int32_t prev_drive_mode = current_drive_mode_;
+        current_drive_mode_ = mode_msg.data[0];
+        drive_mode_cmd_pub_->publish(mode_msg);
+
+        // ARENAモードへ遷移したタイミングでSequenceCtrlのアリーナ走行を起動する
+        if (current_drive_mode_ == 5 && prev_drive_mode != 5 && arena_walk_cmd_pub_) {
+            std_msgs::msg::Int32 arena_start_msg;
+            arena_start_msg.data = 1;
+            arena_walk_cmd_pub_->publish(arena_start_msg);
+            RCLCPP_INFO(get_logger(), "Published arena walk start command to /r1_arena_walk_cmd.");
+        }
+
+        RCLCPP_INFO(
+            get_logger(),
+            "Published auto drive mode for state=%s(%ld): mode=%ld (current_drive_mode_=%ld) rotate_only=%s",
+            stateDisplayName(state_code).c_str(),
+            static_cast<long>(state_code),
+            static_cast<long>(mode_msg.data[0]),
+            static_cast<long>(current_drive_mode_),
+            mode_msg.data.size() > 1 && mode_msg.data[1] ? "true" : "false");
+    }
+
+    void TaskManagerNode::publishOdomResetForState(int32_t state_code) {
+        auto it = state_odom_reset_targets_.find(state_code);
+        if (it == state_odom_reset_targets_.end() || !it->second) {
+            return;
+        }
+
+        std_msgs::msg::Bool reset_msg;
+        reset_msg.data = true;
+        odom_reset_pub_->publish(reset_msg);
+
+        RCLCPP_INFO(
+            get_logger(),
+            "Published odom reset for state=%s(%ld)",
+            stateDisplayName(state_code).c_str(),
+            static_cast<long>(state_code));
+    }
+
+    
+
+    int32_t TaskManagerNode::normalizeHeadingDeg(int32_t heading_deg) {
+        int32_t normalized = heading_deg % 360;
+        if (normalized < 0) {
+            normalized += 360;
+        }
+        const int32_t snapped = static_cast<int32_t>(std::lround(static_cast<double>(normalized) / 90.0)) * 90;
+        return (snapped + 360) % 360;
+    }
+
+    int32_t TaskManagerNode::normalizeTurnDeg(int32_t turn_deg) {
+        int32_t normalized = turn_deg % 360;
+        if (normalized <= -180) {
+            normalized += 360;
+        } else if (normalized > 180) {
+            normalized -= 360;
+        }
+        return static_cast<int32_t>(std::lround(static_cast<double>(normalized) / 90.0)) * 90;
+    }
+
+    void TaskManagerNode::publishStatus(bool force) {
+        if (!force && has_published_status_ && !hasChanged(status_, last_published_status_)) {
+            return;
+        }
+
+        std_msgs::msg::Int32MultiArray status_msg;
+        status_msg.data = {status_.state_code, status_.color_code, status_.transition_mode_code};
+        status_pub_->publish(status_msg);
+
+        std_msgs::msg::String text_msg;
+        text_msg.data = buildStatusText(status_);
+        status_text_pub_->publish(text_msg);
+
+        
+
+        if (has_published_status_ && hasChanged(status_, last_published_status_)) {
+            RCLCPP_INFO(
+                get_logger(), "Task updated: %s", text_msg.data.c_str());
+        }
+
+        last_published_status_ = status_;
+        has_published_status_ = true;
+    }
+
+} // namespace r1_planner
+
+int main(int argc, char **argv) {
+    rclcpp::init(argc, argv);
+    auto node = std::make_shared<r1_planner::TaskManagerNode>();
+    rclcpp::spin(node);
+    rclcpp::shutdown();
+    return 0;
+}
