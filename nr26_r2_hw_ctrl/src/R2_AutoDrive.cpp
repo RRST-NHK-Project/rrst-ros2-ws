@@ -434,6 +434,13 @@ private:
         reset_auto_complete_tracking(true);
         reset_pose_target_control(false);
 
+        if (transition_mode_code_ == TRANSITION_MODE_MANUAL) {
+            RCLCPP_INFO_THROTTLE(
+                this->get_logger(), *this->get_clock(), 1000,
+                "Deferred target command while transition mode is MANUAL");
+            return;
+        }
+
         if (drive_mode_ != DriveMode::AUTO && drive_mode_ != DriveMode::ARENA) {
             switch_drive_mode(DriveMode::AUTO);
             RCLCPP_INFO(this->get_logger(), "Mode changed: AUTO (by target command)");

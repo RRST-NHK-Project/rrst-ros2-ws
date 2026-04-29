@@ -792,7 +792,7 @@ namespace r2_planner {
         case kTransitionManual:
             return "MANUAL";
         case kTransitionAuto:
-            return "AUTO";
+            return "STATE_MANAGEMENT";
         default: {
             std::ostringstream oss;
             oss << "MODE_" << transition_mode_code;
