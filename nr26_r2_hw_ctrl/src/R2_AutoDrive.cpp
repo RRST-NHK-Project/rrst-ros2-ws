@@ -173,6 +173,7 @@ private:
     DriveMode drive_mode_ = DriveMode::MANUAL;
     bool has_target_cmd_ = false;
     int32_t transition_mode_code_ = TRANSITION_MODE_MANUAL;
+    int32_t deferred_mode_code_ = -1;
 
     // ArUco
     float aruco_x_ = 0.0f;
@@ -355,6 +356,49 @@ private:
         switch_drive_mode(DriveMode::ARENA);
     }
 
+    bool apply_mode_code(int32_t mode_code, const char *source) {
+        switch (mode_code) {
+        case 0:
+            if (drive_mode_ != DriveMode::MANUAL) {
+                enter_manual_mode();
+                RCLCPP_INFO(this->get_logger(), "Mode changed: MANUAL (%s)", source);
+            }
+            return true;
+        case 1:
+            if (drive_mode_ != DriveMode::AUTO) {
+                enter_auto_mode();
+                RCLCPP_INFO(this->get_logger(), "Mode changed: AUTO (%s)", source);
+            }
+            return true;
+        case 2:
+            if (drive_mode_ != DriveMode::ARUCO) {
+                enter_aruco_mode();
+                RCLCPP_INFO(this->get_logger(), "Mode changed: ARUCO (%s)", source);
+            }
+            return true;
+        case 3:
+            if (drive_mode_ != DriveMode::PLANE) {
+                enter_plane_mode();
+                RCLCPP_INFO(this->get_logger(), "Mode changed: PLANE (%s)", source);
+            }
+            return true;
+        case 4:
+            if (drive_mode_ != DriveMode::MFF) {
+                enter_mff_mode();
+                RCLCPP_INFO(this->get_logger(), "Mode changed: MFF (%s)", source);
+            }
+            return true;
+        case 5:
+            if (drive_mode_ != DriveMode::ARENA) {
+                enter_arena_mode();
+                RCLCPP_INFO(this->get_logger(), "Mode changed: ARENA (%s)", source);
+            }
+            return true;
+        default:
+            return false;
+        }
+    }
+
     // odom（状態更新のみ）
     void odom_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
         if (msg->data.size() < 3)
@@ -408,47 +452,18 @@ private:
         }
 
         if (transition_mode_code_ == TRANSITION_MODE_MANUAL && mode_code != 0) {
+            deferred_mode_code_ = mode_code;
+            RCLCPP_INFO_THROTTLE(
+                this->get_logger(), *this->get_clock(), 1000,
+                "Deferred mode command %ld while transition mode is MANUAL",
+                static_cast<long>(mode_code));
             return;
         }
 
-        switch (mode_code) {
-        case 0:
-            if (drive_mode_ != DriveMode::MANUAL) {
-                enter_manual_mode();
-                RCLCPP_INFO(this->get_logger(), "Mode changed: MANUAL (by mode command)");
-            }
-            break;
-        case 1:
-            if (drive_mode_ != DriveMode::AUTO) {
-                enter_auto_mode();
-                RCLCPP_INFO(this->get_logger(), "Mode changed: AUTO (by mode command)");
-            }
-            break;
-        case 2:
-            if (drive_mode_ != DriveMode::ARUCO) {
-                enter_aruco_mode();
-                RCLCPP_INFO(this->get_logger(), "Mode changed: ARUCO (by mode command)");
-            }
-            break;
-        case 3:
-            if (drive_mode_ != DriveMode::PLANE) {
-                enter_plane_mode();
-                RCLCPP_INFO(this->get_logger(), "Mode changed: PLANE (by mode command)");
-            }
-            break;
-        case 4:
-            if (drive_mode_ != DriveMode::MFF) {
-                enter_mff_mode();
-                RCLCPP_INFO(this->get_logger(), "Mode changed: MFF (by mode command)");
-            }
-            break;
-        case 5:
-            if (drive_mode_ != DriveMode::ARENA) {
-                enter_arena_mode();
-                RCLCPP_INFO(this->get_logger(), "Mode changed: ARENA (by mode command)");
-            }
-            break;
+        if (mode_code == 0) {
+            deferred_mode_code_ = -1;
         }
+        apply_mode_code(mode_code, "by mode command");
     }
 
     void transition_mode_callback(const std_msgs::msg::Int32::SharedPtr msg) {
@@ -457,10 +472,24 @@ private:
             return;
         }
 
+        if (transition_mode_code_ == next_mode) {
+            return;
+        }
+
         transition_mode_code_ = next_mode;
         if (transition_mode_code_ == TRANSITION_MODE_MANUAL && drive_mode_ != DriveMode::MANUAL) {
             enter_manual_mode();
             RCLCPP_INFO(this->get_logger(), "Mode changed: MANUAL (by transition mode)");
+            return;
+        }
+
+        if (transition_mode_code_ == TRANSITION_MODE_STATE_MANAGEMENT) {
+            RCLCPP_INFO(this->get_logger(), "Transition mode changed: STATE_MANAGEMENT");
+            if (deferred_mode_code_ >= 0) {
+                const int32_t deferred_mode = deferred_mode_code_;
+                deferred_mode_code_ = -1;
+                apply_mode_code(deferred_mode, "by deferred mode command");
+            }
         }
     }
 
