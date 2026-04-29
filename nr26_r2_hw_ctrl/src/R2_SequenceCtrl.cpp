@@ -695,18 +695,15 @@ private:
 
     // 機構関数
     void all_up() {
-        RCLCPP_INFO(get_logger(), "ALL UP");
         pkt.setTR(TR1, 1);
         pkt.setTR(TR2, 1);
     }
 
     void front_down() {
-        RCLCPP_INFO(get_logger(), "FRONT DOWN");
         pkt.setTR(TR2, 0);
     }
 
     void rear_down() {
-        RCLCPP_INFO(get_logger(), "REAR DOWN");
         pkt.setTR(TR1, 0);
         pkt.setMD(MD5, -forward_speed);
         pkt.setMD(MD6, forward_speed);
@@ -715,7 +712,6 @@ private:
     }
 
     void stop_motion() {
-        RCLCPP_INFO(get_logger(), "STOP");
         pkt.setTR(TR1, 0);
         pkt.setTR(TR2, 0);
         pkt.setMD(MD5, 0);
@@ -725,7 +721,6 @@ private:
     }
 
     void front_up() {
-        RCLCPP_INFO(get_logger(), "FRONT UP");
         pkt.setTR(TR2, 1);
         pkt.setMD(MD5, 0);
         pkt.setMD(MD6, 0);
@@ -734,18 +729,15 @@ private:
     }
 
     void rear_up() {
-        RCLCPP_INFO(get_logger(), "REAR UP");
         pkt.setTR(TR1, 1);
     }
 
     void all_down() {
-        RCLCPP_INFO(get_logger(), "ALL DOWN");
         pkt.setTR(TR1, 0);
         pkt.setTR(TR2, 0);
     }
 
     void move_forward() {
-        RCLCPP_INFO(get_logger(), "MOVE FORWARD");
         pkt.setMD(MD5, -forward_speed);
         pkt.setMD(MD6, forward_speed);
         pkt.setMD(MD7, forward_speed);
@@ -753,7 +745,6 @@ private:
     }
 
     void move_stop() {
-        RCLCPP_INFO(get_logger(), "MOVE STOP");
         pkt.setMD(MD5, 0);
         pkt.setMD(MD6, 0);
         pkt.setMD(MD7, 0);
@@ -776,7 +767,6 @@ private:
             pkt.setMD(MD6, 0);
             pkt.setMD(MD7, 0);
             pkt.setMD(MD8, 0);
-            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500, "WALL_ALIGN: Waiting for LiDAR...");
             return;
         }
 
@@ -830,10 +820,6 @@ private:
         pkt.setMD(MD6, static_cast<int16_t>(v2 * align_duty_max));
         pkt.setMD(MD7, static_cast<int16_t>(v3 * align_duty_max));
         pkt.setMD(MD8, static_cast<int16_t>(v4 * align_duty_max));
-
-        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
-                             "WALL_ALIGN: angle=%.4f rad, dist=%d mm | vx=%.3f wz=%.3f",
-                             wall_angle, lidar_value, vx, wz);
     }
 
     // 段差超えシーケンス（上り）
@@ -1065,10 +1051,6 @@ private:
         pkt.setMD(MD6, duty);
         pkt.setMD(MD7, duty);
         pkt.setMD(MD8, duty);
-
-        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
-                             "MFF turn: yaw=%.3f target=%.3f error=%.3f wz=%.3f duty=%d",
-                             odom_yaw_, turn_target_yaw_, yaw_error, wz, duty);
     }
 
     // キューブ探索シーケンス: サーボを往復スキャンしてキューブを探す
@@ -1099,9 +1081,6 @@ private:
         pkt.setMD(MD6, 0);
         pkt.setMD(MD7, 0);
         pkt.setMD(MD8, 0);
-
-        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-                             "CUBE_SCAN: angle=%.1f deg", servo_camera_angle_);
     }
 
     // cube_detectionを使ったキューブへの平行接近シーケンス（PID制御）
@@ -1135,8 +1114,6 @@ private:
             pkt.setMD(MD6, 0);
             pkt.setMD(MD7, 0);
             pkt.setMD(MD8, 0);
-            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-                                 "CUBE_ALIGN: cube lost, stopped. (%.1f s)", age_sec);
             return;
         }
 
@@ -1229,10 +1206,6 @@ private:
         pkt.setMD(MD6, static_cast<int16_t>(v2 * align_duty_max));
         pkt.setMD(MD7, static_cast<int16_t>(v3 * align_duty_max));
         pkt.setMD(MD8, static_cast<int16_t>(v4 * align_duty_max));
-
-        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
-                             "CUBE_ALIGN: yaw=%.2f deg, depth=%.3f m, cx=%.3f(tgt=%.2f) cy=%.3f servo=%.1f | vx=%.3f vy=%.3f wz=%.3f",
-                             cube_yaw_deg_, cube_depth_m_, cube_cx_norm_, cx_target, cube_cy_norm_, servo_camera_angle_, vx, vy, wz);
     }
 
     // アリーナ走行シーケンス
@@ -1291,9 +1264,6 @@ private:
                             "ARENA Step2: wall edge detected (lidar=%d mm, ref=%d mm) -> left approach.",
                             lidar_value, static_cast<int>(arena_wall_edge_ref_mm_));
             }
-            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-                                 "ARENA Step2: moving left, lidar=%d mm (ref=%d mm)",
-                                 lidar_value, static_cast<int>(arena_wall_edge_ref_mm_));
             break;
 
         case ArenaWalkState::AW2_LEFT_APPROACH:
@@ -1313,10 +1283,6 @@ private:
                             "ARENA Step2: left approach done (left=%d mm) -> front approach.",
                             static_cast<int>(arena_left_mm_));
             }
-            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-                                 "ARENA Step2: left approach, left=%s %d mm (target<=%d mm)",
-                                 arena_left_valid_ ? "valid" : "invalid",
-                                 static_cast<int>(arena_left_mm_), arena_left_approach_mm);
             break;
 
         case ArenaWalkState::AW2_FRONT_APPROACH:
@@ -1350,10 +1316,6 @@ private:
                             "ARENA Step2: front approach done (front=%d mm) -> odom reset, target(0,0,0), arena_walk_complete.",
                             static_cast<int>(arena_front_mm_));
             }
-            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-                                 "ARENA Step2: front approach, front=%s %d mm (target<=%d mm)",
-                                 arena_front_valid_ ? "valid" : "invalid",
-                                 static_cast<int>(arena_front_mm_), arena_front_approach_mm);
             break;
 
         case ArenaWalkState::DONE:
@@ -1597,16 +1559,14 @@ private:
         has_pending_turn_ = false;
         accepted_step_generation_ = 0;
         accepted_turn_generation_ = 0;
-        if (had_pending) {
-            RCLCPP_INFO(get_logger(), "Cleared pending MFF commands (%s).", reason);
-        }
+        (void)had_pending;
+        (void)reason;
     }
 
     void publish_odom_reset() {
         std_msgs::msg::Bool reset_msg;
         reset_msg.data = true;
         odom_reset_pub_->publish(reset_msg);
-        RCLCPP_INFO(get_logger(), "Published odom_reset before MFF turn.");
     }
 
     void dispatch_step_command(int cmd) {
@@ -2071,9 +2031,9 @@ private:
             // GUI/Plannerの状態遷移では r2_autodrive 側が一時的に AUTO をpublishすることがあり、
             // ここで無効化すると step/turn コマンド受信前にシーケンスが落ちて不安定になる。
             // モード解除は mode_cmd_callback (r2_drive_mode_cmd) を正とする。
-            RCLCPP_DEBUG(this->get_logger(),
-                         "drive_mode_text=%s received: keep current sequence enable state (authority=mode_cmd)",
-                         mode.c_str());
+            // RCLCPP_DEBUG(this->get_logger(),
+            //              "drive_mode_text=%s received: keep current sequence enable state (authority=mode_cmd)",
+            //              mode.c_str());
         }
     }
 

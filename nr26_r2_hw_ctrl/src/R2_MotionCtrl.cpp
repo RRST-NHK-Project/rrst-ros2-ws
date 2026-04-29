@@ -367,11 +367,6 @@ private:
     }
 
     void log_current_operation_state(const char *source, bool throttled = false) {
-        const int16_t micro1_sw = g_micro1_sw.load();
-        const int16_t micro2_sw = g_micro2_sw.load();
-        const int64_t abs_coord = g_abs_coord.load();
-        const double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
-
         const std::string state_name = current_state_name_.empty()
                                            ? std::string("STATE_") + std::to_string(current_planner_state_)
                                            : current_state_name_;
@@ -381,41 +376,23 @@ private:
         if (throttled) {
             RCLCPP_INFO_THROTTLE(
                 get_logger(), *get_clock(), 1000,
-                "[MotionCtrlState:%s] mode=%s, state=%s(%ld), height=%s, rot=%.3f, sw_up=%d, sw_down=%d, MD1=%d, MD2=%d, SERVO1=%d, SERVO2=%d, TR1=%d, TR2=%d",
+                "[MotionCtrlState:%s] mode=%s, state=%s(%ld), height=%s",
                 source,
                 mode_str,
                 state_name.c_str(),
                 static_cast<long>(current_planner_state_),
-                target_height_to_string(target_height_),
-                rot_units,
-                static_cast<int>(micro1_sw),
-                static_cast<int>(micro2_sw),
-                static_cast<int>(pkt[MD1]),
-                static_cast<int>(pkt[MD2]),
-                static_cast<int>(pkt[SERVO1]),
-                static_cast<int>(pkt[SERVO2]),
-                static_cast<int>(pkt[TR1]),
-                static_cast<int>(pkt[TR2]));
+                target_height_to_string(target_height_));
             return;
         }
 
         RCLCPP_INFO(
             get_logger(),
-            "[MotionCtrlState:%s] mode=%s, state=%s(%ld), height=%s, rot=%.3f, sw_up=%d, sw_down=%d, MD1=%d, MD2=%d, SERVO1=%d, SERVO2=%d, TR1=%d, TR2=%d",
+            "[MotionCtrlState:%s] mode=%s, state=%s(%ld), height=%s",
             source,
             mode_str,
             state_name.c_str(),
             static_cast<long>(current_planner_state_),
-            target_height_to_string(target_height_),
-            rot_units,
-            static_cast<int>(micro1_sw),
-            static_cast<int>(micro2_sw),
-            static_cast<int>(pkt[MD1]),
-            static_cast<int>(pkt[MD2]),
-            static_cast<int>(pkt[SERVO1]),
-            static_cast<int>(pkt[SERVO2]),
-            static_cast<int>(pkt[TR1]),
-            static_cast<int>(pkt[TR2]));
+            target_height_to_string(target_height_));
     }
 
     bool is_manual_mode() const {
@@ -454,11 +431,6 @@ private:
         int64_t abs_coord = g_abs_coord.load();
 
         double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
-
-        RCLCPP_INFO_THROTTLE(
-            get_logger(), *get_clock(), 1000,
-            "micro1_sw=%d",
-            static_cast<int>(micro1_sw));
 
         // 状態遷移時にシーケンスカウンタをリセット
         if (state_code != prev_applied_state_) {
@@ -663,9 +635,6 @@ private:
                 static_cast<long>(state_code));
             break;
         }
-
-        // 現在の動作状態を定期表示
-        log_current_operation_state("apply", true);
     }
 
     // =====================================================================
@@ -747,11 +716,6 @@ private:
         // float LS_Y = msg->axes[1];
         // float RS_X = -1 * msg->axes[3];
         // float RS_Y = msg->axes[4];
-
-        bool CROSS = msg->buttons[0];
-        bool CIRCLE = msg->buttons[1];
-        bool TRIANGLE = msg->buttons[2];
-        bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
         bool RIGHT = msg->axes[6] == -1.0;
@@ -954,13 +918,6 @@ private:
         g_micro2_sw = !msg->data[10]; // 下端スイッチ(micro2)
         g_enc1_val = msg->data[1];    // エンコーダ1
 
-        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
-                             "[sensor_callback] rx_size=%zu micro1(data[10])=%d micro2(data[9])=%d enc1(data[1])=%d",
-                             msg->data.size(),
-                             static_cast<int>(msg->data[9]),
-                             static_cast<int>(msg->data[10]),
-                             static_cast<int>(msg->data[1]));
-
         // =============================================================
         // 座標調査・ラップアラウンド計算
         // =============================================================
@@ -999,8 +956,6 @@ private:
         int64_t abs_coord = -(total_encoder - zero_offset);
         g_abs_coord.store(abs_coord);
 
-        double rot = (double)abs_coord / COUNTS_PER_ROTATION;
-
         if (diff != 0) {
             // RCLCPP_INFO(get_logger(),
             //             "\n--- ROTATION DEBUG ---\n"
@@ -1013,21 +968,9 @@ private:
             //             (int)r_count, abs_coord, rot);
         }
 
-        // --- 通信デバッグ追加 ---
-        static uint64_t packet_count = 0;
-        packet_count++;
-
-        static int16_t l9 = 0, l10 = 0;
-        if (msg->data[9] != l9 || msg->data[10] != l10) {
-            RCLCPP_INFO(get_logger(), "SW Changed! [micro2(data[9]):%d, micro1(data[10]):%d]",
-                        msg->data[9], msg->data[10]);
-            l9 = msg->data[9];
-            l10 = msg->data[10];
-        }
-
         // RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
         //                      "RX Heartbeat (Total:%lu) | Dump: [%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d]",
-        //                      packet_count,
+        //                      0ULL,
         //                      msg->data[0], msg->data[1], msg->data[2], msg->data[3],
         //                      msg->data[4], msg->data[5], msg->data[6], msg->data[7],
         //                      msg->data[8], msg->data[9], msg->data[10], msg->data[11],

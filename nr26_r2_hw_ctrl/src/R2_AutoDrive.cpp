@@ -124,8 +124,8 @@ public:
         reset_auto_complete_tracking(true);
         publish_mode();
 
-        RCLCPP_INFO(this->get_logger(), "PS4 mode toggle (OPTION): %s",
-                    enable_ps4_mode_toggle_ ? "ENABLED" : "DISABLED");
+        // RCLCPP_INFO(this->get_logger(), "PS4 mode toggle (OPTION): %s",
+        //             enable_ps4_mode_toggle_ ? "ENABLED" : "DISABLED");
     }
 
 private:
@@ -370,9 +370,9 @@ private:
             aruco_target_forward_ = msg->data[0];
             aruco_target_lateral_ = msg->data[1];
             aruco_target_yaw_ = msg->data[2];
-            RCLCPP_INFO(this->get_logger(),
-                        "Aruco relative target updated forward=%.3f lateral=%.3f yaw=%.3f [rad]",
-                        aruco_target_forward_, aruco_target_lateral_, aruco_target_yaw_);
+            // RCLCPP_INFO(this->get_logger(),
+            //             "Aruco relative target updated forward=%.3f lateral=%.3f yaw=%.3f [rad]",
+            //             aruco_target_forward_, aruco_target_lateral_, aruco_target_yaw_);
             return;
         }
 
@@ -396,9 +396,9 @@ private:
             RCLCPP_INFO(this->get_logger(), "Mode changed: AUTO (by target command)");
         }
 
-        RCLCPP_INFO(this->get_logger(),
-                    "Target updated x=%.3f y=%.3f yaw=%.3f [rad]",
-                    target_x_, target_y_, target_yaw_);
+        // RCLCPP_INFO(this->get_logger(),
+        //             "Target updated x=%.3f y=%.3f yaw=%.3f [rad]",
+        //             target_x_, target_y_, target_yaw_);
     }
 
     void mode_cmd_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
@@ -475,7 +475,7 @@ private:
 
     void aruco_target_id_callback(const std_msgs::msg::Int32::SharedPtr msg) {
         aruco_target_id_ = msg->data;
-        RCLCPP_INFO(this->get_logger(), "Aruco target ID updated: %d", aruco_target_id_);
+        // RCLCPP_INFO(this->get_logger(), "Aruco target ID updated: %d", aruco_target_id_);
     }
 
     void aruco_camera_offset_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
@@ -485,9 +485,9 @@ private:
 
         aruco_camera_offset_x_ = msg->data[0];
         aruco_camera_offset_y_ = msg->data[1];
-        RCLCPP_INFO(this->get_logger(),
-                    "Aruco camera offset updated x=%.3f y=%.3f [m]",
-                    aruco_camera_offset_x_, aruco_camera_offset_y_);
+        // RCLCPP_INFO(this->get_logger(),
+        //             "Aruco camera offset updated x=%.3f y=%.3f [m]",
+        //             aruco_camera_offset_x_, aruco_camera_offset_y_);
     }
 
     // PS4入力
@@ -579,10 +579,6 @@ private:
     void publish_timer() {
         if (drive_mode_ == DriveMode::MANUAL) {
             publish_packet();
-
-            RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 50,
-                                 "[MANUAL] X: %.2f Y: %.2f Yaw: %.2f | v1 %.2f v2 %.2f v3 %.2f v4 %.2f",
-                                 X_, Y_, yaw_, v1, v2, v3, v4);
             return;
         }
 
@@ -595,10 +591,6 @@ private:
                 stop_motors();
 
                 publish_packet();
-
-                RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
-                                     "[ARUCO] waiting for marker pose (age=%.2f s)",
-                                     age_sec);
                 return;
             }
 
@@ -647,11 +639,6 @@ private:
 
             publish_packet();
 
-            RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 50,
-                                 "[ARUCO] X: %.2f Y: %.2f Z: %.2f | TargetHorizontal: %.2f | vy %.2f",
-                                 aruco_x_, aruco_y_, aruco_z_,
-                                 aruco_target_forward_,
-                                 vy_);
             return;
         }
 
@@ -745,10 +732,6 @@ private:
         pkt.setMD(MD8, static_cast<int16_t>(v4 * duty_max));
 
         publish_packet();
-
-        RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 50,
-                             "[AUTO] X: %.2f Y: %.2f Yaw: %.2f | T: %.2f %.2f %.2f | vx %.2f vy %.2f wz %.2f",
-                             X_, Y_, yaw_, target_x_, target_y_, target_yaw_, vx_, vy_, wz_);
     }
 };
 
