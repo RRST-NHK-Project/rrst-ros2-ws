@@ -1505,6 +1505,12 @@ public:
             10,
             std::bind(&HardWareControl::mode_cmd_callback, this, std::placeholders::_1));
 
+        // r2_plannerの遷移モード（手動/自動）を指示通知で受信
+        transition_mode_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+            "r2/task_transition_mode",
+            rclcpp::QoS(10).best_effort(),
+            std::bind(&HardWareControl::transition_mode_callback, this, std::placeholders::_1));
+
         // r2_autodrive から公開される現在モード文字列（MFF/ARENA）でも
         // SequenceCtrl の有効/無効を切り替えられる受信口を追加
         drive_mode_text_sub_ = this->create_subscription<std_msgs::msg::String>(
@@ -1561,6 +1567,10 @@ private:
     int32_t sdm15_value[4] = {0, 0, 0, 0}; // sdm15の値を保存する配列
     int16_t lidar_x_value = 0;
     int16_t lidar_y_value = 0;
+    // 手動モード: true=手動（コントローラー操作有効）/ false=自動（シーケンス制御）
+    bool manual_mode_ = true;
+    bool last_ps_btn_ = false; // PSボタン前回状態
+
     int32_t pending_step_cmd_ = 0;
     int32_t pending_turn_deg_ = 0;
     bool has_pending_turn_ = false;
@@ -1606,6 +1616,81 @@ private:
     }
 
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
+        // ── PSボタン: 手動/自動モードトグル（モードに関わらず常時判定）──
+        if (msg->buttons.size() > 10) {
+            const bool ps = static_cast<bool>(msg->buttons[10]);
+            if (ps && !last_ps_btn_) {
+                manual_mode_ = !manual_mode_;
+                RCLCPP_INFO(get_logger(),
+                            "[PSボタン] 足回りドライブモード切替 -> %s",
+                            manual_mode_ ? "MANUAL" : "AUTO");
+                if (!manual_mode_) {
+                    // AUTO切替時は足回りを停止
+                    pkt.setMD(MD5, 0);
+                    pkt.setMD(MD6, 0);
+                    pkt.setMD(MD7, 0);
+                    pkt.setMD(MD8, 0);
+                }
+            }
+            last_ps_btn_ = ps;
+        }
+
+        // ── 手動モード: 足回りをコントローラーで直接操作──
+        if (manual_mode_) {
+            float LS_X = -msg->axes[0]; // 左右
+            float LS_Y = msg->axes[1];  // 前後
+            float RS_X = -msg->axes[3]; // 回転
+            float R2 = (-msg->axes[5] + 1) / 2;
+            bool L1 = msg->buttons[4];
+            bool R1 = msg->buttons[5];
+
+            if (fabsf(LS_X) < deadzone)
+                LS_X = 0;
+            if (fabsf(LS_Y) < deadzone)
+                LS_Y = 0;
+            if (fabsf(RS_X) < deadzone)
+                RS_X = 0;
+
+            float vx = -LS_Y * R2;
+            float vy = LS_X * R2;
+            float wz = RS_X * sp_yaw;
+
+            v1 = vx + vy + wz;
+            v3 = vx - vy - wz;
+            v4 = vx - vy + wz;
+            v2 = vx + vy - wz;
+            v3 *= -1;
+            v2 *= -1;
+
+            if (R1) {
+                v1 = sp_yaw;
+                v2 = -sp_yaw;
+                v3 = -sp_yaw;
+                v4 = sp_yaw;
+            }
+            if (L1) {
+                v1 = -sp_yaw;
+                v2 = sp_yaw;
+                v3 = sp_yaw;
+                v4 = -sp_yaw;
+            }
+
+            float max_v = std::max(std::max(fabsf(v1), fabsf(v2)), std::max(fabsf(v3), fabsf(v4)));
+            if (max_v < 1.0f)
+                max_v = 1.0f;
+            v1 /= max_v;
+            v2 /= max_v;
+            v3 /= max_v;
+            v4 /= max_v;
+
+            pkt.setMD(MD5, static_cast<int16_t>(v1 * duty_max));
+            pkt.setMD(MD6, static_cast<int16_t>(v2 * duty_max));
+            pkt.setMD(MD7, static_cast<int16_t>(v3 * duty_max));
+            pkt.setMD(MD8, static_cast<int16_t>(v4 * duty_max));
+            return;
+        }
+
+        // ── 自動モード: MFF/ARENAシーケンス制御──
         if (!seq_->is_mff_mode_enabled() && !seq_->is_arena_mode_enabled()) {
             return;
         }
@@ -1626,38 +1711,27 @@ private:
         bool L1 = msg->buttons[4];
         bool R1 = msg->buttons[5];
 
-        bool PS = msg->buttons[10];
-        bool OPTIONS = msg->buttons[9]; // OPTIONSボタン：アリーナ走行シーケンス
+        bool OPTIONS = (msg->buttons.size() > 9) ? static_cast<bool>(msg->buttons[9]) : false;
 
         static bool last_up = false;
         static bool last_down = false;
-        static bool last_ps = false;
         static bool last_options = false;
 
         if (UP && !last_up) {
-            // 十字キー上：壁調整PID → 自動段差上り
             seq_->start_wall_alignment();
         }
 
         if (DOWN && !last_down) {
-            // 段差下り開始時はWALL_ALIGN/TURNの保留を明示的に破棄
             clear_pending_commands("PS4 DOWN -> STEP_DOWN");
             seq_->start_step_down();
         }
 
-        if (PS && !last_ps) {
-            // PSボタン：キューブへの平行接近PID
-            seq_->start_cube_align();
-        }
-
         if (OPTIONS && !last_options) {
-            // OPTIONSボタン：アリーナ走行シーケンス
             seq_->start_arena_walk();
         }
 
         last_up = UP;
         last_down = DOWN;
-        last_ps = PS;
         last_options = OPTIONS;
 
         if (fabsf(LS_X) < deadzone)
@@ -1724,6 +1798,15 @@ private:
             camera_servo_pub_->publish(servo_msg);
         }
 
+        // 手動モード: コントローラー入力値をそのまま送信（シーケンスなし）
+        if (manual_mode_) {
+            std_msgs::msg::Int16MultiArray msg;
+            msg.data = pkt.toVector();
+            publisher_->publish(msg);
+            return;
+        }
+
+        // 自動モード: MFF/ARENAが無効なら何もしない
         if (!seq_->is_mff_mode_enabled() && !seq_->is_arena_mode_enabled()) {
             clear_pending_commands("sequence mode disabled");
             return;
@@ -2022,6 +2105,24 @@ private:
         }
     }
 
+    // r2/task_transition_mode: 0=MANUAL, 1=AUTO
+    // r2_plannerまたはGUIからのモード指定を受信して手動/自動を切り替える
+    void transition_mode_callback(const std_msgs::msg::Int32::SharedPtr msg) {
+        const bool prev = manual_mode_;
+        manual_mode_ = (msg->data == 0); // 0=MANUAL, 1=AUTO
+        if (prev != manual_mode_) {
+            RCLCPP_INFO(get_logger(),
+                        "[r2/task_transition_mode] 足回りドライブモード切替 -> %s",
+                        manual_mode_ ? "MANUAL" : "AUTO");
+            if (!manual_mode_) {
+                pkt.setMD(MD5, 0);
+                pkt.setMD(MD6, 0);
+                pkt.setMD(MD7, 0);
+                pkt.setMD(MD8, 0);
+            }
+        }
+    }
+
     // odom_xy_yaw: [x, y, yaw, vx, vy, wz]
     void odom_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
         if (msg->data.size() < 3)
@@ -2076,6 +2177,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr arena_walk_cmd_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr odom_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr ld19_eight_dir_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr transition_mode_sub_; // r2/task_transition_mode
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr odom_reset_pub_;
     rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr camera_servo_pub_;
     rclcpp::TimerBase::SharedPtr timer_;

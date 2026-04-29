@@ -174,12 +174,13 @@ private:
     int hold_seq_step_ = 0;
     int hold_wait_count_ = 0;
     bool auto_seq_running_ = false;
-    int  auto_seq_step_    = 0;
-    int  auto_seq_ticks_   = 0;
+    int auto_seq_step_ = 0;
+    int auto_seq_ticks_ = 0;
     int32_t auto_pick_state_ = STATE_PICK_DOWN;
     std::atomic<int32_t> current_drive_mode_{DRIVE_MODE_MANUAL};
     std::string current_state_name_ = "";
     TargetHeight target_height_ = TargetHeight::DOWN;
+    bool last_ps_btn_ = false; // PSボタン前回状態（エッジ検出用）
 
     // モーター1回転あたりのエンコーダのカウント数
     static constexpr double COUNTS_PER_ROTATION = 360.0;
@@ -723,6 +724,20 @@ private:
     // PS4コントローラーコールバック（手動制御用）
     // =====================================================================
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
+        // ── PSボタン: 手動 / 自動モードトグル（モードに関わらず常時判定）──
+        if (msg->buttons.size() > 10) {
+            const bool ps = static_cast<bool>(msg->buttons[10]);
+            if (ps && !last_ps_btn_) {
+                const int32_t next_mode =
+                    is_manual_mode() ? DRIVE_MODE_AUTO : DRIVE_MODE_MANUAL;
+                update_drive_mode(next_mode, "PS_button");
+                RCLCPP_INFO(get_logger(),
+                            "[PSボタン] 機構ドライブモード切替 -> %s",
+                            next_mode == DRIVE_MODE_MANUAL ? "MANUAL" : "AUTO");
+            }
+            last_ps_btn_ = ps;
+        }
+
         if (!is_manual_mode()) {
             return;
         }
@@ -841,20 +856,23 @@ private:
         static bool last_down = false;
 
         auto start_sequence = [&](int32_t pick_state, const char *label) {
-            auto_pick_state_  = pick_state;
-            auto_seq_step_    = 0;
-            auto_seq_ticks_   = 0;
+            auto_pick_state_ = pick_state;
+            auto_seq_step_ = 0;
+            auto_seq_ticks_ = 0;
             auto_seq_running_ = true;
             log_current_operation_state(label);
         };
 
-        if (UP && !last_up)       start_sequence(STATE_PICK_UP,     "up_btn");
-        if (RIGHT && !last_right) start_sequence(STATE_PICK_MIDDLE,  "right_btn");
-        if (DOWN && !last_down)   start_sequence(STATE_PICK_DOWN,    "down_btn");
+        if (UP && !last_up)
+            start_sequence(STATE_PICK_UP, "up_btn");
+        if (RIGHT && !last_right)
+            start_sequence(STATE_PICK_MIDDLE, "right_btn");
+        if (DOWN && !last_down)
+            start_sequence(STATE_PICK_DOWN, "down_btn");
 
-        last_up    = UP;
+        last_up = UP;
         last_right = RIGHT;
-        last_down  = DOWN;
+        last_down = DOWN;
 
         // 配列操作ここまで
     }
@@ -870,15 +888,24 @@ private:
             switch (auto_seq_step_) {
             case 0:
                 current_planner_state_ = STATE_KFS_HAND_INIT;
-                if (auto_seq_ticks_ >= 50) { auto_seq_step_++; auto_seq_ticks_ = 0; }
+                if (auto_seq_ticks_ >= 50) {
+                    auto_seq_step_++;
+                    auto_seq_ticks_ = 0;
+                }
                 break;
             case 1:
                 current_planner_state_ = STATE_KFS_PICK_WAITING;
-                if (auto_seq_ticks_ >= 50) { auto_seq_step_++; auto_seq_ticks_ = 0; }
+                if (auto_seq_ticks_ >= 50) {
+                    auto_seq_step_++;
+                    auto_seq_ticks_ = 0;
+                }
                 break;
             case 2:
                 current_planner_state_ = auto_pick_state_;
-                if (auto_seq_ticks_ >= 50) { auto_seq_step_++; auto_seq_ticks_ = 0; }
+                if (auto_seq_ticks_ >= 50) {
+                    auto_seq_step_++;
+                    auto_seq_ticks_ = 0;
+                }
                 break;
             case 3:
                 current_planner_state_ = STATE_KFS_HOLD;
