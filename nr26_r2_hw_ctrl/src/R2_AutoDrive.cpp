@@ -255,6 +255,10 @@ private:
         return "MANUAL";
     }
 
+    static const char *transition_mode_to_string(int32_t mode) {
+        return mode == TRANSITION_MODE_MANUAL ? "MANUAL" : "STATE_MANAGEMENT";
+    }
+
     void publish_mode() {
         std_msgs::msg::String mode_msg;
         mode_msg.data = drive_mode_to_string(drive_mode_);
@@ -477,6 +481,12 @@ private:
         }
 
         transition_mode_code_ = next_mode;
+        RCLCPP_INFO(
+            this->get_logger(),
+            "Transition mode changed: %s (current drive mode: %s)",
+            transition_mode_to_string(transition_mode_code_),
+            drive_mode_to_string(drive_mode_).c_str());
+
         if (transition_mode_code_ == TRANSITION_MODE_MANUAL && drive_mode_ != DriveMode::MANUAL) {
             enter_manual_mode();
             RCLCPP_INFO(this->get_logger(), "Mode changed: MANUAL (by transition mode)");
@@ -484,11 +494,15 @@ private:
         }
 
         if (transition_mode_code_ == TRANSITION_MODE_STATE_MANAGEMENT) {
-            RCLCPP_INFO(this->get_logger(), "Transition mode changed: STATE_MANAGEMENT");
             if (deferred_mode_code_ >= 0) {
                 const int32_t deferred_mode = deferred_mode_code_;
                 deferred_mode_code_ = -1;
                 apply_mode_code(deferred_mode, "by deferred mode command");
+            } else {
+                RCLCPP_INFO(
+                    this->get_logger(),
+                    "No deferred mode command. Drive mode remains %s.",
+                    drive_mode_to_string(drive_mode_).c_str());
             }
         }
     }
