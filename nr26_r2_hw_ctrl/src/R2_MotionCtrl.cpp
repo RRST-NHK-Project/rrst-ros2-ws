@@ -144,7 +144,7 @@ public:
 private:
     // GUIの task_status[3] に合わせる運転モード
     static constexpr int32_t DRIVE_MODE_MANUAL = 0;
-    static constexpr int32_t DRIVE_MODE_AUTO = 1;
+    static constexpr int32_t DRIVE_MODE_STATE_MANAGEMENT = 1;
 
     // =====================================================================
     // 状態定義
@@ -376,7 +376,7 @@ private:
                                            ? std::string("STATE_") + std::to_string(current_planner_state_)
                                            : current_state_name_;
         const bool is_manual = is_manual_mode();
-        const char *mode_str = is_manual ? "MANUAL" : "AUTO";
+        const char *mode_str = is_manual ? "MANUAL" : "STATE_MANAGEMENT";
 
         if (throttled) {
             RCLCPP_INFO_THROTTLE(
@@ -436,7 +436,7 @@ private:
         //     get_logger(),
         //     "drive_mode(%s) -> %s(%ld)",
         //     source,
-        //     manual ? "MANUAL" : "AUTO",
+        //     manual ? "MANUAL" : "STATE_MANAGEMENT",
         //     static_cast<long>(next_mode));
 
         if (!manual) {
@@ -724,16 +724,16 @@ private:
     // PS4コントローラーコールバック（手動制御用）
     // =====================================================================
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
-        // ── PSボタン: 手動 / 自動モードトグル（モードに関わらず常時判定）──
+        // ── PSボタン: 手動 / 状態管理モードトグル（モードに関わらず常時判定）──
         if (msg->buttons.size() > 10) {
             const bool ps = static_cast<bool>(msg->buttons[10]);
             if (ps && !last_ps_btn_) {
                 const int32_t next_mode =
-                    is_manual_mode() ? DRIVE_MODE_AUTO : DRIVE_MODE_MANUAL;
+                    is_manual_mode() ? DRIVE_MODE_STATE_MANAGEMENT : DRIVE_MODE_MANUAL;
                 update_drive_mode(next_mode, "PS_button");
                 RCLCPP_INFO(get_logger(),
                             "[PSボタン] 機構ドライブモード切替 -> %s",
-                            next_mode == DRIVE_MODE_MANUAL ? "MANUAL" : "AUTO");
+                            next_mode == DRIVE_MODE_MANUAL ? "MANUAL" : "STATE_MANAGEMENT");
             }
             last_ps_btn_ = ps;
         }

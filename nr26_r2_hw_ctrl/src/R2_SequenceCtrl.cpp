@@ -1505,6 +1505,10 @@ public:
             10,
             std::bind(&HardWareControl::mode_cmd_callback, this, std::placeholders::_1));
 
+        drive_mode_cmd_pub_ = this->create_publisher<std_msgs::msg::Int32MultiArray>(
+            "r2_drive_mode_cmd",
+            rclcpp::QoS(1).reliable().transient_local());
+
         // r2_plannerの遷移モード（手動/自動）を指示通知で受信
         transition_mode_sub_ = this->create_subscription<std_msgs::msg::Int32>(
             "r2/task_transition_mode",
@@ -1554,6 +1558,8 @@ public:
     }
 
 private:
+    static constexpr int32_t DRIVE_MODE_MANUAL = 0;
+
     // 定数・変数
     float duty_max = 100;
     float for_speed = 50;
@@ -1567,9 +1573,11 @@ private:
     int32_t sdm15_value[4] = {0, 0, 0, 0}; // sdm15の値を保存する配列
     int16_t lidar_x_value = 0;
     int16_t lidar_y_value = 0;
-    // 手動モード: true=手動（コントローラー操作有効）/ false=自動（シーケンス制御）
+    // 手動モード: true=手動（足回りはr2_autoのMANUALへ委譲）/ false=状態管理モード
     bool manual_mode_ = true;
     bool last_ps_btn_ = false; // PSボタン前回状態
+    std::vector<int32_t> last_state_management_drive_mode_cmd_;
+    bool has_state_management_drive_mode_cmd_ = false;
 
     int32_t pending_step_cmd_ = 0;
     int32_t pending_turn_deg_ = 0;
@@ -1615,82 +1623,77 @@ private:
         }
     }
 
+    void apply_sequence_mode_from_code(int32_t mode_code) {
+        if (mode_code == 4) {
+            seq_->set_mff_mode_enabled(true);
+            clear_pending_commands("mode_cmd -> MFF");
+        } else if (mode_code == 5) {
+            seq_->set_arena_mode_enabled(true);
+            clear_pending_commands("mode_cmd -> ARENA");
+        } else {
+            seq_->set_mff_mode_enabled(false);
+            seq_->set_arena_mode_enabled(false);
+            clear_pending_commands("mode_cmd -> OTHER");
+        }
+    }
+
+    void publish_drive_mode_command(const std::vector<int32_t> &mode_cmd) {
+        if (!drive_mode_cmd_pub_ || mode_cmd.empty()) {
+            return;
+        }
+
+        std_msgs::msg::Int32MultiArray msg;
+        msg.data = mode_cmd;
+        drive_mode_cmd_pub_->publish(msg);
+    }
+
+    void publish_manual_drive_override() {
+        publish_drive_mode_command({DRIVE_MODE_MANUAL, 0});
+    }
+
+    void set_manual_mode(bool enabled, const char *source) {
+        if (manual_mode_ == enabled) {
+            return;
+        }
+
+        manual_mode_ = enabled;
+        pkt.setMD(MD5, 0);
+        pkt.setMD(MD6, 0);
+        pkt.setMD(MD7, 0);
+        pkt.setMD(MD8, 0);
+
+        if (manual_mode_) {
+            clear_pending_commands("enter manual mode");
+            seq_->set_mff_mode_enabled(false);
+            seq_->set_arena_mode_enabled(false);
+            publish_manual_drive_override();
+        } else if (has_state_management_drive_mode_cmd_) {
+            publish_drive_mode_command(last_state_management_drive_mode_cmd_);
+            apply_sequence_mode_from_code(last_state_management_drive_mode_cmd_[0]);
+        }
+
+        RCLCPP_INFO(get_logger(),
+                    "[%s] 足回りドライブモード切替 -> %s",
+                    source,
+                    manual_mode_ ? "MANUAL" : "STATE_MANAGEMENT");
+    }
+
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
-        // ── PSボタン: 手動/自動モードトグル（モードに関わらず常時判定）──
+        // ── PSボタン: 手動/状態管理モードトグル（モードに関わらず常時判定）──
         if (msg->buttons.size() > 10) {
             const bool ps = static_cast<bool>(msg->buttons[10]);
             if (ps && !last_ps_btn_) {
-                manual_mode_ = !manual_mode_;
-                RCLCPP_INFO(get_logger(),
-                            "[PSボタン] 足回りドライブモード切替 -> %s",
-                            manual_mode_ ? "MANUAL" : "AUTO");
-                if (!manual_mode_) {
-                    // AUTO切替時は足回りを停止
-                    pkt.setMD(MD5, 0);
-                    pkt.setMD(MD6, 0);
-                    pkt.setMD(MD7, 0);
-                    pkt.setMD(MD8, 0);
-                }
+                set_manual_mode(!manual_mode_, "PS_button");
             }
             last_ps_btn_ = ps;
         }
 
-        // ── 手動モード: 足回りをコントローラーで直接操作──
+        // ── 手動モード: 足回りはr2_autoのMANUALへ委譲──
         if (manual_mode_) {
-            float LS_X = -msg->axes[0]; // 左右
-            float LS_Y = msg->axes[1];  // 前後
-            float RS_X = -msg->axes[3]; // 回転
-            float R2 = (-msg->axes[5] + 1) / 2;
-            bool L1 = msg->buttons[4];
-            bool R1 = msg->buttons[5];
-
-            if (fabsf(LS_X) < deadzone)
-                LS_X = 0;
-            if (fabsf(LS_Y) < deadzone)
-                LS_Y = 0;
-            if (fabsf(RS_X) < deadzone)
-                RS_X = 0;
-
-            float vx = -LS_Y * R2;
-            float vy = LS_X * R2;
-            float wz = RS_X * sp_yaw;
-
-            v1 = vx + vy + wz;
-            v3 = vx - vy - wz;
-            v4 = vx - vy + wz;
-            v2 = vx + vy - wz;
-            v3 *= -1;
-            v2 *= -1;
-
-            if (R1) {
-                v1 = sp_yaw;
-                v2 = -sp_yaw;
-                v3 = -sp_yaw;
-                v4 = sp_yaw;
-            }
-            if (L1) {
-                v1 = -sp_yaw;
-                v2 = sp_yaw;
-                v3 = sp_yaw;
-                v4 = -sp_yaw;
-            }
-
-            float max_v = std::max(std::max(fabsf(v1), fabsf(v2)), std::max(fabsf(v3), fabsf(v4)));
-            if (max_v < 1.0f)
-                max_v = 1.0f;
-            v1 /= max_v;
-            v2 /= max_v;
-            v3 /= max_v;
-            v4 /= max_v;
-
-            pkt.setMD(MD5, static_cast<int16_t>(v1 * duty_max));
-            pkt.setMD(MD6, static_cast<int16_t>(v2 * duty_max));
-            pkt.setMD(MD7, static_cast<int16_t>(v3 * duty_max));
-            pkt.setMD(MD8, static_cast<int16_t>(v4 * duty_max));
             return;
         }
 
-        // ── 自動モード: MFF/ARENAシーケンス制御──
+        // ── 状態管理モード: MFF/ARENAシーケンス制御──
         if (!seq_->is_mff_mode_enabled() && !seq_->is_arena_mode_enabled()) {
             return;
         }
@@ -1798,15 +1801,13 @@ private:
             camera_servo_pub_->publish(servo_msg);
         }
 
-        // 手動モード: コントローラー入力値をそのまま送信（シーケンスなし）
+        // 手動モード: 足回りはr2_autoが主系。ここではserial_tx_6へ送らない。
         if (manual_mode_) {
-            std_msgs::msg::Int16MultiArray msg;
-            msg.data = pkt.toVector();
-            publisher_->publish(msg);
+            publish_manual_drive_override();
             return;
         }
 
-        // 自動モード: MFF/ARENAが無効なら何もしない
+        // 状態管理モード: MFF/ARENAが無効なら何もしない
         if (!seq_->is_mff_mode_enabled() && !seq_->is_arena_mode_enabled()) {
             clear_pending_commands("sequence mode disabled");
             return;
@@ -2043,21 +2044,23 @@ private:
         }
 
         const int32_t mode_code = msg->data[0];
-        if (mode_code == 4) {
-            seq_->set_mff_mode_enabled(true);
-            // モード切替時に古い保留コマンドを残さない
-            clear_pending_commands("mode_cmd -> MFF");
-        } else if (mode_code == 5) {
-            seq_->set_arena_mode_enabled(true);
-            clear_pending_commands("mode_cmd -> ARENA");
-        } else {
-            seq_->set_mff_mode_enabled(false);
-            seq_->set_arena_mode_enabled(false);
-            clear_pending_commands("mode_cmd -> OTHER");
+        if (mode_code != DRIVE_MODE_MANUAL) {
+            last_state_management_drive_mode_cmd_ = msg->data;
+            has_state_management_drive_mode_cmd_ = true;
         }
+
+        if (manual_mode_) {
+            return;
+        }
+
+        apply_sequence_mode_from_code(mode_code);
     }
 
     void drive_mode_text_callback(const std_msgs::msg::String::SharedPtr msg) {
+        if (manual_mode_) {
+            return;
+        }
+
         const auto &mode = msg->data;
         if (mode == "MFF") {
             seq_->set_mff_mode_enabled(true);
@@ -2105,22 +2108,10 @@ private:
         }
     }
 
-    // r2/task_transition_mode: 0=MANUAL, 1=AUTO
-    // r2_plannerまたはGUIからのモード指定を受信して手動/自動を切り替える
+    // r2/task_transition_mode: 0=MANUAL, 1=STATE_MANAGEMENT
+    // r2_plannerまたはGUIからのモード指定を受信して手動/状態管理を切り替える
     void transition_mode_callback(const std_msgs::msg::Int32::SharedPtr msg) {
-        const bool prev = manual_mode_;
-        manual_mode_ = (msg->data == 0); // 0=MANUAL, 1=AUTO
-        if (prev != manual_mode_) {
-            RCLCPP_INFO(get_logger(),
-                        "[r2/task_transition_mode] 足回りドライブモード切替 -> %s",
-                        manual_mode_ ? "MANUAL" : "AUTO");
-            if (!manual_mode_) {
-                pkt.setMD(MD5, 0);
-                pkt.setMD(MD6, 0);
-                pkt.setMD(MD7, 0);
-                pkt.setMD(MD8, 0);
-            }
-        }
+        set_manual_mode(msg->data == DRIVE_MODE_MANUAL, "r2/task_transition_mode");
     }
 
     // odom_xy_yaw: [x, y, yaw, vx, vy, wz]
@@ -2171,6 +2162,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr turn_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mff_status_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mode_cmd_sub_;
+    rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr drive_mode_cmd_pub_;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr drive_mode_text_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr cube_detect_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr cube_align_cmd_sub_;
