@@ -49,6 +49,9 @@ ament_target_dependencies(r1_mc rclcpp std_msgs sensor_msgs geometry_msgs tf2 tf
 add_executable(r1_dev src/R1_dev.cpp)
 ament_target_dependencies(r1_dev rclcpp std_msgs sensor_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs visualization_msgs)
 
+add_executable(r1_mag src/R1_Magazine.cpp)
+ament_target_dependencies(r1_mag rclcpp std_msgs sensor_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs visualization_msgs)
+
 add_executable(r1_servo_cal src/R1_Servo_Calibrator.cpp)
 ament_target_dependencies(r1_servo_cal rclcpp std_msgs sensor_msgs geometry_msgs)
 target_include_directories(r1_servo_cal PRIVATE ${nlohmann_json_SOURCE_DIR}/single_include)
@@ -58,6 +61,7 @@ install(TARGETS
   r1_sd
   r1_mc
   r1_dev
+  r1_mag
   r1_servo_cal
   DESTINATION lib/${PROJECT_NAME})
 

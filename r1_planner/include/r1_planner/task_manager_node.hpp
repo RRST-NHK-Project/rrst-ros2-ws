@@ -26,18 +26,7 @@ namespace r1_planner
         {
             int32_t state_code{0};
             int32_t color_code{-1};
-            int32_t mff_cell{0};
             int32_t transition_mode_code{0};
-        };
-
-        struct MffTransitionPreview
-        {
-            int32_t from_cell{0};
-            int32_t to_cell{0};
-            int32_t turn_deg{0};
-            int32_t step_cmd{0};
-            int32_t predicted_heading_deg{0};
-            bool valid{false};
         };
 
         struct StatePoseTarget
@@ -53,9 +42,6 @@ namespace r1_planner
         static constexpr int32_t kColorBlue = 0;
         static constexpr int32_t kColorRed = 1;
 
-        static constexpr int32_t kMffCellMin = 1;
-        static constexpr int32_t kMffCellMax = 18; // Includes entrance cells 1E-3E (13-15) and exit cells 1X-3X (16-18)
-
         static constexpr int32_t kStateWaiting = 0;
         static constexpr int32_t kStateMffEnter = 1;
         static constexpr int32_t kStateMffLeave = 2;
@@ -69,7 +55,8 @@ namespace r1_planner
         rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr command_sub_;
         rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr state_sub_;
         rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr color_sub_;
-        rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr cell_sub_;
+        rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr magazine_action_sub_;
+        
         rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr transition_mode_sub_;
         rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr state_sequence_sub_;
         rclcpp::Subscription<std_msgs::msg::String>::SharedPtr state_sequence_names_sub_;
@@ -77,8 +64,6 @@ namespace r1_planner
         rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr state_mode_sub_;
         rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr state_odom_reset_sub_;
         rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr state_wait_sub_;
-        rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mff_path_sub_;
-        rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr mff_path_advance_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr auto_send_enabled_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arena_walk_complete_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr autodrive_complete_sub_;
@@ -88,9 +73,7 @@ namespace r1_planner
         rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr auto_drive_target_pub_;
         rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr drive_mode_cmd_pub_;
         rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr arena_walk_cmd_pub_;
-        rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr mff_turn_cmd_pub_;
-        rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr mff_step_cmd_pub_;
-        rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr mff_status_pub_;
+        
         rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr odom_reset_pub_;
         rclcpp::TimerBase::SharedPtr publish_timer_;
         rclcpp::TimerBase::SharedPtr auto_transition_timer_;
@@ -106,9 +89,7 @@ namespace r1_planner
         std::unordered_map<int32_t, bool> state_rotate_only_targets_;
         std::unordered_map<int32_t, bool> state_odom_reset_targets_;
         std::unordered_map<int32_t, int32_t> state_wait_ms_overrides_;
-        std::vector<int32_t> mff_path_;
-        size_t mff_path_index_{0};
-        int32_t mff_heading_deg_{0};
+        
         bool auto_send_enabled_{true};
         int32_t fallback_drive_mode_on_unset_{0};
         int32_t current_drive_mode_{0};
@@ -116,11 +97,11 @@ namespace r1_planner
         std::chrono::steady_clock::time_point state_entered_at_{std::chrono::steady_clock::now()};
         bool has_autodrive_complete_event_{false};
         std::chrono::steady_clock::time_point last_autodrive_complete_at_{};
+        std::unordered_map<int32_t, int32_t> magazine_action_map_;
 
         void onCommand(const std_msgs::msg::Int32MultiArray::SharedPtr msg);
         void onState(const std_msgs::msg::Int32::SharedPtr msg);
         void onColor(const std_msgs::msg::Int32::SharedPtr msg);
-        void onCell(const std_msgs::msg::Int32::SharedPtr msg);
         void onTransitionMode(const std_msgs::msg::Int32::SharedPtr msg);
         void onStateSequence(const std_msgs::msg::Int32MultiArray::SharedPtr msg);
         void onStateSequenceNames(const std_msgs::msg::String::SharedPtr msg);
@@ -128,15 +109,12 @@ namespace r1_planner
         void onStateMode(const std_msgs::msg::Int32MultiArray::SharedPtr msg);
         void onStateOdomReset(const std_msgs::msg::Int32MultiArray::SharedPtr msg);
         void onStateWait(const std_msgs::msg::Int32MultiArray::SharedPtr msg);
-        void onMffPath(const std_msgs::msg::Int32MultiArray::SharedPtr msg);
-        void onMffPathAdvance(const std_msgs::msg::Bool::SharedPtr msg);
         void onAutoSendEnabled(const std_msgs::msg::Bool::SharedPtr msg);
         void onArenaWalkComplete(const std_msgs::msg::Bool::SharedPtr msg);
         void onAutodriveComplete(const std_msgs::msg::Bool::SharedPtr msg);
 
         void setState(int32_t state_code);
         void setColor(int32_t color_code);
-        void setCell(int32_t cell);
         void setTransitionMode(int32_t transition_mode_code);
         void publishStateSideEffects(int32_t state_code);
         void advanceAutoTransition();
@@ -146,18 +124,9 @@ namespace r1_planner
         void publishAutoDriveTargetForState(int32_t state_code);
         void publishAutoDriveModeForState(int32_t state_code);
         void publishOdomResetForState(int32_t state_code);
-        bool buildMffTransitionPreview(MffTransitionPreview &preview) const;
-        void publishMffPreviewCommands();
-        void publishMffRuntimeStatus(bool force = false);
+        
         void applyStateNameSequenceMapping();
         std::vector<std::string> parseStateNameSequence(const std::string &names_text) const;
-        bool computeMffTransition(
-            int32_t from_cell,
-            int32_t to_cell,
-            int32_t current_heading_deg,
-            int32_t &target_heading_deg,
-            int32_t &turn_deg,
-            int32_t &step_cmd) const;
 
         static std::string stateName(int32_t state_code);
         std::string stateDisplayName(int32_t state_code) const;
@@ -169,6 +138,7 @@ namespace r1_planner
         static int32_t normalizeTurnDeg(int32_t turn_deg);
 
         void publishStatus(bool force = false);
+        void onMagazineAction(const std_msgs::msg::Int32MultiArray::SharedPtr msg);
     };
 
 } // namespace r1_planner
