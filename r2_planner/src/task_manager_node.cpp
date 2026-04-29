@@ -223,9 +223,6 @@ namespace r2_planner {
         drive_mode_cmd_pub_ = create_publisher<std_msgs::msg::Int32MultiArray>(
             drive_mode_cmd_topic, rclcpp::QoS(1).reliable().transient_local());
 
-        arena_walk_cmd_pub_ = create_publisher<std_msgs::msg::Int32>(
-            "/r2_arena_walk_cmd", rclcpp::QoS(10));
-
         mff_turn_cmd_pub_ = create_publisher<std_msgs::msg::Int32>(
             mff_turn_cmd_topic, rclcpp::QoS(10));
 
@@ -305,7 +302,11 @@ namespace r2_planner {
 
     void TaskManagerNode::onTransitionMode(const std_msgs::msg::Int32::SharedPtr msg) {
         RCLCPP_INFO(get_logger(), "Received transition mode command: %ld", static_cast<long>(msg->data));
+        const bool was_auto = status_.transition_mode_code == kTransitionAuto;
         setTransitionMode(msg->data);
+        if (!was_auto && status_.transition_mode_code == kTransitionAuto) {
+            publishStateSideEffects(status_.state_code);
+        }
         publishStatus(true);
     }
 
@@ -879,17 +880,8 @@ namespace r2_planner {
             const bool rotate_only = (rotate_it != state_rotate_only_targets_.end() && rotate_it->second);
             mode_msg.data = {it->second, rotate_only ? 1 : 0};
         }
-        const int32_t prev_drive_mode = current_drive_mode_;
         current_drive_mode_ = mode_msg.data[0];
         drive_mode_cmd_pub_->publish(mode_msg);
-
-        // ARENAモードへ遷移したタイミングでSequenceCtrlのアリーナ走行を起動する
-        if (current_drive_mode_ == 5 && prev_drive_mode != 5 && arena_walk_cmd_pub_) {
-            std_msgs::msg::Int32 arena_start_msg;
-            arena_start_msg.data = 1;
-            arena_walk_cmd_pub_->publish(arena_start_msg);
-            RCLCPP_INFO(get_logger(), "Published arena walk start command to /r2_arena_walk_cmd.");
-        }
 
         RCLCPP_INFO(
             get_logger(),

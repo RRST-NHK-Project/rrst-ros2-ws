@@ -105,7 +105,6 @@ public:
         this->declare_parameter("aruco_target_id", -1);
         this->declare_parameter("aruco_camera_offset_x_m", -0.1735);
         this->declare_parameter("aruco_camera_offset_y_m", 0.0);
-        this->declare_parameter("enable_ps4_mode_toggle", false);
         this->declare_parameter("auto_complete_pos_thresh_m", 0.05);
         this->declare_parameter("auto_complete_yaw_thresh_rad", 0.10);
         this->declare_parameter("auto_complete_hold_sec", 0.30);
@@ -115,7 +114,6 @@ public:
         aruco_target_id_ = this->get_parameter("aruco_target_id").as_int();
         aruco_camera_offset_x_ = static_cast<float>(this->get_parameter("aruco_camera_offset_x_m").as_double());
         aruco_camera_offset_y_ = static_cast<float>(this->get_parameter("aruco_camera_offset_y_m").as_double());
-        enable_ps4_mode_toggle_ = this->get_parameter("enable_ps4_mode_toggle").as_bool();
         auto_complete_pos_thresh_m_ = static_cast<float>(this->get_parameter("auto_complete_pos_thresh_m").as_double());
         auto_complete_yaw_thresh_rad_ = static_cast<float>(this->get_parameter("auto_complete_yaw_thresh_rad").as_double());
         auto_complete_hold_sec_ = static_cast<float>(this->get_parameter("auto_complete_hold_sec").as_double());
@@ -123,9 +121,6 @@ public:
         auto_goal_in_range_since_ = rclcpp::Time(0, 0, get_clock()->get_clock_type());
         reset_auto_complete_tracking(true);
         publish_mode();
-
-        // RCLCPP_INFO(this->get_logger(), "PS4 mode toggle (OPTION): %s",
-        //             enable_ps4_mode_toggle_ ? "ENABLED" : "DISABLED");
     }
 
 private:
@@ -203,7 +198,6 @@ private:
     float aruco_k_wz_ = 1.4f;
     float aruco_pose_timeout_sec_ = 0.5f;
     float aruco_horizontal_deadband_m_ = 0.02f;
-    bool enable_ps4_mode_toggle_ = false;
 
     // AUTO/PLANE 到達完了判定
     float auto_complete_pos_thresh_m_ = 0.05f;
@@ -273,7 +267,7 @@ private:
         publisher_->publish(msg);
     }
 
-    void enter_auto_mode() {
+    void reset_pose_target_control(bool reset_auto_complete) {
         if (!has_target_cmd_) {
             target_x_ = X_;
             target_y_ = Y_;
@@ -286,70 +280,70 @@ private:
         pid_x_.reset();
         pid_y_.reset();
         pid_yaw_.reset();
-        reset_auto_complete_tracking(false);
 
-        drive_mode_ = DriveMode::AUTO;
+        if (reset_auto_complete) {
+            reset_auto_complete_tracking(false);
+        }
+    }
+
+    void switch_drive_mode(DriveMode mode, bool publish_stop_packet = false) {
+        drive_mode_ = mode;
         stop_motors();
         publish_mode();
+
+        if (publish_stop_packet) {
+            publish_packet();
+        }
+    }
+
+    void apply_wheel_outputs(float wheel_1, float wheel_2, float wheel_3, float wheel_4) {
+        v1 = wheel_1;
+        v2 = wheel_2;
+        v3 = wheel_3;
+        v4 = wheel_4;
+
+        float max_v = std::max({fabsf(v1), fabsf(v2), fabsf(v3), fabsf(v4)});
+        if (max_v < 1.0f) {
+            max_v = 1.0f;
+        }
+
+        v1 /= max_v;
+        v2 /= max_v;
+        v3 /= max_v;
+        v4 /= max_v;
+
+        pkt.setMD(MD5, static_cast<int16_t>(v1 * duty_max));
+        pkt.setMD(MD6, static_cast<int16_t>(v2 * duty_max));
+        pkt.setMD(MD7, static_cast<int16_t>(v3 * duty_max));
+        pkt.setMD(MD8, static_cast<int16_t>(v4 * duty_max));
+    }
+
+    void enter_auto_mode() {
+        reset_pose_target_control(true);
+        switch_drive_mode(DriveMode::AUTO);
     }
 
     void enter_aruco_mode() {
-        drive_mode_ = DriveMode::ARUCO;
-        stop_motors();
-        publish_mode();
+        switch_drive_mode(DriveMode::ARUCO);
     }
 
     void enter_manual_mode() {
-        drive_mode_ = DriveMode::MANUAL;
-        stop_motors();
-        publish_mode();
+        switch_drive_mode(DriveMode::MANUAL);
     }
 
     void enter_plane_mode() {
-        if (!has_target_cmd_) {
-            target_x_ = X_;
-            target_y_ = Y_;
-            target_yaw_ = yaw_;
-        }
-
-        pid_x_.set_target(target_x_);
-        pid_y_.set_target(target_y_);
-        pid_yaw_.set_target(target_yaw_);
-        pid_x_.reset();
-        pid_y_.reset();
-        pid_yaw_.reset();
-        reset_auto_complete_tracking(false);
-
-        drive_mode_ = DriveMode::PLANE;
-        stop_motors();
-        publish_mode();
+        reset_pose_target_control(true);
+        switch_drive_mode(DriveMode::PLANE);
     }
 
     void enter_mff_mode() {
-        drive_mode_ = DriveMode::MFF;
-        stop_motors();
-        publish_mode();
         // MFF中はSequenceCtrlを主系にするため、停止パケットを1回だけ送る。
-        publish_packet();
+        switch_drive_mode(DriveMode::MFF, true);
     }
 
     void enter_arena_mode() {
-        if (!has_target_cmd_) {
-            target_x_ = X_;
-            target_y_ = Y_;
-            target_yaw_ = yaw_;
-        }
-
-        pid_x_.set_target(target_x_);
-        pid_y_.set_target(target_y_);
-        pid_yaw_.set_target(target_yaw_);
-        pid_x_.reset();
-        pid_y_.reset();
-        pid_yaw_.reset();
-
-        drive_mode_ = DriveMode::ARENA;
-        stop_motors();
-        publish_mode();
+        reset_pose_target_control(false);
+        switch_drive_mode(DriveMode::ARENA);
     }
 
     // odom（状態更新のみ）
@@ -381,18 +375,10 @@ private:
         target_yaw_ = msg->data[2];
         has_target_cmd_ = true;
         reset_auto_complete_tracking(true);
-
-        pid_x_.set_target(target_x_);
-        pid_y_.set_target(target_y_);
-        pid_yaw_.set_target(target_yaw_);
-        pid_x_.reset();
-        pid_y_.reset();
-        pid_yaw_.reset();
+        reset_pose_target_control(false);
 
         if (drive_mode_ != DriveMode::AUTO && drive_mode_ != DriveMode::ARENA) {
-            drive_mode_ = DriveMode::AUTO;
-            stop_motors();
-            publish_mode();
+            switch_drive_mode(DriveMode::AUTO);
             RCLCPP_INFO(this->get_logger(), "Mode changed: AUTO (by target command)");
         }
 
@@ -495,23 +481,6 @@ private:
         if (msg->axes.size() < 8 || msg->buttons.size() < 10)
             return;
 
-        bool OPTION = msg->buttons[9];
-        static bool last_option = false;
-
-        if (enable_ps4_mode_toggle_ && OPTION && !last_option) {
-            if (drive_mode_ == DriveMode::MANUAL) {
-                enter_auto_mode();
-                RCLCPP_INFO(this->get_logger(), "Mode changed: AUTO");
-            } else if (drive_mode_ == DriveMode::AUTO) {
-                enter_aruco_mode();
-                RCLCPP_INFO(this->get_logger(), "Mode changed: ARUCO");
-            } else {
-                enter_manual_mode();
-                RCLCPP_INFO(this->get_logger(), "Mode changed: MANUAL");
-            }
-        }
-        last_option = OPTION;
-
         if (drive_mode_ != DriveMode::MANUAL) {
             return;
         }
@@ -558,22 +527,7 @@ private:
             v4 = -sp_yaw;
         }
 
-        float max_v = std::max(
-            std::max(fabsf(v1), fabsf(v2)),
-            std::max(fabsf(v3), fabsf(v4)));
-
-        if (max_v < 1.0f)
-            max_v = 1.0f;
-
-        v1 /= max_v;
-        v2 /= max_v;
-        v3 /= max_v;
-        v4 /= max_v;
-
-        pkt.setMD(MD5, static_cast<int16_t>(v1 * duty_max));
-        pkt.setMD(MD6, static_cast<int16_t>(v2 * duty_max));
-        pkt.setMD(MD7, static_cast<int16_t>(v3 * duty_max));
-        pkt.setMD(MD8, static_cast<int16_t>(v4 * duty_max));
+        apply_wheel_outputs(v1, v2, v3, v4);
     }
     // 制御ループ
     void publish_timer() {
@@ -623,19 +577,7 @@ private:
             v3 *= -1;
             v2 *= -1;
 
-            float max_v = std::max({fabs(v1), fabs(v2), fabs(v3), fabs(v4)});
-            if (max_v < 1.0f)
-                max_v = 1.0f;
-
-            v1 /= max_v;
-            v2 /= max_v;
-            v3 /= max_v;
-            v4 /= max_v;
-
-            pkt.setMD(MD5, static_cast<int16_t>(v1 * duty_max));
-            pkt.setMD(MD6, static_cast<int16_t>(v2 * duty_max));
-            pkt.setMD(MD7, static_cast<int16_t>(v3 * duty_max));
-            pkt.setMD(MD8, static_cast<int16_t>(v4 * duty_max));
+            apply_wheel_outputs(v1, v2, v3, v4);
 
             publish_packet();
 
@@ -715,21 +657,7 @@ private:
         v3 *= -1;
         v2 *= -1;
 
-        // 正規化
-        float max_v = std::max({fabs(v1), fabs(v2), fabs(v3), fabs(v4)});
-        if (max_v < 1.0)
-            max_v = 1.0;
-
-        v1 /= max_v;
-        v2 /= max_v;
-        v3 /= max_v;
-        v4 /= max_v;
-
-        // 送信
-        pkt.setMD(MD5, static_cast<int16_t>(v1 * duty_max));
-        pkt.setMD(MD6, static_cast<int16_t>(v2 * duty_max));
-        pkt.setMD(MD7, static_cast<int16_t>(v3 * duty_max));
-        pkt.setMD(MD8, static_cast<int16_t>(v4 * duty_max));
+        apply_wheel_outputs(v1, v2, v3, v4);
 
         publish_packet();
     }

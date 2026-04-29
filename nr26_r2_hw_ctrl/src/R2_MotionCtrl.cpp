@@ -105,17 +105,8 @@ public:
                       this,
                       std::placeholders::_1));
 
-        // GUIから直接状態が送られる場合の互換経路
-        state_sub_ = this->create_subscription<std_msgs::msg::Int32>(
-            "r2/task_state", 10,
-            std::bind(&HardWareControl::task_state_callback, this, std::placeholders::_1));
-
-        // r2_plannerが管理する現在状態（[state, color, cell, mode]）
+        // r2_plannerが管理する現在状態名を購読
         auto status_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
-        status_sub_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
-            "r2/task_status", status_qos,
-            std::bind(&HardWareControl::task_status_callback, this, std::placeholders::_1));
-
         status_text_sub_ = this->create_subscription<std_msgs::msg::String>(
             "/r2/task_status_text", status_qos,
             std::bind(&HardWareControl::task_status_text_callback, this, std::placeholders::_1));
@@ -640,13 +631,6 @@ private:
     // =====================================================================
     // 状態遷移コールバック群
     // =====================================================================
-    void task_state_callback(const std_msgs::msg::Int32::SharedPtr msg) {
-        (void)msg;
-
-        // 状態制御は task_status_text の state 名を正とする
-        // RCLCPP_DEBUG(get_logger(), "task_state ignored (state-by-name mode): %ld", static_cast<long>(msg->data));
-    }
-
     void transition_mode_callback(const std_msgs::msg::Int32::SharedPtr msg) {
         // GUIから直接モードを受信（task_manager_node経由より確実）
         update_drive_mode(msg->data, "transition_mode_direct");
@@ -657,13 +641,6 @@ private:
         if (msg->data.empty())
             return;
         update_drive_mode(msg->data[0], "drive_mode_cmd");
-    }
-
-    void task_status_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
-        // task_status からのモード更新は行わない。
-        // モードは r2/task_transition_mode の直接受信（transition_mode_callback）でのみ管理する。
-        // task_manager_node が古い mode=MANUAL を周期送信し続けると上書きされるため。
-        (void)msg;
     }
 
     void camera_servo_callback(const std_msgs::msg::Int32::SharedPtr msg) {
@@ -982,8 +959,6 @@ private:
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sensor_sub_;
-    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr state_sub_;
-    rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr status_sub_;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr status_text_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr camera_servo_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr transition_mode_sub_;

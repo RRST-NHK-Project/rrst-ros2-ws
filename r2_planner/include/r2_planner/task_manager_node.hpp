@@ -82,7 +82,6 @@ namespace r2_planner {
         rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_text_pub_;
         rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr auto_drive_target_pub_;
         rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr drive_mode_cmd_pub_;
-        rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr arena_walk_cmd_pub_;
         rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr mff_turn_cmd_pub_;
         rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr mff_step_cmd_pub_;
         rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr mff_status_pub_;

@@ -251,8 +251,6 @@ public:
         } else {
             // アリーナモード有効時はMFFモードを無効化
             mff_mode_enabled_ = false;
-            // モード切替直後にARENAシーケンスを自動開始
-            start_arena_walk();
         }
 
         RCLCPP_INFO(get_logger(), "Sequence mode: %s", arena_mode_enabled_ ? "ARENA ENABLED" : "ARENA DISABLED");
@@ -1498,11 +1496,6 @@ public:
             10,
             std::bind(&HardWareControl::cube_align_cmd_callback, this, std::placeholders::_1));
 
-        arena_walk_cmd_sub_ = this->create_subscription<std_msgs::msg::Int32>(
-            "/r2_arena_walk_cmd",
-            10,
-            std::bind(&HardWareControl::arena_walk_cmd_callback, this, std::placeholders::_1));
-
         odom_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
             "odom_xy_yaw",
             10,
@@ -1806,11 +1799,6 @@ private:
         msg.data = pkt.toVector();
         publisher_->publish(msg);
         // print_data();
-
-        // カメラサーボ角度をDevice7（R2_HandCtrl）へ通知
-        std_msgs::msg::Int32 servo_msg;
-        servo_msg.data = seq_->get_camera_servo_angle();
-        camera_servo_pub_->publish(servo_msg);
     }
 
     void print_data() {
@@ -2075,15 +2063,6 @@ private:
         }
     }
 
-    void arena_walk_cmd_callback(const std_msgs::msg::Int32::SharedPtr msg) {
-        if (!seq_->is_arena_mode_enabled()) {
-            return;
-        }
-        if (msg->data == 1) {
-            seq_->start_arena_walk();
-        }
-    }
-
     // r2/task_transition_mode: 0=MANUAL, 1=STATE_MANAGEMENT
     // r2_plannerまたはGUIからのモード指定を受信して手動/状態管理を切り替える
     void transition_mode_callback(const std_msgs::msg::Int32::SharedPtr msg) {
@@ -2143,7 +2122,6 @@ private:
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr drive_mode_text_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr cube_detect_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr cube_align_cmd_sub_;
-    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr arena_walk_cmd_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr odom_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr ld19_eight_dir_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr transition_mode_sub_; // r2/task_transition_mode
