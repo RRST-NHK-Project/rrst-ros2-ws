@@ -569,9 +569,6 @@ private:
         float RS_X = -msg->axes[3];
         float R2 = (-msg->axes[5] + 1) / 2;
 
-        bool L1 = msg->buttons[4];
-        bool R1 = msg->buttons[5];
-
         if (fabsf(LS_X) < deadzone)
             LS_X = 0;
         if (fabsf(LS_Y) < deadzone)
@@ -591,20 +588,6 @@ private:
 
         v3 *= -1;
         v2 *= -1;
-
-        if (R1) {
-            v1 = sp_yaw;
-            v2 = -sp_yaw;
-            v3 = -sp_yaw;
-            v4 = sp_yaw;
-        }
-
-        if (L1) {
-            v1 = -sp_yaw;
-            v2 = sp_yaw;
-            v3 = sp_yaw;
-            v4 = -sp_yaw;
-        }
 
         apply_wheel_outputs(v1, v2, v3, v4);
     }
