@@ -308,9 +308,8 @@ namespace r2_planner {
         RCLCPP_INFO(get_logger(), "Received transition mode command: %ld", static_cast<long>(msg->data));
         const bool was_auto = status_.transition_mode_code == kTransitionAuto;
         setTransitionMode(msg->data);
-        if (!was_auto && status_.transition_mode_code == kTransitionAuto) {
-            publishStateSideEffects(status_.state_code);
-        }
+        // PSボタンによる外部遷移はコマンド自動送信を行わない
+        // publishStateSideEffects は削除。GUIまたはユーザーの明示的操作を待つ。
         publishStatus(true);
     }
 
