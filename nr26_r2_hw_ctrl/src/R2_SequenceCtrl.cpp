@@ -1469,16 +1469,16 @@ public:
             "r2_drive_mode_cmd",
             rclcpp::QoS(1).reliable().transient_local());
 
-        // r2_plannerの遷移モード（手動/自動）を指示通知で受信
-        const auto transition_mode_qos = rclcpp::QoS(rclcpp::KeepLast(1)).best_effort().transient_local();
-        transition_mode_sub_ = this->create_subscription<std_msgs::msg::Int32>(
-            "r2/task_transition_mode",
-            transition_mode_qos,
-            std::bind(&HardWareControl::transition_mode_callback, this, std::placeholders::_1));
+        // PS/GUIの操作モード（手動操作/状態管理）を共有する専用トピック
+        const auto control_mode_qos = rclcpp::QoS(rclcpp::KeepLast(1)).best_effort().transient_local();
+        control_mode_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+            "r2/control_operation_mode",
+            control_mode_qos,
+            std::bind(&HardWareControl::control_mode_callback, this, std::placeholders::_1));
 
-        transition_mode_pub_ = this->create_publisher<std_msgs::msg::Int32>(
-            "r2/task_transition_mode",
-            transition_mode_qos);
+        control_mode_pub_ = this->create_publisher<std_msgs::msg::Int32>(
+            "r2/control_operation_mode",
+            control_mode_qos);
 
         // r2_autodrive から公開される現在モード文字列（MFF/ARENA）でも
         // SequenceCtrl の有効/無効を切り替えられる受信口を追加
@@ -1513,7 +1513,7 @@ public:
         camera_servo_pub_ = this->create_publisher<std_msgs::msg::Int32>(
             "/r2/camera_servo_angle", 10);
 
-        publish_transition_mode_command(manual_mode_);
+        publish_control_mode_command(manual_mode_);
 
         RCLCPP_INFO(get_logger(),
                     "serial_tx_%d started.", device_id_);
@@ -1607,14 +1607,14 @@ private:
         drive_mode_cmd_pub_->publish(msg);
     }
 
-    void publish_transition_mode_command(bool manual_enabled) {
-        if (!transition_mode_pub_) {
+    void publish_control_mode_command(bool manual_enabled) {
+        if (!control_mode_pub_) {
             return;
         }
 
         std_msgs::msg::Int32 msg;
         msg.data = manual_enabled ? DRIVE_MODE_MANUAL : 1;
-        transition_mode_pub_->publish(msg);
+        control_mode_pub_->publish(msg);
     }
 
     void set_manual_mode(bool enabled, const char *source) {
@@ -1644,13 +1644,13 @@ private:
     }
 
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
-        // ── PSボタン: 手動/状態管理モードトグル（モードに関わらず常時判定）──
+        // ── PSボタン: 手動操作/状態管理モードトグル（モードに関わらず常時判定）──
         if (msg->buttons.size() > 10) {
             const bool ps = static_cast<bool>(msg->buttons[10]);
             if (ps && !last_ps_btn_) {
                 const bool next_manual_mode = !manual_mode_;
                 set_manual_mode(next_manual_mode, "PS_button");
-                publish_transition_mode_command(next_manual_mode);
+                publish_control_mode_command(next_manual_mode);
             }
             last_ps_btn_ = ps;
         }
@@ -2061,10 +2061,10 @@ private:
         }
     }
 
-    // r2/task_transition_mode: 0=MANUAL, 1=STATE_MANAGEMENT
-    // r2_plannerまたはGUIからのモード指定を受信して手動/状態管理を切り替える
-    void transition_mode_callback(const std_msgs::msg::Int32::SharedPtr msg) {
-        set_manual_mode(msg->data == DRIVE_MODE_MANUAL, "r2/task_transition_mode");
+    // r2/control_operation_mode: 0=MANUAL, 1=STATE_MANAGEMENT
+    // PSボタンまたはGUIからの操作モード指定を受信して手動/状態管理を切り替える
+    void control_mode_callback(const std_msgs::msg::Int32::SharedPtr msg) {
+        set_manual_mode(msg->data == DRIVE_MODE_MANUAL, "r2/control_operation_mode");
     }
 
     // odom_xy_yaw: [x, y, yaw, vx, vy, wz]
@@ -2116,13 +2116,13 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mff_status_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mode_cmd_sub_;
     rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr drive_mode_cmd_pub_;
-    rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr transition_mode_pub_;
+    rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr control_mode_pub_;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr drive_mode_text_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr cube_detect_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr cube_align_cmd_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr odom_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr ld19_eight_dir_sub_;
-    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr transition_mode_sub_; // r2/task_transition_mode
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr control_mode_sub_; // r2/control_operation_mode
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr odom_reset_pub_;
     rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr camera_servo_pub_;
     rclcpp::TimerBase::SharedPtr timer_;

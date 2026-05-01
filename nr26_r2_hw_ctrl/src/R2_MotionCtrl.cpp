@@ -115,10 +115,10 @@ public:
             "/r2/camera_servo_angle", 10,
             std::bind(&HardWareControl::camera_servo_callback, this, std::placeholders::_1));
 
-        // GUIから直接モードが送られる場合の直接受信（rosbridge互換: best_effort）
-        transition_mode_sub_ = this->create_subscription<std_msgs::msg::Int32>(
-            "r2/task_transition_mode", rclcpp::QoS(rclcpp::KeepLast(1)).best_effort().transient_local(),
-            std::bind(&HardWareControl::transition_mode_callback, this, std::placeholders::_1));
+        // PS/GUIの操作モード（手動操作/状態管理）を受信
+        control_mode_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+            "r2/control_operation_mode", rclcpp::QoS(rclcpp::KeepLast(1)).best_effort().transient_local(),
+            std::bind(&HardWareControl::control_mode_callback, this, std::placeholders::_1));
 
         // 初期状態を適用
         apply_state_to_packet(current_planner_state_);
@@ -625,9 +625,8 @@ private:
     // =====================================================================
     // 状態遷移コールバック群
     // =====================================================================
-    void transition_mode_callback(const std_msgs::msg::Int32::SharedPtr msg) {
-        // GUIから直接モードを受信（task_manager_node経由より確実）
-        update_drive_mode(msg->data, "transition_mode_direct");
+    void control_mode_callback(const std_msgs::msg::Int32::SharedPtr msg) {
+        update_drive_mode(msg->data, "control_operation_mode");
     }
 
     void camera_servo_callback(const std_msgs::msg::Int32::SharedPtr msg) {
@@ -657,7 +656,7 @@ private:
     // PS4コントローラーコールバック（手動制御用）
     // =====================================================================
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
-        // PSボタンによるモード切替は r2/task_transition_mode を正とする。
+        // PSボタンによるモード切替は r2/control_operation_mode を正とする。
         // ここでは手動操作だけを扱い、共有モードの反転は SequenceCtrl/GUI からの通知で受ける。
 
         if (!is_manual_mode()) {
@@ -913,7 +912,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sensor_sub_;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr status_text_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr camera_servo_sub_;
-    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr transition_mode_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr control_mode_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
 };
 

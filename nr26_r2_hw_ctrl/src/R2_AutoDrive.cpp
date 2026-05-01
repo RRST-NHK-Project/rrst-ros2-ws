@@ -70,9 +70,9 @@ public:
             "r2_drive_mode_cmd", rclcpp::QoS(1).reliable().transient_local(),
             std::bind(&PIDMecanumController::mode_cmd_callback, this, std::placeholders::_1));
 
-        transition_mode_sub_ = this->create_subscription<std_msgs::msg::Int32>(
-            "r2/task_transition_mode", rclcpp::QoS(rclcpp::KeepLast(1)).best_effort().transient_local(),
-            std::bind(&PIDMecanumController::transition_mode_callback, this, std::placeholders::_1));
+        control_mode_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+            "r2/control_operation_mode", rclcpp::QoS(rclcpp::KeepLast(1)).best_effort().transient_local(),
+            std::bind(&PIDMecanumController::control_mode_callback, this, std::placeholders::_1));
 
         // ArUco追従入力
         aruco_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
@@ -144,7 +144,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr odom_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr target_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mode_cmd_sub_;
-    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr transition_mode_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr control_mode_sub_;
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr aruco_pose_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr aruco_distance_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr aruco_id_sub_;
@@ -480,7 +480,7 @@ private:
         apply_mode_code(mode_code, "by mode command");
     }
 
-    void transition_mode_callback(const std_msgs::msg::Int32::SharedPtr msg) {
+    void control_mode_callback(const std_msgs::msg::Int32::SharedPtr msg) {
         const int32_t next_mode = msg->data;
         if (next_mode != TRANSITION_MODE_MANUAL && next_mode != TRANSITION_MODE_STATE_MANAGEMENT) {
             return;
