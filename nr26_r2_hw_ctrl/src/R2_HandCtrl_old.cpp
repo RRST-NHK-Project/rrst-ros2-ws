@@ -125,6 +125,7 @@ private:
         tx_data_[17] = 1; // シリンダー：伸ばす
     }
     void set_up_values() {
+        //上回収：3度
         tx_data_[18] = 1; // ハンド：閉じる
     }
 
@@ -140,6 +141,7 @@ private:
         tx_data_[18] = 1; // ハンド：閉じる
     }
     void set_moving_values() {
+        //110,117
         tx_data_[17] = 1; // シリンダー：伸ばす
         tx_data_[18] = 1; // ハンド：閉じる
     }
