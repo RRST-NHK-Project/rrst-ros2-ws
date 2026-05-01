@@ -706,9 +706,6 @@ private:
         //   micro2_sw（終点）押下 → 逆回転禁止、正回転のみ許可
         // =================================================================
 
-        int16_t micro1_sw = g_micro1_sw.load();
-        int16_t micro2_sw = g_micro2_sw.load();
-
         int64_t abs_coord = g_abs_coord.load();
         double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
 
@@ -726,30 +723,13 @@ private:
         int fwd_speed = in_slow_zone ? SLOW_SPEED : NORMAL_SPEED;   // 正回転（始発→終点）の速度
         int rev_speed = in_slow_zone ? -SLOW_SPEED : -NORMAL_SPEED; // 逆回転（終点→始発）の速度
 
-        // micro1_sw が始発(正回転禁止) → rev_speed(R1で逆回転)のみ許可
-        // micro2_sw が終点(逆回転禁止) → fwd_speed(L1で正回転)のみ許可
-        if (micro1_sw == 1) {
-            if (L1 == 1) {
-                pkt.setMD(MD2, fwd_speed);
-            } else {
-                pkt.setMD(MD2, 0);
-            }
-        } else if (micro2_sw == 1) {
-            if (R1 == 1) {
-                pkt.setMD(MD2, rev_speed);
-            } else {
-                pkt.setMD(MD2, 0);
-            }
-        } else {
-            // マイクロスイッチに触れていない通常の範囲
-            if (L1 == 1) {
-                pkt.setMD(MD2, fwd_speed);
-            } else if (R1 == 1) {
-                pkt.setMD(MD2, rev_speed);
-            } else {
-                pkt.setMD(MD2, 0);
-            }
+        int16_t monorail_cmd = 0;
+        if (L1 == 1) {
+            monorail_cmd = fwd_speed;
+        } else if (R1 == 1) {
+            monorail_cmd = rev_speed;
         }
+        pkt.setMD(MD2, apply_direction_limit(monorail_cmd));
 
         // RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
         //                      "【フォーク制御】回転数=%.2f, 減速=%s, 始発SW=%d, 終点SW=%d, 出力=%d",
