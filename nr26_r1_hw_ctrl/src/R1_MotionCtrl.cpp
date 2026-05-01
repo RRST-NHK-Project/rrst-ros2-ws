@@ -522,6 +522,34 @@ private:
 
         cross_pre = CROSS;
 
+
+        // =================================================================
+        // 【実験中】CROSSボタン長押しリセット機能
+        // CROSSボタンを3秒間押し続けると、マガジン回転を初期状態にリセット
+        // =================================================================
+
+        // static rclcpp::Time cross_down_time;  // ボタンが押され始めた時刻を記録
+        // static bool cross_reset_done = false; // リセット実行済みフラグ
+        // if (CROSS)
+        // {
+        //     if (cross_pre == 0) // ボタンが押された瞬間
+        //     {
+        //         cross_down_time = this->get_clock()->now(); // 開始時刻を保存
+        //         cross_reset_done = false;                   // フラグを初期化
+        //     }
+        //     else if (!cross_reset_done) // 押し続けられている間
+        //     {
+        //         // 経過時間を秒単位で取得
+        //         auto duration = (this->get_clock()->now() - cross_down_time).seconds();
+        //         if (duration >= 3.0) // 3秒経過したら
+        //         {
+        //             CROSS_PUSH_COUNT = 0;    // カウントをリセット
+        //             cross_reset_done = true; // 押し続けている間は一度だけ実行
+        //             RCLCPP_INFO(get_logger(), "【実験】CROSSボタン長押しによりマガジン回転カウントをリセットしました");
+        //         }
+        //     }
+        // }
+
         // =================================================================
         // CIRCLE:「KFS回収ハンド機構」 ※動作確認済み
         // KFSをハンドについた吸盤で吸引することにより回収し、そろばん機構に流し、ソレノイドバルブによりプッシュ
