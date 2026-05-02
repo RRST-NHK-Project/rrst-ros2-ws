@@ -155,7 +155,7 @@ private:
         // =================================================================
 
         static int MAG2_SERVO_ANGLE[] = {270, 226, 182, 136, 88, 42, 5};
-        static int MAG_CAT_SERVO_ANGLE[] = {260, 216, 172, 128, 78, 32, 0};
+        static int MAG_CAT_SERVO_ANGLE[] = {265, 221, 177, 131, 83, 37, 0}; // 260, 216, 172, 128, 78, 32, 0
         static int cross_pre = 0;
         static int CROSS_PUSH_COUNT = 0;
         static int CROSS_PUSH_MAX = 31;
