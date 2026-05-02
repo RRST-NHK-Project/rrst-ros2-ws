@@ -820,6 +820,10 @@ private:
         pkt.setMD(MD6, static_cast<int16_t>(v2 * align_duty_max));
         pkt.setMD(MD7, static_cast<int16_t>(v3 * align_duty_max));
         pkt.setMD(MD8, static_cast<int16_t>(v4 * align_duty_max));
+
+        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
+                             "WALL_ALIGN: angle=%.4f rad, dist=%d mm | vx=%.3f wz=%.3f",
+                             wall_angle, lidar_value, vx, wz);
     }
 
     // 段差超えシーケンス（上り）
@@ -1114,6 +1118,9 @@ private:
             pkt.setMD(MD6, 0);
             pkt.setMD(MD7, 0);
             pkt.setMD(MD8, 0);
+            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
+                                 "CUBE_ALIGN: cube lost temporarily (age=%.2f s)",
+                                 age_sec);
             return;
         }
 
@@ -1206,6 +1213,13 @@ private:
         pkt.setMD(MD6, static_cast<int16_t>(v2 * align_duty_max));
         pkt.setMD(MD7, static_cast<int16_t>(v3 * align_duty_max));
         pkt.setMD(MD8, static_cast<int16_t>(v4 * align_duty_max));
+
+        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
+                             "CUBE_ALIGN[%s]: yaw=%.2f deg depth=%.3f m cx=%.3f tgt=%.3f cy=%.3f | err(yaw)=%.3f rad dist=%.3f lat=%.3f | cmd(vx=%.3f vy=%.3f wz=%.3f) servo=%.1f",
+                             (dist_ready && lat_ready) ? "YAW" : "APPROACH",
+                             cube_yaw_deg_, cube_depth_m_, cube_cx_norm_, cx_target, cube_cy_norm_,
+                             yaw_rad, dist_error, lat_error,
+                             vx, vy, wz, servo_camera_angle_);
     }
 
     // アリーナ走行シーケンス
