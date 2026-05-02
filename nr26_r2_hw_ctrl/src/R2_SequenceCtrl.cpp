@@ -15,11 +15,13 @@ L1、R1で回転しようとすると前進、後進してしまう
 */
 
 // 標準
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
 #include <limits>
+#include <string>
 #include <thread>
 
 // ROS　
@@ -1487,6 +1489,11 @@ public:
             rclcpp::QoS(1).reliable().transient_local(),
             std::bind(&HardWareControl::drive_mode_text_callback, this, std::placeholders::_1));
 
+        task_status_text_sub_ = this->create_subscription<std_msgs::msg::String>(
+            "/r2/task_status_text",
+            rclcpp::QoS(1).reliable().transient_local(),
+            std::bind(&HardWareControl::task_status_text_callback, this, std::placeholders::_1));
+
         cube_detect_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
             "/cube_detection/info",
             rclcpp::SensorDataQoS(),
@@ -1522,6 +1529,12 @@ public:
 private:
     static constexpr int32_t DRIVE_MODE_MANUAL = 0;
 
+    enum class PlannerSequenceTrigger {
+        NONE,
+        STEP_UP,
+        STEP_DOWN,
+    };
+
     // 定数・変数
     float duty_max = 100;
     float for_speed = 50;
@@ -1538,6 +1551,8 @@ private:
     // 手動モード: true=手動（足回りはr2_autoのMANUALへ委譲）/ false=状態管理モード
     bool manual_mode_ = true;
     bool last_ps_btn_ = false; // PSボタン前回状態
+    std::string current_task_state_name_;
+    PlannerSequenceTrigger planner_sequence_trigger_ = PlannerSequenceTrigger::NONE;
     std::vector<int32_t> last_state_management_drive_mode_cmd_;
     bool has_state_management_drive_mode_cmd_ = false;
 
@@ -1552,6 +1567,63 @@ private:
     unsigned long long accepted_step_generation_ = 0;
     unsigned long long accepted_turn_generation_ = 0;
 
+    static std::string parse_state_name(const std::string &status_text) {
+        const std::string key = "state=";
+        const auto pos = status_text.find(key);
+        if (pos == std::string::npos) {
+            return "";
+        }
+
+        const auto begin = pos + key.size();
+        const auto color_pos = status_text.find(" color=", begin);
+        if (color_pos != std::string::npos) {
+            return status_text.substr(begin, color_pos - begin);
+        }
+
+        const auto end = status_text.find(' ', begin);
+        if (end == std::string::npos) {
+            return status_text.substr(begin);
+        }
+
+        return status_text.substr(begin, end - begin);
+    }
+
+    static std::string normalize_state_token(const std::string &state_name) {
+        std::string normalized;
+        normalized.reserve(state_name.size());
+
+        bool last_was_separator = false;
+        for (unsigned char ch : state_name) {
+            if (std::isalnum(ch)) {
+                normalized.push_back(static_cast<char>(std::toupper(ch)));
+                last_was_separator = false;
+                continue;
+            }
+
+            if ((ch == ' ' || ch == '-' || ch == '_') && !last_was_separator) {
+                normalized.push_back('_');
+                last_was_separator = true;
+            }
+        }
+
+        while (!normalized.empty() && normalized.back() == '_') {
+            normalized.pop_back();
+        }
+
+        return normalized;
+    }
+
+    static PlannerSequenceTrigger planner_sequence_trigger_from_state_name(const std::string &state_name) {
+        const std::string normalized = normalize_state_token(state_name);
+        if (normalized == "STEP_UP") {
+            return PlannerSequenceTrigger::STEP_UP;
+        }
+        if (normalized == "STEP_DOWN") {
+            return PlannerSequenceTrigger::STEP_DOWN;
+        }
+        return PlannerSequenceTrigger::NONE;
+    }
+
     void clear_pending_commands(const char *reason) {
         const bool had_pending = has_pending_turn_ || (pending_step_cmd_ != 0);
         pending_step_cmd_ = 0;
@@ -1561,6 +1633,42 @@ private:
         accepted_turn_generation_ = 0;
         (void)had_pending;
         (void)reason;
+    }
+
+    void dispatch_pending_sequence_trigger(const char *source) {
+        if (manual_mode_ || planner_sequence_trigger_ == PlannerSequenceTrigger::NONE) {
+            return;
+        }
+
+        if (!seq_->is_mff_mode_enabled()) {
+            RCLCPP_INFO(get_logger(), "[%s] task state %s ignored: MFF mode inactive",
+                        source, current_task_state_name_.c_str());
+            return;
+        }
+
+        if (seq_->is_busy()) {
+            RCLCPP_INFO(get_logger(), "[%s] task state %s ignored: sequence busy",
+                        source, current_task_state_name_.c_str());
+            return;
+        }
+
+        switch (planner_sequence_trigger_) {
+        case PlannerSequenceTrigger::STEP_UP:
+            clear_pending_commands("planner state -> STEP_UP");
+            seq_->start_wall_alignment();
+            RCLCPP_INFO(get_logger(), "[%s] task state STEP_UP -> WALL_ALIGN + STEP_UP", source);
+            break;
+
+        case PlannerSequenceTrigger::STEP_DOWN:
+            clear_pending_commands("planner state -> STEP_DOWN");
+            seq_->start_step_down();
+            RCLCPP_INFO(get_logger(), "[%s] task state STEP_DOWN -> STEP_DOWN", source);
+            break;
+
+        case PlannerSequenceTrigger::NONE:
+        default:
+            break;
+        }
     }
 
     void publish_odom_reset() {
@@ -2039,6 +2147,21 @@ private:
         }
     }
 
+    void task_status_text_callback(const std_msgs::msg::String::SharedPtr msg) {
+        const std::string next_state_name = parse_state_name(msg->data);
+        if (next_state_name.empty() || next_state_name == current_task_state_name_) {
+            return;
+        }
+
+        current_task_state_name_ = next_state_name;
+        planner_sequence_trigger_ = planner_sequence_trigger_from_state_name(current_task_state_name_);
+        if (planner_sequence_trigger_ == PlannerSequenceTrigger::NONE) {
+            return;
+        }
+
+        dispatch_pending_sequence_trigger("task_status_text");
+    }
+
     // /cube_detection/info [flag, cx_norm, cy_norm, w_norm, h_norm, depth_m, score, area, face_yaw_deg]
     void cube_detect_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg) {
         if (msg->data.size() < 9) {
@@ -2118,6 +2241,7 @@ private:
     rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr drive_mode_cmd_pub_;
     rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr control_mode_pub_;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr drive_mode_text_sub_;
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr task_status_text_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr cube_detect_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr cube_align_cmd_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr odom_sub_;
