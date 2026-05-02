@@ -443,7 +443,7 @@ private:
             {
                 data_[9] = MAG_CAT_SERVO_ANGLE[3];
             }
-        }        
+        }
         if (CROSS_PUSH_COUNT == 35)
         {
             data_[9] = MAG2_SERVO_ANGLE[3];
@@ -451,7 +451,7 @@ private:
             {
                 data_[9] = MAG_CAT_SERVO_ANGLE[3];
             }
-        }        
+        }
         if (CROSS_PUSH_COUNT == 36)
         {
             data_[9] = MAG2_SERVO_ANGLE[4];
@@ -475,7 +475,7 @@ private:
             {
                 data_[9] = MAG_CAT_SERVO_ANGLE[4];
             }
-        }        
+        }
         if (CROSS_PUSH_COUNT == 39)
         {
             data_[9] = MAG2_SERVO_ANGLE[4];
@@ -483,7 +483,7 @@ private:
             {
                 data_[9] = MAG_CAT_SERVO_ANGLE[4];
             }
-        }        
+        }
         if (CROSS_PUSH_COUNT == 40)
         {
             data_[9] = MAG2_SERVO_ANGLE[5];
@@ -501,7 +501,7 @@ private:
 
         static int triangle_pre = 0;
         static int triangle_count = 0;
-        static int triangle_max = 4;
+        static int triangle_max = 5;
 
         if (TRIANGLE == 1 && triangle_pre == 0)
         {
@@ -510,17 +510,21 @@ private:
         if (triangle_count == 0)
         {
             data_[10] = 25;
-            data_[11] = 165;
+            data_[11] = 45;
         }
         if (triangle_count == 1)
         {
-            data_[10] = 0;
+            data_[11] = 150;
         }
         if (triangle_count == 2)
         {
-            data_[11] = 45;
+            data_[10] = 0;
         }
         if (triangle_count == 3)
+        {
+            data_[11] = 45;
+        }
+        if (triangle_count == 4)
         {
             data_[10] = 25;
         }

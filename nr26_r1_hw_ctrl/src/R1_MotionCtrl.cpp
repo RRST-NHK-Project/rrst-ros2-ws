@@ -522,7 +522,6 @@ private:
 
         cross_pre = CROSS;
 
-
         // =================================================================
         // 【実験中】CROSSボタン長押しリセット機能
         // CROSSボタンを3秒間押し続けると、マガジン回転を初期状態にリセット
@@ -563,7 +562,7 @@ private:
         static int R1_PUSH_COUNT = 0;
         static int R1_PUSH_MAX = 2;
 
-        static int MOVE_SPEED = 100;
+        static int MOVE_SPEED = 150;
         static int VACUUM_SPEED = 250;
 
         if (CIRCLE == 1 && circle_pre == 0)
