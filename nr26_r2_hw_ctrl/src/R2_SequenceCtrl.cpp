@@ -1533,6 +1533,7 @@ private:
         NONE,
         STEP_UP,
         STEP_DOWN,
+        KFS_ALIGNMENT,
     };
 
     // 定数・変数
@@ -1621,6 +1622,9 @@ private:
         if (normalized == "STEP_DOWN") {
             return PlannerSequenceTrigger::STEP_DOWN;
         }
+        if (normalized == "KFS_ALIGNMENT") {
+            return PlannerSequenceTrigger::KFS_ALIGNMENT;
+        }
         return PlannerSequenceTrigger::NONE;
     }
 
@@ -1663,6 +1667,12 @@ private:
             clear_pending_commands("planner state -> STEP_DOWN");
             seq_->start_step_down();
             RCLCPP_INFO(get_logger(), "[%s] task state STEP_DOWN -> STEP_DOWN", source);
+            break;
+
+        case PlannerSequenceTrigger::KFS_ALIGNMENT:
+            clear_pending_commands("planner state -> KFS_ALIGNMENT");
+            seq_->start_cube_align();
+            RCLCPP_INFO(get_logger(), "[%s] task state KFS_ALIGNMENT -> CUBE_ALIGN", source);
             break;
 
         case PlannerSequenceTrigger::NONE:
