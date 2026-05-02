@@ -767,6 +767,8 @@ private:
             pkt.setMD(MD6, 0);
             pkt.setMD(MD7, 0);
             pkt.setMD(MD8, 0);
+            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
+                                 "WALL_ALIGN: waiting for LiDAR...");
             return;
         }
 
