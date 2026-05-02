@@ -1807,24 +1807,24 @@ private:
 
         float R2 = (-msg->axes[5] + 1) / 2;
 
-        bool UP = msg->axes[7] == 1.0;
-        bool DOWN = msg->axes[7] == -1.0;
+        bool TRIANGLE = msg->buttons[2];
+        bool CROSS    = msg->buttons[0];
 
         bool L1 = msg->buttons[4];
         bool R1 = msg->buttons[5];
 
         bool OPTIONS = (msg->buttons.size() > 9) ? static_cast<bool>(msg->buttons[9]) : false;
 
-        static bool last_up = false;
-        static bool last_down = false;
-        static bool last_options = false;
+        static bool last_triangle = false;
+        static bool last_cross    = false;
+        static bool last_options  = false;
 
-        if (UP && !last_up) {
+        if (TRIANGLE && !last_triangle) {
             seq_->start_wall_alignment();
         }
 
-        if (DOWN && !last_down) {
-            clear_pending_commands("PS4 DOWN -> STEP_DOWN");
+        if (CROSS && !last_cross) {
+            clear_pending_commands("PS4 CROSS -> STEP_DOWN");
             seq_->start_step_down();
         }
 
@@ -1832,9 +1832,9 @@ private:
             seq_->start_arena_walk();
         }
 
-        last_up = UP;
-        last_down = DOWN;
-        last_options = OPTIONS;
+        last_triangle = TRIANGLE;
+        last_cross    = CROSS;
+        last_options  = OPTIONS;
 
         if (fabsf(LS_X) < deadzone)
             LS_X = 0;
