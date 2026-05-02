@@ -326,7 +326,7 @@ private:
         static int BAR_RELE_ANGLE = 245;
         static int cross_pre = 0;
         static int CROSS_PUSH_COUNT = 0;
-        static int CROSS_PUSH_MAX = 42;
+        static int CROSS_PUSH_MAX = 41;
         static int REUSE_ANGLE = 8;
         static int EJECT_ANGLE = 90;
 
@@ -345,176 +345,176 @@ private:
         {
             data_[9] = MAG_SERVO_ANGLE[1];
         }
-        if (CROSS_PUSH_COUNT == 3) // 1本目装填
+        if (CROSS_PUSH_COUNT == 2) // 1本目装填
         {
             data_[9] = MAG_SERVO_ANGLE[3];
             data_[10] = BAR_HOLD_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 4) // 1固定
+        if (CROSS_PUSH_COUNT == 3) // 1固定
         {
             data_[10] = BAR_PUSH_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 5) // 一本目マガジンに戻す
+        if (CROSS_PUSH_COUNT == 4) // 一本目マガジンに戻す
         {
             data_[10] = BAR_RELE_ANGLE;
         }
         // SHOOTに2を合わせる
-        if (CROSS_PUSH_COUNT == 6) // 2準備
+        if (CROSS_PUSH_COUNT == 5) // 2準備
         {
             data_[9] = MAG_SERVO_ANGLE[4];
         }
-        if (CROSS_PUSH_COUNT == 7) // 2入る
+        if (CROSS_PUSH_COUNT == 6) // 2入る
         {
             data_[10] = BAR_HOLD_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 8) // 2固定
+        if (CROSS_PUSH_COUNT == 7) // 2固定
         {
             data_[10] = BAR_PUSH_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 9) // 2戻す
+        if (CROSS_PUSH_COUNT == 8) // 2戻す
         {
             data_[10] = BAR_RELE_ANGLE;
         }
         // SETに3を合わせる
-        if (CROSS_PUSH_COUNT == 10) // 3本目格納
+        if (CROSS_PUSH_COUNT == 9) // 3本目格納
         {
             data_[9] = MAG_SERVO_ANGLE[2];
         }
         // SETに4を合わせる＆SHOOTに1を合わせる
-        if (CROSS_PUSH_COUNT == 11) // 4本目格納,一本目移動
+        if (CROSS_PUSH_COUNT == 10) // 4本目格納,一本目移動
         {
             data_[9] = MAG_SERVO_ANGLE[3];
             data_[10] = BAR_HOLD_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 12) // 1固定
+        if (CROSS_PUSH_COUNT == 11) // 1固定
         {
             data_[10] = BAR_PUSH_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 13) // 一本目マガジンに戻す
+        if (CROSS_PUSH_COUNT == 12) // 一本目マガジンに戻す
         {
             data_[10] = BAR_RELE_ANGLE;
         }
         // SHOOTに2を合わせる
-        if (CROSS_PUSH_COUNT == 14) // 2準備
+        if (CROSS_PUSH_COUNT == 13) // 2準備
         {
             data_[9] = MAG_SERVO_ANGLE[4];
         }
-        if (CROSS_PUSH_COUNT == 15) // 2入る
+        if (CROSS_PUSH_COUNT == 14) // 2入る
         {
             data_[10] = BAR_HOLD_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 16) // 2固定
+        if (CROSS_PUSH_COUNT == 15) // 2固定
         {
             data_[10] = BAR_PUSH_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 17) // 2戻す
+        if (CROSS_PUSH_COUNT == 16) // 2戻す
         {
             data_[10] = BAR_RELE_ANGLE;
         }
         // SHOOTに4を合わせる
-        if (CROSS_PUSH_COUNT == 18) // 4準備
+        if (CROSS_PUSH_COUNT == 17) // 4準備
         {
             data_[9] = MAG_SERVO_ANGLE[6];
         }
-        if (CROSS_PUSH_COUNT == 19) // 4入る
+        if (CROSS_PUSH_COUNT == 18) // 4入る
         {
             data_[10] = BAR_HOLD_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 20) // 4固定
+        if (CROSS_PUSH_COUNT == 19) // 4固定
         {
             data_[10] = BAR_PUSH_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 21) // 4戻す
+        if (CROSS_PUSH_COUNT == 20) // 4戻す
         {
             data_[10] = BAR_RELE_ANGLE;
         }
         // SHOOTに3を合わせる
-        if (CROSS_PUSH_COUNT == 22) // 3準備
+        if (CROSS_PUSH_COUNT == 21) // 3準備
         {
             data_[9] = MAG_SERVO_ANGLE[5];
         }
-        if (CROSS_PUSH_COUNT == 23) // 3入る
+        if (CROSS_PUSH_COUNT == 22) // 3入る
         {
             data_[10] = BAR_HOLD_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 24) // 3固定
+        if (CROSS_PUSH_COUNT == 23) // 3固定
         {
             data_[10] = BAR_PUSH_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 25) // 3戻す
+        if (CROSS_PUSH_COUNT == 24) // 3戻す
         {
             data_[10] = BAR_RELE_ANGLE;
         }
         // SHOOTに4を合わせる＆RELEASEに3を合わせる
-        if (CROSS_PUSH_COUNT == 26) // 4入れる
+        if (CROSS_PUSH_COUNT == 25) // 4入れる
         {
             data_[9] = MAG_SERVO_ANGLE[6];
             data_[10] = BAR_HOLD_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 27) // 3落とす
+        if (CROSS_PUSH_COUNT == 26) // 3落とす
         {
             data_[12] = EJECT_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 28) // 4固定
+        if (CROSS_PUSH_COUNT == 27) // 4固定
         {
             data_[10] = BAR_PUSH_ANGLE;
             data_[12] = REUSE_ANGLE;
         }
         // SHOOTに3を合わせる
-        if (CROSS_PUSH_COUNT == 29) // 空いた3準備
+        if (CROSS_PUSH_COUNT == 28) // 空いた3準備
         {
             data_[9] = MAG_SERVO_ANGLE[5];
         }
-        if (CROSS_PUSH_COUNT == 30) // 3に入れる
+        if (CROSS_PUSH_COUNT == 29) // 3に入れる
         {
             data_[10] = BAR_RELE_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 31) // 4本目開放
+        if (CROSS_PUSH_COUNT == 30) // 4本目開放
         {
             data_[9] = MAG_SERVO_ANGLE[6];
         }
-        if (CROSS_PUSH_COUNT == 32) // 4固定
+        if (CROSS_PUSH_COUNT == 31) // 4固定
         {
             data_[12] = EJECT_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 33) // 開放閉じる
+        if (CROSS_PUSH_COUNT == 32) // 開放閉じる
         {
             data_[12] = REUSE_ANGLE;
         }
         // SHOOTに1を合わせる
-        if (CROSS_PUSH_COUNT == 34) //
+        if (CROSS_PUSH_COUNT == 33) //
         {
             data_[9] = MAG_SERVO_ANGLE[3];
             data_[10] = BAR_HOLD_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 35)
+        if (CROSS_PUSH_COUNT == 34)
         {
             data_[10] = BAR_PUSH_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 36) // 固定
+        if (CROSS_PUSH_COUNT == 35) // 固定
         {
             data_[10] = BAR_RELE_ANGLE;
         }
         // RELEASEに1を合わせる＆SHOOTに2を合わせる
-        if (CROSS_PUSH_COUNT == 37) // 1開放
+        if (CROSS_PUSH_COUNT == 36) // 1開放
         {
             data_[9] = MAG_SERVO_ANGLE[4];
         }
-        if (CROSS_PUSH_COUNT == 38) // 1入れる
+        if (CROSS_PUSH_COUNT == 37) // 1入れる
         {
             data_[12] = EJECT_ANGLE;
             data_[10] = BAR_HOLD_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 39) // 固定
+        if (CROSS_PUSH_COUNT == 38) // 固定
         {
             data_[10] = BAR_PUSH_ANGLE;
         }
-        if (CROSS_PUSH_COUNT == 40) // 2に戻す
+        if (CROSS_PUSH_COUNT == 39) // 2に戻す
         {
             data_[10] = BAR_RELE_ANGLE;
         }
         // RELEASEに2を合わせる
-        if (CROSS_PUSH_COUNT == 41) // 2開放
+        if (CROSS_PUSH_COUNT == 40) // 2開放
         {
             data_[9] = MAG_SERVO_ANGLE[5];
             data_[12] = EJECT_ANGLE;
