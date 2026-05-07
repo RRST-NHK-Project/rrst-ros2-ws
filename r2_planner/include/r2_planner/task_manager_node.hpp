@@ -82,7 +82,6 @@ namespace r2_planner {
         rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_text_pub_;
         rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr auto_drive_target_pub_;
         rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr drive_mode_cmd_pub_;
-        rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr arena_walk_cmd_pub_;
         rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr mff_turn_cmd_pub_;
         rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr mff_step_cmd_pub_;
         rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr mff_status_pub_;
@@ -105,7 +104,7 @@ namespace r2_planner {
         size_t mff_path_index_{0};
         int32_t mff_heading_deg_{0};
         bool auto_send_enabled_{true};
-        int32_t fallback_drive_mode_on_unset_{0};
+        int32_t fallback_drive_mode_on_unset_{3};
         int32_t current_drive_mode_{0};
         int32_t auto_transition_default_wait_ms_{3000};
         std::chrono::steady_clock::time_point state_entered_at_{std::chrono::steady_clock::now()};

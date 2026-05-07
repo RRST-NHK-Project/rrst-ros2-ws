@@ -39,10 +39,10 @@ int wheelspeed = 150; // 64;
 int yawspeed = 32;    // 32;
 
 // サーボの組み付け時のズレを補正（度数法）
-int SERVO1_CAL = 4;
-int SERVO2_CAL = 7;
-int SERVO3_CAL = 2;
-int SERVO4_CAL = -5;
+int SERVO1_CAL = 6;
+int SERVO2_CAL = 5;
+int SERVO3_CAL = 3;
+int SERVO4_CAL = -3;
 
 class HardWareControl : public rclcpp::Node
 {
@@ -204,6 +204,8 @@ private:
 
         // XY座標での正しい角度truedeg
 
+        // 1が３に２が４に３が２に４が１に移行してます
+        // YAWのみdata9-12までが変わってます
         truedeg = deg;
         if ((0 <= truedeg) && (truedeg <= 180))
         {
@@ -313,26 +315,26 @@ private:
         // 時計回りYAW回転
         if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R)
         {
-            data_[9] = 180 + SERVO1_CAL;
-            data_[10] = 90 + SERVO2_CAL;
+            data_[9] = 90 + SERVO1_CAL;
+            data_[10] = 180 + SERVO2_CAL;
             data_[11] = 90 + SERVO3_CAL;
             data_[12] = 180 + SERVO4_CAL;
             data_[1] = yawspeed;
             data_[2] = -yawspeed;
-            data_[3] = -yawspeed;
-            data_[4] = yawspeed;
+            data_[3] = yawspeed;
+            data_[4] = -yawspeed;
         }
         // 半時計回りYAW回転
         if (0 < RS_X && fabs(RS_X) >= DEADZONE_R)
         {
-            data_[9] = 180 + SERVO1_CAL;
-            data_[10] = 90 + SERVO2_CAL;
+            data_[9] = 90 + SERVO1_CAL;
+            data_[10] = 180 + SERVO2_CAL;
             data_[11] = 90 + SERVO3_CAL;
             data_[12] = 180 + SERVO4_CAL;
             data_[1] = -yawspeed;
             data_[2] = yawspeed;
-            data_[3] = yawspeed;
-            data_[4] = -yawspeed;
+            data_[3] = -yawspeed;
+            data_[4] = yawspeed;
         }
 
         // 反転モード

@@ -155,10 +155,10 @@ private:
         // =================================================================
 
         static int MAG2_SERVO_ANGLE[] = {270, 226, 182, 136, 88, 42, 5};
-        static int MAG_CAT_SERVO_ANGLE[] = {260, 216, 172, 128, 78, 32, 0};
+        static int MAG_CAT_SERVO_ANGLE[] = {265, 221, 177, 131, 83, 37, 0}; // 260, 216, 172, 128, 78, 32, 0
         static int cross_pre = 0;
         static int CROSS_PUSH_COUNT = 0;
-        static int CROSS_PUSH_MAX = 31;
+        static int CROSS_PUSH_MAX = 41;
 
         if (CROSS == 1 && cross_pre == 0)
         {
@@ -182,10 +182,10 @@ private:
         }
         if (CROSS_PUSH_COUNT == 2)
         {
-            data_[9] = MAG2_SERVO_ANGLE[2];
+            data_[9] = MAG2_SERVO_ANGLE[3];
             if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
             {
-                data_[9] = MAG_CAT_SERVO_ANGLE[2];
+                data_[9] = MAG_CAT_SERVO_ANGLE[3];
             }
         }
         if (CROSS_PUSH_COUNT == 3)
@@ -206,10 +206,10 @@ private:
         }
         if (CROSS_PUSH_COUNT == 5)
         {
-            data_[9] = MAG2_SERVO_ANGLE[3];
+            data_[9] = MAG2_SERVO_ANGLE[4];
             if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
             {
-                data_[9] = MAG_CAT_SERVO_ANGLE[3];
+                data_[9] = MAG_CAT_SERVO_ANGLE[4];
             }
         }
         if (CROSS_PUSH_COUNT == 6)
@@ -233,79 +233,79 @@ private:
             data_[9] = MAG2_SERVO_ANGLE[4];
             if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
             {
-                data_[16] = MAG_CAT_SERVO_ANGLE[4];
+                data_[9] = MAG_CAT_SERVO_ANGLE[4];
             }
         }
         if (CROSS_PUSH_COUNT == 9)
         {
-            data_[16] = MAG2_SERVO_ANGLE[4];
+            data_[9] = MAG2_SERVO_ANGLE[2];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
+            {
+                data_[9] = MAG_CAT_SERVO_ANGLE[2];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 10)
+        {
+            data_[9] = MAG2_SERVO_ANGLE[3];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
+            {
+                data_[9] = MAG_CAT_SERVO_ANGLE[3];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 11)
+        {
+            data_[9] = MAG2_SERVO_ANGLE[3];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
+            {
+                data_[9] = MAG_CAT_SERVO_ANGLE[3];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 12)
+        {
+            data_[9] = MAG2_SERVO_ANGLE[3];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
+            {
+                data_[9] = MAG_CAT_SERVO_ANGLE[3];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 13)
+        {
+            data_[9] = MAG2_SERVO_ANGLE[4];
             if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
             {
                 data_[9] = MAG_CAT_SERVO_ANGLE[4];
             }
         }
-        if (CROSS_PUSH_COUNT == 10)
-        {
-            data_[9] = MAG2_SERVO_ANGLE[6];
-            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
-            {
-                data_[9] = MAG_CAT_SERVO_ANGLE[6];
-            }
-        }
-        if (CROSS_PUSH_COUNT == 11)
-        {
-            data_[9] = MAG2_SERVO_ANGLE[6];
-            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
-            {
-                data_[9] = MAG_CAT_SERVO_ANGLE[6];
-            }
-        }
-        if (CROSS_PUSH_COUNT == 12)
-        {
-            data_[9] = MAG2_SERVO_ANGLE[6];
-            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
-            {
-                data_[9] = MAG_CAT_SERVO_ANGLE[6];
-            }
-        }
-        if (CROSS_PUSH_COUNT == 13)
-        {
-            data_[9] = MAG2_SERVO_ANGLE[6];
-            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
-            {
-                data_[9] = MAG_CAT_SERVO_ANGLE[6];
-            }
-        }
         if (CROSS_PUSH_COUNT == 14)
         {
-            data_[9] = MAG2_SERVO_ANGLE[5];
+            data_[9] = MAG2_SERVO_ANGLE[4];
             if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
             {
-                data_[9] = MAG_CAT_SERVO_ANGLE[5];
+                data_[9] = MAG_CAT_SERVO_ANGLE[4];
             }
         }
         if (CROSS_PUSH_COUNT == 15)
         {
-            data_[16] = MAG2_SERVO_ANGLE[5];
+            data_[9] = MAG2_SERVO_ANGLE[4];
             if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
             {
-                data_[16] = MAG_CAT_SERVO_ANGLE[5];
+                data_[9] = MAG_CAT_SERVO_ANGLE[4];
             }
         }
         if (CROSS_PUSH_COUNT == 16)
         {
-            data_[9] = MAG2_SERVO_ANGLE[5];
+            data_[9] = MAG2_SERVO_ANGLE[4];
             if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
             {
-                data_[9] = MAG_CAT_SERVO_ANGLE[5];
+                data_[9] = MAG_CAT_SERVO_ANGLE[4];
             }
         }
         if (CROSS_PUSH_COUNT == 17)
         {
-            data_[9] = MAG2_SERVO_ANGLE[5];
+            data_[9] = MAG2_SERVO_ANGLE[6];
             if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
             {
-                data_[9] = MAG_CAT_SERVO_ANGLE[5];
+                data_[9] = MAG_CAT_SERVO_ANGLE[6];
             }
         }
         if (CROSS_PUSH_COUNT == 18)
@@ -326,10 +326,10 @@ private:
         }
         if (CROSS_PUSH_COUNT == 20)
         {
-            data_[9] = MAG2_SERVO_ANGLE[5];
+            data_[9] = MAG2_SERVO_ANGLE[6];
             if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
             {
-                data_[9] = MAG_CAT_SERVO_ANGLE[5];
+                data_[9] = MAG_CAT_SERVO_ANGLE[6];
             }
         }
         if (CROSS_PUSH_COUNT == 21)
@@ -342,69 +342,13 @@ private:
         }
         if (CROSS_PUSH_COUNT == 22)
         {
-            data_[9] = MAG2_SERVO_ANGLE[6];
+            data_[9] = MAG2_SERVO_ANGLE[5];
             if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
             {
-                data_[9] = MAG_CAT_SERVO_ANGLE[6];
+                data_[9] = MAG_CAT_SERVO_ANGLE[5];
             }
         }
         if (CROSS_PUSH_COUNT == 23)
-        {
-            data_[9] = MAG2_SERVO_ANGLE[6];
-            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
-            {
-                data_[9] = MAG_CAT_SERVO_ANGLE[6];
-            }
-        }
-        if (CROSS_PUSH_COUNT == 24)
-        {
-            data_[9] = MAG2_SERVO_ANGLE[3];
-            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
-            {
-                data_[9] = MAG_CAT_SERVO_ANGLE[3];
-            }
-        }
-        if (CROSS_PUSH_COUNT == 25)
-        {
-            data_[9] = MAG2_SERVO_ANGLE[3];
-            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
-            {
-                data_[9] = MAG_CAT_SERVO_ANGLE[3];
-            }
-        }
-        if (CROSS_PUSH_COUNT == 26)
-        {
-            data_[9] = MAG2_SERVO_ANGLE[3];
-            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
-            {
-                data_[9] = MAG_CAT_SERVO_ANGLE[3];
-            }
-        }
-        if (CROSS_PUSH_COUNT == 27)
-        {
-            data_[9] = MAG2_SERVO_ANGLE[4];
-            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
-            {
-                data_[9] = MAG_CAT_SERVO_ANGLE[4];
-            }
-        }
-        if (CROSS_PUSH_COUNT == 28)
-        {
-            data_[9] = MAG2_SERVO_ANGLE[4];
-            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
-            {
-                data_[9] = MAG_CAT_SERVO_ANGLE[4];
-            }
-        }
-        if (CROSS_PUSH_COUNT == 29)
-        {
-            data_[9] = MAG2_SERVO_ANGLE[4];
-            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
-            {
-                data_[9] = MAG_CAT_SERVO_ANGLE[4];
-            }
-        }
-        if (CROSS_PUSH_COUNT == 30)
         {
             data_[9] = MAG2_SERVO_ANGLE[5];
             if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
@@ -412,6 +356,143 @@ private:
                 data_[9] = MAG_CAT_SERVO_ANGLE[5];
             }
         }
+        if (CROSS_PUSH_COUNT == 24)
+        {
+            data_[9] = MAG2_SERVO_ANGLE[5];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
+            {
+                data_[9] = MAG_CAT_SERVO_ANGLE[5];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 25)
+        {
+            data_[9] = MAG2_SERVO_ANGLE[6];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
+            {
+                data_[9] = MAG_CAT_SERVO_ANGLE[6];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 26)
+        {
+            data_[9] = MAG2_SERVO_ANGLE[6];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
+            {
+                data_[9] = MAG_CAT_SERVO_ANGLE[6];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 27)
+        {
+            data_[9] = MAG2_SERVO_ANGLE[6];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
+            {
+                data_[9] = MAG_CAT_SERVO_ANGLE[6];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 28)
+        {
+            data_[9] = MAG2_SERVO_ANGLE[5];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
+            {
+                data_[9] = MAG_CAT_SERVO_ANGLE[5];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 29)
+        {
+            data_[9] = MAG2_SERVO_ANGLE[5];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
+            {
+                data_[9] = MAG_CAT_SERVO_ANGLE[5];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 30)
+        {
+            data_[9] = MAG2_SERVO_ANGLE[6];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
+            {
+                data_[9] = MAG_CAT_SERVO_ANGLE[6];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 31)
+        {
+            data_[9] = MAG2_SERVO_ANGLE[6];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
+            {
+                data_[9] = MAG_CAT_SERVO_ANGLE[6];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 32)
+        {
+            data_[9] = MAG2_SERVO_ANGLE[6];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
+            {
+                data_[9] = MAG_CAT_SERVO_ANGLE[6];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 33)
+        {
+            data_[9] = MAG2_SERVO_ANGLE[3];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
+            {
+                data_[9] = MAG_CAT_SERVO_ANGLE[3];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 34)
+        {
+            data_[9] = MAG2_SERVO_ANGLE[3];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
+            {
+                data_[9] = MAG_CAT_SERVO_ANGLE[3];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 35)
+        {
+            data_[9] = MAG2_SERVO_ANGLE[3];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
+            {
+                data_[9] = MAG_CAT_SERVO_ANGLE[3];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 36)
+        {
+            data_[9] = MAG2_SERVO_ANGLE[4];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
+            {
+                data_[9] = MAG_CAT_SERVO_ANGLE[4];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 37)
+        {
+            data_[9] = MAG2_SERVO_ANGLE[4];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
+            {
+                data_[9] = MAG_CAT_SERVO_ANGLE[4];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 38)
+        {
+            data_[9] = MAG2_SERVO_ANGLE[4];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
+            {
+                data_[9] = MAG_CAT_SERVO_ANGLE[4];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 39)
+        {
+            data_[9] = MAG2_SERVO_ANGLE[4];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
+            {
+                data_[9] = MAG_CAT_SERVO_ANGLE[4];
+            }
+        }
+        if (CROSS_PUSH_COUNT == 40)
+        {
+            data_[9] = MAG2_SERVO_ANGLE[5];
+            if (RS_X < 0 && fabs(RS_X) >= DEADZONE_R || R2 == 1)
+            {
+                data_[9] = MAG_CAT_SERVO_ANGLE[5];
+            }
+        }
+        cross_pre = CROSS;
 
         // =================================================================
         // TRIANGLE:「スタッフ回収機構」
@@ -420,7 +501,7 @@ private:
 
         static int triangle_pre = 0;
         static int triangle_count = 0;
-        static int triangle_max = 4;
+        static int triangle_max = 5;
 
         if (TRIANGLE == 1 && triangle_pre == 0)
         {
@@ -429,22 +510,25 @@ private:
         if (triangle_count == 0)
         {
             data_[10] = 25;
-            data_[11] = 165;
+            data_[11] = 45;
         }
         if (triangle_count == 1)
         {
-            data_[10] = 0;
+            data_[11] = 150;
         }
         if (triangle_count == 2)
         {
-            data_[11] = 45;
+            data_[10] = 0;
         }
         if (triangle_count == 3)
+        {
+            data_[11] = 45;
+        }
+        if (triangle_count == 4)
         {
             data_[10] = 25;
         }
 
-        cross_pre = CROSS;
         triangle_pre = TRIANGLE;
     }
 

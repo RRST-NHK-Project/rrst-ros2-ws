@@ -15,11 +15,13 @@ L1、R1で回転しようとすると前進、後進してしまう
 */
 
 // 標準
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
 #include <limits>
+#include <string>
 #include <thread>
 
 // ROS　
@@ -251,8 +253,6 @@ public:
         } else {
             // アリーナモード有効時はMFFモードを無効化
             mff_mode_enabled_ = false;
-            // モード切替直後にARENAシーケンスを自動開始
-            start_arena_walk();
         }
 
         RCLCPP_INFO(get_logger(), "Sequence mode: %s", arena_mode_enabled_ ? "ARENA ENABLED" : "ARENA DISABLED");
@@ -695,18 +695,15 @@ private:
 
     // 機構関数
     void all_up() {
-        RCLCPP_INFO(get_logger(), "ALL UP");
         pkt.setTR(TR1, 1);
         pkt.setTR(TR2, 1);
     }
 
     void front_down() {
-        RCLCPP_INFO(get_logger(), "FRONT DOWN");
         pkt.setTR(TR2, 0);
     }
 
     void rear_down() {
-        RCLCPP_INFO(get_logger(), "REAR DOWN");
         pkt.setTR(TR1, 0);
         pkt.setMD(MD5, -forward_speed);
         pkt.setMD(MD6, forward_speed);
@@ -715,7 +712,6 @@ private:
     }
 
     void stop_motion() {
-        RCLCPP_INFO(get_logger(), "STOP");
         pkt.setTR(TR1, 0);
         pkt.setTR(TR2, 0);
         pkt.setMD(MD5, 0);
@@ -725,7 +721,6 @@ private:
     }
 
     void front_up() {
-        RCLCPP_INFO(get_logger(), "FRONT UP");
         pkt.setTR(TR2, 1);
         pkt.setMD(MD5, 0);
         pkt.setMD(MD6, 0);
@@ -734,18 +729,15 @@ private:
     }
 
     void rear_up() {
-        RCLCPP_INFO(get_logger(), "REAR UP");
         pkt.setTR(TR1, 1);
     }
 
     void all_down() {
-        RCLCPP_INFO(get_logger(), "ALL DOWN");
         pkt.setTR(TR1, 0);
         pkt.setTR(TR2, 0);
     }
 
     void move_forward() {
-        RCLCPP_INFO(get_logger(), "MOVE FORWARD");
         pkt.setMD(MD5, -forward_speed);
         pkt.setMD(MD6, forward_speed);
         pkt.setMD(MD7, forward_speed);
@@ -753,7 +745,6 @@ private:
     }
 
     void move_stop() {
-        RCLCPP_INFO(get_logger(), "MOVE STOP");
         pkt.setMD(MD5, 0);
         pkt.setMD(MD6, 0);
         pkt.setMD(MD7, 0);
@@ -776,7 +767,8 @@ private:
             pkt.setMD(MD6, 0);
             pkt.setMD(MD7, 0);
             pkt.setMD(MD8, 0);
-            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500, "WALL_ALIGN: Waiting for LiDAR...");
+            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
+                                 "WALL_ALIGN: waiting for LiDAR...");
             return;
         }
 
@@ -1065,10 +1057,6 @@ private:
         pkt.setMD(MD6, duty);
         pkt.setMD(MD7, duty);
         pkt.setMD(MD8, duty);
-
-        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
-                             "MFF turn: yaw=%.3f target=%.3f error=%.3f wz=%.3f duty=%d",
-                             odom_yaw_, turn_target_yaw_, yaw_error, wz, duty);
     }
 
     // キューブ探索シーケンス: サーボを往復スキャンしてキューブを探す
@@ -1099,9 +1087,6 @@ private:
         pkt.setMD(MD6, 0);
         pkt.setMD(MD7, 0);
         pkt.setMD(MD8, 0);
-
-        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-                             "CUBE_SCAN: angle=%.1f deg", servo_camera_angle_);
     }
 
     // cube_detectionを使ったキューブへの平行接近シーケンス（PID制御）
@@ -1136,7 +1121,8 @@ private:
             pkt.setMD(MD7, 0);
             pkt.setMD(MD8, 0);
             RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-                                 "CUBE_ALIGN: cube lost, stopped. (%.1f s)", age_sec);
+                                 "CUBE_ALIGN: cube lost temporarily (age=%.2f s)",
+                                 age_sec);
             return;
         }
 
@@ -1231,8 +1217,11 @@ private:
         pkt.setMD(MD8, static_cast<int16_t>(v4 * align_duty_max));
 
         RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 200,
-                             "CUBE_ALIGN: yaw=%.2f deg, depth=%.3f m, cx=%.3f(tgt=%.2f) cy=%.3f servo=%.1f | vx=%.3f vy=%.3f wz=%.3f",
-                             cube_yaw_deg_, cube_depth_m_, cube_cx_norm_, cx_target, cube_cy_norm_, servo_camera_angle_, vx, vy, wz);
+                             "CUBE_ALIGN[%s]: yaw=%.2f deg depth=%.3f m cx=%.3f tgt=%.3f cy=%.3f | err(yaw)=%.3f rad dist=%.3f lat=%.3f | cmd(vx=%.3f vy=%.3f wz=%.3f) servo=%.1f",
+                             (dist_ready && lat_ready) ? "YAW" : "APPROACH",
+                             cube_yaw_deg_, cube_depth_m_, cube_cx_norm_, cx_target, cube_cy_norm_,
+                             yaw_rad, dist_error, lat_error,
+                             vx, vy, wz, servo_camera_angle_);
     }
 
     // アリーナ走行シーケンス
@@ -1291,9 +1280,6 @@ private:
                             "ARENA Step2: wall edge detected (lidar=%d mm, ref=%d mm) -> left approach.",
                             lidar_value, static_cast<int>(arena_wall_edge_ref_mm_));
             }
-            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-                                 "ARENA Step2: moving left, lidar=%d mm (ref=%d mm)",
-                                 lidar_value, static_cast<int>(arena_wall_edge_ref_mm_));
             break;
 
         case ArenaWalkState::AW2_LEFT_APPROACH:
@@ -1313,10 +1299,6 @@ private:
                             "ARENA Step2: left approach done (left=%d mm) -> front approach.",
                             static_cast<int>(arena_left_mm_));
             }
-            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-                                 "ARENA Step2: left approach, left=%s %d mm (target<=%d mm)",
-                                 arena_left_valid_ ? "valid" : "invalid",
-                                 static_cast<int>(arena_left_mm_), arena_left_approach_mm);
             break;
 
         case ArenaWalkState::AW2_FRONT_APPROACH:
@@ -1350,10 +1332,6 @@ private:
                             "ARENA Step2: front approach done (front=%d mm) -> odom reset, target(0,0,0), arena_walk_complete.",
                             static_cast<int>(arena_front_mm_));
             }
-            RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-                                 "ARENA Step2: front approach, front=%s %d mm (target<=%d mm)",
-                                 arena_front_valid_ ? "valid" : "invalid",
-                                 static_cast<int>(arena_front_mm_), arena_front_approach_mm);
             break;
 
         case ArenaWalkState::DONE:
@@ -1505,11 +1483,20 @@ public:
             10,
             std::bind(&HardWareControl::mode_cmd_callback, this, std::placeholders::_1));
 
-        // r2_plannerの遷移モード（手動/自動）を指示通知で受信
-        transition_mode_sub_ = this->create_subscription<std_msgs::msg::Int32>(
-            "r2/task_transition_mode",
-            rclcpp::QoS(10).best_effort(),
-            std::bind(&HardWareControl::transition_mode_callback, this, std::placeholders::_1));
+        drive_mode_cmd_pub_ = this->create_publisher<std_msgs::msg::Int32MultiArray>(
+            "r2_drive_mode_cmd",
+            rclcpp::QoS(1).reliable().transient_local());
+
+        // PS/GUIの操作モード（手動操作/状態管理）を共有する専用トピック
+        const auto control_mode_qos = rclcpp::QoS(rclcpp::KeepLast(1)).best_effort().transient_local();
+        control_mode_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+            "r2/control_operation_mode",
+            control_mode_qos,
+            std::bind(&HardWareControl::control_mode_callback, this, std::placeholders::_1));
+
+        control_mode_pub_ = this->create_publisher<std_msgs::msg::Int32>(
+            "r2/control_operation_mode",
+            control_mode_qos);
 
         // r2_autodrive から公開される現在モード文字列（MFF/ARENA）でも
         // SequenceCtrl の有効/無効を切り替えられる受信口を追加
@@ -1517,6 +1504,11 @@ public:
             "r2_drive_mode",
             rclcpp::QoS(1).reliable().transient_local(),
             std::bind(&HardWareControl::drive_mode_text_callback, this, std::placeholders::_1));
+
+        task_status_text_sub_ = this->create_subscription<std_msgs::msg::String>(
+            "/r2/task_status_text",
+            rclcpp::QoS(1).reliable().transient_local(),
+            std::bind(&HardWareControl::task_status_text_callback, this, std::placeholders::_1));
 
         cube_detect_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
             "/cube_detection/info",
@@ -1527,11 +1519,6 @@ public:
             "/r2_cube_align_cmd",
             10,
             std::bind(&HardWareControl::cube_align_cmd_callback, this, std::placeholders::_1));
-
-        arena_walk_cmd_sub_ = this->create_subscription<std_msgs::msg::Int32>(
-            "/r2_arena_walk_cmd",
-            10,
-            std::bind(&HardWareControl::arena_walk_cmd_callback, this, std::placeholders::_1));
 
         odom_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
             "odom_xy_yaw",
@@ -1549,11 +1536,22 @@ public:
         camera_servo_pub_ = this->create_publisher<std_msgs::msg::Int32>(
             "/r2/camera_servo_angle", 10);
 
+        publish_control_mode_command(manual_mode_);
+
         RCLCPP_INFO(get_logger(),
                     "serial_tx_%d started.", device_id_);
     }
 
 private:
+    static constexpr int32_t DRIVE_MODE_MANUAL = 0;
+
+    enum class PlannerSequenceTrigger {
+        NONE,
+        STEP_UP,
+        STEP_DOWN,
+        KFS_ALIGNMENT,
+    };
+
     // 定数・変数
     float duty_max = 100;
     float for_speed = 50;
@@ -1567,9 +1565,13 @@ private:
     int32_t sdm15_value[4] = {0, 0, 0, 0}; // sdm15の値を保存する配列
     int16_t lidar_x_value = 0;
     int16_t lidar_y_value = 0;
-    // 手動モード: true=手動（コントローラー操作有効）/ false=自動（シーケンス制御）
+    // 手動モード: true=手動（足回りはr2_autoのMANUALへ委譲）/ false=状態管理モード
     bool manual_mode_ = true;
     bool last_ps_btn_ = false; // PSボタン前回状態
+    std::string current_task_state_name_;
+    PlannerSequenceTrigger planner_sequence_trigger_ = PlannerSequenceTrigger::NONE;
+    std::vector<int32_t> last_state_management_drive_mode_cmd_;
+    bool has_state_management_drive_mode_cmd_ = false;
 
     int32_t pending_step_cmd_ = 0;
     int32_t pending_turn_deg_ = 0;
@@ -1582,6 +1584,66 @@ private:
     unsigned long long accepted_step_generation_ = 0;
     unsigned long long accepted_turn_generation_ = 0;
 
+    static std::string parse_state_name(const std::string &status_text) {
+        const std::string key = "state=";
+        const auto pos = status_text.find(key);
+        if (pos == std::string::npos) {
+            return "";
+        }
+
+        const auto begin = pos + key.size();
+        const auto color_pos = status_text.find(" color=", begin);
+        if (color_pos != std::string::npos) {
+            return status_text.substr(begin, color_pos - begin);
+        }
+
+        const auto end = status_text.find(' ', begin);
+        if (end == std::string::npos) {
+            return status_text.substr(begin);
+        }
+
+        return status_text.substr(begin, end - begin);
+    }
+
+    static std::string normalize_state_token(const std::string &state_name) {
+        std::string normalized;
+        normalized.reserve(state_name.size());
+
+        bool last_was_separator = false;
+        for (unsigned char ch : state_name) {
+            if (std::isalnum(ch)) {
+                normalized.push_back(static_cast<char>(std::toupper(ch)));
+                last_was_separator = false;
+                continue;
+            }
+
+            if ((ch == ' ' || ch == '-' || ch == '_') && !last_was_separator) {
+                normalized.push_back('_');
+                last_was_separator = true;
+            }
+        }
+
+        while (!normalized.empty() && normalized.back() == '_') {
+            normalized.pop_back();
+        }
+
+        return normalized;
+    }
+
+    static PlannerSequenceTrigger planner_sequence_trigger_from_state_name(const std::string &state_name) {
+        const std::string normalized = normalize_state_token(state_name);
+        if (normalized == "STEP_UP") {
+            return PlannerSequenceTrigger::STEP_UP;
+        }
+        if (normalized == "STEP_DOWN") {
+            return PlannerSequenceTrigger::STEP_DOWN;
+        }
+        if (normalized == "KFS_ALIGNMENT") {
+            return PlannerSequenceTrigger::KFS_ALIGNMENT;
+        }
+        return PlannerSequenceTrigger::NONE;
+    }
+
     void clear_pending_commands(const char *reason) {
         const bool had_pending = has_pending_turn_ || (pending_step_cmd_ != 0);
         pending_step_cmd_ = 0;
@@ -1589,8 +1651,49 @@ private:
         has_pending_turn_ = false;
         accepted_step_generation_ = 0;
         accepted_turn_generation_ = 0;
-        if (had_pending) {
-            RCLCPP_INFO(get_logger(), "Cleared pending MFF commands (%s).", reason);
+        (void)had_pending;
+        (void)reason;
+    }
+
+    void dispatch_pending_sequence_trigger(const char *source) {
+        if (manual_mode_ || planner_sequence_trigger_ == PlannerSequenceTrigger::NONE) {
+            return;
+        }
+
+        if (!seq_->is_mff_mode_enabled()) {
+            RCLCPP_INFO(get_logger(), "[%s] task state %s ignored: MFF mode inactive",
+                        source, current_task_state_name_.c_str());
+            return;
+        }
+
+        if (seq_->is_busy()) {
+            RCLCPP_INFO(get_logger(), "[%s] task state %s ignored: sequence busy",
+                        source, current_task_state_name_.c_str());
+            return;
+        }
+
+        switch (planner_sequence_trigger_) {
+        case PlannerSequenceTrigger::STEP_UP:
+            clear_pending_commands("planner state -> STEP_UP");
+            seq_->start_wall_alignment();
+            RCLCPP_INFO(get_logger(), "[%s] task state STEP_UP -> WALL_ALIGN + STEP_UP", source);
+            break;
+
+        case PlannerSequenceTrigger::STEP_DOWN:
+            clear_pending_commands("planner state -> STEP_DOWN");
+            seq_->start_step_down();
+            RCLCPP_INFO(get_logger(), "[%s] task state STEP_DOWN -> STEP_DOWN", source);
+            break;
+
+        case PlannerSequenceTrigger::KFS_ALIGNMENT:
+            clear_pending_commands("planner state -> KFS_ALIGNMENT");
+            seq_->start_cube_align();
+            RCLCPP_INFO(get_logger(), "[%s] task state KFS_ALIGNMENT -> CUBE_ALIGN", source);
+            break;
+
+        case PlannerSequenceTrigger::NONE:
+        default:
+            break;
         }
     }
 
@@ -1598,7 +1701,6 @@ private:
         std_msgs::msg::Bool reset_msg;
         reset_msg.data = true;
         odom_reset_pub_->publish(reset_msg);
-        RCLCPP_INFO(get_logger(), "Published odom_reset before MFF turn.");
     }
 
     void dispatch_step_command(int cmd) {
@@ -1615,82 +1717,84 @@ private:
         }
     }
 
+    void apply_sequence_mode_from_code(int32_t mode_code) {
+        if (mode_code == 4) {
+            seq_->set_mff_mode_enabled(true);
+            clear_pending_commands("mode_cmd -> MFF");
+        } else if (mode_code == 5) {
+            seq_->set_arena_mode_enabled(true);
+            clear_pending_commands("mode_cmd -> ARENA");
+        } else {
+            seq_->set_mff_mode_enabled(false);
+            seq_->set_arena_mode_enabled(false);
+            clear_pending_commands("mode_cmd -> OTHER");
+        }
+    }
+
+    void publish_drive_mode_command(const std::vector<int32_t> &mode_cmd) {
+        if (!drive_mode_cmd_pub_ || mode_cmd.empty()) {
+            return;
+        }
+
+        std_msgs::msg::Int32MultiArray msg;
+        msg.data = mode_cmd;
+        drive_mode_cmd_pub_->publish(msg);
+    }
+
+    void publish_control_mode_command(bool manual_enabled) {
+        if (!control_mode_pub_) {
+            return;
+        }
+
+        std_msgs::msg::Int32 msg;
+        msg.data = manual_enabled ? DRIVE_MODE_MANUAL : 1;
+        control_mode_pub_->publish(msg);
+    }
+
+    void set_manual_mode(bool enabled, const char *source) {
+        if (manual_mode_ == enabled) {
+            return;
+        }
+
+        manual_mode_ = enabled;
+        pkt.setMD(MD5, 0);
+        pkt.setMD(MD6, 0);
+        pkt.setMD(MD7, 0);
+        pkt.setMD(MD8, 0);
+
+        if (manual_mode_) {
+            clear_pending_commands("enter manual mode");
+            seq_->set_mff_mode_enabled(false);
+            seq_->set_arena_mode_enabled(false);
+        } else if (has_state_management_drive_mode_cmd_) {
+            publish_drive_mode_command(last_state_management_drive_mode_cmd_);
+            apply_sequence_mode_from_code(last_state_management_drive_mode_cmd_[0]);
+        }
+
+        RCLCPP_INFO(get_logger(),
+                    "[%s] 足回りドライブモード切替 -> %s",
+                    source,
+                    manual_mode_ ? "MANUAL" : "STATE_MANAGEMENT");
+    }
+
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
-        // ── PSボタン: 手動/自動モードトグル（モードに関わらず常時判定）──
+        // ── PSボタン: 手動操作/状態管理モードトグル（モードに関わらず常時判定）──
         if (msg->buttons.size() > 10) {
             const bool ps = static_cast<bool>(msg->buttons[10]);
             if (ps && !last_ps_btn_) {
-                manual_mode_ = !manual_mode_;
-                RCLCPP_INFO(get_logger(),
-                            "[PSボタン] 足回りドライブモード切替 -> %s",
-                            manual_mode_ ? "MANUAL" : "AUTO");
-                if (!manual_mode_) {
-                    // AUTO切替時は足回りを停止
-                    pkt.setMD(MD5, 0);
-                    pkt.setMD(MD6, 0);
-                    pkt.setMD(MD7, 0);
-                    pkt.setMD(MD8, 0);
-                }
+                const bool next_manual_mode = !manual_mode_;
+                set_manual_mode(next_manual_mode, "PS_button");
+                publish_control_mode_command(next_manual_mode);
             }
             last_ps_btn_ = ps;
         }
 
-        // ── 手動モード: 足回りをコントローラーで直接操作──
+        // ── 手動モード: 足回りはr2_autoのMANUALへ委譲──
         if (manual_mode_) {
-            float LS_X = -msg->axes[0]; // 左右
-            float LS_Y = msg->axes[1];  // 前後
-            float RS_X = -msg->axes[3]; // 回転
-            float R2 = (-msg->axes[5] + 1) / 2;
-            bool L1 = msg->buttons[4];
-            bool R1 = msg->buttons[5];
-
-            if (fabsf(LS_X) < deadzone)
-                LS_X = 0;
-            if (fabsf(LS_Y) < deadzone)
-                LS_Y = 0;
-            if (fabsf(RS_X) < deadzone)
-                RS_X = 0;
-
-            float vx = -LS_Y * R2;
-            float vy = LS_X * R2;
-            float wz = RS_X * sp_yaw;
-
-            v1 = vx + vy + wz;
-            v3 = vx - vy - wz;
-            v4 = vx - vy + wz;
-            v2 = vx + vy - wz;
-            v3 *= -1;
-            v2 *= -1;
-
-            if (R1) {
-                v1 = sp_yaw;
-                v2 = -sp_yaw;
-                v3 = -sp_yaw;
-                v4 = sp_yaw;
-            }
-            if (L1) {
-                v1 = -sp_yaw;
-                v2 = sp_yaw;
-                v3 = sp_yaw;
-                v4 = -sp_yaw;
-            }
-
-            float max_v = std::max(std::max(fabsf(v1), fabsf(v2)), std::max(fabsf(v3), fabsf(v4)));
-            if (max_v < 1.0f)
-                max_v = 1.0f;
-            v1 /= max_v;
-            v2 /= max_v;
-            v3 /= max_v;
-            v4 /= max_v;
-
-            pkt.setMD(MD5, static_cast<int16_t>(v1 * duty_max));
-            pkt.setMD(MD6, static_cast<int16_t>(v2 * duty_max));
-            pkt.setMD(MD7, static_cast<int16_t>(v3 * duty_max));
-            pkt.setMD(MD8, static_cast<int16_t>(v4 * duty_max));
             return;
         }
 
-        // ── 自動モード: MFF/ARENAシーケンス制御──
+        // ── 状態管理モード: MFF/ARENAシーケンス制御──
         if (!seq_->is_mff_mode_enabled() && !seq_->is_arena_mode_enabled()) {
             return;
         }
@@ -1705,24 +1809,24 @@ private:
 
         float R2 = (-msg->axes[5] + 1) / 2;
 
-        bool UP = msg->axes[7] == 1.0;
-        bool DOWN = msg->axes[7] == -1.0;
+        bool TRIANGLE = msg->buttons[2];
+        bool CROSS    = msg->buttons[0];
 
         bool L1 = msg->buttons[4];
         bool R1 = msg->buttons[5];
 
         bool OPTIONS = (msg->buttons.size() > 9) ? static_cast<bool>(msg->buttons[9]) : false;
 
-        static bool last_up = false;
-        static bool last_down = false;
-        static bool last_options = false;
+        static bool last_triangle = false;
+        static bool last_cross    = false;
+        static bool last_options  = false;
 
-        if (UP && !last_up) {
+        if (TRIANGLE && !last_triangle) {
             seq_->start_wall_alignment();
         }
 
-        if (DOWN && !last_down) {
-            clear_pending_commands("PS4 DOWN -> STEP_DOWN");
+        if (CROSS && !last_cross) {
+            clear_pending_commands("PS4 CROSS -> STEP_DOWN");
             seq_->start_step_down();
         }
 
@@ -1730,9 +1834,9 @@ private:
             seq_->start_arena_walk();
         }
 
-        last_up = UP;
-        last_down = DOWN;
-        last_options = OPTIONS;
+        last_triangle = TRIANGLE;
+        last_cross    = CROSS;
+        last_options  = OPTIONS;
 
         if (fabsf(LS_X) < deadzone)
             LS_X = 0;
@@ -1798,15 +1902,13 @@ private:
             camera_servo_pub_->publish(servo_msg);
         }
 
-        // 手動モード: コントローラー入力値をそのまま送信（シーケンスなし）
+        // 手動モード: 足回りは r2/task_transition_mode を受けた r2_auto が主系。
+        // ここでは drive_mode_cmd を上書きせず、serial_tx_6 にも送らない。
         if (manual_mode_) {
-            std_msgs::msg::Int16MultiArray msg;
-            msg.data = pkt.toVector();
-            publisher_->publish(msg);
             return;
         }
 
-        // 自動モード: MFF/ARENAが無効なら何もしない
+        // 状態管理モード: MFF/ARENAが無効なら何もしない
         if (!seq_->is_mff_mode_enabled() && !seq_->is_arena_mode_enabled()) {
             clear_pending_commands("sequence mode disabled");
             return;
@@ -1829,11 +1931,6 @@ private:
         msg.data = pkt.toVector();
         publisher_->publish(msg);
         // print_data();
-
-        // カメラサーボ角度をDevice7（R2_HandCtrl）へ通知
-        std_msgs::msg::Int32 servo_msg;
-        servo_msg.data = seq_->get_camera_servo_angle();
-        camera_servo_pub_->publish(servo_msg);
     }
 
     void print_data() {
@@ -2043,21 +2140,23 @@ private:
         }
 
         const int32_t mode_code = msg->data[0];
-        if (mode_code == 4) {
-            seq_->set_mff_mode_enabled(true);
-            // モード切替時に古い保留コマンドを残さない
-            clear_pending_commands("mode_cmd -> MFF");
-        } else if (mode_code == 5) {
-            seq_->set_arena_mode_enabled(true);
-            clear_pending_commands("mode_cmd -> ARENA");
-        } else {
-            seq_->set_mff_mode_enabled(false);
-            seq_->set_arena_mode_enabled(false);
-            clear_pending_commands("mode_cmd -> OTHER");
+        if (mode_code != DRIVE_MODE_MANUAL) {
+            last_state_management_drive_mode_cmd_ = msg->data;
+            has_state_management_drive_mode_cmd_ = true;
         }
+
+        if (manual_mode_) {
+            return;
+        }
+
+        apply_sequence_mode_from_code(mode_code);
     }
 
     void drive_mode_text_callback(const std_msgs::msg::String::SharedPtr msg) {
+        if (manual_mode_) {
+            return;
+        }
+
         const auto &mode = msg->data;
         if (mode == "MFF") {
             seq_->set_mff_mode_enabled(true);
@@ -2068,10 +2167,25 @@ private:
             // GUI/Plannerの状態遷移では r2_autodrive 側が一時的に AUTO をpublishすることがあり、
             // ここで無効化すると step/turn コマンド受信前にシーケンスが落ちて不安定になる。
             // モード解除は mode_cmd_callback (r2_drive_mode_cmd) を正とする。
-            RCLCPP_DEBUG(this->get_logger(),
-                         "drive_mode_text=%s received: keep current sequence enable state (authority=mode_cmd)",
-                         mode.c_str());
+            // RCLCPP_DEBUG(this->get_logger(),
+            //              "drive_mode_text=%s received: keep current sequence enable state (authority=mode_cmd)",
+            //              mode.c_str());
         }
+    }
+
+    void task_status_text_callback(const std_msgs::msg::String::SharedPtr msg) {
+        const std::string next_state_name = parse_state_name(msg->data);
+        if (next_state_name.empty() || next_state_name == current_task_state_name_) {
+            return;
+        }
+
+        current_task_state_name_ = next_state_name;
+        planner_sequence_trigger_ = planner_sequence_trigger_from_state_name(current_task_state_name_);
+        if (planner_sequence_trigger_ == PlannerSequenceTrigger::NONE) {
+            return;
+        }
+
+        dispatch_pending_sequence_trigger("task_status_text");
     }
 
     // /cube_detection/info [flag, cx_norm, cy_norm, w_norm, h_norm, depth_m, score, area, face_yaw_deg]
@@ -2096,31 +2210,10 @@ private:
         }
     }
 
-    void arena_walk_cmd_callback(const std_msgs::msg::Int32::SharedPtr msg) {
-        if (!seq_->is_arena_mode_enabled()) {
-            return;
-        }
-        if (msg->data == 1) {
-            seq_->start_arena_walk();
-        }
-    }
-
-    // r2/task_transition_mode: 0=MANUAL, 1=AUTO
-    // r2_plannerまたはGUIからのモード指定を受信して手動/自動を切り替える
-    void transition_mode_callback(const std_msgs::msg::Int32::SharedPtr msg) {
-        const bool prev = manual_mode_;
-        manual_mode_ = (msg->data == 0); // 0=MANUAL, 1=AUTO
-        if (prev != manual_mode_) {
-            RCLCPP_INFO(get_logger(),
-                        "[r2/task_transition_mode] 足回りドライブモード切替 -> %s",
-                        manual_mode_ ? "MANUAL" : "AUTO");
-            if (!manual_mode_) {
-                pkt.setMD(MD5, 0);
-                pkt.setMD(MD6, 0);
-                pkt.setMD(MD7, 0);
-                pkt.setMD(MD8, 0);
-            }
-        }
+    // r2/control_operation_mode: 0=MANUAL, 1=STATE_MANAGEMENT
+    // PSボタンまたはGUIからの操作モード指定を受信して手動/状態管理を切り替える
+    void control_mode_callback(const std_msgs::msg::Int32::SharedPtr msg) {
+        set_manual_mode(msg->data == DRIVE_MODE_MANUAL, "r2/control_operation_mode");
     }
 
     // odom_xy_yaw: [x, y, yaw, vx, vy, wz]
@@ -2171,13 +2264,15 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr turn_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mff_status_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mode_cmd_sub_;
+    rclcpp::Publisher<std_msgs::msg::Int32MultiArray>::SharedPtr drive_mode_cmd_pub_;
+    rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr control_mode_pub_;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr drive_mode_text_sub_;
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr task_status_text_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr cube_detect_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr cube_align_cmd_sub_;
-    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr arena_walk_cmd_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr odom_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr ld19_eight_dir_sub_;
-    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr transition_mode_sub_; // r2/task_transition_mode
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr control_mode_sub_; // r2/control_operation_mode
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr odom_reset_pub_;
     rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr camera_servo_pub_;
     rclcpp::TimerBase::SharedPtr timer_;

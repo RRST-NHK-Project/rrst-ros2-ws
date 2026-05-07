@@ -105,17 +105,8 @@ public:
                       this,
                       std::placeholders::_1));
 
-        // GUIから直接状態が送られる場合の互換経路
-        state_sub_ = this->create_subscription<std_msgs::msg::Int32>(
-            "r2/task_state", 10,
-            std::bind(&HardWareControl::task_state_callback, this, std::placeholders::_1));
-
-        // r2_plannerが管理する現在状態（[state, color, cell, mode]）
+        // r2_plannerが管理する現在状態名を購読
         auto status_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
-        status_sub_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
-            "r2/task_status", status_qos,
-            std::bind(&HardWareControl::task_status_callback, this, std::placeholders::_1));
-
         status_text_sub_ = this->create_subscription<std_msgs::msg::String>(
             "/r2/task_status_text", status_qos,
             std::bind(&HardWareControl::task_status_text_callback, this, std::placeholders::_1));
@@ -124,15 +115,10 @@ public:
             "/r2/camera_servo_angle", 10,
             std::bind(&HardWareControl::camera_servo_callback, this, std::placeholders::_1));
 
-        // GUIから直接モードが送られる場合の直接受信（rosbridge互換: best_effort）
-        transition_mode_sub_ = this->create_subscription<std_msgs::msg::Int32>(
-            "r2/task_transition_mode", rclcpp::QoS(10).best_effort(),
-            std::bind(&HardWareControl::transition_mode_callback, this, std::placeholders::_1));
-
-        // task_manager_node 経由のドライブモードコマンド（r2_auto と同じ経路、transient_local）
-        drive_mode_cmd_sub_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
-            "r2_drive_mode_cmd", rclcpp::QoS(1).reliable().transient_local(),
-            std::bind(&HardWareControl::drive_mode_cmd_callback, this, std::placeholders::_1));
+        // PS/GUIの操作モード（手動操作/状態管理）を受信
+        control_mode_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+            "r2/control_operation_mode", rclcpp::QoS(rclcpp::KeepLast(1)).best_effort().transient_local(),
+            std::bind(&HardWareControl::control_mode_callback, this, std::placeholders::_1));
 
         // 初期状態を適用
         apply_state_to_packet(current_planner_state_);
@@ -144,7 +130,7 @@ public:
 private:
     // GUIの task_status[3] に合わせる運転モード
     static constexpr int32_t DRIVE_MODE_MANUAL = 0;
-    static constexpr int32_t DRIVE_MODE_AUTO = 1;
+    static constexpr int32_t DRIVE_MODE_STATE_MANAGEMENT = 1;
 
     // =====================================================================
     // 状態定義
@@ -180,7 +166,6 @@ private:
     std::atomic<int32_t> current_drive_mode_{DRIVE_MODE_MANUAL};
     std::string current_state_name_ = "";
     TargetHeight target_height_ = TargetHeight::DOWN;
-    bool last_ps_btn_ = false; // PSボタン前回状態（エッジ検出用）
 
     // モーター1回転あたりのエンコーダのカウント数
     static constexpr double COUNTS_PER_ROTATION = 360.0;
@@ -367,55 +352,32 @@ private:
     }
 
     void log_current_operation_state(const char *source, bool throttled = false) {
-        const int16_t micro1_sw = g_micro1_sw.load();
-        const int16_t micro2_sw = g_micro2_sw.load();
-        const int64_t abs_coord = g_abs_coord.load();
-        const double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
-
         const std::string state_name = current_state_name_.empty()
                                            ? std::string("STATE_") + std::to_string(current_planner_state_)
                                            : current_state_name_;
         const bool is_manual = is_manual_mode();
-        const char *mode_str = is_manual ? "MANUAL" : "AUTO";
+        const char *mode_str = is_manual ? "MANUAL" : "STATE_MANAGEMENT";
 
         if (throttled) {
             RCLCPP_INFO_THROTTLE(
                 get_logger(), *get_clock(), 1000,
-                "[MotionCtrlState:%s] mode=%s, state=%s(%ld), height=%s, rot=%.3f, sw_up=%d, sw_down=%d, MD1=%d, MD2=%d, SERVO1=%d, SERVO2=%d, TR1=%d, TR2=%d",
+                "[MotionCtrlState:%s] mode=%s, state=%s(%ld), height=%s",
                 source,
                 mode_str,
                 state_name.c_str(),
                 static_cast<long>(current_planner_state_),
-                target_height_to_string(target_height_),
-                rot_units,
-                static_cast<int>(micro1_sw),
-                static_cast<int>(micro2_sw),
-                static_cast<int>(pkt[MD1]),
-                static_cast<int>(pkt[MD2]),
-                static_cast<int>(pkt[SERVO1]),
-                static_cast<int>(pkt[SERVO2]),
-                static_cast<int>(pkt[TR1]),
-                static_cast<int>(pkt[TR2]));
+                target_height_to_string(target_height_));
             return;
         }
 
         RCLCPP_INFO(
             get_logger(),
-            "[MotionCtrlState:%s] mode=%s, state=%s(%ld), height=%s, rot=%.3f, sw_up=%d, sw_down=%d, MD1=%d, MD2=%d, SERVO1=%d, SERVO2=%d, TR1=%d, TR2=%d",
+            "[MotionCtrlState:%s] mode=%s, state=%s(%ld), height=%s",
             source,
             mode_str,
             state_name.c_str(),
             static_cast<long>(current_planner_state_),
-            target_height_to_string(target_height_),
-            rot_units,
-            static_cast<int>(micro1_sw),
-            static_cast<int>(micro2_sw),
-            static_cast<int>(pkt[MD1]),
-            static_cast<int>(pkt[MD2]),
-            static_cast<int>(pkt[SERVO1]),
-            static_cast<int>(pkt[SERVO2]),
-            static_cast<int>(pkt[TR1]),
-            static_cast<int>(pkt[TR2]));
+            target_height_to_string(target_height_));
     }
 
     bool is_manual_mode() const {
@@ -436,7 +398,7 @@ private:
         //     get_logger(),
         //     "drive_mode(%s) -> %s(%ld)",
         //     source,
-        //     manual ? "MANUAL" : "AUTO",
+        //     manual ? "MANUAL" : "STATE_MANAGEMENT",
         //     static_cast<long>(next_mode));
 
         if (!manual) {
@@ -454,11 +416,6 @@ private:
         int64_t abs_coord = g_abs_coord.load();
 
         double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
-
-        RCLCPP_INFO_THROTTLE(
-            get_logger(), *get_clock(), 1000,
-            "micro1_sw=%d",
-            static_cast<int>(micro1_sw));
 
         // 状態遷移時にシーケンスカウンタをリセット
         if (state_code != prev_applied_state_) {
@@ -663,38 +620,13 @@ private:
                 static_cast<long>(state_code));
             break;
         }
-
-        // 現在の動作状態を定期表示
-        log_current_operation_state("apply", true);
     }
 
     // =====================================================================
     // 状態遷移コールバック群
     // =====================================================================
-    void task_state_callback(const std_msgs::msg::Int32::SharedPtr msg) {
-        (void)msg;
-
-        // 状態制御は task_status_text の state 名を正とする
-        // RCLCPP_DEBUG(get_logger(), "task_state ignored (state-by-name mode): %ld", static_cast<long>(msg->data));
-    }
-
-    void transition_mode_callback(const std_msgs::msg::Int32::SharedPtr msg) {
-        // GUIから直接モードを受信（task_manager_node経由より確実）
-        update_drive_mode(msg->data, "transition_mode_direct");
-    }
-
-    void drive_mode_cmd_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
-        // task_manager_node 経由のモードコマンド（r2_drive_mode_cmd[0] がモードコード）
-        if (msg->data.empty())
-            return;
-        update_drive_mode(msg->data[0], "drive_mode_cmd");
-    }
-
-    void task_status_callback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
-        // task_status からのモード更新は行わない。
-        // モードは r2/task_transition_mode の直接受信（transition_mode_callback）でのみ管理する。
-        // task_manager_node が古い mode=MANUAL を周期送信し続けると上書きされるため。
-        (void)msg;
+    void control_mode_callback(const std_msgs::msg::Int32::SharedPtr msg) {
+        update_drive_mode(msg->data, "control_operation_mode");
     }
 
     void camera_servo_callback(const std_msgs::msg::Int32::SharedPtr msg) {
@@ -724,19 +656,8 @@ private:
     // PS4コントローラーコールバック（手動制御用）
     // =====================================================================
     void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
-        // ── PSボタン: 手動 / 自動モードトグル（モードに関わらず常時判定）──
-        if (msg->buttons.size() > 10) {
-            const bool ps = static_cast<bool>(msg->buttons[10]);
-            if (ps && !last_ps_btn_) {
-                const int32_t next_mode =
-                    is_manual_mode() ? DRIVE_MODE_AUTO : DRIVE_MODE_MANUAL;
-                update_drive_mode(next_mode, "PS_button");
-                RCLCPP_INFO(get_logger(),
-                            "[PSボタン] 機構ドライブモード切替 -> %s",
-                            next_mode == DRIVE_MODE_MANUAL ? "MANUAL" : "AUTO");
-            }
-            last_ps_btn_ = ps;
-        }
+        // PSボタンによるモード切替は r2/control_operation_mode を正とする。
+        // ここでは手動操作だけを扱い、共有モードの反転は SequenceCtrl/GUI からの通知で受ける。
 
         if (!is_manual_mode()) {
             return;
@@ -747,11 +668,6 @@ private:
         // float LS_Y = msg->axes[1];
         // float RS_X = -1 * msg->axes[3];
         // float RS_Y = msg->axes[4];
-
-        bool CROSS = msg->buttons[0];
-        bool CIRCLE = msg->buttons[1];
-        bool TRIANGLE = msg->buttons[2];
-        bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
         bool RIGHT = msg->axes[6] == -1.0;
@@ -767,7 +683,6 @@ private:
         // bool L2 = msg->buttons[6];
         // bool R2 = msg->buttons[7];
 
-        // bool SHARE = msg->buttons[8];
         // bool OPTION = msg->buttons[9];
         // bool PS = msg->buttons[10];
 
@@ -776,9 +691,6 @@ private:
 
         // static bool last_option = false;
         // static bool option_latch = false;
-
-        // static bool last_share = false;
-        // static bool share_latch = false;
 
         // 以降、配列data_を操作する
 
@@ -792,9 +704,6 @@ private:
         //   micro1_sw（始発）押下 → 正回転禁止、逆回転のみ許可
         //   micro2_sw（終点）押下 → 逆回転禁止、正回転のみ許可
         // =================================================================
-
-        int16_t micro1_sw = g_micro1_sw.load();
-        int16_t micro2_sw = g_micro2_sw.load();
 
         int64_t abs_coord = g_abs_coord.load();
         double rot_units = static_cast<double>(abs_coord) / COUNTS_PER_ROTATION;
@@ -813,30 +722,13 @@ private:
         int fwd_speed = in_slow_zone ? SLOW_SPEED : NORMAL_SPEED;   // 正回転（始発→終点）の速度
         int rev_speed = in_slow_zone ? -SLOW_SPEED : -NORMAL_SPEED; // 逆回転（終点→始発）の速度
 
-        // micro1_sw が始発(正回転禁止) → rev_speed(R1で逆回転)のみ許可
-        // micro2_sw が終点(逆回転禁止) → fwd_speed(L1で正回転)のみ許可
-        if (micro1_sw == 1) {
-            if (L1 == 1) {
-                pkt.setMD(MD2, fwd_speed);
-            } else {
-                pkt.setMD(MD2, 0);
-            }
-        } else if (micro2_sw == 1) {
-            if (R1 == 1) {
-                pkt.setMD(MD2, rev_speed);
-            } else {
-                pkt.setMD(MD2, 0);
-            }
-        } else {
-            // マイクロスイッチに触れていない通常の範囲
-            if (L1 == 1) {
-                pkt.setMD(MD2, fwd_speed);
-            } else if (R1 == 1) {
-                pkt.setMD(MD2, rev_speed);
-            } else {
-                pkt.setMD(MD2, 0);
-            }
+        int16_t monorail_cmd = 0;
+        if (L1 == 1) {
+            monorail_cmd = fwd_speed;
+        } else if (R1 == 1) {
+            monorail_cmd = rev_speed;
         }
+        pkt.setMD(MD2, apply_direction_limit(monorail_cmd));
 
         // RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
         //                      "【フォーク制御】回転数=%.2f, 減速=%s, 始発SW=%d, 終点SW=%d, 出力=%d",
@@ -954,13 +846,6 @@ private:
         g_micro2_sw = !msg->data[10]; // 下端スイッチ(micro2)
         g_enc1_val = msg->data[1];    // エンコーダ1
 
-        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
-                             "[sensor_callback] rx_size=%zu micro1(data[10])=%d micro2(data[9])=%d enc1(data[1])=%d",
-                             msg->data.size(),
-                             static_cast<int>(msg->data[9]),
-                             static_cast<int>(msg->data[10]),
-                             static_cast<int>(msg->data[1]));
-
         // =============================================================
         // 座標調査・ラップアラウンド計算
         // =============================================================
@@ -999,8 +884,6 @@ private:
         int64_t abs_coord = -(total_encoder - zero_offset);
         g_abs_coord.store(abs_coord);
 
-        double rot = (double)abs_coord / COUNTS_PER_ROTATION;
-
         if (diff != 0) {
             // RCLCPP_INFO(get_logger(),
             //             "\n--- ROTATION DEBUG ---\n"
@@ -1013,21 +896,9 @@ private:
             //             (int)r_count, abs_coord, rot);
         }
 
-        // --- 通信デバッグ追加 ---
-        static uint64_t packet_count = 0;
-        packet_count++;
-
-        static int16_t l9 = 0, l10 = 0;
-        if (msg->data[9] != l9 || msg->data[10] != l10) {
-            RCLCPP_INFO(get_logger(), "SW Changed! [micro2(data[9]):%d, micro1(data[10]):%d]",
-                        msg->data[9], msg->data[10]);
-            l9 = msg->data[9];
-            l10 = msg->data[10];
-        }
-
         // RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
         //                      "RX Heartbeat (Total:%lu) | Dump: [%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d]",
-        //                      packet_count,
+        //                      0ULL,
         //                      msg->data[0], msg->data[1], msg->data[2], msg->data[3],
         //                      msg->data[4], msg->data[5], msg->data[6], msg->data[7],
         //                      msg->data[8], msg->data[9], msg->data[10], msg->data[11],
@@ -1039,12 +910,9 @@ private:
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sensor_sub_;
-    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr state_sub_;
-    rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr status_sub_;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr status_text_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr camera_servo_sub_;
-    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr transition_mode_sub_;
-    rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr drive_mode_cmd_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr control_mode_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
 };
 

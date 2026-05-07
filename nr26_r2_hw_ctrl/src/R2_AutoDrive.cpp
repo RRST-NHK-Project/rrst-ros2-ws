@@ -70,6 +70,10 @@ public:
             "r2_drive_mode_cmd", rclcpp::QoS(1).reliable().transient_local(),
             std::bind(&PIDMecanumController::mode_cmd_callback, this, std::placeholders::_1));
 
+        control_mode_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+            "r2/control_operation_mode", rclcpp::QoS(rclcpp::KeepLast(1)).best_effort().transient_local(),
+            std::bind(&PIDMecanumController::control_mode_callback, this, std::placeholders::_1));
+
         // ArUco追従入力
         aruco_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
             "/aruco_pose", 10,
@@ -105,7 +109,6 @@ public:
         this->declare_parameter("aruco_target_id", -1);
         this->declare_parameter("aruco_camera_offset_x_m", -0.1735);
         this->declare_parameter("aruco_camera_offset_y_m", 0.0);
-        this->declare_parameter("enable_ps4_mode_toggle", false);
         this->declare_parameter("auto_complete_pos_thresh_m", 0.05);
         this->declare_parameter("auto_complete_yaw_thresh_rad", 0.10);
         this->declare_parameter("auto_complete_hold_sec", 0.30);
@@ -115,7 +118,6 @@ public:
         aruco_target_id_ = this->get_parameter("aruco_target_id").as_int();
         aruco_camera_offset_x_ = static_cast<float>(this->get_parameter("aruco_camera_offset_x_m").as_double());
         aruco_camera_offset_y_ = static_cast<float>(this->get_parameter("aruco_camera_offset_y_m").as_double());
-        enable_ps4_mode_toggle_ = this->get_parameter("enable_ps4_mode_toggle").as_bool();
         auto_complete_pos_thresh_m_ = static_cast<float>(this->get_parameter("auto_complete_pos_thresh_m").as_double());
         auto_complete_yaw_thresh_rad_ = static_cast<float>(this->get_parameter("auto_complete_yaw_thresh_rad").as_double());
         auto_complete_hold_sec_ = static_cast<float>(this->get_parameter("auto_complete_hold_sec").as_double());
@@ -123,9 +125,6 @@ public:
         auto_goal_in_range_since_ = rclcpp::Time(0, 0, get_clock()->get_clock_type());
         reset_auto_complete_tracking(true);
         publish_mode();
-
-        RCLCPP_INFO(this->get_logger(), "PS4 mode toggle (OPTION): %s",
-                    enable_ps4_mode_toggle_ ? "ENABLED" : "DISABLED");
     }
 
 private:
@@ -138,10 +137,14 @@ private:
         ARENA,
     };
 
+    static constexpr int32_t TRANSITION_MODE_MANUAL = 0;
+    static constexpr int32_t TRANSITION_MODE_STATE_MANAGEMENT = 1;
+
     // ROS
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr odom_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr target_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr mode_cmd_sub_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr control_mode_sub_;
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr aruco_pose_sub_;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr aruco_distance_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr aruco_id_sub_;
@@ -169,6 +172,8 @@ private:
     float target_yaw_ = 0.0;
     DriveMode drive_mode_ = DriveMode::MANUAL;
     bool has_target_cmd_ = false;
+    int32_t transition_mode_code_ = TRANSITION_MODE_MANUAL;
+    int32_t deferred_mode_code_ = -1;
 
     // ArUco
     float aruco_x_ = 0.0f;
@@ -203,7 +208,6 @@ private:
     float aruco_k_wz_ = 1.4f;
     float aruco_pose_timeout_sec_ = 0.5f;
     float aruco_horizontal_deadband_m_ = 0.02f;
-    bool enable_ps4_mode_toggle_ = false;
 
     // AUTO/PLANE 到達完了判定
     float auto_complete_pos_thresh_m_ = 0.05f;
@@ -251,6 +255,10 @@ private:
         return "MANUAL";
     }
 
+    static const char *transition_mode_to_string(int32_t mode) {
+        return mode == TRANSITION_MODE_MANUAL ? "MANUAL" : "STATE_MANAGEMENT";
+    }
+
     void publish_mode() {
         std_msgs::msg::String mode_msg;
         mode_msg.data = drive_mode_to_string(drive_mode_);
@@ -273,7 +281,7 @@ private:
         publisher_->publish(msg);
     }
 
-    void enter_auto_mode() {
+    void reset_pose_target_control(bool reset_auto_complete) {
         if (!has_target_cmd_) {
             target_x_ = X_;
             target_y_ = Y_;
@@ -286,70 +294,113 @@ private:
         pid_x_.reset();
         pid_y_.reset();
         pid_yaw_.reset();
-        reset_auto_complete_tracking(false);
 
-        drive_mode_ = DriveMode::AUTO;
+        if (reset_auto_complete) {
+            reset_auto_complete_tracking(false);
+        }
+    }
+
+    void switch_drive_mode(DriveMode mode, bool publish_stop_packet = false) {
+        drive_mode_ = mode;
         stop_motors();
         publish_mode();
+
+        if (publish_stop_packet) {
+            publish_packet();
+        }
+    }
+
+    void apply_wheel_outputs(float wheel_1, float wheel_2, float wheel_3, float wheel_4) {
+        v1 = wheel_1;
+        v2 = wheel_2;
+        v3 = wheel_3;
+        v4 = wheel_4;
+
+        float max_v = std::max({fabsf(v1), fabsf(v2), fabsf(v3), fabsf(v4)});
+        if (max_v < 1.0f) {
+            max_v = 1.0f;
+        }
+
+        v1 /= max_v;
+        v2 /= max_v;
+        v3 /= max_v;
+        v4 /= max_v;
+
+        pkt.setMD(MD5, static_cast<int16_t>(v1 * duty_max));
+        pkt.setMD(MD6, static_cast<int16_t>(v2 * duty_max));
+        pkt.setMD(MD7, static_cast<int16_t>(v3 * duty_max));
+        pkt.setMD(MD8, static_cast<int16_t>(v4 * duty_max));
+    }
+
+    void enter_auto_mode() {
+        reset_pose_target_control(true);
+        switch_drive_mode(DriveMode::AUTO);
     }
 
     void enter_aruco_mode() {
-        drive_mode_ = DriveMode::ARUCO;
-        stop_motors();
-        publish_mode();
+        switch_drive_mode(DriveMode::ARUCO);
     }
 
     void enter_manual_mode() {
-        drive_mode_ = DriveMode::MANUAL;
-        stop_motors();
-        publish_mode();
+        switch_drive_mode(DriveMode::MANUAL);
     }
 
     void enter_plane_mode() {
-        if (!has_target_cmd_) {
-            target_x_ = X_;
-            target_y_ = Y_;
-            target_yaw_ = yaw_;
-        }
-
-        pid_x_.set_target(target_x_);
-        pid_y_.set_target(target_y_);
-        pid_yaw_.set_target(target_yaw_);
-        pid_x_.reset();
-        pid_y_.reset();
-        pid_yaw_.reset();
-        reset_auto_complete_tracking(false);
-
-        drive_mode_ = DriveMode::PLANE;
-        stop_motors();
-        publish_mode();
+        reset_pose_target_control(true);
+        switch_drive_mode(DriveMode::PLANE);
     }
 
     void enter_mff_mode() {
-        drive_mode_ = DriveMode::MFF;
-        stop_motors();
-        publish_mode();
         // MFF中はSequenceCtrlを主系にするため、停止パケットを1回だけ送る。
-        publish_packet();
+        switch_drive_mode(DriveMode::MFF, true);
     }
 
     void enter_arena_mode() {
-        if (!has_target_cmd_) {
-            target_x_ = X_;
-            target_y_ = Y_;
-            target_yaw_ = yaw_;
+        reset_pose_target_control(false);
+        switch_drive_mode(DriveMode::ARENA);
+    }
+
+    bool apply_mode_code(int32_t mode_code, const char *source) {
+        switch (mode_code) {
+        case 0:
+            if (drive_mode_ != DriveMode::MANUAL) {
+                enter_manual_mode();
+                RCLCPP_INFO(this->get_logger(), "Mode changed: MANUAL (%s)", source);
+            }
+            return true;
+        case 1:
+            if (drive_mode_ != DriveMode::AUTO) {
+                enter_auto_mode();
+                RCLCPP_INFO(this->get_logger(), "Mode changed: AUTO (%s)", source);
+            }
+            return true;
+        case 2:
+            if (drive_mode_ != DriveMode::ARUCO) {
+                enter_aruco_mode();
+                RCLCPP_INFO(this->get_logger(), "Mode changed: ARUCO (%s)", source);
+            }
+            return true;
+        case 3:
+            if (drive_mode_ != DriveMode::PLANE) {
+                enter_plane_mode();
+                RCLCPP_INFO(this->get_logger(), "Mode changed: PLANE (%s)", source);
+            }
+            return true;
+        case 4:
+            if (drive_mode_ != DriveMode::MFF) {
+                enter_mff_mode();
+                RCLCPP_INFO(this->get_logger(), "Mode changed: MFF (%s)", source);
+            }
+            return true;
+        case 5:
+            if (drive_mode_ != DriveMode::ARENA) {
+                enter_arena_mode();
+                RCLCPP_INFO(this->get_logger(), "Mode changed: ARENA (%s)", source);
+            }
+            return true;
+        default:
+            return false;
         }
-
-        pid_x_.set_target(target_x_);
-        pid_y_.set_target(target_y_);
-        pid_yaw_.set_target(target_yaw_);
-        pid_x_.reset();
-        pid_y_.reset();
-        pid_yaw_.reset();
-
-        drive_mode_ = DriveMode::ARENA;
-        stop_motors();
-        publish_mode();
     }
 
     // odom（状態更新のみ）
@@ -381,18 +432,20 @@ private:
         target_yaw_ = msg->data[2];
         has_target_cmd_ = true;
         reset_auto_complete_tracking(true);
+        reset_pose_target_control(false);
 
-        pid_x_.set_target(target_x_);
-        pid_y_.set_target(target_y_);
-        pid_yaw_.set_target(target_yaw_);
-        pid_x_.reset();
-        pid_y_.reset();
-        pid_yaw_.reset();
+        if (transition_mode_code_ == TRANSITION_MODE_MANUAL) {
+            RCLCPP_INFO_THROTTLE(
+                this->get_logger(), *this->get_clock(), 1000,
+                "Deferred target command while transition mode is MANUAL");
+            RCLCPP_INFO(this->get_logger(),
+                        "Target updated x=%.3f y=%.3f yaw=%.3f [rad]",
+                        target_x_, target_y_, target_yaw_);
+            return;
+        }
 
         if (drive_mode_ != DriveMode::AUTO && drive_mode_ != DriveMode::ARENA) {
-            drive_mode_ = DriveMode::AUTO;
-            stop_motors();
-            publish_mode();
+            switch_drive_mode(DriveMode::AUTO);
             RCLCPP_INFO(this->get_logger(), "Mode changed: AUTO (by target command)");
         }
 
@@ -412,43 +465,55 @@ private:
             return;
         }
 
-        switch (mode_code) {
-        case 0:
-            if (drive_mode_ != DriveMode::MANUAL) {
-                enter_manual_mode();
-                RCLCPP_INFO(this->get_logger(), "Mode changed: MANUAL (by mode command)");
+        if (transition_mode_code_ == TRANSITION_MODE_MANUAL && mode_code != 0) {
+            deferred_mode_code_ = mode_code;
+            RCLCPP_INFO_THROTTLE(
+                this->get_logger(), *this->get_clock(), 1000,
+                "Deferred mode command %ld while transition mode is MANUAL",
+                static_cast<long>(mode_code));
+            return;
+        }
+
+        if (mode_code == 0) {
+            deferred_mode_code_ = -1;
+        }
+        apply_mode_code(mode_code, "by mode command");
+    }
+
+    void control_mode_callback(const std_msgs::msg::Int32::SharedPtr msg) {
+        const int32_t next_mode = msg->data;
+        if (next_mode != TRANSITION_MODE_MANUAL && next_mode != TRANSITION_MODE_STATE_MANAGEMENT) {
+            return;
+        }
+
+        if (transition_mode_code_ == next_mode) {
+            return;
+        }
+
+        transition_mode_code_ = next_mode;
+        RCLCPP_INFO(
+            this->get_logger(),
+            "Transition mode changed: %s (current drive mode: %s)",
+            transition_mode_to_string(transition_mode_code_),
+            drive_mode_to_string(drive_mode_).c_str());
+
+        if (transition_mode_code_ == TRANSITION_MODE_MANUAL && drive_mode_ != DriveMode::MANUAL) {
+            enter_manual_mode();
+            RCLCPP_INFO(this->get_logger(), "Mode changed: MANUAL (by transition mode)");
+            return;
+        }
+
+        if (transition_mode_code_ == TRANSITION_MODE_STATE_MANAGEMENT) {
+            if (deferred_mode_code_ >= 0) {
+                const int32_t deferred_mode = deferred_mode_code_;
+                deferred_mode_code_ = -1;
+                apply_mode_code(deferred_mode, "by deferred mode command");
+            } else {
+                RCLCPP_INFO(
+                    this->get_logger(),
+                    "No deferred mode command. Drive mode remains %s.",
+                    drive_mode_to_string(drive_mode_).c_str());
             }
-            break;
-        case 1:
-            if (drive_mode_ != DriveMode::AUTO) {
-                enter_auto_mode();
-                RCLCPP_INFO(this->get_logger(), "Mode changed: AUTO (by mode command)");
-            }
-            break;
-        case 2:
-            if (drive_mode_ != DriveMode::ARUCO) {
-                enter_aruco_mode();
-                RCLCPP_INFO(this->get_logger(), "Mode changed: ARUCO (by mode command)");
-            }
-            break;
-        case 3:
-            if (drive_mode_ != DriveMode::PLANE) {
-                enter_plane_mode();
-                RCLCPP_INFO(this->get_logger(), "Mode changed: PLANE (by mode command)");
-            }
-            break;
-        case 4:
-            if (drive_mode_ != DriveMode::MFF) {
-                enter_mff_mode();
-                RCLCPP_INFO(this->get_logger(), "Mode changed: MFF (by mode command)");
-            }
-            break;
-        case 5:
-            if (drive_mode_ != DriveMode::ARENA) {
-                enter_arena_mode();
-                RCLCPP_INFO(this->get_logger(), "Mode changed: ARENA (by mode command)");
-            }
-            break;
         }
     }
 
@@ -495,23 +560,6 @@ private:
         if (msg->axes.size() < 8 || msg->buttons.size() < 10)
             return;
 
-        bool OPTION = msg->buttons[9];
-        static bool last_option = false;
-
-        if (enable_ps4_mode_toggle_ && OPTION && !last_option) {
-            if (drive_mode_ == DriveMode::MANUAL) {
-                enter_auto_mode();
-                RCLCPP_INFO(this->get_logger(), "Mode changed: AUTO");
-            } else if (drive_mode_ == DriveMode::AUTO) {
-                enter_aruco_mode();
-                RCLCPP_INFO(this->get_logger(), "Mode changed: ARUCO");
-            } else {
-                enter_manual_mode();
-                RCLCPP_INFO(this->get_logger(), "Mode changed: MANUAL");
-            }
-        }
-        last_option = OPTION;
-
         if (drive_mode_ != DriveMode::MANUAL) {
             return;
         }
@@ -520,9 +568,6 @@ private:
         float LS_Y = msg->axes[1];
         float RS_X = -msg->axes[3];
         float R2 = (-msg->axes[5] + 1) / 2;
-
-        bool L1 = msg->buttons[4];
-        bool R1 = msg->buttons[5];
 
         if (fabsf(LS_X) < deadzone)
             LS_X = 0;
@@ -544,45 +589,12 @@ private:
         v3 *= -1;
         v2 *= -1;
 
-        if (R1) {
-            v1 = sp_yaw;
-            v2 = -sp_yaw;
-            v3 = -sp_yaw;
-            v4 = sp_yaw;
-        }
-
-        if (L1) {
-            v1 = -sp_yaw;
-            v2 = sp_yaw;
-            v3 = sp_yaw;
-            v4 = -sp_yaw;
-        }
-
-        float max_v = std::max(
-            std::max(fabsf(v1), fabsf(v2)),
-            std::max(fabsf(v3), fabsf(v4)));
-
-        if (max_v < 1.0f)
-            max_v = 1.0f;
-
-        v1 /= max_v;
-        v2 /= max_v;
-        v3 /= max_v;
-        v4 /= max_v;
-
-        pkt.setMD(MD5, static_cast<int16_t>(v1 * duty_max));
-        pkt.setMD(MD6, static_cast<int16_t>(v2 * duty_max));
-        pkt.setMD(MD7, static_cast<int16_t>(v3 * duty_max));
-        pkt.setMD(MD8, static_cast<int16_t>(v4 * duty_max));
+        apply_wheel_outputs(v1, v2, v3, v4);
     }
     // 制御ループ
     void publish_timer() {
         if (drive_mode_ == DriveMode::MANUAL) {
             publish_packet();
-
-            RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 50,
-                                 "[MANUAL] X: %.2f Y: %.2f Yaw: %.2f | v1 %.2f v2 %.2f v3 %.2f v4 %.2f",
-                                 X_, Y_, yaw_, v1, v2, v3, v4);
             return;
         }
 
@@ -595,10 +607,6 @@ private:
                 stop_motors();
 
                 publish_packet();
-
-                RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
-                                     "[ARUCO] waiting for marker pose (age=%.2f s)",
-                                     age_sec);
                 return;
             }
 
@@ -631,27 +639,10 @@ private:
             v3 *= -1;
             v2 *= -1;
 
-            float max_v = std::max({fabs(v1), fabs(v2), fabs(v3), fabs(v4)});
-            if (max_v < 1.0f)
-                max_v = 1.0f;
-
-            v1 /= max_v;
-            v2 /= max_v;
-            v3 /= max_v;
-            v4 /= max_v;
-
-            pkt.setMD(MD5, static_cast<int16_t>(v1 * duty_max));
-            pkt.setMD(MD6, static_cast<int16_t>(v2 * duty_max));
-            pkt.setMD(MD7, static_cast<int16_t>(v3 * duty_max));
-            pkt.setMD(MD8, static_cast<int16_t>(v4 * duty_max));
+            apply_wheel_outputs(v1, v2, v3, v4);
 
             publish_packet();
 
-            RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 50,
-                                 "[ARUCO] X: %.2f Y: %.2f Z: %.2f | TargetHorizontal: %.2f | vy %.2f",
-                                 aruco_x_, aruco_y_, aruco_z_,
-                                 aruco_target_forward_,
-                                 vy_);
             return;
         }
 
@@ -728,27 +719,9 @@ private:
         v3 *= -1;
         v2 *= -1;
 
-        // 正規化
-        float max_v = std::max({fabs(v1), fabs(v2), fabs(v3), fabs(v4)});
-        if (max_v < 1.0)
-            max_v = 1.0;
-
-        v1 /= max_v;
-        v2 /= max_v;
-        v3 /= max_v;
-        v4 /= max_v;
-
-        // 送信
-        pkt.setMD(MD5, static_cast<int16_t>(v1 * duty_max));
-        pkt.setMD(MD6, static_cast<int16_t>(v2 * duty_max));
-        pkt.setMD(MD7, static_cast<int16_t>(v3 * duty_max));
-        pkt.setMD(MD8, static_cast<int16_t>(v4 * duty_max));
+        apply_wheel_outputs(v1, v2, v3, v4);
 
         publish_packet();
-
-        RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 50,
-                             "[AUTO] X: %.2f Y: %.2f Yaw: %.2f | T: %.2f %.2f %.2f | vx %.2f vy %.2f wz %.2f",
-                             X_, Y_, yaw_, target_x_, target_y_, target_yaw_, vx_, vy_, wz_);
     }
 };
 
