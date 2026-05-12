@@ -50,6 +50,7 @@ public:
         rx_force_log_period_ms_ = this->declare_parameter<int>("rx_force_log_period_ms", 5000);
         rx_change_epsilon_ = this->declare_parameter<double>("rx_change_epsilon", 0.5);
         rx_target_change_epsilon_ = this->declare_parameter<double>("rx_target_change_epsilon", 1.0);
+        show_info_logs_ = this->declare_parameter<bool>("show_info_logs", false);
         fixed_enable_ = this->declare_parameter<int>("fixed_enable", 1);
         fixed_mode_ = this->declare_parameter<int>("fixed_mode", 0);
         fixed_target_ = this->declare_parameter<double>("fixed_target", 5.0);
@@ -71,17 +72,19 @@ public:
             std::chrono::milliseconds(std::max(1, tx_period_ms_)),
             std::bind(&EscCtrlNode::publish_command, this));
 
-        RCLCPP_INFO(this->get_logger(), "esc_ctrl started (keyboard command mode)");
-        RCLCPP_INFO(this->get_logger(), "device_id=%d tx=%s rx=%s", device_id_,
-                    serial_tx_topic_.c_str(), serial_rx_topic_.c_str());
-        RCLCPP_INFO(this->get_logger(),
-                    "Initial command: enable=%d mode=%d target=%.3f voltage_limit=%.3f", fixed_enable_,
-                    fixed_mode_, fixed_target_, fixed_voltage_limit_);
-        RCLCPP_INFO(this->get_logger(),
-                    "Keyboard input: v<number> (velocity rad/s), p<number> (position deg). Example: v100, p90");
-        RCLCPP_INFO(this->get_logger(),
-                    "RX log mode: on-change (angle/vel/vlim eps=%.3f, target eps=%.3f), snapshot=%d ms",
-                    rx_change_epsilon_, rx_target_change_epsilon_, rx_force_log_period_ms_);
+        if (show_info_logs_) {
+            RCLCPP_INFO(this->get_logger(), "esc_ctrl started (keyboard command mode)");
+            RCLCPP_INFO(this->get_logger(), "device_id=%d tx=%s rx=%s", device_id_,
+                        serial_tx_topic_.c_str(), serial_rx_topic_.c_str());
+            RCLCPP_INFO(this->get_logger(),
+                        "Initial command: enable=%d mode=%d target=%.3f voltage_limit=%.3f", fixed_enable_,
+                        fixed_mode_, fixed_target_, fixed_voltage_limit_);
+            RCLCPP_INFO(this->get_logger(),
+                        "Keyboard input: v<number> (velocity rad/s), p<number> (position deg). Example: v100, p90");
+            RCLCPP_INFO(this->get_logger(),
+                        "RX log mode: on-change (angle/vel/vlim eps=%.3f, target eps=%.3f), snapshot=%d ms",
+                        rx_change_epsilon_, rx_target_change_epsilon_, rx_force_log_period_ms_);
+        }
 
         stdin_is_tty_ = ::isatty(STDIN_FILENO) == 1;
         if (!stdin_is_tty_) {
@@ -136,10 +139,12 @@ private:
                 return;
             }
 
-            RCLCPP_INFO(this->get_logger(), "Updated command: mode=%s target=%.3f %s",
-                        (fixed_mode_ == 0) ? "velocity" : "angle",
-                        fixed_target_,
-                        (fixed_mode_ == 0) ? "rad/s" : "deg");
+            if (show_info_logs_) {
+                RCLCPP_INFO(this->get_logger(), "Updated command: mode=%s target=%.3f %s",
+                            (fixed_mode_ == 0) ? "velocity" : "angle",
+                            fixed_target_,
+                            (fixed_mode_ == 0) ? "rad/s" : "deg");
+            }
         } catch (...) {
             RCLCPP_WARN(this->get_logger(),
                         "Invalid input: %s (use v<number> or p<number>)", line.c_str());
@@ -195,7 +200,7 @@ private:
         const bool periodic_snapshot =
             (now - last_rx_log_time_).nanoseconds() / 1000000 >= std::max(200, rx_force_log_period_ms_);
 
-        if (changed || periodic_snapshot) {
+        if (show_info_logs_ && (changed || periodic_snapshot)) {
             RCLCPP_INFO(this->get_logger(),
                         "RX angle=%.3f deg velocity=%.3f rad/s target=%.3f %s vlim=%.2fV",
                         angle, velocity, target,
@@ -217,6 +222,7 @@ private:
     int rx_force_log_period_ms_;
     double rx_change_epsilon_;
     double rx_target_change_epsilon_;
+    bool show_info_logs_;
     int fixed_enable_;
     int fixed_mode_;
     double fixed_target_;

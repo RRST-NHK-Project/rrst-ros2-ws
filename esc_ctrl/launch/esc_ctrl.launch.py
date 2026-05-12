@@ -12,7 +12,7 @@ def generate_launch_description() -> LaunchDescription:
                 output="screen",
                 parameters=[
                     {
-                        "device_id": 15,
+                        "device_id": 153,
                         "tx_period_ms": 20,
                         "log_period_ms": 200,
                         "fixed_enable": 1,
