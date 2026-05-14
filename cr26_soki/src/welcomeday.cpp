@@ -15,9 +15,13 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include <std_msgs/msg/int16_multi_array.hpp>
 #include <std_msgs/msg/int32_multi_array.hpp>
 
+// 自作
+#include "include/PacketController.hpp"
+PacketController pkt;
+
 // 以下マイコンに合わせて設定
-#define TX_DEVICE_ID 1 // 送信先マイコンのID
-#define RX_DEVICE_ID 1 // 受信先マイコンのID
+#define TX_DEVICE_ID 3 // 送信先マイコンのID
+#define RX_DEVICE_ID 3 // 受信先マイコンのID
 
 #define TX16NUM 24 // 送信データ数
 #define RX16NUM 17 // 受信データ数
@@ -36,7 +40,7 @@ public:
           rx_device_id_(rx_device_id) {
 
         // 配列を0で初期化
-        data_.assign(TX16NUM, 0);
+        pkt.data_.fill(0);
         /*
         マイコンに送信される配列"data_"
         debug: 機能未割り当て, MD: モータードライバー, TR: トランジスタ
@@ -108,7 +112,7 @@ private:
         // bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
 
-        // bool LEFT = msg->axes[6] == 1.0;
+        bool LEFT = msg->axes[6] == 1.0;
         // bool RIGHT = msg->axes[6] == -1.0;
         // bool UP = msg->axes[7] == 1.0;
         // bool DOWN = msg->axes[7] == -1.0;
@@ -136,6 +140,11 @@ private:
         // static bool share_latch = false;
 
         // 以降、配列data_を操作する
+        if(LEFT){
+            pkt.setMD(MD7, 100);
+        } else {
+            pkt.setMD(MD7, 0);
+        }
 
         // デバッグ用
         // RCLCPP_INFO(
@@ -151,7 +160,7 @@ private:
     void publisher_timer_callback() {
         std_msgs::msg::Int16MultiArray msg;
 
-        msg.data = data_;
+        msg.data = pkt.toVector();
 
         publisher_->publish(msg);
     }
@@ -191,14 +200,14 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sensor_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
-    std::vector<int16_t> data_;
+    PacketController pkt;
 };
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
     // figletでノード名を表示
-    std::string figletout = "figlet Serial Bridge Host";
+    std::string figletout = "figlet ! Welcome Day !";
     int result = std::system(figletout.c_str());
     if (result != 0) {
         std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
