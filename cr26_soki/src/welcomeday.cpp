@@ -33,8 +33,11 @@ PacketController pkt;
 #define DEADZONE_R 0.3
 
 #define updown_speed 100 // 差動の速度
-#define forback_speed 50 // 前後移動の速度
+#define forback_speed 100 // 前後移動の速度
 #define turn_speed 50 // 回転の速度
+#define SERVO_STEP 1 // サーボの増減幅
+#define servo_max 270 // サーボの最大角度
+#define servo_min 0 // サーボの最小角度
 
 class HardWareControl : public rclcpp::Node {
 public:
@@ -112,7 +115,7 @@ private:
         // float RS_Y = msg->axes[4];
 
         bool CROSS = msg->buttons[0];
-        // bool CIRCLE = msg->buttons[1];
+        bool CIRCLE = msg->buttons[1];
         bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
 
@@ -127,8 +130,8 @@ private:
         // float L2_DIGITAL = (-1 * msg->axes[2] + 1) / 2;
         // float R2_DIGITAL = (-1 * msg->axes[5] + 1) / 2;
 
-        // bool L2 = msg->buttons[6];
-        // bool R2 = msg->buttons[7];
+        bool L2 = msg->buttons[6];
+        bool R2 = msg->buttons[7];
 
         // bool SHARE = msg->buttons[8];
         // bool OPTION = msg->buttons[9];
@@ -142,6 +145,21 @@ private:
 
         // static bool last_share = false;
         // static bool share_latch = false;
+
+        static bool circle_latch = false;
+        static bool last_circle = false;
+
+        if (CIRCLE && !last_circle) {
+            circle_latch = !circle_latch;
+        }
+
+        last_circle = CIRCLE;
+        
+        if(circle_latch){
+            pkt.setTR(TR1, true);
+        } else {
+            pkt.setTR(TR1, false);
+        }
 
         // 以降、配列data_を操作する
         if(UP){
@@ -162,12 +180,26 @@ private:
         }
 
         if(LEFT){
-            pkt.setMD(MD7, turn_speed);
-        } else if(RIGHT){
             pkt.setMD(MD7, -turn_speed);
+        } else if(RIGHT){
+            pkt.setMD(MD7, turn_speed);
         } else {
             pkt.setMD(MD7, 0);
         }
+
+        static int servo1_value = 130;
+
+        if(R1){
+            servo1_value += SERVO_STEP;
+            pkt.setServo(SERVO1, servo1_value);
+        }else if(L1){
+            servo1_value -= SERVO_STEP;
+            pkt.setServo(SERVO1, servo1_value);
+        }
+
+        if(SERVO1 < servo_min) servo1_value = servo_min;
+        if(SERVO1 > servo_max) servo1_value = servo_max;
+        pkt.setServo(SERVO1, servo1_value);
         // デバッグ用
         // RCLCPP_INFO(
         //     get_logger(),
