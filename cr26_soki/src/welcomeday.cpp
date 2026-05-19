@@ -32,6 +32,10 @@ PacketController pkt;
 #define DEADZONE_L 0.3
 #define DEADZONE_R 0.3
 
+#define updown_speed 100 // 差動の速度
+#define forback_speed 50 // 前後移動の速度
+#define turn_speed 50 // 回転の速度
+
 class HardWareControl : public rclcpp::Node {
 public:
     HardWareControl(uint8_t tx_device_id, uint8_t rx_device_id)
@@ -107,18 +111,18 @@ private:
         // float RS_X = -1 * msg->axes[3];
         // float RS_Y = msg->axes[4];
 
-        // bool CROSS = msg->buttons[0];
+        bool CROSS = msg->buttons[0];
         // bool CIRCLE = msg->buttons[1];
-        // bool TRIANGLE = msg->buttons[2];
+        bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
 
         bool LEFT = msg->axes[6] == 1.0;
-        // bool RIGHT = msg->axes[6] == -1.0;
-        // bool UP = msg->axes[7] == 1.0;
-        // bool DOWN = msg->axes[7] == -1.0;
+        bool RIGHT = msg->axes[6] == -1.0;
+        bool UP = msg->axes[7] == 1.0;
+        bool DOWN = msg->axes[7] == -1.0;
 
-        // bool L1 = msg->buttons[4];
-        // bool R1 = msg->buttons[5];
+        bool L1 = msg->buttons[4];
+        bool R1 = msg->buttons[5];
 
         // float L2_DIGITAL = (-1 * msg->axes[2] + 1) / 2;
         // float R2_DIGITAL = (-1 * msg->axes[5] + 1) / 2;
@@ -140,12 +144,30 @@ private:
         // static bool share_latch = false;
 
         // 以降、配列data_を操作する
+        if(UP){
+            pkt.setMD(MD5, updown_speed);
+            pkt.setMD(MD6, updown_speed);
+        } else if(DOWN){
+            pkt.setMD(MD5, -updown_speed);
+            pkt.setMD(MD6, -updown_speed);
+        } else if(TRIANGLE){
+            pkt.setMD(MD5, forback_speed);
+            pkt.setMD(MD6, -forback_speed);
+        }else if(CROSS){
+            pkt.setMD(MD5, -forback_speed);
+            pkt.setMD(MD6, forback_speed);
+        } else {
+            pkt.setMD(MD5, 0);
+            pkt.setMD(MD6, 0);
+        }
+
         if(LEFT){
-            pkt.setMD(MD7, 100);
+            pkt.setMD(MD7, turn_speed);
+        } else if(RIGHT){
+            pkt.setMD(MD7, -turn_speed);
         } else {
             pkt.setMD(MD7, 0);
         }
-
         // デバッグ用
         // RCLCPP_INFO(
         //     get_logger(),
