@@ -39,6 +39,37 @@ PacketController pkt;
 #define servo_max 270 // サーボの最大角度
 #define servo_min 0 // サーボの最小角度
 
+class Action {
+public:
+    static void moveForward(PacketController &pkt) {
+        pkt.setMD(MD5, forback_speed);
+        pkt.setMD(MD6, -forback_speed);
+    }
+    static void moveBackward(PacketController &pkt) {
+        pkt.setMD(MD5, -forback_speed);
+        pkt.setMD(MD6, forback_speed);
+    }
+    static void moveUp(PacketController &pkt) {
+        pkt.setMD(MD5, updown_speed);
+        pkt.setMD(MD6, updown_speed);
+    }
+    static void moveDown(PacketController &pkt) {
+        pkt.setMD(MD5, -updown_speed);
+        pkt.setMD(MD6, -updown_speed);
+    }
+    static void turnLeft(PacketController &pkt) {
+        pkt.setMD(MD7, -turn_speed);
+    }
+    static void turnRight(PacketController &pkt) {
+        pkt.setMD(MD7, turn_speed);
+    }
+    static void stop(PacketController &pkt) {
+        pkt.setMD(MD5, 0);
+        pkt.setMD(MD6, 0);
+        pkt.setMD(MD7, 0);
+    }
+};
+
 class HardWareControl : public rclcpp::Node {
 public:
     HardWareControl(uint8_t tx_device_id, uint8_t rx_device_id)
@@ -163,30 +194,22 @@ private:
 
         // 以降、配列data_を操作する
         if(UP){
-            pkt.setMD(MD5, updown_speed);
-            pkt.setMD(MD6, updown_speed);
-        } else if(DOWN){
-            pkt.setMD(MD5, -updown_speed);
-            pkt.setMD(MD6, -updown_speed);
-        } else if(TRIANGLE){
-            pkt.setMD(MD5, forback_speed);
-            pkt.setMD(MD6, -forback_speed);
+            Action::moveUp(pkt);
+        }else if(DOWN){
+            Action::moveDown(pkt);
+        }else if(TRIANGLE){
+            Action::moveForward(pkt);
         }else if(CROSS){
-            pkt.setMD(MD5, -forback_speed);
-            pkt.setMD(MD6, forback_speed);
-        } else {
-            pkt.setMD(MD5, 0);
-            pkt.setMD(MD6, 0);
+            Action::moveBackward(pkt);
+        }else if(LEFT){
+            Action::turnLeft(pkt);
+        }else if(RIGHT){
+            Action::turnRight(pkt);
+        }else {
+            Action::stop(pkt);
         }
 
-        if(LEFT){
-            pkt.setMD(MD7, -turn_speed);
-        } else if(RIGHT){
-            pkt.setMD(MD7, turn_speed);
-        } else {
-            pkt.setMD(MD7, 0);
-        }
-
+        //サーボ関連
         static int servo1_value = 130;
 
         if(R1){
@@ -232,9 +255,9 @@ private:
         // int16_t ENC7 = msg->data[7];
         // int16_t ENC8 = msg->data[8];
 
-        // int16_t SW1 = msg->data[9];
-        // int16_t SW2 = msg->data[10];
-        // int16_t SW3 = msg->data[11];
+        int16_t SW1 = msg->data[9];
+        int16_t SW2 = msg->data[10];
+        int16_t SW3 = msg->data[11];
         // int16_t SW4 = msg->data[12];
         // int16_t SW5 = msg->data[13];
         // int16_t SW6 = msg->data[14];
@@ -242,6 +265,11 @@ private:
         // int16_t SW8 = msg->data[16];
 
         // 以降、受信データを使った処理を記述
+        if(SW1 == true){
+            Action::moveUp(pkt);
+        }else if(SW2 == true){
+            Action::moveForward(pkt);
+        }
 
         // 受信データ処理ここまで
     }
