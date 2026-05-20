@@ -210,7 +210,7 @@ private:
         }
 
         //サーボ関連
-        static int servo1_value = 130;
+        static int servo1_value = 135;
 
         if(R1){
             servo1_value += SERVO_STEP;
