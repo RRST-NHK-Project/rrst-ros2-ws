@@ -32,50 +32,60 @@ PacketController pkt;
 #define DEADZONE_L 0.3
 #define DEADZONE_R 0.3
 
-#define updown_speed 100 // 差動の速度
+#define updown_speed 100  // 差動の速度
 #define forback_speed 100 // 前後移動の速度
-#define turn_speed 50 // 回転の速度
-#define SERVO_STEP 1 // サーボの増減幅
-#define servo_max 270 // サーボの最大角度
-#define servo_min 0 // サーボの最小角度
+#define turn_speed 50     // 回転の速度
+#define SERVO_STEP 1      // サーボの増減幅
+#define servo_max 270     // サーボの最大角度
+#define servo_min 0       // サーボの最小角度
 
-class Action {
+class Action
+{
 public:
-    static void moveForward(PacketController &pkt) {
+    static void moveForward(PacketController &pkt)
+    {
         pkt.setMD(MD5, forback_speed);
         pkt.setMD(MD6, -forback_speed);
     }
-    static void moveBackward(PacketController &pkt) {
+    static void moveBackward(PacketController &pkt)
+    {
         pkt.setMD(MD5, -forback_speed);
         pkt.setMD(MD6, forback_speed);
     }
-    static void moveUp(PacketController &pkt) {
+    static void moveUp(PacketController &pkt)
+    {
         pkt.setMD(MD5, updown_speed);
         pkt.setMD(MD6, updown_speed);
     }
-    static void moveDown(PacketController &pkt) {
+    static void moveDown(PacketController &pkt)
+    {
         pkt.setMD(MD5, -updown_speed);
         pkt.setMD(MD6, -updown_speed);
     }
-    static void turnLeft(PacketController &pkt) {
+    static void turnLeft(PacketController &pkt)
+    {
         pkt.setMD(MD7, -turn_speed);
     }
-    static void turnRight(PacketController &pkt) {
+    static void turnRight(PacketController &pkt)
+    {
         pkt.setMD(MD7, turn_speed);
     }
-    static void stop(PacketController &pkt) {
+    static void stop(PacketController &pkt)
+    {
         pkt.setMD(MD5, 0);
         pkt.setMD(MD6, 0);
         pkt.setMD(MD7, 0);
     }
 };
 
-class HardWareControl : public rclcpp::Node {
+class HardWareControl : public rclcpp::Node
+{
 public:
     HardWareControl(uint8_t tx_device_id, uint8_t rx_device_id)
         : Node("hardware_control_" + std::to_string(tx_device_id)),
           tx_device_id_(tx_device_id),
-          rx_device_id_(rx_device_id) {
+          rx_device_id_(rx_device_id)
+    {
 
         // 配列を0で初期化
         pkt.data_.fill(0);
@@ -137,7 +147,8 @@ public:
     }
 
 private:
-    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
+    void ps4_listener_callback(const sensor_msgs::msg::Joy::SharedPtr msg)
+    {
 
         // コントローラーの入力を取得、使わない入力はコメントアウト推奨
         // float LS_X = -1 * msg->axes[0];
@@ -180,48 +191,70 @@ private:
         static bool circle_latch = false;
         static bool last_circle = false;
 
-        if (CIRCLE && !last_circle) {
+        if (CIRCLE && !last_circle)
+        {
             circle_latch = !circle_latch;
         }
 
         last_circle = CIRCLE;
-        
-        if(circle_latch){
+
+        if (circle_latch)
+        {
             pkt.setTR(TR1, true);
-        } else {
+        }
+        else
+        {
             pkt.setTR(TR1, false);
         }
 
         // 以降、配列data_を操作する
-        if(UP){
+        if (TRIANGLE)
+        {
             Action::moveUp(pkt);
-        }else if(DOWN){
+        }
+        else if (CROSS)
+        {
             Action::moveDown(pkt);
-        }else if(TRIANGLE){
+        }
+        else if (UP)
+        {
             Action::moveForward(pkt);
-        }else if(CROSS){
+        }
+        else if (DOWN)
+        {
             Action::moveBackward(pkt);
-        }else if(LEFT){
+        }
+        else if (L1)
+        {
             Action::turnLeft(pkt);
-        }else if(RIGHT){
+        }
+        else if (R1)
+        {
             Action::turnRight(pkt);
-        }else {
+        }
+        else
+        {
             Action::stop(pkt);
         }
 
-        //サーボ関連
+        // サーボ関連
         static int servo1_value = 135;
 
-        if(R1){
+        if (R2)
+        {
             servo1_value += SERVO_STEP;
             pkt.setServo(SERVO1, servo1_value);
-        }else if(L1){
+        }
+        else if (L2)
+        {
             servo1_value -= SERVO_STEP;
             pkt.setServo(SERVO1, servo1_value);
         }
 
-        if(SERVO1 < servo_min) servo1_value = servo_min;
-        if(SERVO1 > servo_max) servo1_value = servo_max;
+        if (SERVO1 < servo_min)
+            servo1_value = servo_min;
+        if (SERVO1 > servo_max)
+            servo1_value = servo_max;
         pkt.setServo(SERVO1, servo1_value);
         // デバッグ用
         // RCLCPP_INFO(
@@ -234,7 +267,8 @@ private:
     }
 
     // publish
-    void publisher_timer_callback() {
+    void publisher_timer_callback()
+    {
         std_msgs::msg::Int16MultiArray msg;
 
         msg.data = pkt.toVector();
@@ -244,7 +278,8 @@ private:
 
     void
     sensor_callback(
-        const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
+        const std_msgs::msg::Int16MultiArray::SharedPtr msg)
+    {
 
         // int16_t ENC1 = msg->data[1];
         // int16_t ENC2 = msg->data[2];
@@ -265,9 +300,12 @@ private:
         // int16_t SW8 = msg->data[16];
 
         // 以降、受信データを使った処理を記述
-        if(SW1 == true){
+        if (SW1 == true)
+        {
             Action::moveUp(pkt);
-        }else if(SW2 == true){
+        }
+        else if (SW2 == true)
+        {
             Action::moveForward(pkt);
         }
 
@@ -285,13 +323,15 @@ private:
     PacketController pkt;
 };
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     rclcpp::init(argc, argv);
 
     // figletでノード名を表示
     std::string figletout = "figlet ! Welcome Day !";
     int result = std::system(figletout.c_str());
-    if (result != 0) {
+    if (result != 0)
+    {
         std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
                   << std::endl;
         std::cerr << "Please install 'figlet' with the following command:"
