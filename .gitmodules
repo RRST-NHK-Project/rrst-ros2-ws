@@ -1,9 +1,9 @@
 [submodule "microcontroller-ws"]
 	path = microcontroller-ws
-	url = https://github.com/RRST-NHK-Project/microcontroller-ws.git
+	url = git@github.com:RRST-NHK-Project/microcontroller-ws.git
 [submodule "serial_bridge"]
 	path = serial_bridge
-	url = https://github.com/RRST-NHK-Project/serial_bridge.git
+	url = git@github.com:RRST-NHK-Project/serial_bridge.git
 [submodule "rrst-console"]
 	path = rrst-console
 	url = git@github.com:RRST-NHK-Project/rrst-console.git
