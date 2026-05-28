@@ -44,7 +44,7 @@ namespace {
 class EscCtrlNode : public rclcpp::Node {
 public:
     EscCtrlNode() : Node("esc_ctrl") {
-        device_id_ = this->declare_parameter<int>("device_id", 1);
+        device_id_ = this->declare_parameter<int>("device_id", 153);
         tx_period_ms_ = this->declare_parameter<int>("tx_period_ms", 20);
         log_period_ms_ = this->declare_parameter<int>("log_period_ms", 200);
         rx_force_log_period_ms_ = this->declare_parameter<int>("rx_force_log_period_ms", 5000);
