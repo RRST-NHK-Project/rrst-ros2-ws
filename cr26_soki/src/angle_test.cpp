@@ -6,6 +6,7 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include <chrono>
 #include <cmath>
 #include <iostream>
+#include <algorithm>
 #include <thread>
 #include <vector>
 
@@ -15,10 +16,8 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include <std_msgs/msg/int16_multi_array.hpp>
 #include <std_msgs/msg/int32_multi_array.hpp>
 
-// 自作
-#include "include/PacketController.hpp"
-PacketController pkt;
-#include "include/PID.hpp"
+// 自作 (common パッケージ)
+#include "common/common.hpp"
 
 // 以下マイコンに合わせて設定
 #define TX_DEVICE_ID 3 // 送信先マイコンのID
@@ -27,7 +26,7 @@ PacketController pkt;
 #define TX16NUM 24 // 送信データ数
 #define RX16NUM 24// 受信データ数
 
-#define PUBLISH_RATE_MS 20 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
+#define PUBLISH_RATE_MS 10 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
 
 // スティックのデッドゾーン
 #define DEADZONE_L 0.3
@@ -98,6 +97,9 @@ public:
                       this,
                       std::placeholders::_1));
 
+        pd_angle_.set_target(static_cast<float>(target_angle_deg_));
+        pd_angle_.reset();
+
         RCLCPP_INFO(get_logger(),
                     "serial_tx_%d started.", tx_device_id_);
     }
@@ -120,7 +122,7 @@ private:
         // bool LEFT = msg->axes[6] == 1.0;
         // bool RIGHT = msg->axes[6] == -1.0;
         bool UP = msg->axes[7] == 1.0;
-        // bool DOWN = msg->axes[7] == -1.0;
+        bool DOWN = msg->axes[7] == -1.0;
 
         // bool L1 = msg->buttons[4];
         // bool R1 = msg->buttons[5];
@@ -147,12 +149,24 @@ private:
         if (UP && !last_up_)
         {
             target_angle_deg_ += 90.0;
-            pid_.set_target(target_angle_deg_);
-            pid_.reset();
+            pd_angle_.set_target(static_cast<float>(target_angle_deg_));
+            pd_angle_.reset();
+            // Initialize internal last_current_ to avoid a large derivative spike
+            pd_angle_.update(static_cast<float>(enc1_total_angle_deg_), 1.0f);
             //RCLCPP_INFO(get_logger(), "Target angle updated: %.3f deg", target_angle_deg_);
         }
 
+        if (DOWN && !last_down_)
+        {
+            target_angle_deg_ -= 90.0;
+            pd_angle_.set_target(static_cast<float>(target_angle_deg_));
+            pd_angle_.reset();
+            // Initialize internal last_current_ to avoid a large derivative spike
+            pd_angle_.update(static_cast<float>(enc1_total_angle_deg_), 1.0f);
+            //RCLCPP_INFO(get_logger(), "Target angle updated: %.3f deg", target_angle_deg_);
+        }
         last_up_ = UP;
+        last_down_ = DOWN;
 
         // デバッグ用
         // RCLCPP_INFO(
@@ -198,8 +212,11 @@ private:
         // int16_t SW8 = msg->data[16];
 
         // 以降、受信データを使った処理を記述
-        const int HALF_ENCODER = 16384;    // デジタルデータの飛躍値の半分
-        const int64_t ENCODER_MAX = 32768; // デジタルデータの飛躍幅
+        //const int32_t HALF_ENCODER = 16384;   
+        //const int64_t ENCODER_MAX = 32768;   //上限 
+
+        const int32_t HALF_ENCODER = 4096;    // 1周(8192)の半分
+        const int64_t ENCODER_MAX = 8192;     // エンコーダ1周あたりのカウント数
 
         if (!enc1_initialized_)
         {
@@ -209,7 +226,7 @@ private:
         }
         else
         {
-            const int diff = enc1 - last_enc1_;
+            const int32_t diff = static_cast<int32_t>(enc1) - last_enc1_;
 
             if (diff > HALF_ENCODER)
             {
@@ -229,8 +246,10 @@ private:
         if (!target_initialized_)
         {
             target_angle_deg_ = enc1_total_angle_deg_;
-            pid_.set_target(static_cast<float>(target_angle_deg_));
-            pid_.reset();
+            pd_angle_.set_target(static_cast<float>(target_angle_deg_));
+            pd_angle_.reset();
+            // prime last_current_ to avoid derivative spike on first update
+            pd_angle_.update(static_cast<float>(enc1_total_angle_deg_), 1.0f);
             target_initialized_ = true;
         }
 
@@ -238,11 +257,20 @@ private:
         const double dt = (current_time - last_control_time_).seconds();
         last_control_time_ = current_time;
 
-        const float command = pid_.update(static_cast<float>(enc1_total_angle_deg_), static_cast<float>(dt));
-        const int md7_command = static_cast<int>(std::round(command));
+        const float command = pd_angle_.update(static_cast<float>(enc1_total_angle_deg_), static_cast<float>(dt));
+
+        // smooth command to avoid sudden jumps (helps with derivative noise)
+        const double smoothed_command = smoothing_alpha_ * prev_command_ + (1.0 - smoothing_alpha_) * static_cast<double>(command);
+        prev_command_ = smoothed_command;
+
+        // clamp to device-expected range (-100..100)
+        const int md7_command = static_cast<int>(std::clamp(smoothed_command, -100.0, 100.0));
+
         pkt.setMD(MD7, md7_command);
 
-        //RCLCPP_INFO(get_logger(), "ENC1 cumulative angle: %.3f deg", enc1_total_angle_deg_);
+        const double error_deg = target_angle_deg_ - enc1_total_angle_deg_;
+        RCLCPP_INFO(get_logger(), "ENC1: %.3f deg target: %.3f deg err: %.3f cmd: %.3f smoothed: %.3f md7: %d",
+                enc1_total_angle_deg_, target_angle_deg_, error_deg, static_cast<double>(command), smoothed_command, md7_command);
         // 受信データ処理ここまで
     }
 
@@ -255,15 +283,20 @@ private:
     rclcpp::TimerBase::SharedPtr timer_;
 
     bool enc1_initialized_ = false;
-    int16_t last_enc1_ = 0;
+    int32_t last_enc1_ = 0;
     int32_t enc1_rotation_count_ = 0;
     int64_t enc1_total_encoder_ = 0;
     double enc1_total_angle_deg_ = 0.0;
     bool last_up_ = false;
+    bool last_down_ =false;
     bool target_initialized_ = false;
     double target_angle_deg_ = 0.0;
     rclcpp::Time last_control_time_;
-    PIDController pid_{1.0f, 0.0f, 0.8f, 100.0f};
+    PDController pd_angle_{2.8f, 0.5f, 100.0f};
+
+    // smoothing for controller output to prevent rapid jumps
+    double prev_command_ = 0.0;
+    const float smoothing_alpha_ = 0.7f; // higher -> more smoothing
 
     PacketController pkt;
 };

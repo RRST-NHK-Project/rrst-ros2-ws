@@ -15,8 +15,8 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include <std_msgs/msg/int16_multi_array.hpp>
 #include <std_msgs/msg/int32_multi_array.hpp>
 
-// 自作
-#include "include/PacketController.hpp"
+// 自作 (common パッケージ)
+#include "common/common.hpp"
 PacketController pkt;
 
 // 以下マイコンに合わせて設定
