@@ -18,9 +18,12 @@ find_package(geometry_msgs REQUIRED)
 add_executable(welcome src/welcomeday.cpp)
 ament_target_dependencies(welcome rclcpp std_msgs sensor_msgs geometry_msgs)
 
+add_executable(angle src/angle_test.cpp src/include/PID.cpp)
+ament_target_dependencies(angle rclcpp std_msgs sensor_msgs geometry_msgs)
 # インストール設定
 install(TARGETS
   welcome
+  angle
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
