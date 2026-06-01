@@ -264,13 +264,13 @@ private:
         prev_command_ = smoothed_command;
 
         // clamp to device-expected range (-100..100)
-        const int md7_command = static_cast<int>(std::clamp(smoothed_command, -100.0, 100.0));
+        const int md7_command = static_cast<int>(std::clamp(smoothed_command, -300.0, 300.0));
 
         pkt.setMD(MD7, md7_command);
 
         const double error_deg = target_angle_deg_ - enc1_total_angle_deg_;
-        RCLCPP_INFO(get_logger(), "ENC1: %.3f deg target: %.3f deg err: %.3f cmd: %.3f smoothed: %.3f md7: %d",
-                enc1_total_angle_deg_, target_angle_deg_, error_deg, static_cast<double>(command), smoothed_command, md7_command);
+        // RCLCPP_INFO(get_logger(), "ENC1: %.3f deg target: %.3f deg err: %.3f cmd: %.3f smoothed: %.3f md7: %d",
+        //         enc1_total_angle_deg_, target_angle_deg_, error_deg, static_cast<double>(command), smoothed_command, md7_command);
         // 受信データ処理ここまで
     }
 
@@ -292,7 +292,7 @@ private:
     bool target_initialized_ = false;
     double target_angle_deg_ = 0.0;
     rclcpp::Time last_control_time_;
-    PDController pd_angle_{2.8f, 0.5f, 100.0f};
+    PDController pd_angle_{1.2f, 0.3f, 100.0f};
 
     // smoothing for controller output to prevent rapid jumps
     double prev_command_ = 0.0;
