@@ -12,11 +12,12 @@ def generate_launch_description() -> LaunchDescription:
                 output="screen",
                 parameters=[
                     {
-                        "device_id": 0,
-                        "rx_device_id": 0,
-                        "tx_period_ms": 5,
+                        "device_id": 101,
+                        "rx_device_id": 102,
+                        "tx_period_ms": 10,
                         "command_topic_prefix": "esc_cmd_pos",
                         "command_rpm_scale": 1.0,
+                        "encoder_ppr": 8192.0,
                         "voltage_limit": 12.0,
                         "position_tolerance_deg": 1.0,
                         "enable_on_command": True,

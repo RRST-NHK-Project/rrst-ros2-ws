@@ -14,7 +14,8 @@
 namespace {
     constexpr std::size_t kTx16Num = 24; // PC -> MCU
     constexpr double kOneTurnDeg = 360.0;
-    constexpr double kWrapDetectThresholdDeg = 180.0;
+    constexpr int32_t kInt16CountRange = 65536;
+    constexpr int32_t kInt16HalfRange = kInt16CountRange / 2;
 
     constexpr float kTargetVelocityScale = 0.1f; // int16 <-> rad/s
     constexpr float kTargetAngleScale = 0.1f;    // int16 <-> deg
@@ -50,21 +51,31 @@ namespace {
     double rad_per_sec_to_rpm(double rad_per_sec) {
         return rad_per_sec * 60.0 / kTau;
     }
+
+    double wrap_degrees_360(double angle_deg) {
+        const double wrapped = std::fmod(angle_deg, kOneTurnDeg);
+        return (wrapped < 0.0) ? (wrapped + kOneTurnDeg) : wrapped;
+    }
 } // namespace
 
 class EscPositionPidNode : public rclcpp::Node {
 public:
     EscPositionPidNode()
         : Node("esc_position_pid") {
-        device_id_ = this->declare_parameter<int>("device_id", 153);
+        device_id_ = this->declare_parameter<int>("device_id", 999);
         rx_device_id_ = this->declare_parameter<int>("rx_device_id", device_id_);
         tx_period_ms_ = this->declare_parameter<int>("tx_period_ms", 20);
         command_topic_prefix_ = this->declare_parameter<std::string>("command_topic_prefix", "esc_cmd_pos");
         command_rpm_scale_ = this->declare_parameter<double>("command_rpm_scale", 1.0);
+        encoder_ppr_ = this->declare_parameter<double>("encoder_ppr", 0.0);
         voltage_limit_ = this->declare_parameter<double>("voltage_limit", 12.0);
         position_tolerance_deg_ = this->declare_parameter<double>("position_tolerance_deg", 1.0);
         enable_on_command_ = this->declare_parameter<bool>("enable_on_command", true);
         show_info_logs_ = this->declare_parameter<bool>("show_info_logs", true);
+
+        if (encoder_ppr_ > 0.0) {
+            encoder_deg_per_count_ = kOneTurnDeg / encoder_ppr_;
+        }
 
         const double pid_kp = this->declare_parameter<double>("pid_kp", 10.0);
         const double pid_ki = this->declare_parameter<double>("pid_ki", 0.0);
@@ -105,6 +116,15 @@ public:
                         serial_tx_topic_.c_str(), serial_rx_topic_.c_str());
             RCLCPP_INFO(this->get_logger(),
                         "Command format: Float64MultiArray [target_deg, max_rpm]");
+            if (encoder_ppr_ > 0.0) {
+                RCLCPP_INFO(this->get_logger(),
+                            "Feedback angle: signed int16 encoder counts, ppr=%.1f deg/count=%.6f",
+                            encoder_ppr_, encoder_deg_per_count_);
+            } else {
+                RCLCPP_INFO(this->get_logger(),
+                            "Feedback angle: legacy int16 scaled by %.3f deg/count",
+                            kTargetAngleScale);
+            }
             RCLCPP_INFO(this->get_logger(),
                         "PID gains: kp=%.3f ki=%.3f kd=%.3f max_rpm=%.1f", pid_kp, pid_ki, pid_kd,
                         pid_max_rpm_);
@@ -141,23 +161,45 @@ private:
             return;
         }
 
-        const double wrapped_angle_deg = static_cast<double>(msg->data[kRxAngle]) * kTargetAngleScale;
-        if (!has_angle_reference_) {
-            current_angle_deg_ = wrapped_angle_deg;
-            last_wrapped_angle_deg_ = wrapped_angle_deg;
-            has_angle_reference_ = true;
-        } else {
-            double delta_deg = wrapped_angle_deg - last_wrapped_angle_deg_;
-            if (delta_deg > kWrapDetectThresholdDeg) {
-                delta_deg -= kOneTurnDeg;
-            } else if (delta_deg < -kWrapDetectThresholdDeg) {
-                delta_deg += kOneTurnDeg;
+        if (encoder_ppr_ > 0.0) {
+            const int32_t raw_encoder_count = static_cast<int32_t>(msg->data[kRxAngle]);
+            if (!has_angle_reference_) {
+                total_encoder_count_ = raw_encoder_count;
+                last_encoder_count_ = raw_encoder_count;
+                has_angle_reference_ = true;
+            } else {
+                int32_t delta_count = raw_encoder_count - last_encoder_count_;
+                if (delta_count > kInt16HalfRange) {
+                    delta_count -= kInt16CountRange;
+                } else if (delta_count < -kInt16HalfRange) {
+                    delta_count += kInt16CountRange;
+                }
+                total_encoder_count_ += delta_count;
+                last_encoder_count_ = raw_encoder_count;
             }
-            current_angle_deg_ += delta_deg;
-            last_wrapped_angle_deg_ = wrapped_angle_deg;
-        }
 
-        wrapped_angle_deg_ = wrapped_angle_deg;
+            current_angle_deg_ = static_cast<double>(total_encoder_count_) * encoder_deg_per_count_;
+            wrapped_angle_deg_ = wrap_degrees_360(current_angle_deg_);
+        } else {
+            const double wrapped_angle_deg =
+                static_cast<double>(msg->data[kRxAngle]) * kTargetAngleScale;
+            if (!has_angle_reference_) {
+                current_angle_deg_ = wrapped_angle_deg;
+                last_wrapped_angle_deg_ = wrapped_angle_deg;
+                has_angle_reference_ = true;
+            } else {
+                double delta_deg = wrapped_angle_deg - last_wrapped_angle_deg_;
+                if (delta_deg > (kOneTurnDeg / 2.0)) {
+                    delta_deg -= kOneTurnDeg;
+                } else if (delta_deg < -(kOneTurnDeg / 2.0)) {
+                    delta_deg += kOneTurnDeg;
+                }
+                current_angle_deg_ += delta_deg;
+                last_wrapped_angle_deg_ = wrapped_angle_deg;
+            }
+
+            wrapped_angle_deg_ = wrapped_angle_deg;
+        }
         current_velocity_rad_per_sec_ =
             static_cast<double>(msg->data[kRxVelocity]) * kTargetVelocityScale;
         current_mode_ = (msg->data[kRxMode] == 1) ? 1 : 0;
@@ -218,6 +260,8 @@ private:
     std::string serial_tx_topic_;
     std::string serial_rx_topic_;
     double command_rpm_scale_{1.0};
+    double encoder_ppr_{0.0};
+    double encoder_deg_per_count_{0.0};
     double voltage_limit_{12.0};
     double position_tolerance_deg_{1.0};
     double pid_max_rpm_{3000.0};
@@ -232,6 +276,8 @@ private:
     double current_angle_deg_{0.0};
     double wrapped_angle_deg_{0.0};
     double last_wrapped_angle_deg_{0.0};
+    int32_t last_encoder_count_{0};
+    int64_t total_encoder_count_{0};
     double current_velocity_rad_per_sec_{0.0};
     int current_mode_{0};
     double current_voltage_limit_{0.0};

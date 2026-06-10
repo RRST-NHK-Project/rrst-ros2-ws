@@ -42,16 +42,23 @@
 - command format: `[target_angle_deg, max_command_rpm]`
 - feedback topic: `serial_rx_[device_id]`
 - output topic: `serial_tx_[device_id]`
+- optional parameter: `encoder_ppr` (`> 0` のとき `serial_rx[kRxAngle]` を符号付き 16bit のエンコーダカウントとして解釈)
 
 `esc_position_pid_node` は `device_id` ごとに `esc_cmd_pos_<id>` を購読します。各ノードは自分の ID 用トピックだけを受け、`common/PID.hpp` の `PIDController` で位置 PID を回して velocity モードの速度指令を `serial_tx_<id>` に送ります。
 
-受信角度はマイコン側で 1 回転ぶんの角度として送られてくるため、このノード側で折り返しを検出して連続角に展開しています。そのため `360 deg` を超える目標値でも連続回転できます。連続角の基準はノード起動後の最初の受信値です。
+既定では受信角度をマイコン側の角度値として扱い、このノード側で折り返しを検出して連続角に展開します。そのため `360 deg` を超える目標値でも連続回転できます。連続角の基準はノード起動後の最初の受信値です。
+
+ESP32 の PCNT 出力のように `serial_rx[kRxAngle]` が符号付き 16bit の生カウント値で来る場合は、`encoder_ppr` を設定してください。`encoder_ppr` を正値にすると、このノードは int16 のオーバーフローを補正しながらカウント差分を連続化し、`360 / encoder_ppr` で度に変換して位置 PID に使います。
 
 例:
 
 - topic: `esc_cmd_pos_153`
 - `data: [90.0, 800.0]`
 - `device_id=153` のノードはこのコマンドを受けて `90 deg` へ最大 `800 rpm` で位置決め
+
+例: ESP32 PCNT が x4 カウントで 8192 count/rev のとき
+
+- `encoder_ppr: 8192.0`
 
 要素数が 2 未満のコマンドは無視します。複数 ID を制御したい場合は、ID ごとに別ノードまたは別 `device_id` インスタンスを立てます。
 
