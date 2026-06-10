@@ -17,6 +17,7 @@ namespace {
     constexpr float kTargetVelocityScale = 0.1f; // int16 <-> rad/s
     constexpr float kTargetAngleScale = 0.1f;    // int16 <-> deg
     constexpr float kVoltageLimitScale = 0.1f;   // int16 <-> V
+    constexpr double kRpmToRadPerSec = (2.0 * M_PI) / 60.0;
 
     constexpr std::size_t kCmdEnable = 1;
     constexpr std::size_t kCmdMode = 2;
@@ -38,6 +39,10 @@ namespace {
             return -32768;
         }
         return static_cast<int16_t>(value);
+    }
+
+    double velocity_command_to_rad_per_sec(double rpm) {
+        return rpm * kRpmToRadPerSec;
     }
 } // namespace
 
@@ -76,15 +81,23 @@ public:
             RCLCPP_INFO(this->get_logger(), "esc_ctrl started (keyboard command mode)");
             RCLCPP_INFO(this->get_logger(), "device_id=%d tx=%s rx=%s", device_id_,
                         serial_tx_topic_.c_str(), serial_rx_topic_.c_str());
-            RCLCPP_INFO(this->get_logger(),
-                        "Initial command: enable=%d mode=%d target=%.3f voltage_limit=%.3f", fixed_enable_,
-                        fixed_mode_, fixed_target_, fixed_voltage_limit_);
-            RCLCPP_INFO(this->get_logger(),
-                        "Keyboard input: v<number> (velocity rad/s), p<number> (position deg). Example: v100, p90");
+            if (fixed_mode_ == 0) {
+                RCLCPP_INFO(this->get_logger(),
+                            "Initial command: enable=%d mode=velocity target=%.3f rpm (%.3f rad/s) voltage_limit=%.3f",
+                            fixed_enable_, fixed_target_,
+                            velocity_command_to_rad_per_sec(fixed_target_), fixed_voltage_limit_);
+            } else {
+                RCLCPP_INFO(this->get_logger(),
+                            "Initial command: enable=%d mode=angle target=%.3f deg voltage_limit=%.3f",
+                            fixed_enable_, fixed_target_, fixed_voltage_limit_);
+            }
             RCLCPP_INFO(this->get_logger(),
                         "RX log mode: on-change (angle/vel/vlim eps=%.3f, target eps=%.3f), snapshot=%d ms",
                         rx_change_epsilon_, rx_target_change_epsilon_, rx_force_log_period_ms_);
         }
+
+        RCLCPP_INFO(this->get_logger(),
+                    "Keyboard input: v<number> (velocity rpm), p<number> (position deg). Example: v1000, p90");
 
         stdin_is_tty_ = ::isatty(STDIN_FILENO) == 1;
         if (!stdin_is_tty_) {
@@ -143,7 +156,7 @@ private:
                 RCLCPP_INFO(this->get_logger(), "Updated command: mode=%s target=%.3f %s",
                             (fixed_mode_ == 0) ? "velocity" : "angle",
                             fixed_target_,
-                            (fixed_mode_ == 0) ? "rad/s" : "deg");
+                            (fixed_mode_ == 0) ? "rpm" : "deg");
             }
         } catch (...) {
             RCLCPP_WARN(this->get_logger(),
@@ -161,7 +174,8 @@ private:
         out.data[kCmdMode] = static_cast<int16_t>(fixed_mode_);
         if (fixed_mode_ == 0) {
             out.data[kCmdTargetVelocity] =
-                clamp_i16(std::lround(fixed_target_ / kTargetVelocityScale));
+                clamp_i16(std::lround(velocity_command_to_rad_per_sec(fixed_target_) /
+                                      kTargetVelocityScale));
             out.data[kCmdTargetAngle] = 0;
         } else {
             out.data[kCmdTargetVelocity] = 0;
