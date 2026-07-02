@@ -14,13 +14,17 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(common REQUIRED)
 
 add_executable(welcome src/welcomeday.cpp)
-ament_target_dependencies(welcome rclcpp std_msgs sensor_msgs geometry_msgs)
+ament_target_dependencies(welcome rclcpp std_msgs sensor_msgs geometry_msgs common)
 
+add_executable(angle src/angle_test.cpp)
+ament_target_dependencies(angle rclcpp std_msgs sensor_msgs geometry_msgs common)
 # インストール設定
 install(TARGETS
   welcome
+  angle
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)

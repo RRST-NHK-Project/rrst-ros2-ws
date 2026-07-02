@@ -6,6 +6,7 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include <chrono>
 #include <cmath>
 #include <iostream>
+#include <algorithm>
 #include <thread>
 #include <vector>
 
@@ -17,66 +18,20 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 
 // 自作 (common パッケージ)
 #include "common/common.hpp"
-PacketController pkt;
 
 // 以下マイコンに合わせて設定
 #define TX_DEVICE_ID 3 // 送信先マイコンのID
 #define RX_DEVICE_ID 3 // 受信先マイコンのID
 
 #define TX16NUM 24 // 送信データ数
-#define RX16NUM 17 // 受信データ数
+#define RX16NUM 24// 受信データ数
 
-#define PUBLISH_RATE_MS 20 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
+#define PUBLISH_RATE_MS 10 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
 
 // スティックのデッドゾーン
 #define DEADZONE_L 0.3
 #define DEADZONE_R 0.3
 
-#define updown_speed 100  // 差動の速度
-#define forback_speed 100 // 前後移動の速度
-#define turn_speed 50     // 回転の速度
-#define SERVO_STEP 1      // サーボの増減幅
-#define servo_max 270     // サーボの最大角度
-#define servo_min 0       // サーボの最小角度
-
-class Action
-{
-public:
-    static void moveForward(PacketController &pkt)
-    {
-        pkt.setMD(MD5, forback_speed);
-        pkt.setMD(MD6, -forback_speed);
-    }
-    static void moveBackward(PacketController &pkt)
-    {
-        pkt.setMD(MD5, -forback_speed);
-        pkt.setMD(MD6, forback_speed);
-    }
-    static void moveUp(PacketController &pkt)
-    {
-        pkt.setMD(MD5, updown_speed);
-        pkt.setMD(MD6, updown_speed);
-    }
-    static void moveDown(PacketController &pkt)
-    {
-        pkt.setMD(MD5, -updown_speed);
-        pkt.setMD(MD6, -updown_speed);
-    }
-    static void turnLeft(PacketController &pkt)
-    {
-        pkt.setMD(MD7, -turn_speed);
-    }
-    static void turnRight(PacketController &pkt)
-    {
-        pkt.setMD(MD7, turn_speed);
-    }
-    static void stop(PacketController &pkt)
-    {
-        pkt.setMD(MD5, 0);
-        pkt.setMD(MD6, 0);
-        pkt.setMD(MD7, 0);
-    }
-};
 
 class HardWareControl : public rclcpp::Node
 {
@@ -142,6 +97,9 @@ public:
                       this,
                       std::placeholders::_1));
 
+        pd_angle_.set_target(static_cast<float>(target_angle_deg_));
+        pd_angle_.reset();
+
         RCLCPP_INFO(get_logger(),
                     "serial_tx_%d started.", tx_device_id_);
     }
@@ -156,24 +114,24 @@ private:
         // float RS_X = -1 * msg->axes[3];
         // float RS_Y = msg->axes[4];
 
-        bool CROSS = msg->buttons[0];
-        bool CIRCLE = msg->buttons[1];
-        bool TRIANGLE = msg->buttons[2];
+        // bool CROSS = msg->buttons[0];
+        // bool CIRCLE = msg->buttons[1];
+        // bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
 
-        bool LEFT = msg->axes[6] == 1.0;
-        bool RIGHT = msg->axes[6] == -1.0;
+        // bool LEFT = msg->axes[6] == 1.0;
+        // bool RIGHT = msg->axes[6] == -1.0;
         bool UP = msg->axes[7] == 1.0;
         bool DOWN = msg->axes[7] == -1.0;
 
-        bool L1 = msg->buttons[4];
-        bool R1 = msg->buttons[5];
+        // bool L1 = msg->buttons[4];
+        // bool R1 = msg->buttons[5];
 
         // float L2_DIGITAL = (-1 * msg->axes[2] + 1) / 2;
         // float R2_DIGITAL = (-1 * msg->axes[5] + 1) / 2;
 
-        bool L2 = msg->buttons[6];
-        bool R2 = msg->buttons[7];
+        //bool L2 = msg->buttons[6];
+        //bool R2 = msg->buttons[7];
 
         // bool SHARE = msg->buttons[8];
         // bool OPTION = msg->buttons[9];
@@ -187,75 +145,29 @@ private:
 
         // static bool last_share = false;
         // static bool share_latch = false;
-
-        static bool circle_latch = false;
-        static bool last_circle = false;
-
-        if (CIRCLE && !last_circle)
+               
+        if (UP && !last_up_)
         {
-            circle_latch = !circle_latch;
+            target_angle_deg_ += 90.0;
+            pd_angle_.set_target(static_cast<float>(target_angle_deg_));
+            pd_angle_.reset();
+            // Initialize internal last_current_ to avoid a large derivative spike
+            pd_angle_.update(static_cast<float>(enc1_total_angle_deg_), 1.0f);
+            //RCLCPP_INFO(get_logger(), "Target angle updated: %.3f deg", target_angle_deg_);
         }
 
-        last_circle = CIRCLE;
+        if (DOWN && !last_down_)
+        {
+            target_angle_deg_ -= 90.0;
+            pd_angle_.set_target(static_cast<float>(target_angle_deg_));
+            pd_angle_.reset();
+            // Initialize internal last_current_ to avoid a large derivative spike
+            pd_angle_.update(static_cast<float>(enc1_total_angle_deg_), 1.0f);
+            //RCLCPP_INFO(get_logger(), "Target angle updated: %.3f deg", target_angle_deg_);
+        }
+        last_up_ = UP;
+        last_down_ = DOWN;
 
-        if (circle_latch)
-        {
-            pkt.setTR(TR1, true);
-        }
-        else
-        {
-            pkt.setTR(TR1, false);
-        }
-
-        // 以降、配列data_を操作する
-        if (TRIANGLE)
-        {
-            Action::moveUp(pkt);
-        }
-        else if (CROSS)
-        {
-            Action::moveDown(pkt);
-        }
-        else if (UP)
-        {
-            Action::moveForward(pkt);
-        }
-        else if (DOWN)
-        {
-            Action::moveBackward(pkt);
-        }
-        else if (L1)
-        {
-            Action::turnLeft(pkt);
-        }
-        else if (R1)
-        {
-            Action::turnRight(pkt);
-        }
-        else
-        {
-            Action::stop(pkt);
-        }
-
-        // サーボ関連
-        static int servo1_value = 135;
-
-        if (R2)
-        {
-            servo1_value += SERVO_STEP;
-            pkt.setServo(SERVO1, servo1_value);
-        }
-        else if (L2)
-        {
-            servo1_value -= SERVO_STEP;
-            pkt.setServo(SERVO1, servo1_value);
-        }
-
-        if (SERVO1 < servo_min)
-            servo1_value = servo_min;
-        if (SERVO1 > servo_max)
-            servo1_value = servo_max;
-        pkt.setServo(SERVO1, servo1_value);
         // デバッグ用
         // RCLCPP_INFO(
         //     get_logger(),
@@ -281,7 +193,7 @@ private:
         const std_msgs::msg::Int16MultiArray::SharedPtr msg)
     {
 
-        // int16_t ENC1 = msg->data[1];
+        int16_t enc1 = msg->data[1];
         // int16_t ENC2 = msg->data[2];
         // int16_t ENC3 = msg->data[3];
         // int16_t ENC4 = msg->data[4];
@@ -290,9 +202,9 @@ private:
         // int16_t ENC7 = msg->data[7];
         // int16_t ENC8 = msg->data[8];
 
-        int16_t SW1 = msg->data[9];
-        int16_t SW2 = msg->data[10];
-        int16_t SW3 = msg->data[11];
+        // int16_t SW1 = msg->data[9];
+        // int16_t SW2 = msg->data[10];
+        // int16_t SW3 = msg->data[11];
         // int16_t SW4 = msg->data[12];
         // int16_t SW5 = msg->data[13];
         // int16_t SW6 = msg->data[14];
@@ -300,15 +212,65 @@ private:
         // int16_t SW8 = msg->data[16];
 
         // 以降、受信データを使った処理を記述
-        if (SW1 == true)
+        //const int32_t HALF_ENCODER = 16384;   
+        //const int64_t ENCODER_MAX = 32768;   //上限 
+
+        const int32_t HALF_ENCODER = 4096;    // 1周(8192)の半分
+        const int64_t ENCODER_MAX = 8192;     // エンコーダ1周あたりのカウント数
+
+        if (!enc1_initialized_)
         {
-            Action::moveUp(pkt);
+            last_enc1_ = enc1;
+            enc1_initialized_ = true;
+            last_control_time_ = now();
         }
-        else if (SW2 == true)
+        else
         {
-            Action::moveForward(pkt);
+            const int32_t diff = static_cast<int32_t>(enc1) - last_enc1_;
+
+            if (diff > HALF_ENCODER)
+            {
+                enc1_rotation_count_--;
+            }
+            else if (diff < -HALF_ENCODER)
+            {
+                enc1_rotation_count_++;
+            }
+
+            last_enc1_ = enc1;
         }
 
+        enc1_total_encoder_ = static_cast<int64_t>(enc1_rotation_count_) * ENCODER_MAX + enc1;
+        enc1_total_angle_deg_ = static_cast<double>(enc1_total_encoder_) * (360.0 / ENCODER_MAX);
+
+        if (!target_initialized_)
+        {
+            target_angle_deg_ = enc1_total_angle_deg_;
+            pd_angle_.set_target(static_cast<float>(target_angle_deg_));
+            pd_angle_.reset();
+            // prime last_current_ to avoid derivative spike on first update
+            pd_angle_.update(static_cast<float>(enc1_total_angle_deg_), 1.0f);
+            target_initialized_ = true;
+        }
+
+        const rclcpp::Time current_time = now();
+        const double dt = (current_time - last_control_time_).seconds();
+        last_control_time_ = current_time;
+
+        const float command = pd_angle_.update(static_cast<float>(enc1_total_angle_deg_), static_cast<float>(dt));
+
+        // smooth command to avoid sudden jumps (helps with derivative noise)
+        const double smoothed_command = smoothing_alpha_ * prev_command_ + (1.0 - smoothing_alpha_) * static_cast<double>(command);
+        prev_command_ = smoothed_command;
+
+        // clamp to device-expected range (-100..100)
+        const int md7_command = static_cast<int>(std::clamp(smoothed_command, -300.0, 300.0));
+
+        pkt.setMD(MD7, md7_command);
+
+        const double error_deg = target_angle_deg_ - enc1_total_angle_deg_;
+        // RCLCPP_INFO(get_logger(), "ENC1: %.3f deg target: %.3f deg err: %.3f cmd: %.3f smoothed: %.3f md7: %d",
+        //         enc1_total_angle_deg_, target_angle_deg_, error_deg, static_cast<double>(command), smoothed_command, md7_command);
         // 受信データ処理ここまで
     }
 
@@ -319,6 +281,22 @@ private:
     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sensor_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
+
+    bool enc1_initialized_ = false;
+    int32_t last_enc1_ = 0;
+    int32_t enc1_rotation_count_ = 0;
+    int64_t enc1_total_encoder_ = 0;
+    double enc1_total_angle_deg_ = 0.0;
+    bool last_up_ = false;
+    bool last_down_ =false;
+    bool target_initialized_ = false;
+    double target_angle_deg_ = 0.0;
+    rclcpp::Time last_control_time_;
+    PDController pd_angle_{1.2f, 0.3f, 100.0f};
+
+    // smoothing for controller output to prevent rapid jumps
+    double prev_command_ = 0.0;
+    const float smoothing_alpha_ = 0.7f; // higher -> more smoothing
 
     PacketController pkt;
 };
