@@ -1,5 +1,5 @@
 /*
-Serial_Bridgeノードのホスト側プログラム
+ros2can (MODE_ROBOMAS) 経由でDJIロボマスの角度制御を行うホスト側テストプログラム
 Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 */
 
@@ -20,11 +20,16 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include "common/common.hpp"
 
 // 以下マイコンに合わせて設定
-#define TX_DEVICE_ID 3 // 送信先マイコンのID
-#define RX_DEVICE_ID 3 // 受信先マイコンのID
+// ros2can (xiao-esp32-s3_can2io, MODE_ROBOMAS) の DEVICE_ID / CAN_ID (指令送信先)
+#define ROBOMAS_DEVICE_ID 201
 
-#define TX16NUM 24 // 送信データ数
-#define RX16NUM 24// 受信データ数
+// 制御対象のロボマスのインデックス (0-3: モータ1-4)
+#define ROBOMAS_MOTOR_INDEX 0
+
+// 位置フィードバック用AMTエンコーダを繋いだ別マイコンのDEVICE_ID (robomasとは別体)
+#define ENCODER_DEVICE_ID 101
+
+#define ARRAY_SIZE 24 // シリアルフレームのスロット数 (frame_data.hppのTx16NUM/Rx16NUMと同じ)
 
 #define PUBLISH_RATE_MS 10 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
 
@@ -32,48 +37,29 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #define DEADZONE_L 0.3
 #define DEADZONE_R 0.3
 
+// 目標rpmの安全クランプ (念のための二重の飽和、PD側のmax_outが本来の制限)
+#define ROBOMAS_MAX_TARGET_RPM 300.0
+
 
 class HardWareControl : public rclcpp::Node
 {
 public:
-    HardWareControl(uint8_t tx_device_id, uint8_t rx_device_id)
-        : Node("hardware_control_" + std::to_string(tx_device_id)),
-          tx_device_id_(tx_device_id),
-          rx_device_id_(rx_device_id)
+    HardWareControl(uint8_t robomas_device_id, uint8_t encoder_device_id)
+        : Node("hardware_control_" + std::to_string(robomas_device_id)),
+          robomas_device_id_(robomas_device_id),
+          encoder_device_id_(encoder_device_id)
     {
-
-        // 配列を0で初期化
-        pkt.data_.fill(0);
         /*
-        マイコンに送信される配列"data_"
-        debug: 機能未割り当て, MD: モータードライバー, TR: トランジスタ
-        | data[n] | 詳細 | 範囲 |
-        | ---- | ---- | ---- |
-        | data[0] | debug | 0 or 1 |
-        | data[1] | MD1 | -100 ~ 100 |
-        | data[2] | MD2 | -100 ~ 100 |
-        | data[3] | MD3 | -100 ~ 100 |
-        | data[4] | MD4 | -100 ~ 100 |
-        | data[5] | MD5 | -100 ~ 100 |
-        | data[6] | MD6 | -100 ~ 100 |
-        | data[7] | MD7 | -100 ~ 100 |
-        | data[8] | MD8 | -100 ~ 100 |
-        | data[9] | Servo1 | 0 ~ 270 |
-        | data[10] | Servo2 | 0 ~ 270 |
-        | data[11] | Servo3 | 0 ~ 270 |
-        | data[12] | Servo4 | 0 ~ 270 |
-        | data[13] | Servo5 | 0 ~ 270 |
-        | data[14] | Servo6 | 0 ~ 270 |
-        | data[15] | Servo7 | 0 ~ 270 |
-        | data[16] | Servo8 | 0 ~ 270 |
-        | data[17] | TR1 | 0 or 1|
-        | data[18] | TR2 | 0 or 1|
-        | data[19] | TR3 | 0 or 1|
-        | data[20] | TR4 | 0 or 1|
-        | data[21] | TR5 | 0 or 1|
-        | data[22] | TR6 | 0 or 1|
-        | data[23] | TR7 | 0 or 1|
-        | data[24] | TR8 | 0 or 1|
+        ros2can (MODE_ROBOMAS) への指令フレーム (robomas.cpp 参照、24スロット):
+
+        送信 (PC -> 本機, serial_tx_[ROBOMAS_DEVICE_ID]、本機側Rx_16Data):
+          0-3: target_rpm (モータ1-4、生のrpm値、スケール無し)
+          4-23: 未使用
+
+        位置フィードバックはrobomas自身の帰還ではなく、出力軸に直付けされた
+        別体のAMTエンコーダ (serial_rx_[ENCODER_DEVICE_ID]) のdata[8]を使用する。
+        このエンコーダは1周8192カウントだが、4周(32768カウント)で0にリセットされる
+        多回転タイプのため、ラップ検出の周期は32768で行う (度への換算は1周=8192のまま)。
         */
 
         // joyノードのSubscribe
@@ -81,17 +67,18 @@ public:
             "joy", 10,
             std::bind(&HardWareControl::ps4_listener_callback, this, std::placeholders::_1));
 
-        // seial_bridgeへpublish
+        // ros2can (robomas) へpublish (target_rpm指令)
         publisher_ = this->create_publisher<std_msgs::msg::Int16MultiArray>(
-            "serial_tx_" + std::to_string(tx_device_id_), 10);
+            "serial_tx_" + std::to_string(robomas_device_id_), 10);
 
         // timer_callbackを呼び出すタイマーを作成
         timer_ = create_wall_timer(
             std::chrono::milliseconds(PUBLISH_RATE_MS),
             std::bind(&HardWareControl::publisher_timer_callback, this));
 
+        // AMTエンコーダ(robomasとは別体のマイコン)からのSubscribe
         sensor_sub_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
-            "serial_rx_" + std::to_string(rx_device_id_),
+            "serial_rx_" + std::to_string(encoder_device_id_),
             10,
             std::bind(&HardWareControl::sensor_callback,
                       this,
@@ -101,7 +88,8 @@ public:
         pd_angle_.reset();
 
         RCLCPP_INFO(get_logger(),
-                    "serial_tx_%d started.", tx_device_id_);
+                    "serial_tx_%d started (encoder: serial_rx_%d).",
+                    robomas_device_id_, encoder_device_id_);
     }
 
 private:
@@ -145,7 +133,7 @@ private:
 
         // static bool last_share = false;
         // static bool share_latch = false;
-               
+
         if (UP && !last_up_)
         {
             target_angle_deg_ += 90.0;
@@ -168,13 +156,11 @@ private:
         last_up_ = UP;
         last_down_ = DOWN;
 
-        // デバッグ用
-        // RCLCPP_INFO(
-        //     get_logger(),
-        //     "data_[1-4]=[%d,%d,%d,%d], data_[9-12]=[%d,%d,%d,%d]",
-        //     data_[1], data_[2], data_[3], data_[4],
-        //     data_[9], data_[10], data_[11], data_[12]);
-
+        RCLCPP_INFO(
+            get_logger(),
+            "target_angle= %.1f, angle= %.1f, target_rpm= %d",
+            target_angle_deg_, enc1_total_angle_deg_, target_rpm_command_
+        );
         // 配列操作ここまで
     }
 
@@ -183,7 +169,8 @@ private:
     {
         std_msgs::msg::Int16MultiArray msg;
 
-        msg.data = pkt.toVector();
+        msg.data.assign(ARRAY_SIZE, 0);
+        msg.data[ROBOMAS_MOTOR_INDEX] = target_rpm_command_;
 
         publisher_->publish(msg);
     }
@@ -192,30 +179,10 @@ private:
     sensor_callback(
         const std_msgs::msg::Int16MultiArray::SharedPtr msg)
     {
+        // AMTエンコーダの生値 (1周8192カウント、4周=32768カウントで0にリセット)
+        const int16_t enc1 = msg->data[8];
 
-        int16_t enc1 = msg->data[1];
-        // int16_t ENC2 = msg->data[2];
-        // int16_t ENC3 = msg->data[3];
-        // int16_t ENC4 = msg->data[4];
-        // int16_t ENC5 = msg->data[5];
-        // int16_t ENC6 = msg->data[6];
-        // int16_t ENC7 = msg->data[7];
-        // int16_t ENC8 = msg->data[8];
-
-        // int16_t SW1 = msg->data[9];
-        // int16_t SW2 = msg->data[10];
-        // int16_t SW3 = msg->data[11];
-        // int16_t SW4 = msg->data[12];
-        // int16_t SW5 = msg->data[13];
-        // int16_t SW6 = msg->data[14];
-        // int16_t SW7 = msg->data[15];
-        // int16_t SW8 = msg->data[16];
-
-        // 以降、受信データを使った処理を記述
-        //const int32_t HALF_ENCODER = 16384;   
-        //const int64_t ENCODER_MAX = 32768;   //上限 
-
-        const int32_t HALF_ENCODER = 4096;    // 1周(8192)の半分
+         const int32_t HALF_ENCODER = 4096;    // 1周(8192)の半分
         const int64_t ENCODER_MAX = 8192;     // エンコーダ1周あたりのカウント数
 
         if (!enc1_initialized_)
@@ -254,34 +221,34 @@ private:
         }
 
         const rclcpp::Time current_time = now();
-        const double dt = (current_time - last_control_time_).seconds();
+        // dtの下限をクランプ (エンコーダマイコンからのメッセージ間隔が数msまで詰まることがあり、
+        // 微分項が (current-last)/dt で跳ね上がって振動の原因になるため)
+        const double dt = std::max((current_time - last_control_time_).seconds(), 0.005);
         last_control_time_ = current_time;
 
+        // 角度PDの出力をそのまま目標rpmとしてrobomasの速度ループへ渡す
         const float command = pd_angle_.update(static_cast<float>(enc1_total_angle_deg_), static_cast<float>(dt));
 
         // smooth command to avoid sudden jumps (helps with derivative noise)
         const double smoothed_command = smoothing_alpha_ * prev_command_ + (1.0 - smoothing_alpha_) * static_cast<double>(command);
         prev_command_ = smoothed_command;
 
-        // clamp to device-expected range (-100..100)
-        const int md7_command = static_cast<int>(std::clamp(smoothed_command, -300.0, 300.0));
+        target_rpm_command_ = static_cast<int16_t>(
+            std::clamp(smoothed_command, -ROBOMAS_MAX_TARGET_RPM, ROBOMAS_MAX_TARGET_RPM));
 
-        pkt.setMD(MD7, md7_command);
-
-        const double error_deg = target_angle_deg_ - enc1_total_angle_deg_;
-        // RCLCPP_INFO(get_logger(), "ENC1: %.3f deg target: %.3f deg err: %.3f cmd: %.3f smoothed: %.3f md7: %d",
-        //         enc1_total_angle_deg_, target_angle_deg_, error_deg, static_cast<double>(command), smoothed_command, md7_command);
+        // const double error_deg = target_angle_deg_ - angle_deg;
+        // RCLCPP_INFO(get_logger(), "angle: %.3f deg target: %.3f deg err: %.3f cmd: %.3f smoothed: %.3f target_rpm: %d",
+        //         angle_deg, target_angle_deg_, error_deg, static_cast<double>(command), smoothed_command, target_rpm_command_);
         // 受信データ処理ここまで
     }
 
-    uint8_t tx_device_id_;
-    uint8_t rx_device_id_;
+    uint8_t robomas_device_id_;
+    uint8_t encoder_device_id_;
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
     rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr publisher_;
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sensor_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
-
     bool enc1_initialized_ = false;
     int32_t last_enc1_ = 0;
     int32_t enc1_rotation_count_ = 0;
@@ -292,13 +259,13 @@ private:
     bool target_initialized_ = false;
     double target_angle_deg_ = 0.0;
     rclcpp::Time last_control_time_;
-    PDController pd_angle_{1.2f, 0.3f, 100.0f};
+    PDController pd_angle_{0.25f, 0.05f, 100.0f};
 
     // smoothing for controller output to prevent rapid jumps
     double prev_command_ = 0.0;
     const float smoothing_alpha_ = 0.7f; // higher -> more smoothing
 
-    PacketController pkt;
+    int16_t target_rpm_command_ = 0;
 };
 
 int main(int argc, char *argv[])
@@ -321,7 +288,7 @@ int main(int argc, char *argv[])
 
     rclcpp::executors::MultiThreadedExecutor exec;
 
-    auto hardware_control = std::make_shared<HardWareControl>(TX_DEVICE_ID, RX_DEVICE_ID);
+    auto hardware_control = std::make_shared<HardWareControl>(ROBOMAS_DEVICE_ID, ENCODER_DEVICE_ID);
     exec.add_node(hardware_control);
     exec.spin();
 
