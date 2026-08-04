@@ -1,4 +1,0 @@
-serial_rx_unwrap_node:
-  ros__parameters:
-    # unwrap対象の ros2can DEVICE_ID (serial_rx_[ID] を購読する)
-    device_id: 101
