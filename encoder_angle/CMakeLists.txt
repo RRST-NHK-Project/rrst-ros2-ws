@@ -12,7 +12,6 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 
 add_executable(encoder_angle_node src/encoder_angle_node.cpp)
-target_include_directories(encoder_angle_node PUBLIC include)
 ament_target_dependencies(encoder_angle_node
   rclcpp
   std_msgs
@@ -34,10 +33,6 @@ if(BUILD_TESTING)
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
-
-  find_package(ament_cmake_gtest REQUIRED)
-  ament_add_gtest(test_counter_unwrapper test/test_counter_unwrapper.cpp)
-  target_include_directories(test_counter_unwrapper PUBLIC include)
 endif()
 
 ament_package()

@@ -25,8 +25,3 @@ encoder_angle_node:
     # エンコーダの回転方向とロボット側で定義した正方向が逆な場合は -1.0 にする。
     enc1_sign: 1.0
     enc2_sign: 1.0
-
-    # CounterUnwrapper の曖昧判定パラメータ。通常は変更不要
-    # (詳細は counter_unwrapper.hpp 冒頭コメント参照)。
-    ambiguous_margin_ratio: 0.1
-    trend_noise_floor: 4

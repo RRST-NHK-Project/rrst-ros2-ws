@@ -1,9 +1,23 @@
 # encoder_angle
 
-`ros2can` の `serial_rx_[DEVICE_ID]` (`Int16MultiArray`) から、汎用IOノード
-(`xiao-esp32-s3_can2io`) のロータリーエンコーダ入力 `ENC1`/`ENC2` スロット
-だけを取り出し、連続角度 (deg) として配信する独立ノードです。`ros2can` 本体
-(サブモジュール) には手を入れません。
+`ros2can` の `serial_rx_[DEVICE_ID]_unwrapped` (`Int32MultiArray`、ros2can側で
+既に連続値化済み) から、汎用IOノード (`xiao-esp32-s3_can2io`) のロータリー
+エンコーダ入力 `ENC1`/`ENC2` スロットだけを取り出し、連続角度 (deg) として
+配信する独立ノードです。
+
+## アーキテクチャ
+
+PCNT の生カウント(int16)のラップ検出(0クリアの補正)は `ros2can` 本体側
+(`ros2can/ros2can/counter_unwrapper.py`)が、シリアルフレームを受信した
+直後のサンプルが密な場所(`RosBackend._on_hardware_frame`/
+`service_simulators`)で行い、`serial_rx_[ID]_unwrapped` として配信する。
+本パッケージはそれを購読し、`ticks * (360 / encoder_ppr) * sign` の単純な
+スケール変換のみを行う。
+
+以前は本パッケージ自身がラップ検出まで行っていたが、ROSトピック経由
+(GUIスレッドの詰まり等でサンプルが疎になりうる)で下流にラップ検出を
+任せると、欠落量がちょうど半周期に近い場合に誤判定しうることが実機検証で
+判明したため、サンプルが密な `ros2can` 側に移設した。
 
 ## なぜ「連続値化」が必要か (ESP32 PCNT の仕様、実機で確認済み)
 
@@ -25,14 +39,8 @@
 リセット幅は正負どちらの方向も **32768** (= h_lim+1 = -l_lim) で対称になる
 (単純な2の補数オーバーフロー=全域65536幅の1本のリング、とは異なる)。
 
-このため生カウントをそのまま角度に換算すると、一周(や複数周)ごとに
-ジャンプが発生します。`CounterUnwrapper`
-(`include/encoder_angle/counter_unwrapper.hpp`) はサンプル間の差分を監視し、
-半周期(16384カウント = 32768/2)を超える跳躍をラップとみなして補正することで、
-連続値 (ticks) に復元します。欠落量がちょうど半周期に近いと「絶対値最小」
-判定だけでは原理的に誤判定しうるため、差分が明らかに曖昧な場合に限り直近の
-移動方向(符号)を優先する補助判定を入れています(静止中の微小ノイズを
-1周期分の大ジャンプと誤判定しないよう、曖昧でない場合は使いません)。
+詳細なアルゴリズム(欠落量が半周期に近い場合の曖昧判定への対処含む)は
+`ros2can/ros2can/counter_unwrapper.py` 冒頭コメントを参照してください。
 
 ## 角度への換算
 
@@ -47,10 +55,20 @@ angle_deg = ticks * (360 / encoder_ppr) * sign
 
 ## トピック
 
-- 購読: `/serial_rx_[device_id]` (`std_msgs/Int16MultiArray`, ros2can が配信)
+- 購読: `/serial_rx_[device_id]_unwrapped` (`std_msgs/Int32MultiArray`,
+  ros2can が配信、既に連続値化済み)
 - 配信 (相対名、ノード毎に分離):
   - `encoder1/angle_deg`, `encoder1/ticks`
   - `encoder2/angle_deg`, `encoder2/ticks`
+
+## esc_ctrl への経路
+
+`esc_ctrl_node` は位置フィードバックとして `serial_rx_[feedback_device_id]_unwrapped`
+(Int32MultiArray) の `feedback_slot` を直接購読する(`esc_ctrl.yaml` の
+`encoder_ppr`/`feedback_sign` で独自にdeg換算する)ため、本パッケージを
+経由しなくても ros2can → esc_ctrl の経路は繋がる。本パッケージは
+odometryやロギングなど、`encoder1/angle_deg` のような単体の角度トピックが
+別途必要な用途のために用意している。
 
 ## ビルド・起動
 
@@ -59,10 +77,4 @@ cd ~/ros2_ws
 colcon build --packages-select encoder_angle
 source install/setup.bash
 ros2 launch encoder_angle encoder_angle.launch.py
-```
-
-## テスト
-
-```bash
-colcon test --packages-select encoder_angle
 ```

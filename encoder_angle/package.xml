@@ -4,10 +4,11 @@
   <name>encoder_angle</name>
   <version>0.0.0</version>
   <description>
-    ros2can の serial_rx_[DEVICE_ID] (Int16MultiArray) から汎用IOノード
-    (xiao-esp32-s3_can2io) のロータリーエンコーダ入力 ENC1/ENC2 スロットを
-    取り出し、PCNT の±32768オーバーフローをラップ検出で連続値化した上で
-    連続角度 (deg) として配信するノード。ros2can本体には手を入れない。
+    ros2can の serial_rx_[DEVICE_ID]_unwrapped (Int32MultiArray、ros2can側で
+    既に連続値化済み) から汎用IOノード (xiao-esp32-s3_can2io) のロータリー
+    エンコーダ入力 ENC1/ENC2 スロットを取り出し、連続角度 (deg) として
+    配信するノード。ラップ検出(PCNTの±32768近辺のリセット処理)は ros2can
+    本体側で行うため、本パッケージは単純なスケール変換のみを担う。
   </description>
   <maintainer email="tashikou1682@gmail.com">dev</maintainer>
   <license>Apache-2.0</license>
@@ -23,7 +24,6 @@
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
-  <test_depend>ament_cmake_gtest</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>
