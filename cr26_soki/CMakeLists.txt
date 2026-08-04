@@ -21,10 +21,14 @@ ament_target_dependencies(welcome rclcpp std_msgs sensor_msgs geometry_msgs comm
 
 add_executable(angle src/angle_test.cpp)
 ament_target_dependencies(angle rclcpp std_msgs sensor_msgs geometry_msgs common)
+
+add_executable(angle_gm src/angle_test_gm.cpp)
+ament_target_dependencies(angle_gm rclcpp std_msgs sensor_msgs geometry_msgs common)
 # インストール設定
 install(TARGETS
   welcome
   angle
+  angle_gm
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
