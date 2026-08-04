@@ -21,7 +21,7 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 
 // 以下マイコンに合わせて設定
 // ros2can (xiao-esp32-s3_can2io, MODE_ROBOMAS) の DEVICE_ID / CAN_ID (指令送信先)
-#define ROBOMAS_DEVICE_ID 201
+#define ROBOMAS_DEVICE_ID 102
 
 // 制御対象のロボマスのインデックス (0-3: モータ1-4)
 #define ROBOMAS_MOTOR_INDEX 0
@@ -78,7 +78,7 @@ public:
 
         // AMTエンコーダ(robomasとは別体のマイコン)からのSubscribe
         sensor_sub_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
-            "serial_rx_" + std::to_string(encoder_device_id_),
+            "serial_rx_" + std::to_string(encoder_device_id_) + "_unwrapped",
             10,
             std::bind(&HardWareControl::sensor_callback,
                       this,
@@ -180,7 +180,7 @@ private:
         const std_msgs::msg::Int16MultiArray::SharedPtr msg)
     {
         // AMTエンコーダの生値 (1周8192カウント、4周=32768カウントで0にリセット)
-        const int16_t enc1 = msg->data[8];
+        const int16_t enc1 = msg->data[3];
 
          const int32_t HALF_ENCODER = 4096;    // 1周(8192)の半分
         const int64_t ENCODER_MAX = 8192;     // エンコーダ1周あたりのカウント数
