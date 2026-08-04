@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>encoder_angle</name>
+  <version>0.0.0</version>
+  <description>
+    ros2can の serial_rx_[DEVICE_ID] (Int16MultiArray) から汎用IOノード
+    (xiao-esp32-s3_can2io) のロータリーエンコーダ入力 ENC1/ENC2 スロットを
+    取り出し、PCNT の±32768オーバーフローをラップ検出で連続値化した上で
+    連続角度 (deg) として配信するノード。ros2can本体には手を入れない。
+  </description>
+  <maintainer email="tashikou1682@gmail.com">dev</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>std_msgs</depend>
+
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
