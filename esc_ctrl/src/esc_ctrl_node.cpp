@@ -1,262 +1,252 @@
+/*
+位置指令をPID制御で速度指令に変換しros2can経由でCANノードへ送信するノード。
+
+位置指令(std_msgs/Float64, deg)を common/PID.hpp の PIDController で位置PID制御
+し、速度指令(rpm)に変換して ros2can 互換の serial_tx_[DEVICE_ID] トピック
+(Int16MultiArray, 24要素)経由で CANホストマイコン配下の FOC モータノード
+(b-g431-esc1_can2io, SimpleFOC)へ送信する。
+
+速度制御そのものはマイコン側(内蔵の速度PID)が行うため、本ノードが担うのは
+位置ループ(外側)のみ。b-g431-esc1_can2io は CAN 途絶時のフェイルセーフを持たず
+最後に受信した target_velocity を保持し続けるため、位置指令が
+command_timeout_sec 以上途絶えた場合は本ノード側で速度指令を0にフォールバック
+する(唯一の安全装置)。
+
+位置フィードバックの取得元(feedback_device_id/feedback_node_index)は、速度指令の
+送信先(device_id/node_index)とは独立して設定できる。ESC自身のエンコーダではなく
+CANホスト機側に接続されたエンコーダ(汎用IOノードのENC1/ENC2等)を使う構成を
+既定として想定しており、パラメータで任意の組み合わせに変更できる。
+feedback スロットの値は encoder_ppr を 0 より大きくすると「1周あたりのパルス数」
+として扱い(360/encoder_ppr [deg/count]でスケール)、0のままなら legacy な
+0.1deg/LSB スケール(angle_scale_deg)を使う。
+
+生のスロットは int16(±32768)でラップするが、そのラップ検出は本ノードでは行わず
+ros2can 側(HardwareManager がシリアルフレームを受信するループ内、サンプルが密な
+場所)で行い、既に連続値化された serial_rx_[ID]_unwrapped トピック(Int32MultiArray)
+を購読する。ROSトピック配信がGUIスレッドの詰まり等で疎になっても、ros2can側で
+既に連続値化済みのため、本ノード側でラップを誤判定することはない
+(過去に本ノード側でも同様のunwrapを行っていたが、疎なサンプルに対する
+「絶対値最小」ヒューリスティックは半周期に近い欠落で原理的に誤判定しうるため、
+サンプルが密なros2can側に移設した)。
+
+1ノード = 1軸を担当する。複数軸を制御する場合は launch でパラメータを変えて
+複数インスタンス起動する。
+*/
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
-#include <iostream>
+#include <memory>
+#include <stdexcept>
 #include <string>
+#include <vector>
 
-#include <sys/select.h>
-#include <unistd.h>
-
-#include <rclcpp/rclcpp.hpp>
+#include "common/PID.hpp"
+#include "rclcpp/rclcpp.hpp"
+#include <std_msgs/msg/float64.hpp>
 #include <std_msgs/msg/int16_multi_array.hpp>
+#include <std_msgs/msg/int32_multi_array.hpp>
 
 namespace {
-    constexpr std::size_t kTx16Num = 24; // PC -> MCU
 
-    constexpr float kTargetVelocityScale = 0.1f; // int16 <-> rad/s
-    constexpr float kTargetAngleScale = 0.1f;    // int16 <-> deg
-    constexpr float kVoltageLimitScale = 0.1f;   // int16 <-> V
-    constexpr double kRpmToRadPerSec = (2.0 * M_PI) / 60.0;
+// serial_bridge/ros2can プロトコルの固定スロット数
+// [ros2can/ros2can/frame_codec.py の SLOT_COUNT と一致させること]
+constexpr int kSlotCount = 24;
 
-    constexpr std::size_t kCmdEnable = 1;
-    constexpr std::size_t kCmdMode = 2;
-    constexpr std::size_t kCmdTargetVelocity = 3;
-    constexpr std::size_t kCmdTargetAngle = 4;
-    constexpr std::size_t kCmdVoltageLimit = 5;
+int16_t clamp_i16(double value) {
+    const double clamped = std::clamp(value, -32768.0, 32767.0);
+    return static_cast<int16_t>(std::lround(clamped));
+}
 
-    constexpr std::size_t kRxAngle = 1;
-    constexpr std::size_t kRxVelocity = 2;
-    constexpr std::size_t kRxTarget = 3;
-    constexpr std::size_t kRxMode = 4;
-    constexpr std::size_t kRxVoltageLimit = 5;
-
-    int16_t clamp_i16(long value) {
-        if (value > 32767) {
-            return 32767;
-        }
-        if (value < -32768) {
-            return -32768;
-        }
-        return static_cast<int16_t>(value);
-    }
-
-    double velocity_command_to_rad_per_sec(double rpm) {
-        return rpm * kRpmToRadPerSec;
-    }
-} // namespace
+}  // namespace
 
 class EscCtrlNode : public rclcpp::Node {
 public:
-    EscCtrlNode() : Node("esc_ctrl") {
-        device_id_ = this->declare_parameter<int>("device_id", 101);
-        tx_period_ms_ = this->declare_parameter<int>("tx_period_ms", 20);
-        log_period_ms_ = this->declare_parameter<int>("log_period_ms", 200);
-        rx_force_log_period_ms_ = this->declare_parameter<int>("rx_force_log_period_ms", 5000);
-        rx_change_epsilon_ = this->declare_parameter<double>("rx_change_epsilon", 0.5);
-        rx_target_change_epsilon_ = this->declare_parameter<double>("rx_target_change_epsilon", 1.0);
-        show_info_logs_ = this->declare_parameter<bool>("show_info_logs", false);
-        fixed_enable_ = this->declare_parameter<int>("fixed_enable", 1);
-        fixed_mode_ = this->declare_parameter<int>("fixed_mode", 0);
-        fixed_target_ = this->declare_parameter<double>("fixed_target", 5.0);
-        fixed_voltage_limit_ = this->declare_parameter<double>("fixed_voltage_limit", 12.0);
+    EscCtrlNode() : Node("esc_ctrl_node") {
+        // --- 速度指令の送信先 (ESC/FOCノード側) ---
+        device_id_ = declare_parameter<int>("device_id", 1);
+        node_index_ = declare_parameter<int>("node_index", 0);
+        slots_per_node_ = declare_parameter<int>("slots_per_node", 5);
+        const int target_velocity_slot_offset =
+            declare_parameter<int>("target_velocity_slot_offset", 0);
+        velocity_limit_rpm_ = std::abs(declare_parameter<double>("velocity_limit_rpm", 450.0));
 
-        fixed_mode_ = (fixed_mode_ == 1) ? 1 : 0;
+        // --- 位置フィードバックの取得元 (既定はホスト機側エンコーダを想定) ---
+        // device_id/node_index とは独立に指定できる(同一ホストの別ノードでも、
+        // 全く別の device_id でもよい)。未指定時は速度指令の送信先と同じ値になる。
+        feedback_device_id_ = declare_parameter<int>("feedback_device_id", device_id_);
+        feedback_node_index_ = declare_parameter<int>("feedback_node_index", node_index_);
+        feedback_slots_per_node_ =
+            declare_parameter<int>("feedback_slots_per_node", slots_per_node_);
+        const int feedback_slot_offset =
+            declare_parameter<int>("feedback_slot_offset", 0);
+        // encoder_ppr > 0 : feedbackスロットを「1周あたりパルス数」の生カウントとして
+        //   扱い、360/encoder_ppr [deg/count] でスケールする(ホスト機ENC1/ENC2等、
+        //   汎用IOノードのロータリーエンコーダ入力を想定)。
+        // encoder_ppr <= 0: legacy な 0.1deg/LSB スケール(angle_scale_deg)を使う
+        //   (FOCノード自身の角度フィードバック等、スケール済みの値を想定)。
+        encoder_ppr_ = declare_parameter<double>("encoder_ppr", 0.0);
+        angle_scale_deg_ = declare_parameter<double>("angle_scale_deg", 0.1);
+        // モーターの正転方向(target_velocityが正の時に実際に回る向き)と、
+        // フィードバックに使うエンコーダのカウント増加方向が逆な場合に-1.0にする。
+        // (別体のエンコーダ等、ESC自身の内部基準と一致している保証が無いため)
+        feedback_sign_ = declare_parameter<double>("feedback_sign", 1.0);
 
-        serial_tx_topic_ = "serial_tx_" + std::to_string(device_id_);
-        serial_rx_topic_ = "serial_rx_" + std::to_string(device_id_);
+        const double kp = declare_parameter<double>("kp", 1.0);
+        const double ki = declare_parameter<double>("ki", 0.0);
+        const double kd = declare_parameter<double>("kd", 0.0);
+        const double control_rate_hz = declare_parameter<double>("control_rate_hz", 50.0);
+        const double command_timeout_sec = declare_parameter<double>("command_timeout_sec", 0.5);
+        show_info_logs_ = declare_parameter<bool>("show_info_logs", true);
 
-        serial_rx_sub_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
-            serial_rx_topic_, 10,
-            std::bind(&EscCtrlNode::on_serial_rx, this, std::placeholders::_1));
+        target_velocity_slot_ = node_index_ * slots_per_node_ + target_velocity_slot_offset;
+        feedback_slot_ = feedback_node_index_ * feedback_slots_per_node_ + feedback_slot_offset;
+        feedback_deg_per_count_ = (encoder_ppr_ > 0.0) ? (360.0 / encoder_ppr_) : angle_scale_deg_;
 
-        serial_tx_pub_ =
-            this->create_publisher<std_msgs::msg::Int16MultiArray>(serial_tx_topic_, 10);
-
-        tx_timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(std::max(1, tx_period_ms_)),
-            std::bind(&EscCtrlNode::publish_command, this));
-
-        if (show_info_logs_) {
-            RCLCPP_INFO(this->get_logger(), "esc_ctrl started (keyboard command mode)");
-            RCLCPP_INFO(this->get_logger(), "device_id=%d tx=%s rx=%s", device_id_,
-                        serial_tx_topic_.c_str(), serial_rx_topic_.c_str());
-            if (fixed_mode_ == 0) {
-                RCLCPP_INFO(this->get_logger(),
-                            "Initial command: enable=%d mode=velocity target=%.3f rpm (%.3f rad/s) voltage_limit=%.3f",
-                            fixed_enable_, fixed_target_,
-                            velocity_command_to_rad_per_sec(fixed_target_), fixed_voltage_limit_);
-            } else {
-                RCLCPP_INFO(this->get_logger(),
-                            "Initial command: enable=%d mode=angle target=%.3f deg voltage_limit=%.3f",
-                            fixed_enable_, fixed_target_, fixed_voltage_limit_);
-            }
-            RCLCPP_INFO(this->get_logger(),
-                        "RX log mode: on-change (angle/vel/vlim eps=%.3f, target eps=%.3f), snapshot=%d ms",
-                        rx_change_epsilon_, rx_target_change_epsilon_, rx_force_log_period_ms_);
+        if (target_velocity_slot_ < 0 || target_velocity_slot_ >= kSlotCount) {
+            throw std::runtime_error(
+                "target_velocity slot index is out of range (check node_index/"
+                "slots_per_node/target_velocity_slot_offset)");
+        }
+        if (feedback_slot_ < 0 || feedback_slot_ >= kSlotCount) {
+            throw std::runtime_error(
+                "feedback slot index is out of range (check feedback_node_index/"
+                "feedback_slots_per_node/feedback_slot_offset)");
         }
 
-        RCLCPP_INFO(this->get_logger(),
-                    "Keyboard input: v<number> (velocity rpm), p<number> (position deg). Example: v1000, p90");
+        command_timeout_ = rclcpp::Duration::from_seconds(command_timeout_sec);
+        control_period_sec_ = 1.0 / control_rate_hz;
 
-        stdin_is_tty_ = ::isatty(STDIN_FILENO) == 1;
-        if (!stdin_is_tty_) {
-            RCLCPP_WARN(this->get_logger(),
-                        "stdin is not a TTY. Keyboard command input is disabled in this run."
-                        " Use ros2 run for interactive control.");
-        }
+        pid_ = std::make_unique<PIDController>(
+            static_cast<float>(kp), static_cast<float>(ki), static_cast<float>(kd),
+            static_cast<float>(velocity_limit_rpm_));
 
-        last_rx_log_time_ = this->now();
+        tx_data_.assign(kSlotCount, 0);
+
+        // serial_tx_/serial_rx_ は ros2can 側がルート名前空間で作るトピックなので、
+        // 本ノードを名前空間付きで複数起動しても解決先がずれないよう絶対名にする。
+        // (position_command は逆にノード毎に分離したいので相対名のままにする)
+        tx_pub_ = create_publisher<std_msgs::msg::Int16MultiArray>(
+            "/serial_tx_" + std::to_string(device_id_), 10);
+        // ros2can が受信ループ内で既に連続値化(unwrap)して配信するトピックを使う
+        // (このノード自身ではラップ検出を行わない。詳細はファイル冒頭のコメント参照)
+        rx_sub_ = create_subscription<std_msgs::msg::Int32MultiArray>(
+            "/serial_rx_" + std::to_string(feedback_device_id_) + "_unwrapped", 10,
+            std::bind(&EscCtrlNode::on_rx, this, std::placeholders::_1));
+        position_command_sub_ = create_subscription<std_msgs::msg::Float64>(
+            "position_command", 10,
+            std::bind(&EscCtrlNode::on_position_command, this, std::placeholders::_1));
+
+        timer_ = create_wall_timer(
+            std::chrono::duration<double>(control_period_sec_),
+            std::bind(&EscCtrlNode::on_control_timer, this));
+
+        rclcpp::on_shutdown([this]() { send_zero_and_stop(); });
+
+        RCLCPP_INFO(get_logger(),
+                    "esc_ctrl_node started: device_id=%d node_index=%d target_velocity_slot=%d | "
+                    "feedback_device_id=%d feedback_node_index=%d feedback_slot=%d "
+                    "(%s, %.5f deg/count, sign=%.0f) | rate=%.1fHz",
+                    device_id_, node_index_, target_velocity_slot_,
+                    feedback_device_id_, feedback_node_index_, feedback_slot_,
+                    (encoder_ppr_ > 0.0) ? "encoder_ppr" : "angle_scale_deg",
+                    feedback_deg_per_count_, feedback_sign_, control_rate_hz);
     }
 
 private:
-    void poll_keyboard_command() {
-        if (!stdin_is_tty_) {
-            return;
-        }
-
-        fd_set readfds;
-        FD_ZERO(&readfds);
-        FD_SET(STDIN_FILENO, &readfds);
-
-        timeval timeout{};
-        timeout.tv_sec = 0;
-        timeout.tv_usec = 0;
-
-        const int ready = select(STDIN_FILENO + 1, &readfds, nullptr, nullptr, &timeout);
-        if (ready <= 0 || !FD_ISSET(STDIN_FILENO, &readfds)) {
-            return;
-        }
-
-        std::string line;
-        if (!std::getline(std::cin, line) || line.empty()) {
-            return;
-        }
-
-        const char prefix = line[0];
-        const std::string value_str = line.substr(1);
-
-        try {
-            const double value = std::stod(value_str);
-            if (prefix == 'v' || prefix == 'V') {
-                fixed_enable_ = 1;
-                fixed_mode_ = 0;
-                fixed_target_ = value;
-            } else if (prefix == 'p' || prefix == 'P') {
-                fixed_enable_ = 1;
-                fixed_mode_ = 1;
-                fixed_target_ = value;
-            } else {
-                RCLCPP_WARN(this->get_logger(),
-                            "Unknown command: %s (use v<number> or p<number>)", line.c_str());
-                return;
-            }
-
-            if (show_info_logs_) {
-                RCLCPP_INFO(this->get_logger(), "Updated command: mode=%s target=%.3f %s",
-                            (fixed_mode_ == 0) ? "velocity" : "angle",
-                            fixed_target_,
-                            (fixed_mode_ == 0) ? "rpm" : "deg");
-            }
-        } catch (...) {
-            RCLCPP_WARN(this->get_logger(),
-                        "Invalid input: %s (use v<number> or p<number>)", line.c_str());
-        }
+    void on_position_command(const std_msgs::msg::Float64::SharedPtr msg) {
+        target_position_deg_ = msg->data;
+        target_stamp_ = now();
+        has_target_ = true;
     }
 
-    void publish_command() {
-        poll_keyboard_command();
+    void on_rx(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+        if (static_cast<int>(msg->data.size()) <= feedback_slot_) {
+            return;
+        }
+        const int64_t unwrapped = msg->data[feedback_slot_];
+        measured_position_deg_ =
+            static_cast<double>(unwrapped) * feedback_deg_per_count_ * feedback_sign_;
+        has_feedback_ = true;
+    }
 
-        std_msgs::msg::Int16MultiArray out;
-        out.data.assign(kTx16Num, 0);
+    void on_control_timer() {
+        const bool stale = !has_target_ || (now() - target_stamp_) > command_timeout_;
+        double velocity_cmd = 0.0;
 
-        out.data[kCmdEnable] = fixed_enable_ ? 1 : 0;
-        out.data[kCmdMode] = static_cast<int16_t>(fixed_mode_);
-        if (fixed_mode_ == 0) {
-            out.data[kCmdTargetVelocity] =
-                clamp_i16(std::lround(velocity_command_to_rad_per_sec(fixed_target_) /
-                                      kTargetVelocityScale));
-            out.data[kCmdTargetAngle] = 0;
+        if (stale || !has_feedback_) {
+            pid_->reset();
+            was_stale_ = true;
         } else {
-            out.data[kCmdTargetVelocity] = 0;
-            out.data[kCmdTargetAngle] =
-                clamp_i16(std::lround(fixed_target_ / kTargetAngleScale));
+            pid_->set_target(static_cast<float>(target_position_deg_));
+            if (was_stale_) {
+                // last_current_ をprimeして、途絶中の変化による微分の跳ねを防ぐ
+                pid_->update(static_cast<float>(measured_position_deg_), 1.0f);
+                was_stale_ = false;
+            }
+            velocity_cmd = pid_->update(static_cast<float>(measured_position_deg_),
+                                         static_cast<float>(control_period_sec_));
         }
-        out.data[kCmdVoltageLimit] =
-            clamp_i16(std::lround(fixed_voltage_limit_ / kVoltageLimitScale));
 
-        serial_tx_pub_->publish(out);
+        tx_data_[target_velocity_slot_] = clamp_i16(velocity_cmd);
+        publish_tx();
+
+        if (show_info_logs_) {
+            RCLCPP_INFO_THROTTLE(
+                get_logger(), *get_clock(), 500,
+                "target=%.2fdeg measured=%.2fdeg err=%.2fdeg cmd=%.1frpm stale=%d "
+                "has_feedback=%d",
+                target_position_deg_, measured_position_deg_,
+                target_position_deg_ - measured_position_deg_, velocity_cmd, stale,
+                has_feedback_);
+        }
     }
 
-    void on_serial_rx(const std_msgs::msg::Int16MultiArray::SharedPtr msg) {
-        if (msg->data.size() < 6) {
-            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                                 "serial_rx frame too short: %zu", msg->data.size());
-            return;
-        }
-
-        const int mode = (msg->data[kRxMode] == 1) ? 1 : 0;
-        const float angle = static_cast<float>(msg->data[kRxAngle]) * kTargetAngleScale;
-        const float velocity = static_cast<float>(msg->data[kRxVelocity]) * kTargetVelocityScale;
-        const float target = static_cast<float>(msg->data[kRxTarget]) *
-                             (mode == 1 ? kTargetAngleScale : kTargetVelocityScale);
-        const float vlim = static_cast<float>(msg->data[kRxVoltageLimit]) * kVoltageLimitScale;
-
-        const bool changed =
-            !has_last_rx_ ||
-            std::fabs(angle - last_angle_) > rx_change_epsilon_ ||
-            std::fabs(velocity - last_velocity_) > rx_change_epsilon_ ||
-            std::fabs(target - last_target_) > rx_target_change_epsilon_ ||
-            std::fabs(vlim - last_vlim_) > rx_change_epsilon_ ||
-            mode != last_mode_;
-
-        const auto now = this->now();
-        const bool periodic_snapshot =
-            (now - last_rx_log_time_).nanoseconds() / 1000000 >= std::max(200, rx_force_log_period_ms_);
-
-        if (show_info_logs_ && (changed || periodic_snapshot)) {
-            RCLCPP_INFO(this->get_logger(),
-                        "RX angle=%.3f deg velocity=%.3f rad/s target=%.3f %s vlim=%.2fV",
-                        angle, velocity, target,
-                        mode == 1 ? "deg" : "rad/s", vlim);
-            last_rx_log_time_ = now;
-        }
-
-        has_last_rx_ = true;
-        last_angle_ = angle;
-        last_velocity_ = velocity;
-        last_target_ = target;
-        last_vlim_ = vlim;
-        last_mode_ = mode;
+    void publish_tx() {
+        std_msgs::msg::Int16MultiArray msg;
+        msg.data = tx_data_;
+        tx_pub_->publish(msg);
     }
 
-    int device_id_;
-    int tx_period_ms_;
-    int log_period_ms_;
-    int rx_force_log_period_ms_;
-    double rx_change_epsilon_;
-    double rx_target_change_epsilon_;
-    bool show_info_logs_;
-    int fixed_enable_;
-    int fixed_mode_;
-    double fixed_target_;
-    double fixed_voltage_limit_;
+    void send_zero_and_stop() {
+        tx_data_[target_velocity_slot_] = 0;
+        publish_tx();
+    }
 
-    std::string serial_tx_topic_;
-    std::string serial_rx_topic_;
+    int device_id_ = 1;
+    int node_index_ = 0;
+    int slots_per_node_ = 5;
+    int target_velocity_slot_ = 0;
 
-    bool has_last_rx_{false};
-    float last_angle_{0.0f};
-    float last_velocity_{0.0f};
-    float last_target_{0.0f};
-    float last_vlim_{0.0f};
-    int last_mode_{0};
-    rclcpp::Time last_rx_log_time_;
-    bool stdin_is_tty_{false};
+    int feedback_device_id_ = 1;
+    int feedback_node_index_ = 0;
+    int feedback_slots_per_node_ = 5;
+    int feedback_slot_ = 0;
+    double encoder_ppr_ = 0.0;
+    double angle_scale_deg_ = 0.1;
+    double feedback_deg_per_count_ = 0.1;
+    double feedback_sign_ = 1.0;
 
-    rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr serial_rx_sub_;
-    rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr serial_tx_pub_;
-    rclcpp::TimerBase::SharedPtr tx_timer_;
+    double velocity_limit_rpm_ = 450.0;
+    double control_period_sec_ = 0.02;
+    rclcpp::Duration command_timeout_{0, 0};
+    bool show_info_logs_ = true;
+
+    std::unique_ptr<PIDController> pid_;
+
+    std::vector<int16_t> tx_data_;
+    bool has_target_ = false;
+    bool has_feedback_ = false;
+    bool was_stale_ = true;
+    double target_position_deg_ = 0.0;
+    double measured_position_deg_ = 0.0;
+    rclcpp::Time target_stamp_;
+
+    rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr tx_pub_;
+    rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr rx_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr position_command_sub_;
+    rclcpp::TimerBase::SharedPtr timer_;
 };
 
 int main(int argc, char *argv[]) {

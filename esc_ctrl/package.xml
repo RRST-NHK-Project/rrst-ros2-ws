@@ -2,8 +2,15 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>esc_ctrl</name>
-  <version>0.1.0</version>
-  <description>ESC controller node for serial_bridge-compatible FOC MCU.</description>
+  <version>0.0.0</version>
+  <description>
+    受け取った位置指令(std_msgs/Float64)を common パッケージの PIDController で
+    速度指令(rpm)へ変換し、ros2can 互換の serial_tx_[DEVICE_ID] トピック
+    (Int16MultiArray)経由で CANホストマイコン配下の FOC モータノード
+    (b-g431-esc1_can2io, SimpleFOC)へ送信する。速度制御自体はマイコン側
+    (内蔵の速度PID)が行う、位置ループ(本パッケージ)/速度ループ(ファームウェア)の
+    カスケード構成。
+  </description>
   <maintainer email="tashikou1682@gmail.com">dev</maintainer>
   <license>Apache-2.0</license>
 
@@ -11,11 +18,11 @@
 
   <depend>common</depend>
   <depend>rclcpp</depend>
-  <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
 
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
