@@ -7,13 +7,13 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     config = os.path.join(
-        get_package_share_directory('esc_ctrl'), 'config', 'esc_ctrl.yaml')
+        get_package_share_directory('encoder_angle'), 'config', 'encoder_angle.yaml')
 
     return LaunchDescription([
         Node(
-            package='esc_ctrl',
-            executable='esc_ctrl_node',
-            name='esc_ctrl_node',
+            package='encoder_angle',
+            executable='encoder_angle_node',
+            name='encoder_angle_node',
             output='screen',
             parameters=[config],
         ),

@@ -7,3 +7,6 @@
 [submodule "rrst-console"]
 	path = rrst-console
 	url = git@github.com:RRST-NHK-Project/rrst-console.git
+[submodule "ros2can"]
+	path = ros2can
+	url = git@github.com:RRST-NHK-Project/ros2can.git

@@ -1,22 +1,20 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>esc_ctrl</name>
+  <name>encoder_angle</name>
   <version>0.0.0</version>
   <description>
-    受け取った位置指令(std_msgs/Float64)を common パッケージの PIDController で
-    速度指令(rpm)へ変換し、ros2can 互換の serial_tx_[DEVICE_ID] トピック
-    (Int16MultiArray)経由で CANホストマイコン配下の FOC モータノード
-    (b-g431-esc1_can2io, SimpleFOC)へ送信する。速度制御自体はマイコン側
-    (内蔵の速度PID)が行う、位置ループ(本パッケージ)/速度ループ(ファームウェア)の
-    カスケード構成。
+    ros2can の serial_rx_[DEVICE_ID]_unwrapped (Int32MultiArray、ros2can側で
+    既に連続値化済み) から汎用IOノード (xiao-esp32-s3_can2io) のロータリー
+    エンコーダ入力 ENC1/ENC2 スロットを取り出し、連続角度 (deg) として
+    配信するノード。ラップ検出(PCNTの±32768近辺のリセット処理)は ros2can
+    本体側で行うため、本パッケージは単純なスケール変換のみを担う。
   </description>
   <maintainer email="tashikou1682@gmail.com">dev</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <depend>common</depend>
   <depend>rclcpp</depend>
   <depend>std_msgs</depend>
 

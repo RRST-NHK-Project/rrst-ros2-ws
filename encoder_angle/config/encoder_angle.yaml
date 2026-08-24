@@ -1,0 +1,27 @@
+encoder_angle_node:
+  ros__parameters:
+    # 対象の ros2can DEVICE_ID (CANホストマイコンのシリアル通信上のID)。
+    # esc_ctrl.yaml の feedback_device_id と同様、ホスト機自身
+    # (xiao-esp32-s3_can2io, MODE_CAN_HOST) の既定IDに合わせている。
+    device_id: 101
+
+    # CANホスト配下でのノード番号(0-origin)。ホスト機自身の汎用IOノードは
+    # 通常 node_index=0 (make_can_host_profile の1台目)。
+    node_index: 0
+
+    # 1ノードあたりのスロット数。ホスト側 config.hpp の CAN_SLOTS_PER_NODE と一致させる。
+    slots_per_node: 5
+
+    # ノード内での ENC1/ENC2 スロットオフセット。汎用IOノードは
+    # [SW1, SW2, SW3, ENC1, ENC2] の順(offset 0-4)。
+    enc1_slot_offset: 3
+    enc2_slot_offset: 4
+
+    # 1回転あたりの生カウント数(PCNTのx4逓倍後)。
+    # xiao-esp32-s3_can2io/src/defs.hpp の PPR = ENC_PPR_SPEC(2048) * 4 に対応。
+    # 使用エンコーダのPPR実測値/規格値に応じて変更すること。
+    encoder_ppr: 8192.0
+
+    # エンコーダの回転方向とロボット側で定義した正方向が逆な場合は -1.0 にする。
+    enc1_sign: 1.0
+    enc2_sign: 1.0

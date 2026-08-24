@@ -1,0 +1,67 @@
+esc_ctrl_node:
+  ros__parameters:
+    # === 速度指令の送信先 (ESC/FOCノード側) ===
+
+    # 対象の ros2can DEVICE_ID (CANホストマイコンのシリアル通信上のID)
+    device_id: 101
+
+    # CANホスト配下でのノード番号(0-origin)。CAN_ID = 100 + (node_index+1) に対応。
+    # node2 (CAN_ID=102) が対象のESC (b-g431-esc1_can2io)
+    node_index: 1
+
+    # 1ノードあたりのスロット数。ホスト側 config.hpp の CAN_SLOTS_PER_NODE と一致させる
+    slots_per_node: 5
+
+    # ノード内でのtarget_velocityスロットオフセット。b-g431-esc1_can2io のマッピング
+    # (frame_data.hpp: RX_TARGET_VELOCITY=0) に合わせた既定値
+    target_velocity_slot_offset: 0
+
+    # 速度指令の上限 [rpm] (robomas互換プロファイルの既定±450rpmに合わせた初期値)
+    velocity_limit_rpm: 4500.0
+
+    # === 位置フィードバックの取得元 ===
+    # ESC(b-g431-esc1_can2io)自身のエンコーダではなく、CANホスト機側に接続された
+    # エンコーダ(汎用IOノードのENC1/ENC2等)を使う構成を既定にしている。
+    # device_id/node_index (速度指令の送信先)とは完全に独立しているので、
+    # 別のノード・別のdevice_idに変更したい場合はここだけ変更すればよい。
+
+    # フィードバックを読む serial_rx_[ID] の DEVICE_ID。省略時は device_id と同じ
+    # (今回はESCと同じホストID101のENC1を使うので device_id と同一)
+    feedback_device_id: 101
+
+    # フィードバックを読むノード番号(0-origin)。ホスト機自身の汎用IOノードは
+    # 通常 node_index=0 (make_can_host_profile の 1台目)
+    feedback_node_index: 0
+
+    # feedback_node_index のノードのスロット数。通常は slots_per_node と同じ
+    feedback_slots_per_node: 5
+
+    # feedback_node_index 内でのオフセット。汎用IOノードは
+    # [SW1, SW2, SW3, ENC1, ENC2] の順(offset 0-4)なので、ENC1 を使うなら 3
+    feedback_slot_offset: 3
+
+    # feedbackスロットの解釈方法:
+    #   encoder_ppr > 0  : 1周あたりのパルス数として扱う(360/encoder_pprでdeg換算)。
+    #                      ホスト機のENC入力(生カウント)はこちらを使う。
+    #                      例: 気合いで実測した値、または規格値(600, 1024, 2048 等)
+    #   encoder_ppr <= 0 : angle_scale_deg [deg/LSB] のスケール済み値として扱う
+    #                      (FOCノード自身の角度フィードバック等で使用)
+    encoder_ppr: 8192.0
+    angle_scale_deg: 0.1
+
+    # モーターの正転方向(target_velocityが正の時に実際に回る向き)と、
+    # フィードバックに使うエンコーダのカウント増加方向が逆な場合は -1.0 にする。
+    # (ESC自身の内部基準とは別体のエンコーダのため、一致している保証が無い)
+    feedback_sign: -1.0
+
+    # 位置PIDゲイン (common::PIDController、入力: deg誤差, 出力: rpm)。実機でチューニングすること
+    kp: 10.0
+    ki: 0.0
+    kd: 1.0
+
+    # 制御周期 [Hz]
+    control_rate_hz: 50.0
+
+    # 位置指令(position_command)がこの秒数以上途絶えたら速度指令を0にフォールバックする。
+    # b-g431-esc1_can2io は CAN 途絶時のフェイルセーフを持たないため必須の安全機構。
+    command_timeout_sec: 0.5

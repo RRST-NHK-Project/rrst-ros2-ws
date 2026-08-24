@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(esc_ctrl)
+project(encoder_angle)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -8,19 +8,17 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
-find_package(common REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 
-add_executable(esc_ctrl_node src/esc_ctrl_node.cpp)
-ament_target_dependencies(esc_ctrl_node
-  common
+add_executable(encoder_angle_node src/encoder_angle_node.cpp)
+ament_target_dependencies(encoder_angle_node
   rclcpp
   std_msgs
 )
 
 install(TARGETS
-  esc_ctrl_node
+  encoder_angle_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
