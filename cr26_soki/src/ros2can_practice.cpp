@@ -5,6 +5,36 @@ Serial_Bridge_Host.cpp のros2can版。Ros2CanPacketControllerを使用してノ
 Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 */
 
+// ===== Ros2CanPacketController (common/Ros2CanPacketController.hpp) 関数一覧 =====
+// void setServo(int node, int servo_no, int deg)
+//   指定ノード(node: 0-origin, 0~NODE_COUNT-1)のSERVOn(servo_no: 1~3)を
+//   角度deg[0~270]に設定する(範囲外deg値はクランプ、node/servo_no範囲外は無視)。
+//
+// bool getSW(int node, int sw_no) const
+//   指定ノードのSWn(sw_no: 1~3)状態を取得する。SERVOnとピン共有のため
+//   ファームウェア側でMULTIn=0(スイッチ入力)のときのみ有効な値になる。
+//   node/sw_no範囲外はfalseを返す。
+//
+// int16_t getEnc(int node, int enc_no) const
+//   指定ノードのENCn(enc_no: 1~2)カウンタ値を取得する。node/enc_no範囲外は0を返す。
+//
+// static int canId(int node)
+//   node(0-origin)に対応する実CAN_ID(101,102,103,104)を返す。
+//
+// void updateRx(const std::vector<int16_t> &data)
+//   受信したInt16MultiArray相当のdataでrx_配列を更新する(sensor_callback等で使用)。
+//
+// std::vector<int16_t> toVector() const
+//   送信用配列tx_をstd::vectorに変換して取得する(publish直前に使用)。
+//
+// int16_t &operator[](int index) / const int16_t &operator[](int index) const
+//   tx_配列への直接アクセス(グローバルslot index指定、通常はsetServo等を優先)。
+//
+// メンバ変数:
+//   std::array<int16_t, DATA_SIZE> tx_  送信配列本体 (ROS -> ホスト -> CAN -> 各ノード)
+//   std::array<int16_t, DATA_SIZE> rx_  受信配列本体 (各ノード -> CAN -> ホスト -> ROS)
+// ================================================================================
+
 #include <chrono>
 #include <cmath>
 #include <iostream>
