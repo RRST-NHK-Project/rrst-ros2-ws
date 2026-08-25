@@ -12,11 +12,26 @@
 // ロボマスのGM6020のようなホスト側PID (common/PID.hpp) は不要。
 //
 // 指令 (TX, PC -> マイコン -> CAN -> 各モータ):
-//   0-3:  target (モータ1-4、意味は control_mode に依存)
-//         control_mode=MODE_VELOCITY : 電気角速度、10ERPM/LSB (±327670ERPM)
-//         control_mode=MODE_POSITION : 位置、0.1deg/LSB (±3276.7deg)
-//   4-7:  control_mode (モータ1-4): 0=速度ループ, 1=位置ループ
-//   8-23: 未使用
+//   0-3:   target (モータ1-4、意味は control_mode に依存)
+//          control_mode=MODE_VELOCITY : 電気角速度、10ERPM/LSB (±327670ERPM)
+//          control_mode=MODE_POSITION : 位置、0.1deg/LSB (±3276.7deg)
+//          control_mode=MODE_MIT      : 目標位置、0.1deg/LSB (setMit()の範囲でクランプ)
+//   4-7:   control_mode (モータ1-4): 0=速度ループ, 1=位置ループ, 2=MIT(Force Control)
+//   8-11:  MIT用 目標速度 (モータ1-4)、0.01rad/s/LSB (control_mode=MODE_MITのみ参照)
+//   12-15: MIT用 Kp (モータ1-4)、0.1/LSB、レンジ0-500 (control_mode=MODE_MITのみ参照)
+//   16-19: MIT用 Kd (モータ1-4)、0.01/LSB、レンジ0-5 (control_mode=MODE_MITのみ参照)
+//   20-23: MIT用 目標トルクFF (モータ1-4)、0.01N・m/LSB (control_mode=MODE_MITのみ参照)
+//
+// MIT(Force Control)モード (AK Series Module Product Manual V3.2.0 4.2節) は
+// 位置・速度・Kp・Kd・トルクFFを同時に指令し、モータ側で
+// torque = Kp*(pos_des-pos) + Kd*(vel_des-vel) + torque_ff を計算するインピーダンス
+// 制御。CAN ID/フレーム形式はServo(CAN)モード(速度/位置ループ)と共通の拡張ID方式
+// なので、cubemars.cppはcontrol_modeスロットの値でモータごとに毎周期選択するだけでよい。
+//
+// MIT_P/V/T_MIN~MAX (setMit()が使うクランプ範囲) は、マニュアルのパラメータ表に
+// AK40-10の掲載が無いため他モータからの類推値。ファーム側config.hppの
+// CUBEMARS_MIT_*と必ず一致させ、実機のR-Link(CubeMarsTool)設定と揃えること。
+// 不一致だと指令値の意味(rad, rad/s, N・m)がズレて意図しない速度・トルクが出力される。
 //
 // 帰還 (RX, 各モータ -> CAN -> マイコン -> PC。マニュアル4.3.1のCAN Upload Message
 //       Protocol (Function ID 0x29) の値をスケール変換無しでそのまま格納):
@@ -49,6 +64,9 @@ ctrlPkt.setPosition(0, 90.0);
 
 // モータ2(0-origin: 1)を速度ループで3000ERPMへ
 ctrlPkt.setVelocity(1, 3000.0);
+
+// モータ3(0-origin: 2)をMIT(Force Control)モードで、90degへKp=20,Kd=1.0で追従
+ctrlPkt.setMit(2, 90.0, 0.0, 20.0, 1.0, 0.0);
 
 // 送信用配列を取得してpublish
 auto sendArray = ctrlPkt.toVector();
@@ -86,10 +104,31 @@ public:
     static constexpr double VELOCITY_MIN_ERPM = -327680.0;
     static constexpr double VELOCITY_MAX_ERPM = 327670.0;
 
+    // MITモード用スロットのスケール (cubemars.cpp と一致させること)
+    static constexpr double MIT_VELOCITY_LSB_RADPS = 0.01; // 目標速度 0.01rad/s/LSB
+    static constexpr double MIT_KP_LSB = 0.1;               // Kp 0.1/LSB
+    static constexpr double MIT_KD_LSB = 0.01;              // Kd 0.01/LSB
+    static constexpr double MIT_TORQUE_LSB_NM = 0.01;       // トルクFF 0.01N・m/LSB
+
+    // MITモードのクランプ範囲 (setMit()が使用)。ファーム側config.hppの
+    // CUBEMARS_MIT_*、および実機のR-Link設定と必ず一致させること
+    // (不一致だと指令値の意味がズレる。ヘッダ冒頭コメント参照)。
+    static constexpr double MIT_POSITION_MIN_DEG = -716.2; // ≈ -12.5rad
+    static constexpr double MIT_POSITION_MAX_DEG = 716.2;  // ≈ 12.5rad
+    static constexpr double MIT_VELOCITY_MIN_RADPS = -50.0;
+    static constexpr double MIT_VELOCITY_MAX_RADPS = 50.0;
+    static constexpr double MIT_TORQUE_MIN_NM = -18.0;
+    static constexpr double MIT_TORQUE_MAX_NM = 18.0;
+    static constexpr double MIT_KP_MIN = 0.0;
+    static constexpr double MIT_KP_MAX = 500.0;
+    static constexpr double MIT_KD_MIN = 0.0;
+    static constexpr double MIT_KD_MAX = 5.0;
+
     // control_mode スロットの値 (cubemars.cpp の CUBEMARS_MODE_* と一致させること)
     enum ControlMode : int16_t {
         MODE_VELOCITY = 0, // 速度ループ (target = 電気角速度)
         MODE_POSITION = 1, // 位置ループ (target = 位置)
+        MODE_MIT = 2,      // MIT(Force Control)。位置+速度+Kp+Kd+トルクFFを同時指令
     };
 
     // error code スロットの値 (マニュアル4.3.1)
@@ -106,8 +145,12 @@ public:
 
     // 各データのスロット先頭index (モータm(0-origin)は base + m)
     enum TxSlot : int {
-        SLOT_TARGET = 0,       // 0-3
-        SLOT_CONTROL_MODE = 4, // 4-7
+        SLOT_TARGET = 0,        // 0-3
+        SLOT_CONTROL_MODE = 4,  // 4-7
+        SLOT_MIT_VELOCITY = 8,  // 8-11  (control_mode=MODE_MITのみ参照)
+        SLOT_MIT_KP = 12,       // 12-15 (control_mode=MODE_MITのみ参照)
+        SLOT_MIT_KD = 16,       // 16-19 (control_mode=MODE_MITのみ参照)
+        SLOT_MIT_TORQUE_FF = 20, // 20-23 (control_mode=MODE_MITのみ参照)
     };
     enum RxSlot : int {
         SLOT_POSITION = 0,     // 0-3
@@ -146,6 +189,30 @@ public:
             toSlot(std::clamp(erpm, VELOCITY_MIN_ERPM, VELOCITY_MAX_ERPM) / VELOCITY_LSB_ERPM);
     }
 
+    // 指定モータをMIT(Force Control)モードで駆動する。位置(deg)・速度(rad/s)・
+    // Kp・Kd・トルクFF(N・m)を同時に指令し、モータ側で
+    // torque = Kp*(pos_des-pos) + Kd*(vel_des-vel) + torque_ff を計算する
+    // インピーダンス制御 (マニュアル4.2節)。各値はMIT_*_MIN~MAXへクランプされる
+    // (motor範囲外は無視)。この範囲がファーム側config.hppのCUBEMARS_MIT_*と
+    // 一致していないと指令値の意味がズレるので、ヘッダ冒頭コメントも参照のこと。
+    // 呼んだ瞬間に現在値からの追従を開始するため、初回はKp/Kdを小さめに設定して
+    // 挙動を確認してから上げること。
+    void setMit(int motor, double pos_deg, double vel_radps, double kp, double kd, double torque_ff_nm) {
+        if (!validMotor(motor))
+            return;
+        tx_[SLOT_CONTROL_MODE + motor] = MODE_MIT;
+        tx_[SLOT_TARGET + motor] =
+            toSlot(std::clamp(pos_deg, MIT_POSITION_MIN_DEG, MIT_POSITION_MAX_DEG) / POSITION_LSB_DEG);
+        tx_[SLOT_MIT_VELOCITY + motor] =
+            toSlot(std::clamp(vel_radps, MIT_VELOCITY_MIN_RADPS, MIT_VELOCITY_MAX_RADPS) / MIT_VELOCITY_LSB_RADPS);
+        tx_[SLOT_MIT_KP + motor] =
+            toSlot(std::clamp(kp, MIT_KP_MIN, MIT_KP_MAX) / MIT_KP_LSB);
+        tx_[SLOT_MIT_KD + motor] =
+            toSlot(std::clamp(kd, MIT_KD_MIN, MIT_KD_MAX) / MIT_KD_LSB);
+        tx_[SLOT_MIT_TORQUE_FF + motor] =
+            toSlot(std::clamp(torque_ff_nm, MIT_TORQUE_MIN_NM, MIT_TORQUE_MAX_NM) / MIT_TORQUE_LSB_NM);
+    }
+
     // 指定モータをゼロ速度指令(その場停止)にする。位置ジャンプは発生しない。
     void stop(int motor) {
         if (!validMotor(motor))
@@ -165,7 +232,12 @@ public:
     ControlMode getControlMode(int motor) const {
         if (!validMotor(motor))
             return MODE_VELOCITY;
-        return (tx_[SLOT_CONTROL_MODE + motor] == MODE_POSITION) ? MODE_POSITION : MODE_VELOCITY;
+        int16_t mode = tx_[SLOT_CONTROL_MODE + motor];
+        if (mode == MODE_POSITION)
+            return MODE_POSITION;
+        if (mode == MODE_MIT)
+            return MODE_MIT;
+        return MODE_VELOCITY;
     }
 
     // ---- 帰還 (RX) ----
