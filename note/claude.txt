@@ -62,12 +62,11 @@ soki 4関節はすべて `ros2can` パッケージ (xiao-esp32-s3_can2io ファ�
 serial_bridge/robomas.cpp(M3508/GM6020含む旧実装)はsokiの4関節には未使用
 (他用途 or 現状未使用)。
 
-##ros2canのエンコーダ原点セット機能 (2026-08-27新規実装)
+##ros2canのエンコーダ原点セット機能 (2026-08-27新規実装、同日中に2件修正済み)
 自動化中の脱調や再起動をまたいだ蓄積誤差で、マイコン側のエンコーダ値/多回転
 カウンタと機構上の原点がズレることがある問題への対応。マイコン側の値そのものは
 書き換えず、ros2can(GUI/ROS 2ノード)側がチャンネルごとにソフトウェアオフセットを
-持つ方式にした(対象: ロボマス内蔵カウンタ、CubeMars内蔵位置、汎用AMTエンコーダ、
-COUNTER/READOUT種別のチャンネル全般)。
+持つ方式にした(対象: ロボマス内蔵カウンタ、CubeMars内蔵位置、汎用AMTエンコーダ)。
   - 原点セット = 「現在値」をそのままオフセットとして記録するだけ(ゼロ点からの
     相対値 = 現在値 - オフセット)
   - GUI: Monitorタブの対象チャンネル行に「原点セット」ボタン、デバイスヘッダーに
@@ -83,8 +82,22 @@ COUNTER/READOUT種別のチャンネル全般)。
   - オフセットはGUIプロセスのメモリ上のみ(再起動で消える、永続化はしていない)
 新規パッケージ `ros2can_interfaces` (srv/ZeroChannel.srv) を追加、`ros2can`が依存。
 実装箇所: ros2can/ros2can/ros_backend.py (zero_channel/zero_all_channels/
-zeroed_value、ZeroChannelサービス)、widgets.py (ChannelMonitorRowの原点セットボタン)、
-device_panel.py (配線)。
+zeroed_value、ZeroChannelサービス)、widgets.py (ChannelMonitorRow/ChannelControlRow
+の原点セットボタン)、device_panel.py (配線)、device_profiles.py (zeroableフラグ)。
+
+修正1: 当初は`kind==READOUT`でボタン表示を判定していたが、READOUTは角度以外に
+速度/電流/温度等の瞬時値にも使われており、それらにも誤って原点セットボタンが
+出ていた。ChannelDefに明示的な`zeroable: bool`フラグを追加し、角度/位置/カウンタ系
+(M{n} angle、M{n} position、ENC1/ENC2)にだけTrueを設定して解消。カスタム
+プロファイルの保存/読込(JSON)にも反映済み。
+
+修正2: シミュレータ(仮想デバイス)モードではENC等のCOUNTER系RXは動作確認用に
+編集可能な`ChannelControlRow`(スライダー)へ差し替えられる仕様があり、原点セット
+ボタンを表示専用の`ChannelMonitorRow`側にしか実装していなかったため、CANホスト
+プロファイル(唯一のzeroable対象がこのENC1/ENC2)をシミュレータモードで見ると
+ボタンが丸ごと消えていた。ChannelControlRow側にも同じzeroRequestedシグナルと
+ボタン(chdef.zeroableのときだけ表示)を追加して解消。offscreen Qt
+(QT_QPA_PLATFORM=offscreen)でクリック→バックエンド反映まで動作確認済み。
 
 ##cr26_sokiパッケージ
 welcomeday.cpp / angle_test.cpp / angle_test_gm.cpp / ros2can_practice.cpp
