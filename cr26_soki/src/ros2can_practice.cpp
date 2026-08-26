@@ -71,6 +71,11 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 // 制御対象のモータ (0-origin: 0~3、CAN_ID 101~104に対応)
 #define TARGET_MOTOR 0
 
+// MIT(Force Control)モードのゲイン (Ros2CanCubemarsPacketController::setMit()参照)
+// 初回は小さめに設定して挙動を確認してから上げること。
+#define MIT_KP 3.6
+#define MIT_KD 1.08
+
 // スティックのデッドゾーン
 #define DEADZONE_L 0.3
 #define DEADZONE_R 0.3
@@ -147,7 +152,7 @@ private:
 
         bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
-        // bool TRIANGLE = msg->buttons[2];
+        bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
@@ -172,22 +177,32 @@ private:
         // bool R3 = msg->buttons[12];
 
         // 以降、Ros2CanCubemarsPacketControllerを操作する
-        // 例: LS_Yでモータ1を-180~180degに割り当てる場合
-        // ctrlPkt_.setPosition(TARGET_MOTOR, LS_Y * 180.0);
+        // 三角(TRIANGLE)を押すたびに目標角度へ+90deg、×(CROSS)を押すたびに-90deg、
+        // 丸(CIRCLE)を押すと0degへリセットし、MIT(Force Control)モードで追従させる。
+        // ボタンを押しっぱなしにしても1回の押下(立ち上がりエッジ)につき1回だけ加減算する。
         //
-        // 注意: setPosition()を呼んだ瞬間に現在位置から目標位置へ移動を開始する。
-        // 下の分岐はボタンを押していない間も135degを指令し続けるので、joyが繋がった
-        // 時点でモータが135degまで動く。それが困る場合は else 節を
-        // ctrlPkt_.stop(TARGET_MOTOR); に変えるか、else 節自体を消して
-        // 直前の位置指令を保持させること(位置ループはその位置を保持し続ける)。
-
-        if (CROSS) {
-            ctrlPkt_.setPosition(TARGET_MOTOR, 0.0);
-        } else if (CIRCLE) {
-            ctrlPkt_.setPosition(TARGET_MOTOR, 180.0);
-        } else {
-            ctrlPkt_.setPosition(TARGET_MOTOR, 90.0);
+        // 注意: setMit()を呼んだ瞬間に現在値からの追従を開始する。tx_は最後に設定した
+        // 値を保持し続けるので、target_angle_deg_を更新した時だけsetMit()を呼べばよい。
+        // joyが繋がった直後はtx_が全ゼロ(velocity 0)のままなので、いずれかのボタンを
+        // 押すまでモータは動かない。
+        if (TRIANGLE && !last_triangle_) {
+            target_angle_deg_ += 90.0;
+            ctrlPkt_.setMit(TARGET_MOTOR, target_angle_deg_, 0.0, MIT_KP, MIT_KD, 0.0);
         }
+
+        if (CROSS && !last_cross_) {
+            target_angle_deg_ -= 90.0;
+            ctrlPkt_.setMit(TARGET_MOTOR, target_angle_deg_, 0.0, MIT_KP, MIT_KD, 0.0);
+        }
+
+        if (CIRCLE && !last_circle_) {
+            target_angle_deg_ = 0.0;
+            ctrlPkt_.setMit(TARGET_MOTOR, target_angle_deg_, 0.0, MIT_KP, MIT_KD, 0.0);
+        }
+
+        last_triangle_ = TRIANGLE;
+        last_cross_ = CROSS;
+        last_circle_ = CIRCLE;
 
         // デバッグ用
         // RCLCPP_INFO(
@@ -247,6 +262,12 @@ private:
     rclcpp::TimerBase::SharedPtr timer_;
 
     Ros2CanCubemarsPacketController ctrlPkt_;
+
+    // ボタンの立ち上がりエッジ検出用 & 目標角度(MITモードの位置指令、加減算式)
+    bool last_triangle_ = false;
+    bool last_cross_ = false;
+    bool last_circle_ = false;
+    double target_angle_deg_ = 0.0;
 };
 
 int main(int argc, char *argv[]) {
