@@ -21,6 +21,30 @@ motor_mixer_nodeが/joint_statesを監視し、motor1/2側とz/r側どちらが
 command_gui_node(2026-08-27新規作成)はX/Y/Zの目標値をGUI指定→逆運動学で
 theta/z/rに変換して/mixed_joint_statesへpublishする指令送信GUI。
 
+##soki_simフィールド(ワーク配置環境)反映 (2026-08-27新規追加)
+実機のワーク配置環境をURDF(soki_sim.urdf.xacro)に静的モデルとして追加(衝突/慣性なし、視覚のみ)。
+base_link原点、+X=奥行き(ワーク側)、Y=幅方向(ワーク群中心線=機体中心=機体の乗っている板の中心と一致)。
+  - 機体が乗っている板: 690(幅)x290(奥行き)mm。ロボット原点は板の奥行き中心にある想定
+    (field_board_edge_offset=145mm、板前端までの距離としてプロパティ化。実機の搭載位置が
+    ズレていたらここだけ変更すればよい)
+  - 前面の板(ワークが並ぶ側): 幅・奥行きの実測値は未確認のため仮値(front_board_width=1.2m等)。
+    要実測。
+  - ワーク: 直径66mm・長さ142mmの円柱を横倒し(軸=奥行き(X)方向)、底面を機体側に。
+    4行(奥行き方向、機体に近い方が1行目)x6列(幅方向、中心間ピッチ200mm)=24本。
+    行間隔: 板前端→1行目49mm、1-2行間58mm、2-3行間58mm、3-4行間13mm、4行目のみ20mm高い。
+  - RVizで見た目確認済み(display.launch.pyで表示、行・列配置と4行目のリフトを目視で確認)。
+
+##soki_simシューティングエリア反映 (2026-08-27新規追加)
+ワークをシュートして集める左右のエリアもURDFに追加(視覚のみ)。
+  - 機体が乗っている板の中心(field_robot_board_center_x)からワークと反対方向(-X)に305mm、
+    そこから左右(Y)にそれぞれ525mmの位置が各シューティングエリアの板の中心(shoot_center_x/
+    shoot_offset_y としてプロパティ化)
+  - 板は幅(Y)300mm x 奥行き(X)600mm。短辺(300mm)がワーク底面と平行(=X方向)
+  - 板の上に箱が4個。箱は内径255(Y,長辺)x138(X,短辺)mm・高さ145mm・板厚5mmの上面開放
+    トレー(底板+側壁4枚で表現)。長辺(255mm)がワーク底面と平行(=Y方向)。板幅300mmには
+    1個しか横に並ばないため奥行き(X)方向に4個、箱間2mmの隙間をあけて並べている
+  - RVizで見た目確認済み(左右対称に配置され、箱が板の奥行き方向に4個並ぶことを目視で確認)
+
 ##実機モータ制御 (ros2can経由。soki本体はこちらを使用、serial_bridge/robomas.cppは不使用)
 soki 4関節はすべて `ros2can` パッケージ (xiao-esp32-s3_can2io ファームウェア) 配下。
 1マイコン=1モードで、以下2系統の独立デバイスに分かれている。
@@ -38,12 +62,37 @@ soki 4関節はすべて `ros2can` パッケージ (xiao-esp32-s3_can2io ファ�
 serial_bridge/robomas.cpp(M3508/GM6020含む旧実装)はsokiの4関節には未使用
 (他用途 or 現状未使用)。
 
+##ros2canのエンコーダ原点セット機能 (2026-08-27新規実装)
+自動化中の脱調や再起動をまたいだ蓄積誤差で、マイコン側のエンコーダ値/多回転
+カウンタと機構上の原点がズレることがある問題への対応。マイコン側の値そのものは
+書き換えず、ros2can(GUI/ROS 2ノード)側がチャンネルごとにソフトウェアオフセットを
+持つ方式にした(対象: ロボマス内蔵カウンタ、CubeMars内蔵位置、汎用AMTエンコーダ、
+COUNTER/READOUT種別のチャンネル全般)。
+  - 原点セット = 「現在値」をそのままオフセットとして記録するだけ(ゼロ点からの
+    相対値 = 現在値 - オフセット)
+  - GUI: Monitorタブの対象チャンネル行に「原点セット」ボタン、デバイスヘッダーに
+    「エンコーダ原点セット(全チャンネル)」ボタン(全24チャンネル一括)
+  - 外部ノードから: ROS 2サービス `/zero_channel` (ros2can_interfaces/srv/ZeroChannel、
+    device_id, channel_index(-1で全チャンネル) -> success, message)
+  - 配信: 原点セット後の相対値は `serial_rx_[ID]_zeroed` (Int32MultiArray, 24スロット、
+    既存の `serial_rx_[ID]_unwrapped` と対の新トピック) で配信
+  - MODE_HARDWARE/MODE_SIMULATORはPCNTラップアラウンド解決後のrx_unwrapped基準
+    (多回転関節でもズレなく原点セット可能)。MODE_TOPIC_CLIENTは素のrx_data基準
+    (ラップアラウンド解決をしていないため32768カウント幅を跨ぐケースはズレ得る、
+    ros_backend.py内コメント参照)
+  - オフセットはGUIプロセスのメモリ上のみ(再起動で消える、永続化はしていない)
+新規パッケージ `ros2can_interfaces` (srv/ZeroChannel.srv) を追加、`ros2can`が依存。
+実装箇所: ros2can/ros2can/ros_backend.py (zero_channel/zero_all_channels/
+zeroed_value、ZeroChannelサービス)、widgets.py (ChannelMonitorRowの原点セットボタン)、
+device_panel.py (配線)。
+
 ##cr26_sokiパッケージ
 welcomeday.cpp / angle_test.cpp / angle_test_gm.cpp / ros2can_practice.cpp
 が置かれている。中身は未精査、soki本体との関係も未確認。
 
 ##未確認・要確認事項
 - soki_simのURDF寸法(base_height/lift_size_z/arm_length等)と実機寸法の対応
+- フィールド(ワーク配置環境)の前面の板の幅・奥行き寸法、板厚(すべて仮値のまま)
 - ros2can側(MODE_CUBEMARS/MODE_ROBOMAS)のCAN_ID・スロット割り当てと、
   root_theta/tip_theta/z/rそれぞれが実際にどのデバイス・トピックに紐づくか
 - cr26_sokiパッケージの位置づけ(sokiとの関係)
