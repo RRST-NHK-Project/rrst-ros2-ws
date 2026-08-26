@@ -1,0 +1,5 @@
+#GUI関連
+ros2 launch soki_sim display.launch.py
+ros2 run soki_sim command_gui_node
+
+#自動機メインノード
