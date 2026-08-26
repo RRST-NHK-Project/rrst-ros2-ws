@@ -31,9 +31,9 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
   <xacro:property name="lift_size_xy" value="0.14"/>
   <xacro:property name="lift_size_z" value="0.08"/>
   <xacro:property name="z_lower" value="0.0"/>
-  <xacro:property name="z_upper" value="0.55"/>
+  <xacro:property name="z_upper" value="0.432"/>
 
-  <xacro:property name="arm_length" value="0.4"/>
+  <xacro:property name="arm_length" value="1.244"/>
   <xacro:property name="arm_size_yz" value="0.05"/>
   <xacro:property name="r_lower" value="${-arm_length / 2}"/>
   <xacro:property name="r_upper" value="${arm_length / 2}"/>

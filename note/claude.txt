@@ -1,0 +1,49 @@
+#soki構成 (Claudeが現状把握している内容。2026-08-27時点、間違っていたら訂正してください)
+
+##シミュレーション (soki_sim)
+円柱座標型4自由度アーム。RVizでの見た目確認用(物理演算なし)。
+  root_theta_joint : 旋回      continuous, z軸
+  z_joint          : 昇降      prismatic, 0.0~0.432m
+  r_joint          : 伸縮      prismatic, -0.622~0.622m (アーム長1.244m、実機寸法に合わせ済み)
+  tip_theta_joint  : 手先回転  continuous
+実機ではz_joint/r_jointはmotor1/motor2の2モータ差動機構で駆動
+  z = k(m1+m2), r = k(m1-m2), k=0.5
+
+各関節の使用モーター
+  root_theta_joint : AK40-10 KV170 V3.0 with MIT mode
+  z_joint          : m2006 with c610 driver マイコンで速度制御、位置ループはROS側で回す      
+  r_joint          : m2006 with c610 driver マイコンで速度制御、位置ループはROS側で回す       
+  tip_theta_joint  : AK40-10 KV170 V3.0 with MIT mode
+
+motor_mixer_nodeが/joint_statesを監視し、motor1/2側とz/r側どちらが
+動いたかを判定して双方向にミキシング計算し/mixed_joint_statesへpublish
+(joint_state_publisher(_gui)のsource_listで取り込む)。
+command_gui_node(2026-08-27新規作成)はX/Y/Zの目標値をGUI指定→逆運動学で
+theta/z/rに変換して/mixed_joint_statesへpublishする指令送信GUI。
+
+##実機モータ制御 (ros2can経由。soki本体はこちらを使用、serial_bridge/robomas.cppは不使用)
+soki 4関節はすべて `ros2can` パッケージ (xiao-esp32-s3_can2io ファームウェア) 配下。
+1マイコン=1モードで、以下2系統の独立デバイスに分かれている。
+  MODE_CUBEMARS (root_theta_joint / tip_theta_joint 用):
+    CubeMars AKシリーズ(AK40-10)をServo(CAN)モード or Force Control(MIT)モードで
+    直接駆動。アクチュエータ内蔵クローズドループに指令、ホスト側PIDなし。CAN 1Mbps固定。
+    ファームウェア: ros2can/firmware/xiao-esp32-s3_can2io/src/cubemars.cpp/.hpp
+  MODE_ROBOMAS (z_joint / r_joint 用、motor1/motor2 = M2006 x2):
+    C610ドライバでM2006を速度制御(マイコン側)、位置ループはROS側(motor_mixer_node
+    経由でz/rとの相互変換)。
+    ファームウェア: ros2can/firmware/xiao-esp32-s3_can2io/src/robomas.cpp/.hpp
+    (serial_bridge/firmware/esp32_serial_bridge/src/robomas.cpp とは別物、混同注意)
+どちらもUSBシリアルで `ros2can` GUI/ノードとやり取りする(24 x int16スロット、
+デバイスごとにCAN_IDでスロット範囲を割り当て)。
+serial_bridge/robomas.cpp(M3508/GM6020含む旧実装)はsokiの4関節には未使用
+(他用途 or 現状未使用)。
+
+##cr26_sokiパッケージ
+welcomeday.cpp / angle_test.cpp / angle_test_gm.cpp / ros2can_practice.cpp
+が置かれている。中身は未精査、soki本体との関係も未確認。
+
+##未確認・要確認事項
+- soki_simのURDF寸法(base_height/lift_size_z/arm_length等)と実機寸法の対応
+- ros2can側(MODE_CUBEMARS/MODE_ROBOMAS)のCAN_ID・スロット割り当てと、
+  root_theta/tip_theta/z/rそれぞれが実際にどのデバイス・トピックに紐づくか
+- cr26_sokiパッケージの位置づけ(sokiとの関係)

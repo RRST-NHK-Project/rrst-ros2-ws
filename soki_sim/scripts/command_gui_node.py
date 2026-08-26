@@ -31,8 +31,8 @@ from sensor_msgs.msg import JointState
 # soki_sim.urdf.xacro の寸法定数と一致させること
 BASE_HEIGHT = 0.06
 LIFT_SIZE_Z = 0.08
-ARM_LENGTH = 0.4
-Z_LOWER, Z_UPPER = 0.0, 0.55
+ARM_LENGTH = 1.244
+Z_LOWER, Z_UPPER = 0.0, 0.432
 R_LOWER, R_UPPER = -ARM_LENGTH / 2.0, ARM_LENGTH / 2.0
 
 # lift_link原点(z_joint基準)の地面からの高さオフセット
