@@ -21,7 +21,7 @@ note/can_mapping.txt)。変換ノード(real_joint_bridge_node)も実装済み�
 soki_sim/config/real_joint_bridge.yamlのパラメータ変更のみで数値を反映できる
 (詳細はnote/claude.txt「実機とsimの関節角度校正」参照)。要点は以下:
   - root_theta/tip_theta: CubeMars AK40-10、絶対値エンコーダ(電源再投入後も
-    実角度保持)。外部減速比は両方判明済み: root_theta=13と5/7(=96/7)、
+    実角度保持)。外部減速比は両方判明済み: root_theta=112/24(=14/3、2026-08-27変更)、
     tip_theta=ベルト+プーリ(モーター側20T/手先側28T=1.4倍)。
     原点センサは1箇所(初期較正用と思われる、要確認)。
   - z_joint/r_joint: M2006+C610の差動機構だが、位置の真値はロボマス内蔵
@@ -30,17 +30,24 @@ soki_sim/config/real_joint_bridge.yamlのパラメータ変更のみで数値を
     基準を喪失。上限・下限それぞれに原点センサあり(合成後のz軸/r軸それぞれに1個、
     motor1/motor2の個別軸ではない、確認済み)。毎起動ホーミングが必須。
   - ros2canの「エンコーダ原点セット」機能(zero_channel)はz/rの毎起動
-    ホーミングにのみ使う。root_theta/tip_thetaはzero_channelのオフセットが
-    非永続なことに依存せず、real_joint_bridge_node側で永続パラメータ
-    (root_theta_offset_rad/tip_theta_offset_rad)による初回較正のみの方式に
-    変更済み(詳細はnote/hardware_mapping.txt「root_theta/tip_thetaの原点
-    初期化」参照)。
+    ホーミングにのみ使う。tip_thetaはzero_channelのオフセットが非永続な
+    ことに依存せず、real_joint_bridge_node側で永続パラメータ
+    (tip_theta_offset_rad)による初回較正のみの方式にしている。root_thetaは
+    さらに一歩進めて2026-08-27にsoftwareオフセット方式自体を廃止し、CubeMars
+    本体へSet Origin CANコマンドを送って実機エンコーダの原点を直接較正する
+    方式に変更済み(/set_root_theta_originサービス、詳細はnote/hardware_mapping.txt
+    「root_theta/tip_thetaの原点初期化」参照)。
 
 ### 残タスク
   - real_joint_bridge_nodeの実機での疎通確認(sim側と同じ/mixed_joint_states
     経由でcommand_gui_node・trajectory_follower_nodeが動くか)
-  - root_theta/tip_thetaの初回較正の実施(原点センサ位置で_unwrapped値を読み、
-    root_theta_offset_rad/tip_theta_offset_radをreal_joint_bridge.yamlに記入)
+  - root_theta本体Set Originコマンド(control_mode_id=5)がAK Series Module
+    Product Manual V3.2.0 4.1節の実際の記載と一致するか実機投入前に要確認
+    (2026-08-27時点、RPM=3/POS=4の続き番号として採用したのみで未検証。
+    note/hardware_mapping.txt参照)
+  - root_thetaの初回較正の実施(原点センサ位置で/set_root_theta_originを呼ぶ)
+  - tip_thetaの初回較正の実施(原点センサ位置で_unwrapped値を読み、
+    tip_theta_offset_radをreal_joint_bridge.yamlに記入)
   - homing_node(z/r起動時ホーミング)は実装済み(2026-08-27、soki_sim/scripts/
     homing_node.py)だが、以下は仮定のまま実機未検証:
     - z軸/r軸原点センサのSWチャンネル配線(node_index/local_index、

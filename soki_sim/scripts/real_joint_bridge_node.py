@@ -14,13 +14,16 @@ CAN_ID/スロット割当の実測値はnote/can_mapping.txtを参照。値が�
 購読トピック (ros2can/ros_backend.py が配信する Int32MultiArray, 24スロット):
   serial_rx_{cubemars_device_id}_unwrapped
     -> M{n} position (0.1deg/LSB) から root_theta_joint / tip_theta_joint を算出。
+       _zeroedではなく_unwrapped(ラップアラウンド解決済みの生の絶対値)を購読する。
+       root_theta_jointはCubeMars AK40-10本体へ「Set Origin」CANコマンド
+       (control_mode=3、trajectory_follower_nodeの/set_root_theta_origin
+       サービス経由、2026-08-27実装)を送ることで実機エンコーダ自体の原点を
+       永続的に(フラッシュ保存、電源off/onを跨いでも)真の機械原点に合わせる方式
+       にしたため、本ノード側でのオフセット補正(root_theta_offset_rad)は廃止した。
+       tip_theta_jointはCubeMars本体側にSet Origin機能を使っておらず、従来通り
        ros2canの/zero_channel(オフセットがGUIプロセスのメモリ上限りで永続化
-       されない)には依存せず、_zeroedではなく_unwrapped(ラップアラウンド解決
-       済みの生の絶対値)を購読し、本ノード側のパラメータ(root_theta_offset_rad/
-       tip_theta_offset_rad、yamlに保存され再起動しても消えない)で真の原点との
-       ズレを補正する。CubeMars AK40-10は絶対値エンコーダなので、この
-       オフセットは実機組み立て後の初回較正で一度決めればよく、以後は
-       ros2canプロセスの再起動・電源off/onを跨いでも再較正不要。
+       されない)には依存せず、本ノード側のパラメータ(tip_theta_offset_rad、
+       yamlに保存され再起動しても消えない)で真の原点とのズレを補正する。
        較正手順: 関節を原点センサの位置(真の機械原点)へ物理的に合わせ、
        その瞬間の_unwrapped値でoffsetを逆算してyamlに書き込む。
   serial_rx_{can_host_device_id}_unwrapped
@@ -53,13 +56,14 @@ class RealJointBridgeNode(Node):
         self.declare_parameter('cubemars_root_theta_index', 0)   # M1
         self.declare_parameter('cubemars_tip_theta_index', 1)    # M2
         self.declare_parameter('cubemars_position_scale_deg', 0.1)  # LSB -> deg
-        self.declare_parameter('root_theta_reduction', 96.0 / 7.0)  # 13と5/7
+        self.declare_parameter('root_theta_reduction', 112.0 / 24.0)  # 112/24
         self.declare_parameter('tip_theta_reduction', 1.4)          # 28T/20T
         self.declare_parameter('root_theta_sign', 1.0)
         self.declare_parameter('tip_theta_sign', 1.0)
+        # tip_thetaのみ対象(root_thetaはCubeMars本体のSet Originコマンドで原点を
+        # 永続化するため、本ノード側のオフセット補正は廃止した。ファイル冒頭コメント参照)。
         # 実機組み立て後の初回較正のみで決める、真の機械原点とのズレ補正値。
         # ros2canの/zero_channelに頼らずここで永続的に持つ(較正手順はファイル冒頭コメント参照)。
-        self.declare_parameter('root_theta_offset_rad', 0.0)
         self.declare_parameter('tip_theta_offset_rad', 0.0)
 
         # ---- CAN_HOST配下ノードのENC1/ENC2 (motor1_joint / motor2_joint) ----
@@ -92,7 +96,6 @@ class RealJointBridgeNode(Node):
         self.tip_theta_reduction_ = gp('tip_theta_reduction').value
         self.root_theta_sign_ = gp('root_theta_sign').value
         self.tip_theta_sign_ = gp('tip_theta_sign').value
-        self.root_theta_offset_ = gp('root_theta_offset_rad').value
         self.tip_theta_offset_ = gp('tip_theta_offset_rad').value
 
         self.can_host_device_id_ = gp('can_host_device_id').value
@@ -159,7 +162,7 @@ class RealJointBridgeNode(Node):
         root_theta_deg = root_theta_raw * self.cubemars_scale_deg_
         tip_theta_deg = tip_theta_raw * self.cubemars_scale_deg_
         root_theta = (self.root_theta_sign_ * math.radians(root_theta_deg)
-                      / self.root_theta_reduction_ + self.root_theta_offset_)
+                      / self.root_theta_reduction_)
         tip_theta = (self.tip_theta_sign_ * math.radians(tip_theta_deg)
                      / self.tip_theta_reduction_ + self.tip_theta_offset_)
 

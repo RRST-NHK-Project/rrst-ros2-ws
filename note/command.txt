@@ -4,9 +4,34 @@ ros2 launch soki_sim display.launch.py use_joy:=true
 ros2 run soki_sim command_gui_node
 
 #自動機メインノード
+ros2 launch soki_sim real_root_theta_test.launch.py use_viz:=true use_joy:=true
+
 
 #実機関節角度校正 (2026-08-27新規)
 ros2 run soki_sim real_joint_bridge_node --ros-args --params-file install/soki_sim/share/soki_sim/config/real_joint_bridge.yaml
+
+# root_thetaの原点較正 (2026-08-27新規、CubeMars本体へSet Originコマンド送信)
+# 事前にroot_theta_jointを原点センサの位置(真の機械原点)へ物理的に合わせておくこと。
+# trajectory_follower_nodeが起動している必要がある(cubemars_joint_namesにroot_theta_joint設定済み)。
+ros2 service call /set_root_theta_origin std_srvs/srv/Trigger
+# GUIから呼ぶ場合: command_gui_node起動後「root_theta原点設定」パネルのボタン、
+# または ros2can GUIの「エンコーダ初期化」タブ内「外部ノードのTriggerサービス呼び出し」欄
+# (デフォルトで/set_root_theta_originが入力済み)
+
+# root_theta実機動作確認 (2026-08-27新規、real_root_theta_test.launch.py)
+# display.launch.pyはcubemars_*未設定(実機出力オフ)のため、動作確認時はこちらを使う
+# (display.launch.pyと同時起動しないこと。trajectory_follower_nodeが二重起動になる)。
+# ros2can GUI・real_joint_bridge_node・trajectory_follower_node(実機出力あり)・
+# command_gui_nodeを一括起動する。device_id=11(MODE_CUBEMARS)のトピック通過は
+# ros2can GUI側で手動でONにすること。
+ros2 launch soki_sim real_root_theta_test.launch.py
+# joyも使う場合(control_modeは自動的にbothになる):
+ros2 launch soki_sim real_root_theta_test.launch.py use_joy:=true
+# simの見た目(rviz)も見たい場合:
+ros2 launch soki_sim real_root_theta_test.launch.py use_viz:=true
+# 配線・ゲインを変える場合(デフォルトはmotor_index=1(M2)・Kp=5・Kd=0.5・reduction=112/24):
+ros2 launch soki_sim real_root_theta_test.launch.py motor_index:=0 kp:=10.0 kd:=1.0
+# 引数一覧: ros2 launch soki_sim real_root_theta_test.launch.py --show-args
 
 #エンコーダー管理ノード (2026-08-27新規)
 ros2 run soki_sim homing_node --ros-args --params-file install/soki_sim/share/soki_sim/config/real_joint_bridge.yaml

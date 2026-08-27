@@ -46,13 +46,14 @@ import json
 import math
 import os
 import tkinter as tk
-from tkinter import messagebox, simpledialog
+from tkinter import messagebox, simpledialog, ttk
 
 import rclpy
 from rcl_interfaces.msg import Parameter, ParameterType, ParameterValue
 from rcl_interfaces.srv import GetParameters, SetParameters
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
+from std_srvs.srv import Trigger
 
 # soki_sim.urdf.xacro の寸法定数と一致させること
 BASE_HEIGHT = 0.06
@@ -60,6 +61,13 @@ LIFT_SIZE_Z = 0.08
 ARM_LENGTH = 1.244
 Z_LOWER, Z_UPPER = 0.0, 0.432
 R_LOWER, R_UPPER = -ARM_LENGTH / 2.0, ARM_LENGTH / 2.0
+
+# root_theta: 実機CubeMars(MITモード)の指令可能範囲(±12.5rad、アクチュエータ軸)を
+# 外部減速比(112/24)で関節角度に変換した値。soki_sim.urdf.xacroのroot_theta_limitと
+# 一致させること。note/hardware_mapping.txt参照(2026-08-27、sim側もこの範囲に制限)。
+ROOT_THETA_REDUCTION = 112.0 / 24.0
+ROOT_THETA_LIMIT = 12.5 / ROOT_THETA_REDUCTION
+ROOT_THETA_LOWER, ROOT_THETA_UPPER = -ROOT_THETA_LIMIT, ROOT_THETA_LIMIT
 
 # lift_link原点(z_joint基準)の地面からの高さオフセット
 Z_OFFSET = BASE_HEIGHT + LIFT_SIZE_Z / 2.0
@@ -134,13 +142,14 @@ def xyz_to_joint(x, y, z):
     root_theta_joint角度は旋回軸に対して定義された内部基準(前方=Y+の時にtheta=0)
     に合わせるため、atan2の引数はatan2(-x, y)となる(X/Yをそのまま使うatan2(y,x)ではない)。
     """
-    theta = math.atan2(-x, y)
+    theta_raw = math.atan2(-x, y)
+    theta = clamp(theta_raw, ROOT_THETA_LOWER, ROOT_THETA_UPPER)
     radius = math.hypot(x, y)
     raw_r = radius - ARM_LENGTH / 2.0
     raw_z = z - Z_OFFSET
     r = clamp(raw_r, R_LOWER, R_UPPER)
     zj = clamp(raw_z, Z_LOWER, Z_UPPER)
-    clamped = (abs(raw_r - r) > 1e-9) or (abs(raw_z - zj) > 1e-9)
+    clamped = (abs(theta_raw - theta) > 1e-9) or (abs(raw_r - r) > 1e-9) or (abs(raw_z - zj) > 1e-9)
     return theta, zj, r, clamped
 
 
@@ -174,6 +183,9 @@ class CommandGuiNode(Node):
             )
             for node_name in (TRAJ_NODE_NAME, JOY_NODE_NAME)
         }
+        # std_srvs/Triggerサービス(/set_root_theta_origin等)呼び出し用クライアント。
+        # サービス名ごとに遅延生成してキャッシュする。
+        self._trigger_clients = {}
 
     def _on_mixed_joint_state(self, msg):
         for name, pos in zip(msg.name, msg.position):
@@ -221,6 +233,8 @@ class CommandGuiNode(Node):
                     values[name] = pv.double_value
                 elif pv.type == ParameterType.PARAMETER_STRING:
                     values[name] = pv.string_value
+                elif pv.type == ParameterType.PARAMETER_STRING_ARRAY:
+                    values[name] = list(pv.string_array_value)
             on_success(values)
 
         future.add_done_callback(_done)
@@ -258,6 +272,32 @@ class CommandGuiNode(Node):
             future.add_done_callback(_done)
         return True
 
+    def call_trigger_service(self, service_name, on_done):
+        """std_srvs/Trigger型のサービス(/set_root_theta_origin等)を非同期呼び出しする。
+
+        on_done(success: bool, message: str)は、後続のrclpy.spin_once()呼び出し中
+        (Tkinterのafter()ループと同じメインスレッド)に呼ばれる。サービス未起動の
+        場合は即座にon_done(False, ...)を呼んでFalseを返す。"""
+        client = self._trigger_clients.get(service_name)
+        if client is None:
+            client = self.create_client(Trigger, service_name)
+            self._trigger_clients[service_name] = client
+        if not client.service_is_ready():
+            on_done(False, f'{service_name} が起動していません')
+            return False
+        future = client.call_async(Trigger.Request())
+
+        def _done(fut):
+            try:
+                res = fut.result()
+            except Exception as exc:
+                on_done(False, str(exc))
+                return
+            on_done(res.success, res.message)
+
+        future.add_done_callback(_done)
+        return True
+
 
 class CommandGuiApp(tk.Tk):
     CANVAS_SIZE = 440
@@ -274,17 +314,39 @@ class CommandGuiApp(tk.Tk):
         self.y_var = tk.DoubleVar(value=0.0)
         self.z_var = tk.DoubleVar(value=(WORLD_Z_LOWER + WORLD_Z_UPPER) / 2.0)
         self.step_var = tk.DoubleVar(value=0.01)
-        for var in (self.x_var, self.y_var, self.z_var):
-            var.trace_add('write', lambda *_: self._redraw_pin())
 
         self._build_widgets()
+        # trace_addは_build_widgets()より後で登録すること: 先に登録すると、
+        # coord_frameのEntry(textvariable=x_var等)を生成した時点でTkinterが
+        # 変数の書き込みイベントを発生させ、_redraw_pin->_update_statusが
+        # self.status_label作成(_build_widgets()の終盤)より前に呼ばれてしまう。
+        for var in (self.x_var, self.y_var, self.z_var):
+            var.trace_add('write', lambda *_: self._redraw_pin())
         self._redraw_pin()
         self._refresh_point_list()
         self.after(50, self._spin_ros)
 
     # ---------- widgets ----------
     def _build_widgets(self):
-        main = tk.Frame(self, padx=8, pady=8)
+        # パラメータパネル(設定タブ)が増えるにつれ縦に伸び、ワーク/シューティング
+        # ボックスのボタン(元は移動タブ側)が画面外に押し出される問題が起きたため、
+        # ttk.Notebookで「移動」(円クリック・ジョグ・保存済みポイント等、自由な
+        # 位置への移動系)と「設定」(各種パラメータパネル、およびワーク/
+        # シューティングボックスの定型位置移動ボタン)を別タブに分離した
+        # (2026-08-27)。
+        notebook = ttk.Notebook(self)
+        notebook.pack(fill=tk.BOTH, expand=True)
+
+        move_tab = tk.Frame(notebook)
+        settings_tab = tk.Frame(notebook)
+        notebook.add(move_tab, text='移動')
+        notebook.add(settings_tab, text='設定')
+
+        self._build_move_tab(move_tab)
+        self._build_settings_tab(settings_tab)
+
+    def _build_move_tab(self, parent):
+        main = tk.Frame(parent, padx=8, pady=8)
         main.pack(fill=tk.BOTH, expand=True)
 
         left = tk.Frame(main)
@@ -345,14 +407,70 @@ class CommandGuiApp(tk.Tk):
         tk.Button(btns, text='送信', command=self._on_send_selected).pack(side=tk.LEFT, expand=True, fill=tk.X)
         tk.Button(btns, text='削除', command=self._on_delete_point).pack(side=tk.LEFT, expand=True, fill=tk.X)
 
-        info_col = tk.Frame(main)
-        info_col.pack(side=tk.LEFT, padx=(8, 0), fill=tk.Y)
-        self._build_current_state_panel(info_col)
-        self._build_mode_panel(info_col)
-        self._build_trajectory_panel(info_col)
-        self._build_joy_speed_panel(info_col)
+    def _build_settings_tab(self, parent):
+        # パネルが縦に長くなっても画面からはみ出さないよう、スクロール可能な
+        # 領域に入れる(2026-08-27、ワーク/シューティングボックスが画面外に
+        # 押し出された問題を受けて、今後パネルが増えても同じ罠を踏まないため)。
+        # ワーク/シューティングボックス(定型位置への移動)は「移動」タブの
+        # 自由位置移動系(円クリック・ジョグ・保存済みポイント)とは性質が違う
+        # ("設定"に近い定型操作)ため、こちらへ移した(2026-08-27)。
+        settings_col = self._make_scrollable(parent)
+        self._build_field_buttons(settings_col)  # 2つのLabelFrameが横並びで幅を取るため全幅のまま
 
-        self._build_field_buttons()
+        # 縦一列だと画面をはみ出しやすいため、残りのパネルは2カラムに分けて
+        # 横に並べる(2026-08-27、スクロールバーだけでは気づかれにくいとの
+        # フィードバックを受けて、そもそもの縦の長さを減らす対応も追加)。
+        columns = tk.Frame(settings_col)
+        columns.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
+        left_col = tk.Frame(columns)
+        left_col.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 8), anchor='n')
+        right_col = tk.Frame(columns)
+        right_col.pack(side=tk.LEFT, fill=tk.Y, anchor='n')
+
+        self._build_current_state_panel(left_col)
+        self._build_mode_panel(left_col)
+        self._build_origin_panel(left_col)
+
+        self._build_trajectory_panel(right_col)
+        self._build_joy_speed_panel(right_col)
+        self._build_mit_gain_panel(right_col)
+
+    def _make_scrollable(self, parent):
+        """parent一杯に縦スクロール可能な内側Frameを作って返す。"""
+        canvas = tk.Canvas(parent, highlightthickness=0)
+        scrollbar = tk.Scrollbar(parent, orient=tk.VERTICAL, command=canvas.yview)
+        inner = tk.Frame(canvas, padx=8, pady=8)
+        inner.bind('<Configure>', lambda _e: canvas.configure(scrollregion=canvas.bbox('all')))
+        canvas.create_window((0, 0), window=inner, anchor='nw')
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # マウスホイールでもスクロールできるようにする(スクロールバーのドラッグ
+        # だけでは気づかれにくく「スクロールできない」ように見える、2026-08-27)。
+        # カーソルがこの領域上にある間だけbind_allする(離れたら解除し、他の
+        # ウィジェットのホイール動作を奪わない)。Linux(X11/XWayland)は
+        # <Button-4/5>、Windows/macOSは<MouseWheel>(event.deltaの符号で判定)。
+        def _on_wheel(event):
+            if event.num == 4 or getattr(event, 'delta', 0) > 0:
+                canvas.yview_scroll(-1, 'units')
+            elif event.num == 5 or getattr(event, 'delta', 0) < 0:
+                canvas.yview_scroll(1, 'units')
+
+        def _bind_wheel(_e):
+            canvas.bind_all('<Button-4>', _on_wheel)
+            canvas.bind_all('<Button-5>', _on_wheel)
+            canvas.bind_all('<MouseWheel>', _on_wheel)
+
+        def _unbind_wheel(_e):
+            canvas.unbind_all('<Button-4>')
+            canvas.unbind_all('<Button-5>')
+            canvas.unbind_all('<MouseWheel>')
+
+        canvas.bind('<Enter>', _bind_wheel)
+        canvas.bind('<Leave>', _unbind_wheel)
+
+        return inner
 
     def _build_current_state_panel(self, parent):
         frame = tk.LabelFrame(parent, text='現在状態 (リアルタイム)')
@@ -428,8 +546,82 @@ class CommandGuiApp(tk.Tk):
         tk.Button(btn_row, text='適用', command=self._on_apply_joy_speed,
                   bg='#4a90d9', fg='white').pack(side=tk.LEFT, expand=True, fill=tk.X)
 
-    def _build_field_buttons(self):
-        field = tk.Frame(self, padx=8)
+    def _build_mit_gain_panel(self, parent):
+        # cubemars_joint_names(実機出力対象の関節)はtrajectory_follower_nodeの
+        # 起動構成次第で一部の関節だけのことがある(例: root_thetaのみ)ため、
+        # 軌道生成パラメータパネルと同じく実際のjoint_names順に読込・適用する
+        # (JOINT_NAMES固定でzipするとreal_root_theta_test.launch.py等の1関節構成で
+        # 表示が更新されない、2026-08-27発覚のバグと同じ罠を踏むため)。
+        frame = tk.LabelFrame(parent, text='MITゲイン (実機CubeMars、trajectory_follower_node)')
+        frame.pack(fill=tk.X, pady=(8, 0))
+
+        tk.Label(frame, text='Kp').grid(row=0, column=1)
+        tk.Label(frame, text='Kd').grid(row=0, column=2)
+        tk.Label(frame, text='torque_ff').grid(row=0, column=3)
+
+        self._mit_joint_names = []
+        self.mit_kp_vars = {}
+        self.mit_kd_vars = {}
+        self.mit_torque_vars = {}
+        for i, name in enumerate(JOINT_NAMES):
+            tk.Label(frame, text=name).grid(row=i + 1, column=0, sticky='w')
+            kp_var = tk.DoubleVar(value=0.0)
+            kd_var = tk.DoubleVar(value=0.0)
+            tff_var = tk.DoubleVar(value=0.0)
+            self.mit_kp_vars[name] = kp_var
+            self.mit_kd_vars[name] = kd_var
+            self.mit_torque_vars[name] = tff_var
+            tk.Entry(frame, textvariable=kp_var, width=6).grid(row=i + 1, column=1, padx=2, pady=2)
+            tk.Entry(frame, textvariable=kd_var, width=6).grid(row=i + 1, column=2, padx=2, pady=2)
+            tk.Entry(frame, textvariable=tff_var, width=6).grid(row=i + 1, column=3, padx=2, pady=2)
+
+        self.mit_gain_status_label = tk.Label(frame, text='未読込', fg='grey',
+                                               wraplength=220, justify=tk.LEFT)
+        self.mit_gain_status_label.grid(row=len(JOINT_NAMES) + 1, column=0, columnspan=4, pady=(4, 0))
+
+        btn_row = tk.Frame(frame)
+        btn_row.grid(row=len(JOINT_NAMES) + 2, column=0, columnspan=4, pady=4, sticky='we')
+        tk.Button(btn_row, text='読込', command=self._on_load_mit_gains).pack(
+            side=tk.LEFT, expand=True, fill=tk.X)
+        tk.Button(btn_row, text='適用', command=self._on_apply_mit_gains,
+                  bg='#d9534f', fg='white').pack(side=tk.LEFT, expand=True, fill=tk.X)
+
+    def _build_origin_panel(self, parent):
+        frame = tk.LabelFrame(parent, text='root_theta原点設定 (CubeMars本体、trajectory_follower_node)')
+        frame.pack(fill=tk.X, pady=(8, 0))
+
+        tk.Label(frame, text='呼び出し前に、root_theta_jointを原点センサの位置\n'
+                              '(真の機械原点)へ物理的に合わせておくこと。',
+                 fg='#a00', justify=tk.LEFT, wraplength=220).pack(padx=4, pady=(4, 2), anchor='w')
+
+        self.origin_status_label = tk.Label(frame, text='未実行', fg='grey',
+                                             wraplength=220, justify=tk.LEFT)
+        self.origin_status_label.pack(padx=4, pady=(0, 4), anchor='w')
+
+        tk.Button(frame, text='/set_root_theta_origin 呼び出し',
+                  command=self._on_set_root_theta_origin, bg='#d9534f', fg='white').pack(
+            fill=tk.X, padx=4, pady=(0, 4))
+
+    def _on_set_root_theta_origin(self):
+        if not messagebox.askyesno(
+                '根本θ原点設定の確認',
+                'root_theta_jointをCubeMars本体(AK40-10)のフラッシュへ\n'
+                '永久原点として書き込みます。\n\n'
+                '関節は今、原点センサの位置(真の機械原点)にありますか？\n'
+                '間違った位置で実行すると、以後のすべての角度がずれます。'):
+            return
+        self.origin_status_label.config(text='呼び出し中...', fg='grey')
+        ok = self.node.call_trigger_service(
+            '/set_root_theta_origin', self._on_set_root_theta_origin_done)
+        if not ok:
+            self.origin_status_label.config(text='サービス未起動です', fg='red')
+
+    def _on_set_root_theta_origin_done(self, success, message):
+        self.origin_status_label.config(
+            text=message, fg=('#1a7a1a' if success else 'red'))
+
+    def _build_field_buttons(self, parent):
+        field = tk.Frame(parent, padx=8)
         field.pack(fill=tk.X, pady=(0, 8))
 
         work_frame = tk.LabelFrame(field, text='ワーク (クリックで移動)')
@@ -488,8 +680,14 @@ class CommandGuiApp(tk.Tk):
                                  outline='#1a7a1a', width=2, tags='current')
 
     def _on_load_traj_params(self):
+        # joint_namesも取得する: trajectory_follower_nodeは実行構成によって
+        # JOINT_NAMES(root_theta/z/r)の全部ではなく一部だけで起動されることがある
+        # (例: real_root_theta_test.launch.pyはroot_theta_jointのみ)。max_velocity等の
+        # 配列は「そのノードの実際のjoint_names順」なので、GUI固定のJOINT_NAMESと
+        # 前提にlen比較・zipすると、一致しない構成では表示が更新されず0のままに見える
+        # (2026-08-27発覚)。
         ok = self.node.request_node_params(
-            TRAJ_NODE_NAME, ['max_velocity', 'max_acceleration', 'control_mode'],
+            TRAJ_NODE_NAME, ['max_velocity', 'max_acceleration', 'control_mode', 'joint_names'],
             self._apply_loaded_traj_params,
             lambda reason: self.traj_status_label.config(text=f'読込失敗: {reason}', fg='red'))
         self.traj_status_label.config(
@@ -500,21 +698,33 @@ class CommandGuiApp(tk.Tk):
         vel = values.get('max_velocity')
         accel = values.get('max_acceleration')
         mode = values.get('control_mode')
-        if vel and len(vel) == len(JOINT_NAMES):
-            for name, v in zip(JOINT_NAMES, vel):
-                self.traj_vel_vars[name].set(round(v, 4))
-        if accel and len(accel) == len(JOINT_NAMES):
-            for name, v in zip(JOINT_NAMES, accel):
-                self.traj_accel_vars[name].set(round(v, 4))
+        names = values.get('joint_names') or JOINT_NAMES
+        self._traj_joint_names = list(names)
+        missing = [n for n in JOINT_NAMES if n not in names]
+        if vel and len(vel) == len(names):
+            for name, v in zip(names, vel):
+                if name in self.traj_vel_vars:
+                    self.traj_vel_vars[name].set(round(v, 4))
+        if accel and len(accel) == len(names):
+            for name, v in zip(names, accel):
+                if name in self.traj_accel_vars:
+                    self.traj_accel_vars[name].set(round(v, 4))
         if mode:
             self.mode_var.set(mode)
             self.mode_status_label.config(text=f'現在のモード: {mode}', fg='blue')
-        self.traj_status_label.config(text='読込完了', fg='blue')
+        status = '読込完了'
+        if missing:
+            status += f' (未起動構成: {", ".join(missing)}は表示更新されません)'
+        self.traj_status_label.config(text=status, fg='blue')
 
     def _on_apply_traj_params(self):
+        # 実際にtrajectory_follower_nodeが持つjoint_names順で配列を組む
+        # (GUI固定のJOINT_NAMESで組むと、一部関節のみの構成では長さ不一致で
+        # set_parametersに拒否される。読込未実施時はJOINT_NAMES全部を仮定する)。
+        names = getattr(self, '_traj_joint_names', JOINT_NAMES)
         try:
-            vel = [self.traj_vel_vars[name].get() for name in JOINT_NAMES]
-            accel = [self.traj_accel_vars[name].get() for name in JOINT_NAMES]
+            vel = [self.traj_vel_vars[name].get() for name in names]
+            accel = [self.traj_accel_vars[name].get() for name in names]
         except tk.TclError:
             messagebox.showerror('入力エラー', '速度・加速度に数値を入力してください')
             return
@@ -534,6 +744,81 @@ class CommandGuiApp(tk.Tk):
         else:
             reasons = '; '.join(r.reason for r in results if not r.successful)
             self.traj_status_label.config(text=f'適用失敗: {reasons}', fg='red')
+
+    def _on_load_mit_gains(self):
+        ok = self.node.request_node_params(
+            TRAJ_NODE_NAME,
+            ['cubemars_kp', 'cubemars_kd', 'cubemars_torque_ff', 'cubemars_joint_names'],
+            self._apply_loaded_mit_gains,
+            lambda reason: self.mit_gain_status_label.config(text=f'読込失敗: {reason}', fg='red'))
+        self.mit_gain_status_label.config(
+            text='読込中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
+            fg='grey' if ok else 'red')
+
+    def _apply_loaded_mit_gains(self, values):
+        kp = values.get('cubemars_kp')
+        kd = values.get('cubemars_kd')
+        tff = values.get('cubemars_torque_ff')
+        names = values.get('cubemars_joint_names') or []
+        self._mit_joint_names = list(names)
+        if kp and len(kp) == len(names):
+            for name, v in zip(names, kp):
+                if name in self.mit_kp_vars:
+                    self.mit_kp_vars[name].set(round(v, 4))
+        if kd and len(kd) == len(names):
+            for name, v in zip(names, kd):
+                if name in self.mit_kd_vars:
+                    self.mit_kd_vars[name].set(round(v, 4))
+        if tff and len(tff) == len(names):
+            for name, v in zip(names, tff):
+                if name in self.mit_torque_vars:
+                    self.mit_torque_vars[name].set(round(v, 4))
+        status = '読込完了'
+        not_configured = [n for n in JOINT_NAMES if n not in names]
+        if not_configured:
+            status += f' (実機出力対象外: {", ".join(not_configured)})'
+        if not names:
+            status = '読込完了 (実機出力対象の関節が設定されていません)'
+        self.mit_gain_status_label.config(text=status, fg='blue')
+
+    def _on_apply_mit_gains(self):
+        # cubemars_joint_namesの実際の順序(_on_load_mit_gainsで取得済みのもの)で
+        # 配列を組む必要がある。未読込のまま適用すると対象関節・順序が不明なため、
+        # 先に読込を要求する(誤った関節にゲインを適用する事故を防ぐ)。
+        names = getattr(self, '_mit_joint_names', None)
+        if not names:
+            messagebox.showerror('未読込', '先に「読込」を実行して対象関節を確認してください')
+            return
+        try:
+            kp = [self.mit_kp_vars[name].get() for name in names]
+            kd = [self.mit_kd_vars[name].get() for name in names]
+            tff = [self.mit_torque_vars[name].get() for name in names]
+        except tk.TclError:
+            messagebox.showerror('入力エラー', 'Kp/Kd/torque_ffに数値を入力してください')
+            return
+        if not messagebox.askyesno(
+                'MITゲイン適用の確認',
+                f'{", ".join(names)} のMITゲインを実機へ即座に反映します。\n'
+                'Kpを大きくするほど保持力・応答性が上がりますが、\n'
+                '実機にかかる力も大きくなります。よろしいですか？'):
+            return
+        ok = self.node.set_node_params(
+            TRAJ_NODE_NAME,
+            {'cubemars_kp': kp, 'cubemars_kd': kd, 'cubemars_torque_ff': tff},
+            self._apply_mit_gain_set_result)
+        self.mit_gain_status_label.config(
+            text='適用中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
+            fg='grey' if ok else 'red')
+
+    def _apply_mit_gain_set_result(self, results):
+        if results is None:
+            self.mit_gain_status_label.config(text='適用に失敗しました(応答なし)', fg='red')
+            return
+        if all(r.successful for r in results):
+            self.mit_gain_status_label.config(text='適用しました', fg='green')
+        else:
+            reasons = '; '.join(r.reason for r in results if not r.successful)
+            self.mit_gain_status_label.config(text=f'適用失敗: {reasons}', fg='red')
 
     def _on_load_joy_speed(self):
         ok = self.node.request_node_params(

@@ -17,7 +17,8 @@ max_velocity/max_accelerationで制限された現実的な速度で動くよう
 
 同じ軌道(位置・速度)を、実機のCubeMars AKシリーズ(MITモード)へもそのまま
 指令できる。cubemars_joint_names等のパラメータで対象関節・device_id・
-モータ番号(0-3, ros2canのM1-M4に対応)を指定すると、ros2canのトピック規約
+モータ番号(0-3, ros2canのM1-M4に対応)・reduction(関節<->アクチュエータ軸の
+減速比、note/hardware_mapping.txt参照)を指定すると、ros2canのトピック規約
 (serial_tx_[ID] へInt16MultiArray(24スロット)をpublishすると外部指令として
 反映される。ros2can/ros2can/ros_backend.py参照)に従ってMIT指令フレームを
 毎周期publishする。device_id/motor_indexの対応は実機配線に依存するため、
@@ -27,6 +28,20 @@ MITモードの各スロットのスケールはros2can/firmware/xiao-esp32-s3_c
 cubemars.cppのコメントと一致させること
   (target: 0.1deg/LSB, mit_velocity: 0.01rad/s/LSB, mit_kp: 0.1/LSB,
    mit_kd: 0.01/LSB, mit_torque_ff: 0.01N・m/LSB)。
+target/mit_velocityはアクチュエータ軸(CubeMars本体側)の値であり、本ノード内部の
+self.pos_/self.vel_(関節角度)に cubemars_reduction を掛けて変換してから送信する
+(real_joint_bridge_nodeの joint = actuator / reduction の逆変換、2026-08-27修正)。
+また、最初の/joint_targets受信より前は serial_rx_[device_id]_unwrapped の実機
+帰還値でself.pos_を追従させ、起動直後の内部状態(0.0)と実機の実際の角度との
+ズレによる意図しない位置ジャンプを防ぐ(_on_cubemars_feedback参照)。
+
+root_theta_jointについては、/set_root_theta_origin(std_srvs/Trigger)サービスで
+CubeMars本体(AK40-10)へSet Origin(永久原点、フラッシュ保存)CANコマンドを送信できる
+(2026-08-27追加、control_mode=3、ros2can/firmware側の対応実装はcubemars.cpp参照)。
+呼び出すと数周期(ORIGIN_HOLD_CYCLES)だけ通常のMIT指令を止めてSET_ORIGINモードを
+送る。これにより実機エンコーダ自体の原点が電源off/onを跨いで保持されるため、
+real_joint_bridge_node側のroot_theta_offset_radによるソフトウェア補正は廃止した
+(note/hardware_mapping.txt参照)。
 
 /joint_targetsの送信元は自動(command_gui_node)とjoy_teleop_node(手動操作)の
 2系統があり、control_modeパラメータ('auto'/'manual'/'both')でどちらを受け付ける
@@ -41,10 +56,20 @@ import rclpy
 from rcl_interfaces.msg import ParameterDescriptor, SetParametersResult
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Int16MultiArray
+from std_msgs.msg import Int16MultiArray, Int32MultiArray
+from std_srvs.srv import Trigger
 
 CUBEMARS_MODE_MIT = 2
+CUBEMARS_POSITION_SCALE_DEG = 0.1  # 帰還/MIT指令とも0.1deg/LSB(cubemars.cpp参照)
+CUBEMARS_MODE_SET_ORIGIN = 3  # ros2can/firmware/.../cubemars.cppのcontrol_mode enumと一致させること
+CUBEMARS_ORIGIN_MODE_PERMANENT = 1  # target流用: 0=一時原点/1=永久原点(フラッシュ保存)/2=デフォルト復元
 CUBEMARS_SLOT_COUNT = 24
+
+# /set_root_theta_originサービス呼び出し後、Set Originコマンドの送信を保証するために
+# 通常のMIT指令を止めてSET_ORIGINモードを保持する周期数(update_rate_hzでの周期数)。
+# ros2can側firmwareは実際のCANコマンド送信をエッジ検出で1回だけ行うため、この間に
+# 少なくとも1回はcubemarsTask(200Hz)の処理サイクルへ届けば十分。
+ORIGIN_HOLD_CYCLES = 10
 
 INT16_MIN, INT16_MAX = -32768, 32767
 
@@ -122,6 +147,10 @@ class TrajectoryFollowerNode(Node):
         self.declare_parameter('cubemars_kp', [], dyn)
         self.declare_parameter('cubemars_kd', [], dyn)
         self.declare_parameter('cubemars_torque_ff', [], dyn)
+        # 関節角度[joint]とCubeMars本体(アクチュエータ軸)角度[actuator]の変換比:
+        # actuator_deg = joint_deg * reduction (real_joint_bridge_nodeの
+        # joint = actuator / reduction の逆)。note/hardware_mapping.txt参照。
+        self.declare_parameter('cubemars_reduction', [], dyn)
 
         self.joint_names_ = list(self.get_parameter('joint_names').value)
         max_vel = list(self.get_parameter('max_velocity').value)
@@ -145,6 +174,7 @@ class TrajectoryFollowerNode(Node):
         self.has_target_ = False
 
         self._setup_cubemars_outputs()
+        self.create_service(Trigger, 'set_root_theta_origin', self._on_set_root_theta_origin)
 
         # max_velocity/max_accelerationは起動時にself.max_vel_/max_accel_へ
         # 取り込んだ後は参照されないため、command_gui_node等がros2 param set(GUIの
@@ -174,11 +204,14 @@ class TrajectoryFollowerNode(Node):
         kp = list(self.get_parameter('cubemars_kp').value)
         kd = list(self.get_parameter('cubemars_kd').value)
         torque_ff = list(self.get_parameter('cubemars_torque_ff').value)
+        reduction = list(self.get_parameter('cubemars_reduction').value)
 
-        lengths = {len(names), len(device_ids), len(motor_indices), len(kp), len(kd), len(torque_ff)}
+        lengths = {len(names), len(device_ids), len(motor_indices), len(kp), len(kd), len(torque_ff),
+                   len(reduction)}
         if len(names) > 0 and lengths != {len(names)}:
             raise ValueError(
-                'cubemars_joint_names/device_ids/motor_indices/kp/kd/torque_ff must all have the same length')
+                'cubemars_joint_names/device_ids/motor_indices/kp/kd/torque_ff/reduction '
+                'must all have the same length')
         for name in names:
             if name not in self.joint_names_:
                 raise ValueError(f'cubemars_joint_names entry "{name}" is not in joint_names')
@@ -188,30 +221,63 @@ class TrajectoryFollowerNode(Node):
         self.cubemars_ = {}
         self.device_buffers_ = {}
         self.device_publishers_ = {}
-        for name, device_id, motor_index, kp_v, kd_v, tff_v in zip(
-                names, device_ids, motor_indices, kp, kd, torque_ff):
+        self.device_feedback_subs_ = {}
+        for name, device_id, motor_index, kp_v, kd_v, tff_v, red_v in zip(
+                names, device_ids, motor_indices, kp, kd, torque_ff, reduction):
             self.cubemars_[name] = {
                 'device_id': int(device_id),
                 'motor_index': int(motor_index),
                 'kp': float(kp_v),
                 'kd': float(kd_v),
                 'torque_ff': float(tff_v),
+                'reduction': float(red_v),
             }
             if device_id not in self.device_buffers_:
                 self.device_buffers_[device_id] = [0] * CUBEMARS_SLOT_COUNT
                 self.device_publishers_[device_id] = self.create_publisher(
                     Int16MultiArray, f'serial_tx_{device_id}', 10)
+                self.device_feedback_subs_[device_id] = self.create_subscription(
+                    Int32MultiArray, f'serial_rx_{device_id}_unwrapped',
+                    lambda msg, did=device_id: self._on_cubemars_feedback(msg, did), 10)
+
+        # /set_root_theta_originで起動した「原点設定モード保持」の残り周期数
+        # (関節名 -> 残りcycle数)。0または未登録なら通常のMIT指令を送る。
+        self._origin_pending_ = {}
+
+    def _on_cubemars_feedback(self, msg: Int32MultiArray, device_id: int):
+        # 最初の/joint_targets受信(has_target_=True)より前は、実機からの帰還値で
+        # self.pos_を追従させておく。これをしないとノード起動直後の内部状態(0.0)と
+        # 実機の実際の角度がズレたまま最初の目標へ台形プロファイルが走り、
+        # 実機側に意図しない大きな位置ジャンプ(Kp*(p_des-p)のステップ入力)が
+        # 発生する。目標を一度でも受け取ったら以後はプロファイル側の値を信用し、
+        # 帰還での上書きはしない。
+        if self.has_target_:
+            return
+        for name, cfg in self.cubemars_.items():
+            if cfg['device_id'] != device_id:
+                continue
+            raw_deg = msg.data[cfg['motor_index']] * CUBEMARS_POSITION_SCALE_DEG
+            joint_rad = math.radians(raw_deg) / cfg['reduction']
+            self.pos_[name] = joint_rad
+            self.vel_[name] = 0.0
+            self.target_[name] = joint_rad
 
     def _on_set_parameters(self, params):
         # add_on_set_parameters_callbackに渡されるのはrclpy.parameter.Parameter
         # (Pythonラッパー)であり、.valueはParameterValueメッセージではなく
         # 素のPython値(list等)が直接入っている点に注意。
         n = len(self.joint_names_)
+        m = len(self.cubemars_)
+        cubemars_array_params = ('cubemars_kp', 'cubemars_kd', 'cubemars_torque_ff')
         for p in params:
             if p.name in ('max_velocity', 'max_acceleration') and len(p.value) != n:
                 return SetParametersResult(
                     successful=False,
                     reason=f'{p.name} must have {n} elements (one per joint_names entry)')
+            if p.name in cubemars_array_params and len(p.value) != m:
+                return SetParametersResult(
+                    successful=False,
+                    reason=f'{p.name} must have {m} elements (one per cubemars_joint_names entry)')
             if p.name == 'control_mode' and p.value not in VALID_CONTROL_MODES:
                 return SetParametersResult(
                     successful=False,
@@ -223,6 +289,16 @@ class TrajectoryFollowerNode(Node):
                 self.max_accel_ = dict(zip(self.joint_names_, p.value))
             elif p.name == 'control_mode':
                 self.control_mode_ = p.value
+            elif p.name in cubemars_array_params:
+                # cubemars_*系のKp/Kd/torque_ffは_setup_cubemars_outputs()実行時に
+                # self.cubemars_[name]へキャッシュされ、_publish_cubemars_commands()は
+                # そのキャッシュ値だけを参照する(毎周期get_parameterはしない)ため、
+                # set_parametersで変更した値を実際にMIT指令へ反映させるにはここで
+                # キャッシュ側も更新する必要がある(2026-08-27、GUIからのゲイン調整用に追加)。
+                key = {'cubemars_kp': 'kp', 'cubemars_kd': 'kd',
+                       'cubemars_torque_ff': 'torque_ff'}[p.name]
+                for name, v in zip(self.cubemars_.keys(), p.value):
+                    self.cubemars_[name][key] = float(v)
         return SetParametersResult(successful=True)
 
     def target_callback(self, msg: JointState):
@@ -253,6 +329,26 @@ class TrajectoryFollowerNode(Node):
 
         self.has_target_ = True
 
+    def _on_set_root_theta_origin(self, request, response):
+        """root_theta_jointのCubeMars本体(AK40-10)へSet Origin(永久原点、
+        フラッシュ保存)コマンドを送るようリクエストする。real_joint_bridge_node側の
+        root_theta_offset_radは廃止済みのため、この操作が実機の唯一の原点設定手段になる。
+        呼び出し前に関節を原点センサの位置(真の機械原点)へ物理的に合わせておくこと。
+        """
+        name = 'root_theta_joint'
+        cfg = self.cubemars_.get(name)
+        if cfg is None:
+            response.success = False
+            response.message = (
+                f'{name} はcubemars_joint_names未設定のため実機へSet Originを送信できません')
+            return response
+        self._origin_pending_[name] = ORIGIN_HOLD_CYCLES
+        response.success = True
+        response.message = (
+            f'{name}: CubeMars(device_id={cfg["device_id"]}, motor_index={cfg["motor_index"]})'
+            f'へSet Origin(永久原点)コマンドを送信します')
+        return response
+
     def timer_callback(self):
         if not self.has_target_:
             return
@@ -274,10 +370,21 @@ class TrajectoryFollowerNode(Node):
         for name, cfg in self.cubemars_.items():
             m = cfg['motor_index']
             buf = self.device_buffers_[cfg['device_id']]
-            pos_deg = math.degrees(self.pos_[name])
-            buf[m] = clamp_int16(pos_deg * 10.0)                    # target: 0.1deg/LSB
+
+            remaining = self._origin_pending_.get(name, 0)
+            if remaining > 0:
+                # Set Origin保持中はMIT指令を送らない(ros2can側cubemars.cppがtarget
+                # スロットをorigin_modeとして解釈するため、通常のtarget/kp/kd等は書かない)。
+                buf[m] = CUBEMARS_ORIGIN_MODE_PERMANENT
+                buf[4 + m] = CUBEMARS_MODE_SET_ORIGIN
+                self._origin_pending_[name] = remaining - 1
+                continue
+
+            actuator_deg = math.degrees(self.pos_[name]) * cfg['reduction']
+            buf[m] = clamp_int16(actuator_deg * 10.0)               # target: 0.1deg/LSB(アクチュエータ軸)
             buf[4 + m] = CUBEMARS_MODE_MIT
-            buf[8 + m] = clamp_int16(self.vel_[name] * 100.0)       # mit_velocity: 0.01rad/s/LSB
+            actuator_vel_radps = self.vel_[name] * cfg['reduction']
+            buf[8 + m] = clamp_int16(actuator_vel_radps * 100.0)    # mit_velocity: 0.01rad/s/LSB(アクチュエータ軸)
             buf[12 + m] = clamp_int16(cfg['kp'] * 10.0)             # mit_kp: 0.1/LSB
             buf[16 + m] = clamp_int16(cfg['kd'] * 100.0)            # mit_kd: 0.01/LSB
             buf[20 + m] = clamp_int16(cfg['torque_ff'] * 100.0)     # mit_torque_ff: 0.01N・m/LSB

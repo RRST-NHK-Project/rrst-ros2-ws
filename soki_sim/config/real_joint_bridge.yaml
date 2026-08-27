@@ -8,12 +8,14 @@ real_joint_bridge_node:
     cubemars_root_theta_index: 0   # M1
     cubemars_tip_theta_index: 1    # M2
     cubemars_position_scale_deg: 0.1
-    root_theta_reduction: 13.714285714285714  # 13と5/7 (= 96/7)
+    root_theta_reduction: 4.666666666666667   # 112/24 (= 14/3)
     tip_theta_reduction: 1.4                  # 28T/20T
     root_theta_sign: 1.0
     tip_theta_sign: 1.0
-    root_theta_offset_rad: 0.0  # 要初回較正: 原点センサ位置での_unwrapped値から逆算して設定
-    tip_theta_offset_rad: 0.0   # 同上
+    # root_theta_offset_radは廃止(2026-08-27)。CubeMars本体へSet Originコマンドを
+    # 送ることで実機エンコーダ自体の原点を永続化する方式に変更した
+    # (trajectory_follower_nodeの/set_root_theta_originサービス、note/hardware_mapping.txt参照)。
+    tip_theta_offset_rad: 0.0   # 要初回較正: 原点センサ位置での_unwrapped値から逆算して設定
 
     # ---- CAN_HOST配下ノードのENC1/ENC2 (motor1_joint / motor2_joint) ----
     can_host_device_id: 101

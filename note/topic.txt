@@ -36,6 +36,15 @@ soki関連トピック一覧(soki_sim + joy連携。全てsensor_msgs/JointState
   CubeMars(MITモード)への24スロットコマンドフレーム。device_id/motor_index未設定時は
   publishされない(soki_simの表示のみ)。
 
+/set_root_theta_origin (std_srvs/Trigger, サービス。2026-08-27新規)
+  提供: trajectory_follower_node
+  root_theta_jointのCubeMars本体(AK40-10)へSet Origin(永久原点、フラッシュ保存)
+  CANコマンドを送信する(上記/serial_tx_[device_id]を経由、数周期だけMIT指令を止めて
+  control_mode=3を送る)。呼び出し前に関節を原点センサの位置(真の機械原点)へ
+  物理的に合わせておくこと。real_joint_bridge_node側のroot_theta_offset_radは
+  廃止されたため、実機の原点較正はこのサービスが唯一の手段になった
+  (詳細はnote/hardware_mapping.txt参照)。
+
 ■ 実機入力(ros2can連携、real_joint_bridge_node/homing_node用。2026-08-27新規)
 
 /serial_rx_[device_id]_unwrapped (std_msgs/Int32MultiArray, 24スロット)

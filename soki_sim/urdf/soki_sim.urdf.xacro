@@ -5,7 +5,7 @@ soki_sim: r(半径方向), 根本θ(旋回), z(昇降), 手先θ(手先回転) �
 RVizでの見た目確認用途のため、慣性(inertial)や衝突形状(collision)は持たない。
 
 関節構成 (base_link を基準に直列):
-  base_link   =[root_theta_joint (continuous, z軸)]=>  turret_link (旋回台+マスト)
+  base_link   =[root_theta_joint (revolute, z軸, ±153.5°=実機MIT可動域)]=>  turret_link (旋回台+マスト)
   turret_link =[z_joint (prismatic, z軸)]=>             lift_link (昇降キャリッジ)
   lift_link   =[r_joint (prismatic, x軸)]=>             arm_link (伸縮アーム)
   arm_link    =[tip_theta_joint (continuous, z軸)]=>    tip_link (手先)
@@ -52,6 +52,15 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
 
   <xacro:property name="joint_velocity" value="1.0"/>
   <xacro:property name="joint_effort" value="10.0"/>
+
+  <!-- root_theta: 実機CubeMars(MITモード)の指令可能範囲(±12.5rad、アクチュエータ軸、
+       AK Series Module Driver Manual由来)を外部減速比(112/24)で関節角度に変換した値。
+       MITモードのプロトコル制約上、実機は本当の意味でのcontinuous回転ができないため
+       (note/hardware_mapping.txt「root_theta/tip_thetaはMITモードの都合上そもそも
+       『continuous』ではない」参照)、simもこの範囲に制限して実機と挙動を合わせる
+       (2026-08-27)。 -->
+  <xacro:property name="root_theta_reduction" value="${112.0 / 24.0}"/>
+  <xacro:property name="root_theta_limit" value="${12.5 / root_theta_reduction}"/>
 
   <!-- マテリアル -->
   <material name="base_grey">
@@ -101,13 +110,14 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
     </visual>
   </link>
 
-  <joint name="root_theta_joint" type="continuous">
+  <joint name="root_theta_joint" type="revolute">
     <parent link="base_link"/>
     <child link="turret_link"/>
     <origin xyz="0 0 ${base_height}" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
     <dynamics damping="0.1"/>
-    <limit effort="${joint_effort}" velocity="${joint_velocity}"/>
+    <limit lower="${-root_theta_limit}" upper="${root_theta_limit}"
+           effort="${joint_effort}" velocity="${joint_velocity}"/>
   </joint>
 
   <!-- motor1_link/motor2_link: 差動機構の各モータ位置を示すインジケータ -->
