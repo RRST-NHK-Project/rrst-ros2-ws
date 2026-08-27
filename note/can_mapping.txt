@@ -71,16 +71,16 @@ homing_node以下を直接編集すること。
 
 z軸原点センサはCAN_HOSTのどのノード・どのSWチャンネルか
 (現状の仮定: ENC1/ENC2と同じnode_index=1のSW1):
-  node_index →
-  local_index(SW1=0/SW2=1/SW3=2) →
+  node_index →1
+  local_index(SW1=0/SW2=1/SW3=2) →1
 
 r軸原点センサ(現状の仮定: 同じくnode_index=1のSW2):
-  node_index →
-  local_index →
+  node_index →1
+  local_index →2
 
 センサ検出時のスイッチ値(現状の仮定: 1=検出、pin_ctrl_task.cppの
 !digitalRead()相当。実機で違えば0に):
-  →
+  →1
 
 原点センサ位置での真のz_joint/r_joint値(m。soki_sim.urdf.xacroのz_joint
 可動域0.0~0.432、r_joint可動域-0.622~0.622を参照して、センサが実際に
