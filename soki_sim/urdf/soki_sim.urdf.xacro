@@ -1,0 +1,465 @@
+<?xml version="1.0"?>
+<!--
+soki_sim: r(半径方向), 根本θ(旋回), z(昇降), 手先θ(手先回転) の
+4自由度円柱座標型アームの簡易モデル。
+RVizでの見た目確認用途のため、慣性(inertial)や衝突形状(collision)は持たない。
+
+関節構成 (base_link を基準に直列):
+  base_link   =[root_theta_joint (continuous, z軸)]=>  turret_link (旋回台+マスト)
+  turret_link =[z_joint (prismatic, z軸)]=>             lift_link (昇降キャリッジ)
+  lift_link   =[r_joint (prismatic, x軸)]=>             arm_link (伸縮アーム)
+  arm_link    =[tip_theta_joint (continuous, z軸)]=>    tip_link (手先)
+
+z_joint/r_joint は実機ではmotor1/motor2の2モータによる差動機構で駆動される
+(z = k(m1+m2), r = k(m1-m2))ため、URDF上にもmotor1_joint/motor2_jointを
+インジケータ(turret_link横の小さなスライダー)として持たせている。
+soki_sim/motor_mixer_node が /joint_states を見て、motor1/motor2側とz/r側の
+どちらが操作されたかを判定し、双方向にミキシングして反対側を追従させる
+(launch/display.launch.py 参照)。そのためjoint_state_publisher_guiでは
+motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_jointの
+スライダーを直接動かしても、両方が連動して動く。
+-->
+<robot name="soki_sim" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- 寸法パラメータ -->
+  <xacro:property name="base_radius" value="0.15"/>
+  <xacro:property name="base_height" value="0.06"/>
+
+  <xacro:property name="mast_radius" value="0.035"/>
+  <xacro:property name="mast_height" value="0.7"/>
+
+  <xacro:property name="lift_size_xy" value="0.14"/>
+  <xacro:property name="lift_size_z" value="0.08"/>
+  <xacro:property name="z_lower" value="0.0"/>
+  <xacro:property name="z_upper" value="0.432"/>
+
+  <xacro:property name="arm_length" value="1.244"/>
+  <xacro:property name="arm_size_yz" value="0.05"/>
+  <xacro:property name="r_lower" value="${-arm_length / 2}"/>
+  <xacro:property name="r_upper" value="${arm_length / 2}"/>
+
+  <xacro:property name="tip_radius" value="0.03"/>
+  <xacro:property name="tip_height" value="0.1"/>
+
+  <!-- motor1/motor2: z_joint/r_jointを駆動する差動機構のインジケータ -->
+  <!-- z = mix_k*(m1+m2), r = mix_k*(m1-m2) の関係上、m1/m2の可動域は
+       m1,m2 = z +/- r の取り得る範囲(z_lower+r_lower 〜 z_upper+r_upper)に一致させる -->
+  <xacro:property name="motor_indicator_radius" value="0.015"/>
+  <xacro:property name="motor_indicator_height" value="0.06"/>
+  <xacro:property name="motor_offset_y" value="0.08"/>
+  <xacro:property name="motor_lower" value="${z_lower + r_lower}"/>
+  <xacro:property name="motor_upper" value="${z_upper + r_upper}"/>
+
+  <xacro:property name="joint_velocity" value="1.0"/>
+  <xacro:property name="joint_effort" value="10.0"/>
+
+  <!-- マテリアル -->
+  <material name="base_grey">
+    <color rgba="0.5 0.5 0.5 1.0"/>
+  </material>
+  <material name="turret_blue">
+    <color rgba="0.2 0.4 0.8 1.0"/>
+  </material>
+  <material name="lift_orange">
+    <color rgba="0.9 0.5 0.1 1.0"/>
+  </material>
+  <material name="arm_green">
+    <color rgba="0.2 0.7 0.3 1.0"/>
+  </material>
+  <material name="tip_red">
+    <color rgba="0.8 0.1 0.1 1.0"/>
+  </material>
+  <material name="motor_yellow">
+    <color rgba="0.9 0.8 0.1 1.0"/>
+  </material>
+  <material name="board_grey">
+    <color rgba="0.55 0.55 0.5 1.0"/>
+  </material>
+  <material name="work_tan">
+    <color rgba="0.75 0.6 0.35 1.0"/>
+  </material>
+
+  <!-- base_link: 固定の台座 -->
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 ${base_height / 2}" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="${base_radius}" length="${base_height}"/>
+      </geometry>
+      <material name="base_grey"/>
+    </visual>
+  </link>
+
+  <!-- turret_link: 旋回台+マスト (root_theta_joint で旋回) -->
+  <link name="turret_link">
+    <visual>
+      <origin xyz="0 0 ${mast_height / 2}" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="${mast_radius}" length="${mast_height}"/>
+      </geometry>
+      <material name="turret_blue"/>
+    </visual>
+  </link>
+
+  <joint name="root_theta_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="turret_link"/>
+    <origin xyz="0 0 ${base_height}" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <dynamics damping="0.1"/>
+    <limit effort="${joint_effort}" velocity="${joint_velocity}"/>
+  </joint>
+
+  <!-- motor1_link/motor2_link: 差動機構の各モータ位置を示すインジケータ -->
+  <!-- 実際の見た目(マスト昇降・アーム伸縮)を動かすのはz_joint/r_jointであり、
+       motor1_joint/motor2_jointはturret_link横で上下するだけの表示専用リンク -->
+  <link name="motor1_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="${motor_indicator_radius}" length="${motor_indicator_height}"/>
+      </geometry>
+      <material name="motor_yellow"/>
+    </visual>
+  </link>
+
+  <joint name="motor1_joint" type="prismatic">
+    <parent link="turret_link"/>
+    <child link="motor1_link"/>
+    <origin xyz="${mast_radius + 0.03} ${motor_offset_y} 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="${motor_lower}" upper="${motor_upper}" effort="${joint_effort}" velocity="${joint_velocity}"/>
+  </joint>
+
+  <link name="motor2_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="${motor_indicator_radius}" length="${motor_indicator_height}"/>
+      </geometry>
+      <material name="motor_yellow"/>
+    </visual>
+  </link>
+
+  <joint name="motor2_joint" type="prismatic">
+    <parent link="turret_link"/>
+    <child link="motor2_link"/>
+    <origin xyz="${mast_radius + 0.03} ${-motor_offset_y} 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="${motor_lower}" upper="${motor_upper}" effort="${joint_effort}" velocity="${joint_velocity}"/>
+  </joint>
+
+  <!-- lift_link: マストに沿って昇降するキャリッジ (z_joint) -->
+  <link name="lift_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${lift_size_xy} ${lift_size_xy} ${lift_size_z}"/>
+      </geometry>
+      <material name="lift_orange"/>
+    </visual>
+  </link>
+
+  <joint name="z_joint" type="prismatic">
+    <parent link="turret_link"/>
+    <child link="lift_link"/>
+    <origin xyz="0 0 ${lift_size_z / 2}" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="${z_lower}" upper="${z_upper}" effort="${joint_effort}" velocity="${joint_velocity}"/>
+  </joint>
+
+  <!-- arm_link: キャリッジから水平に伸縮するアーム (r_joint) -->
+  <!-- r_joint の原点(r=0)がアームの中心になるよう、visualはarm_link原点を中心に配置する -->
+  <link name="arm_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${arm_length} ${arm_size_yz} ${arm_size_yz}"/>
+      </geometry>
+      <material name="arm_green"/>
+    </visual>
+  </link>
+
+  <joint name="r_joint" type="prismatic">
+    <parent link="lift_link"/>
+    <child link="arm_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="${r_lower}" upper="${r_upper}" effort="${joint_effort}" velocity="${joint_velocity}"/>
+  </joint>
+
+  <!-- tip_link: アーム先端で回転する手先 (tip_theta_joint) -->
+  <link name="tip_link">
+    <visual>
+      <origin xyz="0 0 ${tip_height / 2}" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="${tip_radius}" length="${tip_height}"/>
+      </geometry>
+      <material name="tip_red"/>
+    </visual>
+  </link>
+
+  <joint name="tip_theta_joint" type="continuous">
+    <parent link="arm_link"/>
+    <child link="tip_link"/>
+    <origin xyz="${arm_length / 2} 0 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <dynamics damping="0.1"/>
+    <limit effort="${joint_effort}" velocity="${joint_velocity}"/>
+  </joint>
+
+  <!-- ==================== フィールド(ワーク配置環境) ====================
+       実機のワーク設置環境をRVizで確認できるよう再現した静的モデル
+       (板・ワークとも衝突/慣性なし、視覚のみ)。base_link(旋回軸)を原点とし、
+       +X方向をワークが並ぶ奥行き方向、Y方向を幅方向(ワーク群の中心線 = 機体中心
+       = 機体が乗っている板の中心と一致)とする。
+       行(1〜4) = 奥行き方向の並び(機体に近い方が1行目)
+       列(1〜6) = 幅方向の並び(横並び) -->
+
+  <!-- 機体が乗っている板 -->
+  <xacro:property name="field_robot_board_width" value="0.690"/>
+  <xacro:property name="field_robot_board_depth" value="0.290"/>
+  <!-- 板の厚み(実測値未確認のため仮値。前面の板も同じ高さとして扱う) -->
+  <xacro:property name="field_board_thickness" value="0.01"/>
+
+  <!-- base_link(旋回軸)から、板の前端(ワーク側。以下の49mm等はここが基準)までの
+       奥行き方向オフセット。現状は板の奥行き中心にロボットが乗っている想定
+       (290mm/2)。実機のロボット搭載位置に合わせてここだけ調整すればよい -->
+  <xacro:property name="field_board_edge_offset" value="${field_robot_board_depth / 2}"/>
+
+  <!-- 前面の板(ワークが並ぶ側)。幅・奥行きは仕様未指定のため、
+       ワーク配置(4行分)+余白を確保する仮の大きさにしている -->
+  <xacro:property name="field_front_board_width" value="1.20"/>
+  <xacro:property name="field_front_board_margin" value="0.05"/>
+
+  <!-- ワーク(円柱、横倒し。軸方向=奥行き(X)方向、底面(1行目に近い面)を機体側とする) -->
+  <xacro:property name="work_diameter" value="0.066"/>
+  <xacro:property name="work_length" value="0.142"/>
+  <xacro:property name="work_rest_z" value="${work_diameter / 2}"/>
+
+  <!-- 行間隔(奥行き方向)。板前端から1行目近位端まで49mm、以降 行間58/58/13mm -->
+  <xacro:property name="field_row_gap0" value="0.049"/>
+  <xacro:property name="field_row_gap1" value="0.058"/>
+  <xacro:property name="field_row_gap2" value="0.058"/>
+  <xacro:property name="field_row_gap3" value="0.013"/>
+  <xacro:property name="field_row4_z_lift" value="0.020"/>
+
+  <!-- 各行の近位端(機体側の底面)・遠位端のX座標(base_link基準) -->
+  <xacro:property name="row1_near_x" value="${field_board_edge_offset + field_row_gap0}"/>
+  <xacro:property name="row1_far_x" value="${row1_near_x + work_length}"/>
+  <xacro:property name="row2_near_x" value="${row1_far_x + field_row_gap1}"/>
+  <xacro:property name="row2_far_x" value="${row2_near_x + work_length}"/>
+  <xacro:property name="row3_near_x" value="${row2_far_x + field_row_gap2}"/>
+  <xacro:property name="row3_far_x" value="${row3_near_x + work_length}"/>
+  <xacro:property name="row4_near_x" value="${row3_far_x + field_row_gap3}"/>
+  <xacro:property name="row4_far_x" value="${row4_near_x + work_length}"/>
+
+  <!-- 各行の中心X座標・高さ(4行目のみ20mm高い) -->
+  <xacro:property name="row1_x" value="${row1_near_x + work_length / 2}"/>
+  <xacro:property name="row2_x" value="${row2_near_x + work_length / 2}"/>
+  <xacro:property name="row3_x" value="${row3_near_x + work_length / 2}"/>
+  <xacro:property name="row4_x" value="${row4_near_x + work_length / 2}"/>
+  <xacro:property name="row1_z" value="${work_rest_z}"/>
+  <xacro:property name="row2_z" value="${work_rest_z}"/>
+  <xacro:property name="row3_z" value="${work_rest_z}"/>
+  <xacro:property name="row4_z" value="${work_rest_z + field_row4_z_lift}"/>
+
+  <!-- 列(幅方向、6列)の中心間ピッチ200mmと各列Y座標(ワーク群中心線=Y0に整列) -->
+  <xacro:property name="work_col_pitch" value="0.200"/>
+  <xacro:property name="col1_y" value="${-2.5 * work_col_pitch}"/>
+  <xacro:property name="col2_y" value="${-1.5 * work_col_pitch}"/>
+  <xacro:property name="col3_y" value="${-0.5 * work_col_pitch}"/>
+  <xacro:property name="col4_y" value="${0.5 * work_col_pitch}"/>
+  <xacro:property name="col5_y" value="${1.5 * work_col_pitch}"/>
+  <xacro:property name="col6_y" value="${2.5 * work_col_pitch}"/>
+
+  <xacro:property name="field_front_board_depth"
+                   value="${row4_far_x - field_board_edge_offset + field_front_board_margin}"/>
+
+  <!-- 機体が乗っている板の中心X座標(base_link基準) -->
+  <xacro:property name="field_robot_board_center_x" value="${field_board_edge_offset - field_robot_board_depth / 2}"/>
+
+  <!-- 機体が乗っている板 -->
+  <link name="robot_board_link">
+    <visual>
+      <origin xyz="${field_board_edge_offset - field_robot_board_depth / 2} 0 ${-field_board_thickness / 2}" rpy="0 0 0"/>
+      <geometry>
+        <box size="${field_robot_board_depth} ${field_robot_board_width} ${field_board_thickness}"/>
+      </geometry>
+      <material name="board_grey"/>
+    </visual>
+  </link>
+  <joint name="robot_board_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="robot_board_link"/>
+  </joint>
+
+  <!-- 前面の板(ワーク設置面。機体の板と同じ高さ) -->
+  <link name="front_board_link">
+    <visual>
+      <origin xyz="${field_board_edge_offset + field_front_board_depth / 2} 0 ${-field_board_thickness / 2}" rpy="0 0 0"/>
+      <geometry>
+        <box size="${field_front_board_depth} ${field_front_board_width} ${field_board_thickness}"/>
+      </geometry>
+      <material name="board_grey"/>
+    </visual>
+  </link>
+  <joint name="front_board_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="front_board_link"/>
+  </joint>
+
+  <!-- ワーク(円柱、横倒し) -->
+  <xacro:macro name="workpiece" params="name x y z">
+    <link name="${name}">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 ${pi / 2} 0"/>
+        <geometry>
+          <cylinder radius="${work_diameter / 2}" length="${work_length}"/>
+        </geometry>
+        <material name="work_tan"/>
+      </visual>
+    </link>
+    <joint name="${name}_joint" type="fixed">
+      <parent link="base_link"/>
+      <child link="${name}"/>
+      <origin xyz="${x} ${y} ${z}" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:workpiece name="work_1_1" x="${row1_x}" y="${col1_y}" z="${row1_z}"/>
+  <xacro:workpiece name="work_1_2" x="${row1_x}" y="${col2_y}" z="${row1_z}"/>
+  <xacro:workpiece name="work_1_3" x="${row1_x}" y="${col3_y}" z="${row1_z}"/>
+  <xacro:workpiece name="work_1_4" x="${row1_x}" y="${col4_y}" z="${row1_z}"/>
+  <xacro:workpiece name="work_1_5" x="${row1_x}" y="${col5_y}" z="${row1_z}"/>
+  <xacro:workpiece name="work_1_6" x="${row1_x}" y="${col6_y}" z="${row1_z}"/>
+
+  <xacro:workpiece name="work_2_1" x="${row2_x}" y="${col1_y}" z="${row2_z}"/>
+  <xacro:workpiece name="work_2_2" x="${row2_x}" y="${col2_y}" z="${row2_z}"/>
+  <xacro:workpiece name="work_2_3" x="${row2_x}" y="${col3_y}" z="${row2_z}"/>
+  <xacro:workpiece name="work_2_4" x="${row2_x}" y="${col4_y}" z="${row2_z}"/>
+  <xacro:workpiece name="work_2_5" x="${row2_x}" y="${col5_y}" z="${row2_z}"/>
+  <xacro:workpiece name="work_2_6" x="${row2_x}" y="${col6_y}" z="${row2_z}"/>
+
+  <xacro:workpiece name="work_3_1" x="${row3_x}" y="${col1_y}" z="${row3_z}"/>
+  <xacro:workpiece name="work_3_2" x="${row3_x}" y="${col2_y}" z="${row3_z}"/>
+  <xacro:workpiece name="work_3_3" x="${row3_x}" y="${col3_y}" z="${row3_z}"/>
+  <xacro:workpiece name="work_3_4" x="${row3_x}" y="${col4_y}" z="${row3_z}"/>
+  <xacro:workpiece name="work_3_5" x="${row3_x}" y="${col5_y}" z="${row3_z}"/>
+  <xacro:workpiece name="work_3_6" x="${row3_x}" y="${col6_y}" z="${row3_z}"/>
+
+  <xacro:workpiece name="work_4_1" x="${row4_x}" y="${col1_y}" z="${row4_z}"/>
+  <xacro:workpiece name="work_4_2" x="${row4_x}" y="${col2_y}" z="${row4_z}"/>
+  <xacro:workpiece name="work_4_3" x="${row4_x}" y="${col3_y}" z="${row4_z}"/>
+  <xacro:workpiece name="work_4_4" x="${row4_x}" y="${col4_y}" z="${row4_z}"/>
+  <xacro:workpiece name="work_4_5" x="${row4_x}" y="${col5_y}" z="${row4_z}"/>
+  <xacro:workpiece name="work_4_6" x="${row4_x}" y="${col6_y}" z="${row4_z}"/>
+
+  <!-- ==================== シューティングエリア(左右) ====================
+       ワークをシュートして集める左右のエリア。機体が乗っている板の中心から
+       ワークと反対方向(-X)に305mm、そこからさらに左右(Y)に525mmの位置が
+       各エリアの板の中心。板の短辺(300mm)がワーク底面と平行(=X方向)。 -->
+
+  <xacro:property name="shoot_offset_x" value="0.305"/>
+  <xacro:property name="shoot_offset_y" value="0.525"/>
+  <xacro:property name="shoot_board_width" value="0.300"/>
+  <xacro:property name="shoot_board_depth" value="0.600"/>
+  <xacro:property name="shoot_center_x" value="${field_robot_board_center_x - shoot_offset_x}"/>
+
+  <material name="shoot_box_material">
+    <color rgba="0.3 0.55 0.75 1.0"/>
+  </material>
+
+  <xacro:macro name="shoot_board" params="name y">
+    <link name="${name}">
+      <visual>
+        <origin xyz="${shoot_center_x} ${y} ${-field_board_thickness / 2}" rpy="0 0 0"/>
+        <geometry>
+          <box size="${shoot_board_depth} ${shoot_board_width} ${field_board_thickness}"/>
+        </geometry>
+        <material name="board_grey"/>
+      </visual>
+    </link>
+    <joint name="${name}_joint" type="fixed">
+      <parent link="base_link"/>
+      <child link="${name}"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:shoot_board name="shoot_board_left" y="${shoot_offset_y}"/>
+  <xacro:shoot_board name="shoot_board_right" y="${-shoot_offset_y}"/>
+
+  <!-- シュートを受ける箱(内径255x138、高さ145、板厚5mm、上面開放の5枚組)。
+       長辺(255mm)がワーク底面と平行(=Y方向)。板幅300mmには1個しか並ばないため
+       奥行き(X)方向に4個、箱間2mmの隙間をあけて板の奥行き中心に揃えて並べる。 -->
+  <xacro:property name="shoot_box_inner_x" value="0.138"/>
+  <xacro:property name="shoot_box_inner_y" value="0.255"/>
+  <xacro:property name="shoot_box_wall" value="0.005"/>
+  <xacro:property name="shoot_box_height" value="0.145"/>
+  <xacro:property name="shoot_box_outer_x" value="${shoot_box_inner_x + 2 * shoot_box_wall}"/>
+  <xacro:property name="shoot_box_outer_y" value="${shoot_box_inner_y + 2 * shoot_box_wall}"/>
+  <xacro:property name="shoot_box_wall_height" value="${shoot_box_height - shoot_box_wall}"/>
+  <xacro:property name="shoot_box_gap" value="0.002"/>
+  <xacro:property name="shoot_box_pitch" value="${shoot_box_outer_x + shoot_box_gap}"/>
+
+  <xacro:property name="shoot_box_pos1" value="${-1.5 * shoot_box_pitch}"/>
+  <xacro:property name="shoot_box_pos2" value="${-0.5 * shoot_box_pitch}"/>
+  <xacro:property name="shoot_box_pos3" value="${0.5 * shoot_box_pitch}"/>
+  <xacro:property name="shoot_box_pos4" value="${1.5 * shoot_box_pitch}"/>
+
+  <xacro:macro name="shoot_box" params="name x y">
+    <link name="${name}">
+      <visual>
+        <origin xyz="0 0 ${shoot_box_wall / 2}" rpy="0 0 0"/>
+        <geometry>
+          <box size="${shoot_box_outer_x} ${shoot_box_outer_y} ${shoot_box_wall}"/>
+        </geometry>
+        <material name="shoot_box_material"/>
+      </visual>
+      <visual>
+        <origin xyz="${shoot_box_outer_x / 2 - shoot_box_wall / 2} 0 ${shoot_box_wall + shoot_box_wall_height / 2}" rpy="0 0 0"/>
+        <geometry>
+          <box size="${shoot_box_wall} ${shoot_box_outer_y} ${shoot_box_wall_height}"/>
+        </geometry>
+        <material name="shoot_box_material"/>
+      </visual>
+      <visual>
+        <origin xyz="${-(shoot_box_outer_x / 2 - shoot_box_wall / 2)} 0 ${shoot_box_wall + shoot_box_wall_height / 2}" rpy="0 0 0"/>
+        <geometry>
+          <box size="${shoot_box_wall} ${shoot_box_outer_y} ${shoot_box_wall_height}"/>
+        </geometry>
+        <material name="shoot_box_material"/>
+      </visual>
+      <visual>
+        <origin xyz="0 ${shoot_box_outer_y / 2 - shoot_box_wall / 2} ${shoot_box_wall + shoot_box_wall_height / 2}" rpy="0 0 0"/>
+        <geometry>
+          <box size="${shoot_box_inner_x} ${shoot_box_wall} ${shoot_box_wall_height}"/>
+        </geometry>
+        <material name="shoot_box_material"/>
+      </visual>
+      <visual>
+        <origin xyz="0 ${-(shoot_box_outer_y / 2 - shoot_box_wall / 2)} ${shoot_box_wall + shoot_box_wall_height / 2}" rpy="0 0 0"/>
+        <geometry>
+          <box size="${shoot_box_inner_x} ${shoot_box_wall} ${shoot_box_wall_height}"/>
+        </geometry>
+        <material name="shoot_box_material"/>
+      </visual>
+    </link>
+    <joint name="${name}_joint" type="fixed">
+      <parent link="base_link"/>
+      <child link="${name}"/>
+      <origin xyz="${x} ${y} 0" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:shoot_box name="shoot_box_left_1" x="${shoot_center_x + shoot_box_pos1}" y="${shoot_offset_y}"/>
+  <xacro:shoot_box name="shoot_box_left_2" x="${shoot_center_x + shoot_box_pos2}" y="${shoot_offset_y}"/>
+  <xacro:shoot_box name="shoot_box_left_3" x="${shoot_center_x + shoot_box_pos3}" y="${shoot_offset_y}"/>
+  <xacro:shoot_box name="shoot_box_left_4" x="${shoot_center_x + shoot_box_pos4}" y="${shoot_offset_y}"/>
+
+  <xacro:shoot_box name="shoot_box_right_1" x="${shoot_center_x + shoot_box_pos1}" y="${-shoot_offset_y}"/>
+  <xacro:shoot_box name="shoot_box_right_2" x="${shoot_center_x + shoot_box_pos2}" y="${-shoot_offset_y}"/>
+  <xacro:shoot_box name="shoot_box_right_3" x="${shoot_center_x + shoot_box_pos3}" y="${-shoot_offset_y}"/>
+  <xacro:shoot_box name="shoot_box_right_4" x="${shoot_center_x + shoot_box_pos4}" y="${-shoot_offset_y}"/>
+
+</robot>

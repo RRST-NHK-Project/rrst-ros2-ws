@@ -1,25 +1,34 @@
 /*
-ros2can (CANホスト) ノードのホスト側プログラム
-Serial_Bridge_Host.cpp のros2can版。Ros2CanPacketControllerを使用してノード/スロット
-分配を意識せずに送受信配列へアクセスする。
+ros2can (MODE_CUBEMARS) ノードのホスト側プログラム
+CubeMars AKシリーズ(Servo(CAN)モード)を位置制御する使用例。
+Ros2CanCubemarsPacketControllerを使用してスロット割当を意識せずに送受信配列へ
+アクセスする。
 Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 */
 
-// ===== Ros2CanPacketController (common/Ros2CanPacketController.hpp) 関数一覧 =====
-// void setServo(int node, int servo_no, int deg)
-//   指定ノード(node: 0-origin, 0~NODE_COUNT-1)のSERVOn(servo_no: 1~3)を
-//   角度deg[0~270]に設定する(範囲外deg値はクランプ、node/servo_no範囲外は無視)。
+// ===== Ros2CanCubemarsPacketController (common/Ros2CanCubemarsPacketController.hpp) 関数一覧 =====
+// void setPosition(int motor, double deg)
+//   指定モータ(motor: 0-origin, 0~MOTOR_COUNT-1)を位置ループ(control_mode=1)にして
+//   角度deg[±3276.7]へ動かす(範囲外degはクランプ、motor範囲外は無視)。
+//   アクチュエータ内蔵のクローズドループが追従するのでホスト側PIDは不要。
 //
-// bool getSW(int node, int sw_no) const
-//   指定ノードのSWn(sw_no: 1~3)状態を取得する。SERVOnとピン共有のため
-//   ファームウェア側でMULTIn=0(スイッチ入力)のときのみ有効な値になる。
-//   node/sw_no範囲外はfalseを返す。
+// void setVelocity(int motor, double erpm)
+//   指定モータを速度ループ(control_mode=0)にして電気角速度erpm[±327670]で回す。
+//   出力軸rpmではなく電気角速度なので注意(換算比はモータ機種依存)。
 //
-// int16_t getEnc(int node, int enc_no) const
-//   指定ノードのENCn(enc_no: 1~2)カウンタ値を取得する。node/enc_no範囲外は0を返す。
+// void stop(int motor) / void stopAll()
+//   ゼロ速度指令(その場停止)にする。位置ジャンプは発生しない。
 //
-// static int canId(int node)
-//   node(0-origin)に対応する実CAN_ID(101,102,103,104)を返す。
+// double getPosition(int motor) const   現在位置[deg]を取得する。
+// double getVelocity(int motor) const   現在速度[電気角ERPM]を取得する。
+// double getCurrent(int motor) const    実測電流[A]を取得する。
+// int getTemperature(int motor) const   モータ温度[degC]を取得する。
+// int16_t getError(int motor) const     エラーコードを取得する(0=no fault)。
+// static const char *errorText(int16_t code)
+//   エラーコードを人が読める文字列にする(ログ出力用)。
+//
+// static int canId(int motor)
+//   motor(0-origin)に対応するCAN_IDの既定値(101,102,103,104)を返す。
 //
 // void updateRx(const std::vector<int16_t> &data)
 //   受信したInt16MultiArray相当のdataでrx_配列を更新する(sensor_callback等で使用)。
@@ -28,11 +37,11 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 //   送信用配列tx_をstd::vectorに変換して取得する(publish直前に使用)。
 //
 // int16_t &operator[](int index) / const int16_t &operator[](int index) const
-//   tx_配列への直接アクセス(グローバルslot index指定、通常はsetServo等を優先)。
+//   tx_配列への直接アクセス(グローバルslot index指定、通常はsetPosition等を優先)。
 //
 // メンバ変数:
-//   std::array<int16_t, DATA_SIZE> tx_  送信配列本体 (ROS -> ホスト -> CAN -> 各ノード)
-//   std::array<int16_t, DATA_SIZE> rx_  受信配列本体 (各ノード -> CAN -> ホスト -> ROS)
+//   std::array<int16_t, DATA_SIZE> tx_  送信配列本体 (ROS -> マイコン -> CAN -> 各モータ)
+//   std::array<int16_t, DATA_SIZE> rx_  受信配列本体 (各モータ -> CAN -> マイコン -> ROS)
 // ================================================================================
 
 #include <chrono>
@@ -47,52 +56,66 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #include <std_msgs/msg/int16_multi_array.hpp>
 
 // ライブラリ
-#include "common/Ros2CanPacketController.hpp"
+#include "common/Ros2CanCubemarsPacketController.hpp"
 
 // 以下マイコンに合わせて設定
-// TX/RX_DEVICE_ID は CANホスト自身のシリアルフレームDEVICE_ID
+// TX/RX_DEVICE_ID は CubeMarsドライバマイコン自身のシリアルフレームDEVICE_ID
 // (firmware/xiao-esp32-s3_can2io/src/config.hpp の DEVICE_ID)。
-// CANバス上の各ノードのCAN_ID (101,102,103,104) とは別物なので注意。
-#define TX_DEVICE_ID 1 // 送信先CANホストのDEVICE_ID
-#define RX_DEVICE_ID 1 // 受信先CANホストのDEVICE_ID
+// CANバス上の各モータのCAN_ID (101,102,103,104、config.hppのCUBEMARS_MOTOR_ID_n)
+// とは別物なので注意。
+#define TX_DEVICE_ID 101 // 送信先マイコンのDEVICE_ID
+#define RX_DEVICE_ID 101 // 受信先マイコンのDEVICE_ID
 
 #define PUBLISH_RATE_MS 20 // publish周期(ms), 短くしすぎるとマイコンが処理しきれなくなるので注意
+
+// 制御対象のモータ (0-origin: 0~3、CAN_ID 101~104に対応)
+#define TARGET_MOTOR 0
+
+// MIT(Force Control)モードのゲイン (Ros2CanCubemarsPacketController::setMit()参照)
+// 初回は小さめに設定して挙動を確認してから上げること。
+#define MIT_KP 3.6
+#define MIT_KD 1.08
 
 // スティックのデッドゾーン
 #define DEADZONE_L 0.3
 #define DEADZONE_R 0.3
 
-class Ros2CanHostControl : public rclcpp::Node {
+class Ros2CanCubemarsControl : public rclcpp::Node {
 public:
-    Ros2CanHostControl(uint8_t tx_device_id, uint8_t rx_device_id)
-        : Node("ros2can_host_" + std::to_string(tx_device_id)),
+    Ros2CanCubemarsControl(uint8_t tx_device_id, uint8_t rx_device_id)
+        : Node("ros2can_cubemars_" + std::to_string(tx_device_id)),
           tx_device_id_(tx_device_id),
           rx_device_id_(rx_device_id) {
 
         /*
-        ros2canが送受信する配列(Ros2CanPacketController::tx_ / rx_)は
-        serial_bridge互換の24 x int16スロットだが、CANバス上の最大
-        Ros2CanPacketController::NODE_COUNT台のノードへ
-        Ros2CanPacketController::SLOTS_PER_NODE ずつ分配される。
-        実機はDCモータ非搭載 (ENCx2, SWx3, SERVOx3のみ)。
+        ros2canが送受信する配列(Ros2CanCubemarsPacketController::tx_ / rx_)は
+        serial_bridge互換の24 x int16スロットだが、MODE_CUBEMARSはMODE_CAN_HOSTと違い
+        ノード/スロット分配を行わない「独立デバイス」として、24スロットをそのまま
+        CubeMars AKシリーズ最大 MOTOR_COUNT 台分の指令/帰還に割り当てる。
 
-        | ノードローカルslot | 指令(TX) | 帰還(RX) |
-        | ---- | ---- | ---- |
-        | 0 | SERVO1 (0~270) | SW1 |
-        | 1 | SERVO2 (0~270) | SW2 |
-        | 2 | SERVO3 (0~270) | SW3 |
-        | 3 | 予備 | ENC1 |
-        | 4 | 予備 | ENC2 |
+        | slot  | 指令(TX)                  | 帰還(RX)              |
+        | ----- | ------------------------- | --------------------- |
+        | 0-3   | target (モータ1-4)        | position (0.1deg/LSB) |
+        | 4-7   | control_mode (0=速度/1=位置) | speed (10ERPM/LSB)  |
+        | 8-11  | 未使用                    | current (0.01A/LSB)   |
+        | 12-15 | 未使用                    | temperature (degC)    |
+        | 16-19 | 未使用                    | error code            |
+        | 20-23 | 未使用                    | 未使用                |
 
-        SERVOn と SWn はピン共有 (ファームウェア config.hpp の MULTIn で切替)。
-        グローバルslot index = node(0-origin) * SLOTS_PER_NODE + local_index
-        ノードのCAN_ID = Ros2CanPacketController::canId(node) (101,102,103,104)
+        targetの意味はcontrol_modeに依存する:
+          control_mode=0(速度): 電気角速度 10ERPM/LSB
+          control_mode=1(位置): 位置 0.1deg/LSB
+        setPosition()/setVelocity() が target と control_mode を同時に設定するので、
+        通常はこの割当を直接意識する必要はない。
+
+        速度/位置ともアクチュエータ内蔵のクローズドループが指令にそのまま追従するため、
+        ロボマスのGM6020のようなホスト側PID (common/PID.hpp) は不要。
         */
 
         // joyノードのSubscribe
         joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
             "joy", 10,
-            std::bind(&Ros2CanHostControl::ps4_listener_callback, this, std::placeholders::_1));
+            std::bind(&Ros2CanCubemarsControl::ps4_listener_callback, this, std::placeholders::_1));
 
         // ros2canへpublish
         publisher_ = this->create_publisher<std_msgs::msg::Int16MultiArray>(
@@ -101,14 +124,18 @@ public:
         // timer_callbackを呼び出すタイマーを作成
         timer_ = create_wall_timer(
             std::chrono::milliseconds(PUBLISH_RATE_MS),
-            std::bind(&Ros2CanHostControl::publisher_timer_callback, this));
+            std::bind(&Ros2CanCubemarsControl::publisher_timer_callback, this));
 
         sensor_sub_ = this->create_subscription<std_msgs::msg::Int16MultiArray>(
             "serial_rx_" + std::to_string(rx_device_id_),
             10,
-            std::bind(&Ros2CanHostControl::sensor_callback,
+            std::bind(&Ros2CanCubemarsControl::sensor_callback,
                       this,
                       std::placeholders::_1));
+
+        // firmware側にCAN/シリアル途絶時のフェイルセーフは無く、最後に受信した指令を
+        // 保持し続ける。ノード終了時は全モータをゼロ速度に戻す(唯一の安全装置)。
+        rclcpp::on_shutdown([this]() { send_zero_and_stop(); });
 
         RCLCPP_INFO(get_logger(),
                     "serial_tx_%d started.", tx_device_id_);
@@ -125,7 +152,7 @@ private:
 
         bool CROSS = msg->buttons[0];
         bool CIRCLE = msg->buttons[1];
-        // bool TRIANGLE = msg->buttons[2];
+        bool TRIANGLE = msg->buttons[2];
         // bool SQUARE = msg->buttons[3];
 
         // bool LEFT = msg->axes[6] == 1.0;
@@ -149,23 +176,41 @@ private:
         // bool L3 = msg->buttons[11];
         // bool R3 = msg->buttons[12];
 
-        // 以降、Ros2CanPacketControllerを操作する
-        // 例: LS_Yでノード1(CAN_ID=101)のSERVO1を0~270度に割り当てる場合
-        // ctrlPkt_.setServo(0, 1, static_cast<int>((LS_Y + 1.0) / 2.0 * 270));
-
-        if (CROSS) {
-            ctrlPkt_.setServo(0, 1, 0);
-        } else if (CIRCLE) {
-            ctrlPkt_.setServo(0, 1, 270);
-        } else {
-            ctrlPkt_.setServo(0, 1, 135);
+        // 以降、Ros2CanCubemarsPacketControllerを操作する
+        // 三角(TRIANGLE)を押すたびに目標角度へ+90deg、×(CROSS)を押すたびに-90deg、
+        // 丸(CIRCLE)を押すと0degへリセットし、MIT(Force Control)モードで追従させる。
+        // ボタンを押しっぱなしにしても1回の押下(立ち上がりエッジ)につき1回だけ加減算する。
+        //
+        // 注意: setMit()を呼んだ瞬間に現在値からの追従を開始する。tx_は最後に設定した
+        // 値を保持し続けるので、target_angle_deg_を更新した時だけsetMit()を呼べばよい。
+        // joyが繋がった直後はtx_が全ゼロ(velocity 0)のままなので、いずれかのボタンを
+        // 押すまでモータは動かない。
+        if (TRIANGLE && !last_triangle_) {
+            target_angle_deg_ += 90.0;
+            ctrlPkt_.setMit(TARGET_MOTOR, target_angle_deg_, 0.0, MIT_KP, MIT_KD, 0.0);
         }
+
+        if (CROSS && !last_cross_) {
+            target_angle_deg_ -= 90.0;
+            ctrlPkt_.setMit(TARGET_MOTOR, target_angle_deg_, 0.0, MIT_KP, MIT_KD, 0.0);
+        }
+
+        if (CIRCLE && !last_circle_) {
+            target_angle_deg_ = 0.0;
+            ctrlPkt_.setMit(TARGET_MOTOR, target_angle_deg_, 0.0, MIT_KP, MIT_KD, 0.0);
+        }
+
+        last_triangle_ = TRIANGLE;
+        last_cross_ = CROSS;
+        last_circle_ = CIRCLE;
 
         // デバッグ用
         // RCLCPP_INFO(
         //     get_logger(),
-        //     "node0 servo=[%d,%d,%d]",
-        //     ctrlPkt_.tx_[0], ctrlPkt_.tx_[1], ctrlPkt_.tx_[2]);
+        //     "motor%d mode=%d target=%d",
+        //     TARGET_MOTOR,
+        //     ctrlPkt_.tx_[Ros2CanCubemarsPacketController::SLOT_CONTROL_MODE + TARGET_MOTOR],
+        //     ctrlPkt_.tx_[Ros2CanCubemarsPacketController::SLOT_TARGET + TARGET_MOTOR]);
 
         // 配列操作ここまで
     }
@@ -185,16 +230,27 @@ private:
 
         ctrlPkt_.updateRx(msg->data);
 
-        // bool SW1 = ctrlPkt_.getSW(0, 1);
-        // bool SW2 = ctrlPkt_.getSW(0, 2);
-        // bool SW3 = ctrlPkt_.getSW(0, 3);
-
-        // int16_t ENC1 = ctrlPkt_.getEnc(0, 1);
-        // int16_t ENC2 = ctrlPkt_.getEnc(0, 2);
+        // double position_deg = ctrlPkt_.getPosition(TARGET_MOTOR);
+        // double velocity_erpm = ctrlPkt_.getVelocity(TARGET_MOTOR);
+        // double current_a = ctrlPkt_.getCurrent(TARGET_MOTOR);
+        // int temperature_c = ctrlPkt_.getTemperature(TARGET_MOTOR);
+        // int16_t error = ctrlPkt_.getError(TARGET_MOTOR);
 
         // 以降、受信データを使った処理を記述
 
+        // RCLCPP_INFO_THROTTLE(
+        //     get_logger(), *get_clock(), 500,
+        //     "motor%d pos=%.1fdeg speed=%.0fERPM current=%.2fA temp=%ddegC error=%s",
+        //     TARGET_MOTOR, position_deg, velocity_erpm, current_a, temperature_c,
+        //     Ros2CanCubemarsPacketController::errorText(error));
+
         // 受信データ処理ここまで
+    }
+
+    // 全モータをゼロ速度指令(その場停止)にして送信する
+    void send_zero_and_stop() {
+        ctrlPkt_.stopAll();
+        publisher_timer_callback();
     }
 
     uint8_t tx_device_id_;
@@ -205,14 +261,20 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr sensor_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
-    Ros2CanPacketController ctrlPkt_;
+    Ros2CanCubemarsPacketController ctrlPkt_;
+
+    // ボタンの立ち上がりエッジ検出用 & 目標角度(MITモードの位置指令、加減算式)
+    bool last_triangle_ = false;
+    bool last_cross_ = false;
+    bool last_circle_ = false;
+    double target_angle_deg_ = 0.0;
 };
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
 
     // figletでノード名を表示
-    std::string figletout = "figlet Ros2Can Host";
+    std::string figletout = "figlet Ros2Can CubeMars";
     int result = std::system(figletout.c_str());
     if (result != 0) {
         std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -226,8 +288,8 @@ int main(int argc, char *argv[]) {
 
     rclcpp::executors::MultiThreadedExecutor exec;
 
-    auto ros2can_host = std::make_shared<Ros2CanHostControl>(TX_DEVICE_ID, RX_DEVICE_ID);
-    exec.add_node(ros2can_host);
+    auto ros2can_cubemars = std::make_shared<Ros2CanCubemarsControl>(TX_DEVICE_ID, RX_DEVICE_ID);
+    exec.add_node(ros2can_cubemars);
     exec.spin();
 
     rclcpp::shutdown();

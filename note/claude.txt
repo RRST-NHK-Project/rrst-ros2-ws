@@ -1,0 +1,151 @@
+#soki構成 (Claudeが現状把握している内容。2026-08-27時点、間違っていたら訂正してください)
+
+##シミュレーション (soki_sim)
+円柱座標型4自由度アーム。RVizでの見た目確認用(物理演算なし)。
+  root_theta_joint : 旋回      continuous, z軸
+  z_joint          : 昇降      prismatic, 0.0~0.432m
+  r_joint          : 伸縮      prismatic, -0.622~0.622m (アーム長1.244m、実機寸法に合わせ済み)
+  tip_theta_joint  : 手先回転  continuous
+実機ではz_joint/r_jointはmotor1/motor2の2モータ差動機構で駆動
+  z = k(m1+m2), r = k(m1-m2), k=0.5
+
+各関節の使用モーター
+  root_theta_joint : AK40-10 KV170 V3.0 with MIT mode
+  z_joint          : m2006 with c610 driver マイコンで速度制御、位置ループはROS側で回す      
+  r_joint          : m2006 with c610 driver マイコンで速度制御、位置ループはROS側で回す       
+  tip_theta_joint  : AK40-10 KV170 V3.0 with MIT mode
+
+motor_mixer_nodeが/joint_statesを監視し、motor1/2側とz/r側どちらが
+動いたかを判定して双方向にミキシング計算し/mixed_joint_statesへpublish
+(joint_state_publisher(_gui)のsource_listで取り込む)。
+command_gui_node(2026-08-27新規作成)はX/Y/Zの目標値をGUI指定→逆運動学で
+theta/z/rに変換して/mixed_joint_statesへpublishする指令送信GUI。
+
+##soki_simフィールド(ワーク配置環境)反映 (2026-08-27新規追加)
+実機のワーク配置環境をURDF(soki_sim.urdf.xacro)に静的モデルとして追加(衝突/慣性なし、視覚のみ)。
+base_link原点、+X=奥行き(ワーク側)、Y=幅方向(ワーク群中心線=機体中心=機体の乗っている板の中心と一致)。
+  - 機体が乗っている板: 690(幅)x290(奥行き)mm。ロボット原点は板の奥行き中心にある想定
+    (field_board_edge_offset=145mm、板前端までの距離としてプロパティ化。実機の搭載位置が
+    ズレていたらここだけ変更すればよい)
+  - 前面の板(ワークが並ぶ側): 幅・奥行きの実測値は未確認のため仮値(front_board_width=1.2m等)。
+    要実測。
+  - ワーク: 直径66mm・長さ142mmの円柱を横倒し(軸=奥行き(X)方向)、底面を機体側に。
+    4行(奥行き方向、機体に近い方が1行目)x6列(幅方向、中心間ピッチ200mm)=24本。
+    行間隔: 板前端→1行目49mm、1-2行間58mm、2-3行間58mm、3-4行間13mm、4行目のみ20mm高い。
+  - RVizで見た目確認済み(display.launch.pyで表示、行・列配置と4行目のリフトを目視で確認)。
+
+##soki_simシューティングエリア反映 (2026-08-27新規追加)
+ワークをシュートして集める左右のエリアもURDFに追加(視覚のみ)。
+  - 機体が乗っている板の中心(field_robot_board_center_x)からワークと反対方向(-X)に305mm、
+    そこから左右(Y)にそれぞれ525mmの位置が各シューティングエリアの板の中心(shoot_center_x/
+    shoot_offset_y としてプロパティ化)
+  - 板は幅(Y)300mm x 奥行き(X)600mm。短辺(300mm)がワーク底面と平行(=X方向)
+  - 板の上に箱が4個。箱は内径255(Y,長辺)x138(X,短辺)mm・高さ145mm・板厚5mmの上面開放
+    トレー(底板+側壁4枚で表現)。長辺(255mm)がワーク底面と平行(=Y方向)。板幅300mmには
+    1個しか横に並ばないため奥行き(X)方向に4個、箱間2mmの隙間をあけて並べている
+  - RVizで見た目確認済み(左右対称に配置され、箱が板の奥行き方向に4個並ぶことを目視で確認)
+
+##実機モータ制御 (ros2can経由。soki本体はこちらを使用、serial_bridge/robomas.cppは不使用)
+soki 4関節はすべて `ros2can` パッケージ (xiao-esp32-s3_can2io ファームウェア) 配下。
+1マイコン=1モードで、以下2系統の独立デバイスに分かれている。
+  MODE_CUBEMARS (root_theta_joint / tip_theta_joint 用):
+    CubeMars AKシリーズ(AK40-10)をServo(CAN)モード or Force Control(MIT)モードで
+    直接駆動。アクチュエータ内蔵クローズドループに指令、ホスト側PIDなし。CAN 1Mbps固定。
+    ファームウェア: ros2can/firmware/xiao-esp32-s3_can2io/src/cubemars.cpp/.hpp
+  MODE_ROBOMAS (z_joint / r_joint 用、motor1/motor2 = M2006 x2):
+    C610ドライバでM2006を速度制御(マイコン側)、位置ループはROS側(motor_mixer_node
+    経由でz/rとの相互変換)。
+    ファームウェア: ros2can/firmware/xiao-esp32-s3_can2io/src/robomas.cpp/.hpp
+    (serial_bridge/firmware/esp32_serial_bridge/src/robomas.cpp とは別物、混同注意)
+どちらもUSBシリアルで `ros2can` GUI/ノードとやり取りする(24 x int16スロット、
+デバイスごとにCAN_IDでスロット範囲を割り当て)。
+serial_bridge/robomas.cpp(M3508/GM6020含む旧実装)はsokiの4関節には未使用
+(他用途 or 現状未使用)。
+
+##ros2canのエンコーダ原点セット機能 (2026-08-27新規実装、同日中に2件修正済み)
+自動化中の脱調や再起動をまたいだ蓄積誤差で、マイコン側のエンコーダ値/多回転
+カウンタと機構上の原点がズレることがある問題への対応。マイコン側の値そのものは
+書き換えず、ros2can(GUI/ROS 2ノード)側がチャンネルごとにソフトウェアオフセットを
+持つ方式にした(対象: ロボマス内蔵カウンタ、CubeMars内蔵位置、汎用AMTエンコーダ)。
+  - 原点セット = 「現在値」をそのままオフセットとして記録するだけ(ゼロ点からの
+    相対値 = 現在値 - オフセット)
+  - GUI: Monitorタブの対象チャンネル行に「原点セット」ボタン、デバイスヘッダーに
+    「エンコーダ原点セット(全チャンネル)」ボタン(全24チャンネル一括)
+  - 外部ノードから: ROS 2サービス `/zero_channel` (ros2can_interfaces/srv/ZeroChannel、
+    device_id, channel_index(-1で全チャンネル) -> success, message)
+  - 配信: 原点セット後の相対値は `serial_rx_[ID]_zeroed` (Int32MultiArray, 24スロット、
+    既存の `serial_rx_[ID]_unwrapped` と対の新トピック) で配信
+  - MODE_HARDWARE/MODE_SIMULATORはPCNTラップアラウンド解決後のrx_unwrapped基準
+    (多回転関節でもズレなく原点セット可能)。MODE_TOPIC_CLIENTは素のrx_data基準
+    (ラップアラウンド解決をしていないため32768カウント幅を跨ぐケースはズレ得る、
+    ros_backend.py内コメント参照)
+  - オフセットはGUIプロセスのメモリ上のみ(再起動で消える、永続化はしていない)
+新規パッケージ `ros2can_interfaces` (srv/ZeroChannel.srv) を追加、`ros2can`が依存。
+実装箇所: ros2can/ros2can/ros_backend.py (zero_channel/zero_all_channels/
+zeroed_value、ZeroChannelサービス)、widgets.py (ChannelMonitorRow/ChannelControlRow
+の原点セットボタン)、device_panel.py (配線)、device_profiles.py (zeroableフラグ)。
+
+修正1: 当初は`kind==READOUT`でボタン表示を判定していたが、READOUTは角度以外に
+速度/電流/温度等の瞬時値にも使われており、それらにも誤って原点セットボタンが
+出ていた。ChannelDefに明示的な`zeroable: bool`フラグを追加し、角度/位置/カウンタ系
+(M{n} angle、M{n} position、ENC1/ENC2)にだけTrueを設定して解消。カスタム
+プロファイルの保存/読込(JSON)にも反映済み。
+
+修正2: シミュレータ(仮想デバイス)モードではENC等のCOUNTER系RXは動作確認用に
+編集可能な`ChannelControlRow`(スライダー)へ差し替えられる仕様があり、原点セット
+ボタンを表示専用の`ChannelMonitorRow`側にしか実装していなかったため、CANホスト
+プロファイル(唯一のzeroable対象がこのENC1/ENC2)をシミュレータモードで見ると
+ボタンが丸ごと消えていた。ChannelControlRow側にも同じzeroRequestedシグナルと
+ボタン(chdef.zeroableのときだけ表示)を追加して解消。offscreen Qt
+(QT_QPA_PLATFORM=offscreen)でクリック→バックエンド反映まで動作確認済み。
+
+##ros2can GUIの「エンコーダ初期化」一覧ページ (2026-08-27新規追加、同日中に1件修正)
+上記の原点セット機能は元々デバイスを1台ずつ選んでMonitorタブを開く必要があった
+ため、検出済み全デバイスのzeroable対象チャンネルを1画面で一覧・一括初期化できる
+専用ページを追加した。
+  - 実装: ros2can/ros2can/encoder_init_panel.py (新規、EncoderInitPanel。全デバイス
+    分のzeroableチャンネルをGroupBox単位でChannelMonitorRow一覧表示、行ごと/
+    デバイスごと/全デバイス一括の3段階で原点セット可能)
+  - main_window.py: ツールバーに「🧭 エンコーダ初期化…」ボタンを追加。押すと
+    EncoderInitPanel.rebuild()してstackに表示する(device_listの選択状態とは
+    完全に独立)。
+
+修正1: 当初はdevice_list(左のデバイス一覧QListWidget)の先頭に固定項目として
+追加していたが、実機なしで起動した直後にこのページがデフォルト表示されてしまう
+不具合が発生(報告により発覚)。原因はQt側の仕様: QListWidgetは表示(show())
+された時点で選択が何も無いと先頭の項目を自動選択する。起動直後、実デバイスが
+まだ検出されていない間は「エンコーダ初期化」の固定項目だけがリストに存在する
+ため、それが自動的に選択されてしまっていた。さらに一度選択済み扱いになる
+ため、その後実デバイスが検出されても「未選択なら自動選択する」ロジック
+(_refresh_device_listのcurrentItem() is Noneガード)が働かなくなり、実デバイス
+の自動選択機能自体も壊れる(=起動後ずっとエンコーダ初期化ページに固定される)
+副作用があった。offscreenのQApplication上でwin.show()を実際に呼ぶテストで
+再現・確認済み(show()を呼ばない素のコンストラクタ呼び出しだけのテストでは
+再現しなかったため、最初のスモークテストでは見逃していた)。
+対策として、device_listへの項目追加はやめ、ツールバーの独立ボタン
+(_on_open_encoder_init)からstackを直接切り替える方式に変更(現状の実装)。
+これによりdevice_listの選択・自動選択ロジックは変更前の挙動に完全に戻り、
+デバイス未検出時は従来通りプレースホルダがデフォルト表示のままになる。
+教訓: QListWidget/QTreeWidget等QAbstractItemView系ウィジェットの選択初期状態を
+検証する際は、コンストラクタ呼び出しだけでなくshow()まで実行してテストしない
+と、この種の「表示時に発火する」自動選択系の副作用を見逃す。
+
+修正2: 修正1の対策(ツールバーボタンでdevice_listの選択とは独立にstackを
+切り替える方式)にした結果、今度は「エンコーダ初期化ページを開いた後、既に
+選択済みだったデバイス行をクリックしても戻れない」不具合が発生(報告により
+発覚)。原因はQtの仕様: QListWidgetのcurrentItemChangedは選択が実際に変わった
+時にしか発火しないため、離脱前から選択されていた行を再クリックしても
+選択状態自体は変化せずシグナルが飛ばない。対策として、クリックには常に
+反応するitemClickedシグナルも併用し(_on_device_item_clicked)、同じ行の
+再クリックでも確実に対応するDevicePanelへ戻れるようにした。
+
+##cr26_sokiパッケージ
+welcomeday.cpp / angle_test.cpp / angle_test_gm.cpp / ros2can_practice.cpp
+が置かれている。中身は未精査、soki本体との関係も未確認。
+
+##未確認・要確認事項
+- soki_simのURDF寸法(base_height/lift_size_z/arm_length等)と実機寸法の対応
+- フィールド(ワーク配置環境)の前面の板の幅・奥行き寸法、板厚(すべて仮値のまま)
+- ros2can側(MODE_CUBEMARS/MODE_ROBOMAS)のCAN_ID・スロット割り当てと、
+  root_theta/tip_theta/z/rそれぞれが実際にどのデバイス・トピックに紐づくか
+- cr26_sokiパッケージの位置づけ(sokiとの関係)
