@@ -60,6 +60,30 @@ root_theta_offset_rad/tip_theta_offset_rad(ノード側パラメータ、yamlに
 z_joint/r_jointは元々毎起動homing_nodeが/zero_channelを呼ぶ設計なので、
 こちらはros2can側オフセットが非永続でも問題ない(むしろ意図通り)。
 
+## CubeMars M{n} positionのラップアラウンド対応 (2026-08-27実装)
+root_theta/tip_thetaは上記の通り_unwrapped(ros2can側のCounterUnwrapper)に
+依存しているが、CubeMarsのServo(CAN)帰還フレームのposition値は int16・
+0.1deg/LSB固定(AK40-10出力軸換算で±3276.7°=±9.10回転)であり、外部減速比
+(root_theta:96/7≒13.714、tip_theta:1.4)を通すと関節側では
+  root_theta_joint: 約0.66回転(約239°)ごとに生値が一巡
+  tip_theta_joint : 約6.5回転ごとに生値が一巡
+と、continuous関節(無制限回転)としては短い周期でラップする。さらに
+CounterUnwrapperの既定ラップ幅(32768)はESP32のPCNTハードウェア(ENC1/ENC2)
+の実機確認済み挙動に基づく値で、CubeMarsのposition値はPCNTを経由せずCAN
+受信バイト列を直接int16化しただけ(firmware/xiao-esp32-s3_can2io/src/
+cubemars.cpp)のため、本来は標準的な2の補数の65536幅でラップするはずで
+32768とは合わない(検証: ros2can/test/test_counter_unwrapper.py
+test_set_counts_per_wrap_unwraps_standard_twos_complement_int16)。
+  対応: device_profiles.py の ChannelDef に wrap_counts フィールドを追加し、
+  CubeMarsのM{n} position(4チャンネル)にwrap_counts=65536を設定。
+  ros_backend.py の RosBackend._sync_wrap_counts が(プロファイル切替時のみ)
+  各チャンネルのCounterUnwrapper.set_counts_per_wrap()でこれを反映する。
+  プロファイル編集ダイアログ(profile_editor.py)がzeroable/wrap_counts等の
+  表に無い属性をcollect()時に落として既定値へ戻してしまう既存の問題も
+  あわせて修正(元定義から引き継ぐように変更)。
+  real_joint_bridge_node.py 側の変更は不要(_unwrappedを継続値として
+  そのまま使う設計は変わらない。ros2can側の復元が正しくなるだけ)。
+
 ## z_joint/r_jointのホーミング (homing_node、2026-08-27実装)
 z=k(m1+m2)/r=k(m1-m2)という合成後の量は、ros2canの/zero_channel(ENC単体を
 ゼロ化するだけ)では正しく較正できないため、root_theta/tip_thetaと同様に
