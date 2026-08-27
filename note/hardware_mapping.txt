@@ -60,29 +60,47 @@ root_theta_offset_rad/tip_theta_offset_rad(ノード側パラメータ、yamlに
 z_joint/r_jointは元々毎起動homing_nodeが/zero_channelを呼ぶ設計なので、
 こちらはros2can側オフセットが非永続でも問題ない(むしろ意図通り)。
 
-## CubeMars M{n} positionのラップアラウンド対応 (2026-08-27実装)
-root_theta/tip_thetaは上記の通り_unwrapped(ros2can側のCounterUnwrapper)に
-依存しているが、CubeMarsのServo(CAN)帰還フレームのposition値は int16・
-0.1deg/LSB固定(AK40-10出力軸換算で±3276.7°=±9.10回転)であり、外部減速比
-(root_theta:96/7≒13.714、tip_theta:1.4)を通すと関節側では
-  root_theta_joint: 約0.66回転(約239°)ごとに生値が一巡
-  tip_theta_joint : 約6.5回転ごとに生値が一巡
-と、continuous関節(無制限回転)としては短い周期でラップする。さらに
-CounterUnwrapperの既定ラップ幅(32768)はESP32のPCNTハードウェア(ENC1/ENC2)
-の実機確認済み挙動に基づく値で、CubeMarsのposition値はPCNTを経由せずCAN
-受信バイト列を直接int16化しただけ(firmware/xiao-esp32-s3_can2io/src/
-cubemars.cpp)のため、本来は標準的な2の補数の65536幅でラップするはずで
-32768とは合わない(検証: ros2can/test/test_counter_unwrapper.py
-test_set_counts_per_wrap_unwraps_standard_twos_complement_int16)。
-  対応: device_profiles.py の ChannelDef に wrap_counts フィールドを追加し、
-  CubeMarsのM{n} position(4チャンネル)にwrap_counts=65536を設定。
-  ros_backend.py の RosBackend._sync_wrap_counts が(プロファイル切替時のみ)
-  各チャンネルのCounterUnwrapper.set_counts_per_wrap()でこれを反映する。
-  プロファイル編集ダイアログ(profile_editor.py)がzeroable/wrap_counts等の
-  表に無い属性をcollect()時に落として既定値へ戻してしまう既存の問題も
-  あわせて修正(元定義から引き継ぐように変更)。
-  real_joint_bridge_node.py 側の変更は不要(_unwrappedを継続値として
-  そのまま使う設計は変わらない。ros2can側の復元が正しくなるだけ)。
+## root_theta/tip_thetaはMITモードの都合上そもそも「continuous」ではない
+## (2026-08-27、AK Seriesマニュアル確認により判明。対応方針決定済み)
+claude.txt/soki_sim.urdf.xacroではroot_theta_joint(旋回)/tip_theta_joint
+(手先回転)を無制限回転可能なcontinuous関節として扱っているが、実際には
+MITモードのプロトコル仕様そのものにより可動域が制限される。
+
+CubeMars AK SeriesのMITモード位置指令(pos_des)は、ros2can側の実装
+(firmware/xiao-esp32-s3_can2io/src/config.hpp、CUBEMARS_MIT_P_MIN_RAD/
+MAX_RAD = ±12.5f)、およびマニュアル記載のParameter range表(AK40-10含む
+全モデル共通)の両方で ±12.5rad(=±716.2°)固定と確認済み。これはMIT
+Cheetah系アクチュエータ共通のプロトコル制約(16bit固定小数点で8byteに
+position/velocity/Kp/Kd/torqueを詰め込む都合)で、ros2can側の設定ミスでは
+ない。範囲外を指令してもcubemars.cppのfloatToUint()内でクランプされる
+(x = std::min(std::max(x, x_min), x_max))。
+外部減速比を通すと指令できる範囲は
+  root_theta_joint: ±716.2°/13.714 ≒ ±52.2°
+  tip_theta_joint : ±716.2°/1.4    ≒ ±511.6°(約1.4回転)
+と、いずれも1回転に満たない(root_theta)か1回転強(tip_theta)程度しかない。
+
+CubeMarsのServo(CAN)帰還フレームのposition値(int16・0.1deg/LSB)も
+AK Series Module Driver Manual V1.0.18 5.2.1節により有効範囲が
+-32000~32000(=±3200°、AK40-10出力軸換算で±8.89回転)止まりと判明して
+いたが、上記の指令側の制約(±52.2°/±511.6°)のほうがずっと狭いため、
+実際の可動域では帰還側の境界には到達しない(指令できる範囲の方が先に
+尽きるため)。よってposition帰還のクランプ/ラップ挙動そのものは実運用上
+問題にならない。
+
+**方針決定(2026-08-27、ユーザー判断)**: 上記の通りMITモードのままでは
+真の意味でのcontinuous回転は不可能。デッドレコニング(速度積算による
+連続絶対位置推定)やServo(CAN)モードへの制御方式変更は行わず、
+「一旦制限つきでよい、MITモードの可動域(root_theta:±52.2°、
+tip_theta:±511.6°)の中だけで動作すればよい」という前提で運用する。
+ros2can/real_joint_bridge_node.py側のコード変更は不要(既存のposition
+帰還ベースの実装のまま)。
+  将来もし真のcontinuous回転が必要になった場合の選択肢(未着手):
+  (a) Servo(CAN) Velocity Loop Mode(mode 3、指令範囲の制約なし)+
+      ホスト側(real_joint_bridge_node.py等)での位置制御ループを新規実装
+  (b) Servo(CAN) Position-Velocity Loop Mode(mode 6、指令範囲±36000°=
+      ±100回転)へ切替。MIT特有のKp/Kdによる柔らかい制御は失う。
+  いずれもMITモードからServo(CAN)モードへの制御方式変更が必要で、
+  現状は選択していない。
 
 ## z_joint/r_jointのホーミング (homing_node、2026-08-27実装)
 z=k(m1+m2)/r=k(m1-m2)という合成後の量は、ros2canの/zero_channel(ENC単体を
