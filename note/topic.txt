@@ -1,0 +1,46 @@
+soki関連トピック一覧(soki_sim + joy連携。全てsensor_msgs/JointStateまたはjoy/std_msgs)
+
+■ 目標指令 → 関節状態
+
+/joint_targets (sensor_msgs/JointState)
+  pub: command_gui_node (header.frame_id='auto'), joy_teleop_node (header.frame_id='manual')
+  sub: trajectory_follower_node
+  root_theta_joint/z_joint/r_jointの目標位置。frame_idで送信元を区別し、
+  trajectory_follower_nodeのcontrol_modeパラメータ(auto/manual/both)で採否判定。
+
+/mixed_joint_states (sensor_msgs/JointState)
+  pub: trajectory_follower_node (台形速度プロファイル後の現在値+cubemars出力元),
+       motor_mixer_node (motor1/2⇔z/r相互変換結果)
+  sub: joint_state_publisher(_gui)のsource_list, command_gui_node/joy_teleop_node (現在位置表示・同期用)
+  表示・追従に使う最終的な関節値。
+
+/joint_states (sensor_msgs/JointState)
+  pub: joint_state_publisher(_gui) (mixed_joint_states + GUIスライダーを統合)
+  sub: motor_mixer_node, robot_state_publisher
+  RVizのTF反映とmotor_mixer_nodeの入力に使う統合関節状態。
+
+■ 手動操作(joy)
+
+/joy (sensor_msgs/Joy)
+  pub: joy_node (joyパッケージ、use_joy:=true時のみ起動)
+  sub: joy_teleop_node
+  ジョイスティック生入力(スティック/十字キー)。
+
+■ 実機出力(ros2can連携、現状デフォルト無効)
+
+/serial_tx_[device_id] (std_msgs/Int16MultiArray)
+  pub: trajectory_follower_node (cubemars_joint_names等のパラメータ設定時のみ)
+  sub: ros2can
+  CubeMars(MITモード)への24スロットコマンドフレーム。device_id/motor_index未設定時は
+  publishされない(soki_simの表示のみ)。
+
+■ TF
+
+/tf, /tf_static
+  pub: robot_state_publisher
+  URDF(soki_sim.urdf.xacro)と/joint_statesから計算した座標変換。
+
+※ max_velocity/max_acceleration/control_mode(trajectory_follower_node)、
+  theta_speed/z_speed/r_speed(joy_teleop_node)はトピックではなくROS 2パラメータ
+  (rcl_interfacesのget_parameters/set_parametersサービス経由)。command_gui_nodeの
+  GUIから読込・変更できる。
