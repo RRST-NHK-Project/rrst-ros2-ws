@@ -7,6 +7,7 @@ install(DIRECTORY
   urdf
   launch
   rviz
+  config
   DESTINATION share/${PROJECT_NAME}
 )
 
@@ -32,6 +33,18 @@ install(PROGRAMS
   scripts/joy_teleop_node.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME joy_teleop_node
+)
+
+install(PROGRAMS
+  scripts/real_joint_bridge_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME real_joint_bridge_node
+)
+
+install(PROGRAMS
+  scripts/homing_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME homing_node
 )
 
 if(BUILD_TESTING)

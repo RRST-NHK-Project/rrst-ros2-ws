@@ -1,0 +1,81 @@
+#soki 実機ハードウェア 減速比・伝達機構メモ (2026-08-27作成)
+関節角度の実機/sim校正(note/claude_task.txt参照)のための基礎データ。
+
+## root_theta_joint (旋回)
+CubeMars AK40-10 (Servo/MITモードで直接駆動、アクチュエータ内蔵クローズドループ)
++ 外部減速ギア追加あり。減速比 = 13と5/7 (= 96/7 ≒ 13.714286)
+  root_theta_joint角度 = AK40-10側のエンコーダ角度 / (96/7)
+  (AK40-10自体の内蔵ギア比は別途アクチュエータ仕様通り。ここでの13と5/7は
+   さらに外側に付いている減速ギアの比)
+
+tip_theta_jointは root_theta_joint とは別方式: タイミングベルト+プーリで
+モーター側20T・手先側28T(減速比 = 28/20 = 1.4 = 7/5)。
+  tip_theta_joint角度 = AK40-10エンコーダ角度 / 1.4 ( = * 5/7 )
+
+## z_joint / r_joint (motor1/motor2差動、M2006+C610)
+位置の真値はC610/M2006内蔵ロータエンコーダのCAN帰還(ROBOMASのM{n} angle)ではなく、
+外付けAMTエンコーダ(ENC1/ENC2、CAN_HOST配下ノードのローカルチャンネル、
+note/can_mapping.txt参照)を使う。ロボマス(M2006)モーター軸 →
+プーリ(ピッチ円直径22.92mm、確認済み) → タイミングベルトで機構に接続。
+  pulley_radius = 22.92 / 2 = 11.46mm (ピッチ円直径なのでこれを直径として半分にする)
+  motor1_joint/motor2_joint(線形変位、m) = motor_angle[rad] * pulley_radius[m]
+    motor_angle[rad] = ENCカウント値 / エンコーダ分解能(CPR、要確認) * 2π
+この線形変位に対して、既存の差動ミキシング(soki_sim/scripts/motor_mixer_node.py)が
+そのまま適用される:
+  z = k*(m1+m2), r = k*(m1-m2), k = 0.5
+上下限の原点センサは合成後のz/r軸それぞれに付いている(motor1/motor2の
+個別軸ではない、確認済み)。相対エンコーダのため毎起動ホーミング必須
+(詳細はnote/claude_task.txt「実機とsimの関節角度校正」参照)。
+
+## ros2can CAN_ID・スロット割当 (note/can_mapping.txt記入済み、2026-08-27。
+## デバイスIDは実機再確認により修正済み)
+MODE_CUBEMARSデバイス (device_id=11):
+  M1 (CAN_ID=101) → root_theta_joint (絶対値エンコーダ、M{n} position帰還を使用)
+  M2 (CAN_ID=102) → tip_theta_joint  (同上)
+  M3/M4 → 未使用
+MODE_ROBOMASデバイス (device_id=21):
+  M1 (CAN_ID=0x201) → motor1_joint (速度指令用。位置の真値には使わない、上記参照)
+  M2 (CAN_ID=0x202) → motor2_joint (同上)
+  M3/M4 → 未使用
+CAN_HOSTデバイス (device_id=101、xiao_esp32_s3_smd_serial_bridge):
+  配下ノード(node_index、要確認)のENC1 → motor1_joint、ENC2 → motor2_joint
+  グローバルスロット = node_index*5 + {3:ENC1, 4:ENC2}
+
+CAN_HOSTのnode_index=1、外付けAMTエンコーダの分解能=2048CPRと判明済み
+(note/can_mapping.txt、real_joint_bridge.yamlに反映済み)。
+
+## root_theta/tip_thetaの原点初期化(θの「毎起動ホーミング」は不要な設計)
+z/rと違い、CubeMars AK40-10は絶対値エンコーダなので機構の原点自体は
+電源off/onを跨いで保持される。ただしros2canの/zero_channelはオフセットが
+GUIプロセスのメモリ上限りで永続化されない(ros2canプロセスの再起動だけで
+消える)ため、これに頼ると絶対値エンコーダの利点が活きない。
+そこでreal_joint_bridge_nodeはCubeMars側だけ_zeroedではなく_unwrapped
+(ラップアラウンド解決済みの生の絶対値)を購読し、real_joint_bridge.yamlの
+root_theta_offset_rad/tip_theta_offset_rad(ノード側パラメータ、yamlに保存
+されるため永続)で真の原点とのズレを補正する方式にした。
+  較正手順(実機組み立て後に1回だけ): 関節を原点センサの位置(真の機械原点)へ
+  物理的に合わせ、その瞬間の_unwrapped値から逆算したoffsetをyamlへ書き込む。
+  以後はros2can・real_joint_bridge_nodeの再起動、電源off/onを跨いでも
+  再較正不要(エンコーダ自体がズレない限り)。
+z_joint/r_jointは元々毎起動homing_nodeが/zero_channelを呼ぶ設計なので、
+こちらはros2can側オフセットが非永続でも問題ない(むしろ意図通り)。
+
+## z_joint/r_jointのホーミング (homing_node、2026-08-27実装)
+z=k(m1+m2)/r=k(m1-m2)という合成後の量は、ros2canの/zero_channel(ENC単体を
+ゼロ化するだけ)では正しく較正できないため、root_theta/tip_thetaと同様に
+real_joint_bridge_node側のランタイムパラメータ(z_offset_m/r_offset_m、
+ただしこちらはyaml初期値ではなく毎起動homing_nodeが計算してSetParameters
+で書き込む値)で補正する方式にした。
+  手順: motor1/motor2を同方向に駆動しz軸原点センサ検出→z_offset_m算出
+        →続けて差動方向に駆動しr軸原点センサ検出→r_offset_m算出
+        →real_joint_bridge_nodeへSetParametersで反映
+  実装: soki_sim/scripts/homing_node.py。安全のため自動起動はせず、
+  start_homing/stop_homing(std_srvs/Trigger)サービスで明示的に起動・中断する。
+  パラメータはreal_joint_bridge.yamlのhoming_node以下。
+
+## 未確認事項 (2026-08-27時点)
+- root_theta/tip_thetaの原点センサの物理位置(真の機械原点との対応)
+  → 上記較正手順を実施する際に確定させる
+- homing_nodeが仮定しているz/r原点センサのSWチャンネル配線、センサ検出時の
+  真のz/r値、モータ回転符号とz/r移動方向の対応(note/can_mapping.txt
+  「z/r原点センサ(ホーミング用)」に記入欄あり、実機で要検証)

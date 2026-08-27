@@ -5,4 +5,14 @@ ros2 run soki_sim command_gui_node
 
 #自動機メインノード
 
-#エンコーダー管理ノード
+#実機関節角度校正 (2026-08-27新規)
+ros2 run soki_sim real_joint_bridge_node --ros-args --params-file install/soki_sim/share/soki_sim/config/real_joint_bridge.yaml
+
+#エンコーダー管理ノード (2026-08-27新規)
+ros2 run soki_sim homing_node --ros-args --params-file install/soki_sim/share/soki_sim/config/real_joint_bridge.yaml
+# ホーミング開始(motor1/2をROBOMAS deviceのtopic_passthrough ON後に低速駆動)
+ros2 service call /start_homing std_srvs/srv/Trigger
+# 中断(いつでもモータ停止)
+ros2 service call /stop_homing std_srvs/srv/Trigger
+# センサ配線・基準値は仮定のまま(note/can_mapping.txt「z/r原点センサ」参照)、
+# 実機検証・調整が必要

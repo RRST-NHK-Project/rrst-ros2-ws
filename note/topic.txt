@@ -10,9 +10,11 @@ soki関連トピック一覧(soki_sim + joy連携。全てsensor_msgs/JointState
 
 /mixed_joint_states (sensor_msgs/JointState)
   pub: trajectory_follower_node (台形速度プロファイル後の現在値+cubemars出力元),
-       motor_mixer_node (motor1/2⇔z/r相互変換結果)
+       motor_mixer_node (motor1/2⇔z/r相互変換結果、sim用),
+       real_joint_bridge_node (実機センサ値からの変換結果、実機用。2026-08-27新規)
   sub: joint_state_publisher(_gui)のsource_list, command_gui_node/joy_teleop_node (現在位置表示・同期用)
-  表示・追従に使う最終的な関節値。
+  表示・追従に使う最終的な関節値。motor_mixer_nodeとreal_joint_bridge_nodeは
+  sim/実機のどちらか一方だけを起動する想定(同時にpublishすると競合する)。
 
 /joint_states (sensor_msgs/JointState)
   pub: joint_state_publisher(_gui) (mixed_joint_states + GUIスライダーを統合)
@@ -33,6 +35,37 @@ soki関連トピック一覧(soki_sim + joy連携。全てsensor_msgs/JointState
   sub: ros2can
   CubeMars(MITモード)への24スロットコマンドフレーム。device_id/motor_index未設定時は
   publishされない(soki_simの表示のみ)。
+
+■ 実機入力(ros2can連携、real_joint_bridge_node/homing_node用。2026-08-27新規)
+
+/serial_rx_[device_id]_unwrapped (std_msgs/Int32MultiArray, 24スロット)
+  pub: ros2can (ラップアラウンド解決済みの生の絶対値、/zero_channelには依存しない)
+  sub: real_joint_bridge_node, homing_node
+  device_id=11(MODE_CUBEMARS、root_theta/tip_thetaのM{n} position)、
+  device_id=101(CAN_HOST、配下ノードのENC1/ENC2=motor1/motor2の外付け
+  エンコーダ、SW1/SW2=z/r原点センサ)の2本を購読する。減速比・プーリ半径・
+  差動ミキシングを適用して/mixed_joint_statesへ変換するのはreal_joint_bridge_node
+  (root_theta/tip_thetaはyaml保存のoffsetパラメータ、z/rはhoming_node実行時に
+  SetParametersで書き込むoffsetパラメータで真の原点に補正)。詳細は
+  note/hardware_mapping.txt、note/can_mapping.txt参照。
+
+■ 実機出力(homing_node → ros2can、2026-08-27新規)
+
+/serial_tx_[robomas_device_id] (std_msgs/Int16MultiArray, 24スロット)
+  pub: homing_node (ホーミング中のみ、motor1/motor2 target_velocity)
+  sub: ros2can (該当deviceのtopic_passthroughをGUIでONにしておく必要あり)
+  z軸/r軸の原点センサ検出まで低速駆動するための速度指令。通常運転時は
+  trajectory_follower_nodeの/serial_tx_[cubemars_device_id]とは別device。
+
+/start_homing, /stop_homing (std_srvs/Trigger, サービス)
+  提供: homing_node
+  ホーミング開始/中断(安全のため自動起動はせず、明示的にサービス呼び出しが必要)。
+
+/{real_joint_bridge_node,homing_node}/set_parameters, get_parameters
+  (rcl_interfaces、サービス)
+  homing_nodeがホーミング完了時にreal_joint_bridge_nodeのz_offset_m/r_offset_mを
+  書き込むのに使う(command_gui_nodeが既存ノードのパラメータを読み書きするのと
+  同じ仕組み)。
 
 ■ TF
 

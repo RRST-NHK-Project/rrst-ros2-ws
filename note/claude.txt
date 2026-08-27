@@ -143,9 +143,32 @@ zeroed_value、ZeroChannelサービス)、widgets.py (ChannelMonitorRow/ChannelC
 welcomeday.cpp / angle_test.cpp / angle_test_gm.cpp / ros2can_practice.cpp
 が置かれている。中身は未精査、soki本体との関係も未確認。
 
+##実機とsimの関節角度校正 (2026-08-27新規実装、別スレッドから継続)
+実機(ros2can経由)のセンサ値をsokiのjoint_states(root_theta_joint/
+tip_theta_joint/z_joint/r_joint)に変換して/mixed_joint_statesへpublishする
+`real_joint_bridge_node`を追加。sim側のmotor_mixer_nodeと役割を分担し、
+command_gui_node/trajectory_follower_nodeはsim/実機を区別せず同じ
+インタフェース(/mixed_joint_states)で扱える。
+  - 実装: soki_sim/scripts/real_joint_bridge_node.py(新規)、
+    soki_sim/config/real_joint_bridge.yaml(パラメータ)。減速比・プーリ半径・
+    CAN_ID/device_id・センサ分解能などの実機定数は全てROSパラメータ化しており、
+    値が変わってもコード変更不要でyaml編集のみで反映できる。
+  - 変換の内訳・根拠数値はnote/hardware_mapping.txt、CAN_ID/スロット割当の
+    実測値はnote/can_mapping.txtにまとめてある。
+  - root_theta/tip_theta(CubeMars AK40-10、絶対値エンコーダ)はMODE_CUBEMARS
+    (device_id=11)のM{n} position帰還を使用。z/r(motor1/2差動、M2006+C610)は
+    ROBOMAS(device_id=21)のCAN帰還ではなく、CAN_HOST(device_id=101)配下ノードの
+    外付けAMTエンコーダ(ENC1/ENC2)を位置の真値として使う設計
+    (詳細はnote/claude_task.txt参照)。
+  - z/r起動時ホーミングノード(homing_node)も実装済み(soki_sim/scripts/
+    homing_node.py)。motor1/2を同方向/差動方向に低速駆動して原点センサを
+    検出し、z_offset_m/r_offset_mをreal_joint_bridge_nodeへSetParametersで
+    反映する。安全のためstart_homing/stop_homing(Trigger)サービス呼び出しで
+    のみ起動(自動起動なし)。センサ配線・回転符号・基準値は仮定のままなので
+    実機検証が必要(note/can_mapping.txt「z/r原点センサ」参照)。
+  - 未着手: 実機での疎通確認・homing_nodeの調整全般。
+
 ##未確認・要確認事項
 - soki_simのURDF寸法(base_height/lift_size_z/arm_length等)と実機寸法の対応
 - フィールド(ワーク配置環境)の前面の板の幅・奥行き寸法、板厚(すべて仮値のまま)
-- ros2can側(MODE_CUBEMARS/MODE_ROBOMAS)のCAN_ID・スロット割り当てと、
-  root_theta/tip_theta/z/rそれぞれが実際にどのデバイス・トピックに紐づくか
 - cr26_sokiパッケージの位置づけ(sokiとの関係)
