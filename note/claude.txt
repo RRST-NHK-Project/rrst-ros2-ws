@@ -99,6 +99,46 @@ zeroed_value、ZeroChannelサービス)、widgets.py (ChannelMonitorRow/ChannelC
 ボタン(chdef.zeroableのときだけ表示)を追加して解消。offscreen Qt
 (QT_QPA_PLATFORM=offscreen)でクリック→バックエンド反映まで動作確認済み。
 
+##ros2can GUIの「エンコーダ初期化」一覧ページ (2026-08-27新規追加、同日中に1件修正)
+上記の原点セット機能は元々デバイスを1台ずつ選んでMonitorタブを開く必要があった
+ため、検出済み全デバイスのzeroable対象チャンネルを1画面で一覧・一括初期化できる
+専用ページを追加した。
+  - 実装: ros2can/ros2can/encoder_init_panel.py (新規、EncoderInitPanel。全デバイス
+    分のzeroableチャンネルをGroupBox単位でChannelMonitorRow一覧表示、行ごと/
+    デバイスごと/全デバイス一括の3段階で原点セット可能)
+  - main_window.py: ツールバーに「🧭 エンコーダ初期化…」ボタンを追加。押すと
+    EncoderInitPanel.rebuild()してstackに表示する(device_listの選択状態とは
+    完全に独立)。
+
+修正1: 当初はdevice_list(左のデバイス一覧QListWidget)の先頭に固定項目として
+追加していたが、実機なしで起動した直後にこのページがデフォルト表示されてしまう
+不具合が発生(報告により発覚)。原因はQt側の仕様: QListWidgetは表示(show())
+された時点で選択が何も無いと先頭の項目を自動選択する。起動直後、実デバイスが
+まだ検出されていない間は「エンコーダ初期化」の固定項目だけがリストに存在する
+ため、それが自動的に選択されてしまっていた。さらに一度選択済み扱いになる
+ため、その後実デバイスが検出されても「未選択なら自動選択する」ロジック
+(_refresh_device_listのcurrentItem() is Noneガード)が働かなくなり、実デバイス
+の自動選択機能自体も壊れる(=起動後ずっとエンコーダ初期化ページに固定される)
+副作用があった。offscreenのQApplication上でwin.show()を実際に呼ぶテストで
+再現・確認済み(show()を呼ばない素のコンストラクタ呼び出しだけのテストでは
+再現しなかったため、最初のスモークテストでは見逃していた)。
+対策として、device_listへの項目追加はやめ、ツールバーの独立ボタン
+(_on_open_encoder_init)からstackを直接切り替える方式に変更(現状の実装)。
+これによりdevice_listの選択・自動選択ロジックは変更前の挙動に完全に戻り、
+デバイス未検出時は従来通りプレースホルダがデフォルト表示のままになる。
+教訓: QListWidget/QTreeWidget等QAbstractItemView系ウィジェットの選択初期状態を
+検証する際は、コンストラクタ呼び出しだけでなくshow()まで実行してテストしない
+と、この種の「表示時に発火する」自動選択系の副作用を見逃す。
+
+修正2: 修正1の対策(ツールバーボタンでdevice_listの選択とは独立にstackを
+切り替える方式)にした結果、今度は「エンコーダ初期化ページを開いた後、既に
+選択済みだったデバイス行をクリックしても戻れない」不具合が発生(報告により
+発覚)。原因はQtの仕様: QListWidgetのcurrentItemChangedは選択が実際に変わった
+時にしか発火しないため、離脱前から選択されていた行を再クリックしても
+選択状態自体は変化せずシグナルが飛ばない。対策として、クリックには常に
+反応するitemClickedシグナルも併用し(_on_device_item_clicked)、同じ行の
+再クリックでも確実に対応するDevicePanelへ戻れるようにした。
+
 ##cr26_sokiパッケージ
 welcomeday.cpp / angle_test.cpp / angle_test_gm.cpp / ros2can_practice.cpp
 が置かれている。中身は未精査、soki本体との関係も未確認。

@@ -18,6 +18,13 @@ def generate_launch_description():
         'gui', default_value='true',
         description='trueならjoint_state_publisher_guiのスライダーで関節を操作する')
 
+    use_joy_arg = DeclareLaunchArgument(
+        'use_joy', default_value='false',
+        description='trueならjoyパッケージのjoy_node(ジョイスティック入力)と'
+                    'joy_teleop_node(手動操作への変換)を起動する。'
+                    '動作モード(自動専用/手動専用/併用)はcommand_gui_nodeの'
+                    'GUIから切り替える(デフォルトはcontrol_mode=auto)')
+
     robot_description = ParameterValue(
         Command(['xacro ', xacro_file]), value_type=str)
 
@@ -55,6 +62,44 @@ def generate_launch_description():
         parameters=[{'mix_k': 0.5}],
     )
 
+    # command_gui_nodeの目標値(/joint_targets)を台形速度プロファイルで滑らかに
+    # 追従させ、/mixed_joint_statesへ出力する。max_velocity/max_accelerationは
+    # 暫定値なので実機の動作速度に合わせて調整すること。cubemars_*系パラメータは
+    # 実機のdevice_id/motor_indexが確定してから設定する(未設定時はsoki_sim表示のみ)。
+    # z/rは元々0.05m/s・0.1m/s²だったが、joyでの手動ジョグがGUIクリック移動用の
+    # この控えめな値では大きく遅延して感じたため引き上げた(soki_simはRVizの
+    # 表示専用でcubemars_*未設定=実機出力は無効なので、この値を上げても実機側への
+    # 影響はない)。
+    trajectory_follower_node = Node(
+        package='soki_sim',
+        executable='trajectory_follower_node',
+        name='trajectory_follower_node',
+        parameters=[{
+            'joint_names': ['root_theta_joint', 'z_joint', 'r_joint'],
+            'max_velocity': [1.0, 0.2, 0.2],
+            'max_acceleration': [2.0, 0.4, 0.4],
+            'update_rate_hz': 50.0,
+            # 'auto'=command_gui_nodeのみ受付。command_gui_nodeの「動作モード」パネル
+            # から'manual'/'both'に切り替えるとjoy_teleop_nodeの入力も受け付ける。
+            'control_mode': 'auto',
+        }],
+    )
+
+    # ジョイスティックによる手動操作(use_joy:=trueの時のみ起動)。
+    joy_node = Node(
+        package='joy',
+        executable='joy_node',
+        name='joy_node',
+        condition=IfCondition(LaunchConfiguration('use_joy')),
+    )
+
+    joy_teleop_node = Node(
+        package='soki_sim',
+        executable='joy_teleop_node',
+        name='joy_teleop_node',
+        condition=IfCondition(LaunchConfiguration('use_joy')),
+    )
+
     rviz_node = Node(
         package='rviz2',
         executable='rviz2',
@@ -65,9 +110,13 @@ def generate_launch_description():
 
     return LaunchDescription([
         gui_arg,
+        use_joy_arg,
         robot_state_publisher_node,
         joint_state_publisher_gui_node,
         joint_state_publisher_node,
         motor_mixer_node,
+        trajectory_follower_node,
+        joy_node,
+        joy_teleop_node,
         rviz_node,
     ])

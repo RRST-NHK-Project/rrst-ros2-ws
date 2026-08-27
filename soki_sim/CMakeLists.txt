@@ -22,6 +22,18 @@ install(PROGRAMS
   RENAME command_gui_node
 )
 
+install(PROGRAMS
+  scripts/trajectory_follower_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME trajectory_follower_node
+)
+
+install(PROGRAMS
+  scripts/joy_teleop_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME joy_teleop_node
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)
