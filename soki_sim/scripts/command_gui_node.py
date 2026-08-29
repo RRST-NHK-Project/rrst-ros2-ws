@@ -48,6 +48,8 @@ import os
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
 
+from ament_index_python.packages import get_package_share_directory, PackageNotFoundError
+
 import rclpy
 from rcl_interfaces.msg import Parameter, ParameterType, ParameterValue
 from rcl_interfaces.srv import GetParameters, SetParameters
@@ -127,6 +129,9 @@ SHOOT_POINTS = {
 }
 
 JOINT_NAMES = ['root_theta_joint', 'z_joint', 'r_joint']
+# MITゲインパネル(CubeMars)対象関節。JOINT_NAMESとは別物: root_theta/tip_thetaの
+# 2つがCubeMars駆動(z/rはロボマス駆動、note/hardware_mapping.txt参照)。
+CUBEMARS_JOINT_NAMES = ['root_theta_joint', 'tip_theta_joint']
 TRAJ_NODE_NAME = 'trajectory_follower_node'
 JOY_NODE_NAME = 'joy_teleop_node'
 
@@ -168,6 +173,26 @@ def joint_to_xyz(theta, zj, r):
     y = radius * math.cos(theta)
     z = zj + Z_OFFSET
     return x, y, z
+
+
+def _load_soki_logo_image(target_height: int):
+    """ros2can/resources/soki_logo.png と同じ画像(soki_sim/resources/soki_logo.png、
+    CMakeLists.txtでインストール)を読み込む。PIL非依存(python3-tk同梱の
+    tk.PhotoImageのみ、subsampleで整数倍率縮小)なのでtarget_heightちょうどには
+    ならない(近い倍率に丸める)。読めない場合はNoneを返す(ロゴ無しでも動作継続)。"""
+    try:
+        share_dir = get_package_share_directory('soki_sim')
+    except PackageNotFoundError:
+        return None
+    path = os.path.join(share_dir, 'resources', 'soki_logo.png')
+    if not os.path.isfile(path):
+        return None
+    try:
+        image = tk.PhotoImage(file=path)
+    except tk.TclError:
+        return None
+    factor = max(1, round(image.height() / target_height))
+    return image.subsample(factor, factor)
 
 
 class CommandGuiNode(Node):
@@ -354,6 +379,12 @@ class CommandGuiApp(tk.Tk):
         # およびワーク/シューティングボックスの定型位置移動ボタン)を別タブに分離した
         # (2026-08-27)。起動時に表示するタブは、動作モード切替や各種パラメータなど
         # 主要な操作をまとめた統合操作タブをデフォルトにする(2026-08-29)。
+        self._logo_image = _load_soki_logo_image(target_height=36)
+        if self._logo_image is not None:
+            header = tk.Frame(self)
+            header.pack(fill=tk.X, side=tk.TOP, anchor='e')
+            tk.Label(header, image=self._logo_image).pack(side=tk.RIGHT, padx=6, pady=4)
+
         notebook = ttk.Notebook(self)
         notebook.pack(fill=tk.BOTH, expand=True)
 
@@ -588,7 +619,7 @@ class CommandGuiApp(tk.Tk):
         self.mit_kp_vars = {}
         self.mit_kd_vars = {}
         self.mit_torque_vars = {}
-        for i, name in enumerate(JOINT_NAMES):
+        for i, name in enumerate(CUBEMARS_JOINT_NAMES):
             tk.Label(frame, text=name).grid(row=i + 1, column=0, sticky='w')
             kp_var = tk.DoubleVar(value=0.0)
             kd_var = tk.DoubleVar(value=0.0)
@@ -602,10 +633,10 @@ class CommandGuiApp(tk.Tk):
 
         self.mit_gain_status_label = tk.Label(frame, text='未読込', fg='grey',
                                                wraplength=220, justify=tk.LEFT)
-        self.mit_gain_status_label.grid(row=len(JOINT_NAMES) + 1, column=0, columnspan=4, pady=(4, 0))
+        self.mit_gain_status_label.grid(row=len(CUBEMARS_JOINT_NAMES) + 1, column=0, columnspan=4, pady=(4, 0))
 
         btn_row = tk.Frame(frame)
-        btn_row.grid(row=len(JOINT_NAMES) + 2, column=0, columnspan=4, pady=4, sticky='we')
+        btn_row.grid(row=len(CUBEMARS_JOINT_NAMES) + 2, column=0, columnspan=4, pady=4, sticky='we')
         tk.Button(btn_row, text='読込', command=self._on_load_mit_gains).pack(
             side=tk.LEFT, expand=True, fill=tk.X)
         tk.Button(btn_row, text='適用', command=self._on_apply_mit_gains,
@@ -856,7 +887,7 @@ class CommandGuiApp(tk.Tk):
                 if name in self.mit_torque_vars:
                     self.mit_torque_vars[name].set(round(v, 4))
         status = '読込完了'
-        not_configured = [n for n in JOINT_NAMES if n not in names]
+        not_configured = [n for n in CUBEMARS_JOINT_NAMES if n not in names]
         if not_configured:
             status += f' (実機出力対象外: {", ".join(not_configured)})'
         if not names:

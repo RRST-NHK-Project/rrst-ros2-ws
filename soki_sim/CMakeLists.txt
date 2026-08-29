@@ -8,6 +8,7 @@ install(DIRECTORY
   launch
   rviz
   config
+  resources
   DESTINATION share/${PROJECT_NAME}
 )
 
