@@ -79,9 +79,11 @@ def generate_launch_description():
             'max_velocity': [1.0, 0.2, 0.2],
             'max_acceleration': [2.0, 0.4, 0.4],
             'update_rate_hz': 50.0,
-            # 'auto'=command_gui_nodeのみ受付。command_gui_nodeの「動作モード」パネル
-            # から'manual'/'both'に切り替えるとjoy_teleop_nodeの入力も受け付ける。
-            'control_mode': 'auto',
+            # デフォルトは'both'(command_gui_node/joy_teleop_node併用)。
+            # command_gui_nodeの「動作モード」パネルから'auto'/'manual'に切り替え可能
+            # (2026-08-29、use_joy:=trueで起動してもGUI側で手動切り替えするまで
+            # joy入力が無視されていた点を解消するためデフォルトを変更)。
+            'control_mode': 'both',
         }],
     )
 

@@ -130,6 +130,13 @@ JOINT_NAMES = ['root_theta_joint', 'z_joint', 'r_joint']
 TRAJ_NODE_NAME = 'trajectory_follower_node'
 JOY_NODE_NAME = 'joy_teleop_node'
 
+# 機体原点オフセット(soki_sim.urdf.xacroのmachine_origin_x/y/z_joint、base_linkの
+# 子であるprismaticジョイント)。trajectory_follower_nodeの管理対象外(滑らか追従は
+# 不要な較正値)のため、motor_mixer_nodeと同様/mixed_joint_statesへ直接publishする。
+MACHINE_ORIGIN_JOINT_NAMES = ['machine_origin_x_joint', 'machine_origin_y_joint', 'machine_origin_z_joint']
+# soki_sim.urdf.xacroのmachine_origin_offset_limitと一致させること
+MACHINE_ORIGIN_OFFSET_LIMIT = 0.1
+
 
 def clamp(value, lower, upper):
     return max(lower, min(upper, value))
@@ -168,8 +175,9 @@ class CommandGuiNode(Node):
     def __init__(self):
         super().__init__('command_gui_node')
         self.pub_ = self.create_publisher(JointState, 'joint_targets', 10)
+        self.mixed_pub_ = self.create_publisher(JointState, 'mixed_joint_states', 10)
 
-        self._current_positions = {name: 0.0 for name in JOINT_NAMES}
+        self._current_positions = {name: 0.0 for name in JOINT_NAMES + MACHINE_ORIGIN_JOINT_NAMES}
         self._current_received = False
         self.create_subscription(JointState, 'mixed_joint_states', self._on_mixed_joint_state, 10)
 
@@ -206,6 +214,15 @@ class CommandGuiNode(Node):
         msg.name = list(JOINT_NAMES)
         msg.position = [theta, zj, r]
         self.pub_.publish(msg)
+
+    def send_machine_origin(self, x, y, z):
+        """機体原点オフセット(machine_origin_x/y/z_joint)を/mixed_joint_statesへ
+        直接publishする。trajectory_follower_nodeを経由しないため即座に反映される。"""
+        msg = JointState()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.name = list(MACHINE_ORIGIN_JOINT_NAMES)
+        msg.position = [x, y, z]
+        self.mixed_pub_.publish(msg)
 
     def request_node_params(self, target_node, names, on_success, on_failure=None):
         """target_node(trajectory_follower_nodeまたはjoy_teleop_node)のパラメータを
@@ -328,22 +345,25 @@ class CommandGuiApp(tk.Tk):
 
     # ---------- widgets ----------
     def _build_widgets(self):
-        # パラメータパネル(設定タブ)が増えるにつれ縦に伸び、ワーク/シューティング
-        # ボックスのボタン(元は移動タブ側)が画面外に押し出される問題が起きたため、
-        # ttk.Notebookで「移動」(円クリック・ジョグ・保存済みポイント等、自由な
-        # 位置への移動系)と「設定」(各種パラメータパネル、およびワーク/
-        # シューティングボックスの定型位置移動ボタン)を別タブに分離した
-        # (2026-08-27)。
+        # パラメータパネル(統合操作タブ)が増えるにつれ縦に伸び、ワーク/シューティング
+        # ボックスのボタン(元はマニュアル操作タブ側)が画面外に押し出される問題が
+        # 起きたため、ttk.Notebookで「マニュアル操作」(円クリック・ジョグ・保存済み
+        # ポイント等、自由な位置への移動系)と「統合操作」(各種パラメータパネル、
+        # およびワーク/シューティングボックスの定型位置移動ボタン)を別タブに分離した
+        # (2026-08-27)。起動時に表示するタブは、動作モード切替や各種パラメータなど
+        # 主要な操作をまとめた統合操作タブをデフォルトにする(2026-08-29)。
         notebook = ttk.Notebook(self)
         notebook.pack(fill=tk.BOTH, expand=True)
 
-        move_tab = tk.Frame(notebook)
-        settings_tab = tk.Frame(notebook)
-        notebook.add(move_tab, text='移動')
-        notebook.add(settings_tab, text='設定')
+        manual_tab = tk.Frame(notebook)
+        integrated_tab = tk.Frame(notebook)
+        notebook.add(manual_tab, text='マニュアル操作')
+        notebook.add(integrated_tab, text='統合操作')
 
-        self._build_move_tab(move_tab)
-        self._build_settings_tab(settings_tab)
+        self._build_move_tab(manual_tab)
+        self._build_settings_tab(integrated_tab)
+
+        notebook.select(integrated_tab)
 
     def _build_move_tab(self, parent):
         main = tk.Frame(parent, padx=8, pady=8)
@@ -411,9 +431,9 @@ class CommandGuiApp(tk.Tk):
         # パネルが縦に長くなっても画面からはみ出さないよう、スクロール可能な
         # 領域に入れる(2026-08-27、ワーク/シューティングボックスが画面外に
         # 押し出された問題を受けて、今後パネルが増えても同じ罠を踏まないため)。
-        # ワーク/シューティングボックス(定型位置への移動)は「移動」タブの
+        # ワーク/シューティングボックス(定型位置への移動)は「マニュアル操作」タブの
         # 自由位置移動系(円クリック・ジョグ・保存済みポイント)とは性質が違う
-        # ("設定"に近い定型操作)ため、こちらへ移した(2026-08-27)。
+        # ("統合操作"に近い定型操作)ため、こちらへ移した(2026-08-27)。
         settings_col = self._make_scrollable(parent)
         self._build_field_buttons(settings_col)  # 2つのLabelFrameが横並びで幅を取るため全幅のまま
 
@@ -429,6 +449,7 @@ class CommandGuiApp(tk.Tk):
 
         self._build_current_state_panel(left_col)
         self._build_mode_panel(left_col)
+        self._build_machine_origin_offset_panel(left_col)
         self._build_origin_panel(left_col)
 
         self._build_trajectory_panel(right_col)
@@ -483,7 +504,7 @@ class CommandGuiApp(tk.Tk):
         frame = tk.LabelFrame(parent, text='動作モード (trajectory_follower_node)')
         frame.pack(fill=tk.X, pady=(8, 0))
 
-        self.mode_var = tk.StringVar(value='auto')
+        self.mode_var = tk.StringVar(value='both')
         for value, label in (('auto', '自動専用 (GUI)'), ('manual', '手動専用 (joy)'), ('both', '併用')):
             tk.Radiobutton(frame, text=label, variable=self.mode_var, value=value,
                            command=self._on_mode_changed).pack(anchor='w', padx=4)
@@ -585,6 +606,63 @@ class CommandGuiApp(tk.Tk):
             side=tk.LEFT, expand=True, fill=tk.X)
         tk.Button(btn_row, text='適用', command=self._on_apply_mit_gains,
                   bg='#d9534f', fg='white').pack(side=tk.LEFT, expand=True, fill=tk.X)
+
+    def _build_machine_origin_offset_panel(self, parent):
+        frame = tk.LabelFrame(parent, text='機体原点オフセット (soki_sim.urdf.xacro)')
+        frame.pack(fill=tk.X, pady=(8, 0))
+
+        tk.Label(frame, text=f'base_link(旋回軸)から実機の機体原点までのズレ[m]。\n'
+                              f'ワーク・シューティングボックスもこのオフセットに\n'
+                              f'追従して動く(可動範囲: 各軸±{MACHINE_ORIGIN_OFFSET_LIMIT:.2f}m)。',
+                 fg='#555', justify=tk.LEFT, wraplength=220).pack(padx=4, pady=(4, 2), anchor='w')
+
+        self.machine_origin_vars = {name: tk.DoubleVar(value=0.0) for name in MACHINE_ORIGIN_JOINT_NAMES}
+        entries = tk.Frame(frame)
+        entries.pack(padx=4, pady=(0, 2), anchor='w')
+        for i, (label, name) in enumerate((
+                ('X', 'machine_origin_x_joint'),
+                ('Y', 'machine_origin_y_joint'),
+                ('Z', 'machine_origin_z_joint'))):
+            tk.Label(entries, text=label).grid(row=0, column=i * 2, padx=(0 if i == 0 else 6, 2))
+            tk.Entry(entries, textvariable=self.machine_origin_vars[name], width=7).grid(
+                row=0, column=i * 2 + 1)
+
+        self.machine_origin_status_label = tk.Label(frame, text='未送信', fg='grey',
+                                                      wraplength=220, justify=tk.LEFT)
+        self.machine_origin_status_label.pack(padx=4, pady=(2, 4), anchor='w')
+
+        btn_row = tk.Frame(frame)
+        btn_row.pack(fill=tk.X, padx=4, pady=(0, 4))
+        tk.Button(btn_row, text='現在値を反映', command=self._on_load_machine_origin).pack(
+            side=tk.LEFT, expand=True, fill=tk.X)
+        tk.Button(btn_row, text='適用', command=self._on_apply_machine_origin,
+                  bg='#4a90d9', fg='white').pack(side=tk.LEFT, expand=True, fill=tk.X)
+
+    def _on_load_machine_origin(self):
+        if not self.node.has_current_state():
+            messagebox.showinfo('未取得', 'まだmixed_joint_statesを受信していません')
+            return
+        pos = self.node.get_current_positions()
+        for name, var in self.machine_origin_vars.items():
+            var.set(round(pos.get(name, 0.0), 4))
+        self.machine_origin_status_label.config(text='現在値を反映しました', fg='blue')
+
+    def _on_apply_machine_origin(self):
+        try:
+            raw = {name: self.machine_origin_vars[name].get() for name in MACHINE_ORIGIN_JOINT_NAMES}
+        except tk.TclError:
+            messagebox.showerror('入力エラー', 'X/Y/Zに数値を入力してください')
+            return
+        limit = MACHINE_ORIGIN_OFFSET_LIMIT
+        clamped = {name: clamp(v, -limit, limit) for name, v in raw.items()}
+        for name, v in clamped.items():
+            self.machine_origin_vars[name].set(round(v, 4))
+        self.node.send_machine_origin(*(clamped[name] for name in MACHINE_ORIGIN_JOINT_NAMES))
+        x, y, z = (clamped[name] for name in MACHINE_ORIGIN_JOINT_NAMES)
+        text = f'送信しました (x={x:.3f}, y={y:.3f}, z={z:.3f})'
+        if any(abs(raw[name] - clamped[name]) > 1e-9 for name in MACHINE_ORIGIN_JOINT_NAMES):
+            text += '\n(可動範囲外のためクランプされました)'
+        self.machine_origin_status_label.config(text=text, fg='green')
 
     def _build_origin_panel(self, parent):
         frame = tk.LabelFrame(parent, text='root_theta原点設定 (CubeMars本体、trajectory_follower_node)')
