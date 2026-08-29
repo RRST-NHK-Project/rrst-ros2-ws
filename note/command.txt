@@ -4,7 +4,7 @@ ros2 launch soki_sim display.launch.py use_joy:=true
 ros2 run soki_sim command_gui_node
 
 #自動機メインノード
-ros2 launch soki_sim real_root_theta_test.launch.py use_viz:=true use_joy:=true
+ros2 launch soki_sim real_axes_test.launch.py use_joy:=true use_viz:=true
 
 
 #実機関節角度校正 (2026-08-27新規)
@@ -41,3 +41,32 @@ ros2 service call /start_homing std_srvs/srv/Trigger
 ros2 service call /stop_homing std_srvs/srv/Trigger
 # センサ配線・基準値は仮定のまま(note/can_mapping.txt「z/r原点センサ」参照)、
 # 実機検証・調整が必要
+
+# ホーミングのスキップ (2026-08-29新規、原点センサ配線が未検証のうちの代替手段)
+# motor1/motor2を駆動せず、現在位置をz_ref_value_m/r_ref_value_m(原点センサ位置での
+# 真値)とみなしてoffsetを即座に反映する。呼び出し前に、joy等で機体を原点センサ位置
+# 相当へ手動で合わせておくこと(間違った位置で実行すると以後のz/r値が全てズレる)。
+ros2 service call /skip_homing std_srvs/srv/Trigger
+
+# z_joint/r_joint実機動作確認 (2026-08-29新規、ロボマスMITモード)
+# root_theta同様、use_robomas:=trueでz/r(motor1/motor2、device_id=21)へも
+# MIT指令を送る。robomas_kp/robomas_kdは低ゲインから調整すること。
+# ros2can GUI側でdevice_id=21(MODE_ROBOMAS)のtopic_passthroughを手動でONにすること。
+ros2 launch soki_sim real_root_theta_test.launch.py use_robomas:=true
+# ホーミング未実施だとz/rの原点は未較正のまま。先にhoming_nodeを別途起動し
+# start_homingを実施しておくこと(homing_node起動中はtrajectory_follower_node側の
+# ロボマス出力は自動的に一時停止される、pause_robomas_output/resume_robomas_output)。
+# ゲイン調整例:
+ros2 launch soki_sim real_root_theta_test.launch.py use_robomas:=true robomas_kp:=0.02 robomas_kd:=0.002
+
+# 手先θ(tip_theta_joint)を除く全軸の実機動作確認 (2026-08-29新規)
+# root_theta(CubeMars)+z/r(ロボマス、常時有効・トグル無し)+homing_nodeを
+# 一括起動する。tip_thetaは初回較正未実施のため対象外のまま
+# (note/hardware_mapping.txt「tip_thetaの初回較正の実施」参照)。
+ros2 launch soki_sim real_axes_test.launch.py
+# 起動後、まずros2can GUIでdevice_id=21のtopic_passthroughをONにしてから
+# ホーミングを実施すること:
+ros2 service call /start_homing std_srvs/srv/Trigger
+# joyも使う場合・見た目(rviz)も見たい場合は real_root_theta_test.launch.py と同様
+# use_joy:=true / use_viz:=true が使える。引数一覧:
+# ros2 launch soki_sim real_axes_test.launch.py --show-args

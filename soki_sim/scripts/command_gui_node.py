@@ -248,6 +248,8 @@ class CommandGuiNode(Node):
                     values[name] = list(pv.double_array_value)
                 elif pv.type == ParameterType.PARAMETER_DOUBLE:
                     values[name] = pv.double_value
+                elif pv.type == ParameterType.PARAMETER_INTEGER:
+                    values[name] = pv.integer_value
                 elif pv.type == ParameterType.PARAMETER_STRING:
                     values[name] = pv.string_value
                 elif pv.type == ParameterType.PARAMETER_STRING_ARRAY:
@@ -455,6 +457,8 @@ class CommandGuiApp(tk.Tk):
         self._build_trajectory_panel(right_col)
         self._build_joy_speed_panel(right_col)
         self._build_mit_gain_panel(right_col)
+        self._build_robomas_gain_panel(right_col)
+        self._build_homing_panel(right_col)
 
     def _make_scrollable(self, parent):
         """parent一杯に縦スクロール可能な内側Frameを作って返す。"""
@@ -897,6 +901,169 @@ class CommandGuiApp(tk.Tk):
         else:
             reasons = '; '.join(r.reason for r in results if not r.successful)
             self.mit_gain_status_label.config(text=f'適用失敗: {reasons}', fg='red')
+
+    def _build_robomas_gain_panel(self, parent):
+        # robomas_kp/kd/current_ffはcubemars_*と異なりz_joint/r_joint(motor1/motor2)
+        # 共通のスカラー値(joint別ではない、trajectory_follower_node.py参照)なので、
+        # MITゲインパネルのような関節ごとの行ではなく単一行で表示する。
+        frame = tk.LabelFrame(parent, text='MITゲイン (実機ロボマス、trajectory_follower_node)')
+        frame.pack(fill=tk.X, pady=(8, 0))
+
+        tk.Label(frame, text='motor1/motor2(z/r)共通の値。robomas_device_id未設定なら'
+                              '実機出力無効。', fg='#555', justify=tk.LEFT,
+                 wraplength=220).grid(row=0, column=0, columnspan=2, sticky='w', padx=4)
+
+        self.robomas_kp_var = tk.DoubleVar(value=0.0)
+        self.robomas_kd_var = tk.DoubleVar(value=0.0)
+        self.robomas_current_ff_var = tk.DoubleVar(value=0.0)
+        for i, (label, var) in enumerate((
+                ('Kp [A/deg]', self.robomas_kp_var),
+                ('Kd [A/rpm]', self.robomas_kd_var),
+                ('current_ff [A]', self.robomas_current_ff_var))):
+            tk.Label(frame, text=label).grid(row=i + 1, column=0, sticky='w', padx=4)
+            tk.Entry(frame, textvariable=var, width=8).grid(row=i + 1, column=1, padx=2, pady=2)
+
+        self.robomas_gain_status_label = tk.Label(frame, text='未読込', fg='grey',
+                                                    wraplength=220, justify=tk.LEFT)
+        self.robomas_gain_status_label.grid(row=4, column=0, columnspan=2, pady=(4, 0))
+
+        btn_row = tk.Frame(frame)
+        btn_row.grid(row=5, column=0, columnspan=2, pady=4, sticky='we')
+        tk.Button(btn_row, text='読込', command=self._on_load_robomas_gains).pack(
+            side=tk.LEFT, expand=True, fill=tk.X)
+        tk.Button(btn_row, text='適用', command=self._on_apply_robomas_gains,
+                  bg='#d9534f', fg='white').pack(side=tk.LEFT, expand=True, fill=tk.X)
+
+        # homing_node実行中はtrajectory_follower_node側が自動でpause/resumeするが
+        # (note/hardware_mapping.txt参照)、実機調整時に手動で止めたい場合用に
+        # root_theta原点パネルと同じTriggerボタンの型でも操作できるようにする。
+        pause_row = tk.Frame(frame)
+        pause_row.grid(row=6, column=0, columnspan=2, pady=(4, 4), sticky='we')
+        tk.Button(pause_row, text='出力を一時停止', command=lambda: self._on_robomas_pause_resume(
+            '/pause_robomas_output')).pack(side=tk.LEFT, expand=True, fill=tk.X)
+        tk.Button(pause_row, text='出力を再開', command=lambda: self._on_robomas_pause_resume(
+            '/resume_robomas_output')).pack(side=tk.LEFT, expand=True, fill=tk.X)
+
+    def _on_load_robomas_gains(self):
+        ok = self.node.request_node_params(
+            TRAJ_NODE_NAME, ['robomas_kp', 'robomas_kd', 'robomas_current_ff', 'robomas_device_id'],
+            self._apply_loaded_robomas_gains,
+            lambda reason: self.robomas_gain_status_label.config(text=f'読込失敗: {reason}', fg='red'))
+        self.robomas_gain_status_label.config(
+            text='読込中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
+            fg='grey' if ok else 'red')
+
+    def _apply_loaded_robomas_gains(self, values):
+        if 'robomas_kp' in values:
+            self.robomas_kp_var.set(round(values['robomas_kp'], 6))
+        if 'robomas_kd' in values:
+            self.robomas_kd_var.set(round(values['robomas_kd'], 6))
+        if 'robomas_current_ff' in values:
+            self.robomas_current_ff_var.set(round(values['robomas_current_ff'], 6))
+        device_id = values.get('robomas_device_id', 0)
+        status = '読込完了'
+        if not device_id:
+            status += ' (実機出力無効: robomas_device_id未設定)'
+        else:
+            status += f' (device_id={device_id})'
+        self.robomas_gain_status_label.config(text=status, fg='blue')
+
+    def _on_apply_robomas_gains(self):
+        try:
+            values = {
+                'robomas_kp': self.robomas_kp_var.get(),
+                'robomas_kd': self.robomas_kd_var.get(),
+                'robomas_current_ff': self.robomas_current_ff_var.get(),
+            }
+        except tk.TclError:
+            messagebox.showerror('入力エラー', 'Kp/Kd/current_ffに数値を入力してください')
+            return
+        if not messagebox.askyesno(
+                'MITゲイン適用の確認',
+                'motor1/motor2(z/r)のMITゲインを実機へ即座に反映します。\n'
+                'Kpを大きくするほど保持力・応答性が上がりますが、\n'
+                '実機にかかる力も大きくなります。よろしいですか？'):
+            return
+        ok = self.node.set_node_params(TRAJ_NODE_NAME, values, self._apply_robomas_gain_set_result)
+        self.robomas_gain_status_label.config(
+            text='適用中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
+            fg='grey' if ok else 'red')
+
+    def _apply_robomas_gain_set_result(self, results):
+        if results is None:
+            self.robomas_gain_status_label.config(text='適用に失敗しました(応答なし)', fg='red')
+            return
+        if all(r.successful for r in results):
+            self.robomas_gain_status_label.config(text='適用しました', fg='green')
+        else:
+            reasons = '; '.join(r.reason for r in results if not r.successful)
+            self.robomas_gain_status_label.config(text=f'適用失敗: {reasons}', fg='red')
+
+    def _on_robomas_pause_resume(self, service_name):
+        self.robomas_gain_status_label.config(text=f'{service_name} 呼び出し中...', fg='grey')
+        ok = self.node.call_trigger_service(
+            service_name, self._on_robomas_pause_resume_done)
+        if not ok:
+            self.robomas_gain_status_label.config(text='サービス未起動です', fg='red')
+
+    def _on_robomas_pause_resume_done(self, success, message):
+        self.robomas_gain_status_label.config(
+            text=message, fg=('#1a7a1a' if success else 'red'))
+
+    def _build_homing_panel(self, parent):
+        frame = tk.LabelFrame(parent, text='z/rホーミング (homing_node)')
+        frame.pack(fill=tk.X, pady=(8, 0))
+
+        tk.Label(frame, text='開始: motor1/motor2を低速駆動し原点センサまで動かす。\n'
+                              'スキップ: 機体を先に原点センサ位置相当へ手動で\n'
+                              '合わせてから使うこと(モータは駆動しない)。',
+                 fg='#555', justify=tk.LEFT, wraplength=220).pack(padx=4, pady=(4, 2), anchor='w')
+
+        self.homing_status_label = tk.Label(frame, text='未実行', fg='grey',
+                                             wraplength=220, justify=tk.LEFT)
+        self.homing_status_label.pack(padx=4, pady=(0, 4), anchor='w')
+
+        btn_row = tk.Frame(frame)
+        btn_row.pack(fill=tk.X, padx=4, pady=(0, 4))
+        tk.Button(btn_row, text='開始', command=self._on_start_homing,
+                  bg='#4a90d9', fg='white').pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 2))
+        tk.Button(btn_row, text='中断', command=self._on_stop_homing).pack(
+            side=tk.LEFT, expand=True, fill=tk.X, padx=2)
+        tk.Button(btn_row, text='スキップ', command=self._on_skip_homing,
+                  bg='#d9534f', fg='white').pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(2, 0))
+
+    def _on_start_homing(self):
+        if not messagebox.askyesno(
+                'ホーミング開始の確認',
+                'motor1/motor2を低速駆動してz/r原点センサまで動かします。\n'
+                '周囲に人・障害物がないか確認してください。'):
+            return
+        self.homing_status_label.config(text='開始中...', fg='grey')
+        ok = self.node.call_trigger_service('/start_homing', self._on_homing_service_done)
+        if not ok:
+            self.homing_status_label.config(text='サービス未起動です(homing_node起動確認)', fg='red')
+
+    def _on_stop_homing(self):
+        self.homing_status_label.config(text='中断中...', fg='grey')
+        ok = self.node.call_trigger_service('/stop_homing', self._on_homing_service_done)
+        if not ok:
+            self.homing_status_label.config(text='サービス未起動です(homing_node起動確認)', fg='red')
+
+    def _on_skip_homing(self):
+        if not messagebox.askyesno(
+                'ホーミングスキップの確認',
+                'motor1/motor2は駆動せず、現在位置を原点センサ位置(z_ref_value_m/\n'
+                'r_ref_value_m)とみなしてoffsetを即座に反映します。\n\n'
+                '機体は今、原点センサ位置相当にありますか？\n'
+                '間違った位置で実行すると以後のz/r値が全てズレます。'):
+            return
+        self.homing_status_label.config(text='スキップ処理中...', fg='grey')
+        ok = self.node.call_trigger_service('/skip_homing', self._on_homing_service_done)
+        if not ok:
+            self.homing_status_label.config(text='サービス未起動です(homing_node起動確認)', fg='red')
+
+    def _on_homing_service_done(self, success, message):
+        self.homing_status_label.config(text=message, fg=('#1a7a1a' if success else 'red'))
 
     def _on_load_joy_speed(self):
         ok = self.node.request_node_params(

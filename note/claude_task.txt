@@ -38,9 +38,25 @@ soki_sim/config/real_joint_bridge.yamlのパラメータ変更のみで数値を
     方式に変更済み(/set_root_theta_originサービス、詳細はnote/hardware_mapping.txt
     「root_theta/tip_thetaの原点初期化」参照)。
 
+  - z_joint/r_jointについても、ros2canのMODE_ROBOMASにMITモードが実装された
+    ことを受け、2026-08-29にtrajectory_follower_node経由でのMIT位置制御出力を
+    実装した(root_theta/tip_thetaと同じパターン。robomas_device_id等の
+    パラメータで有効化、未設定なら実機出力無効のまま)。homing_nodeとの
+    排他制御(pause_robomas_output/resume_robomas_output)、offsetの
+    trajectory_follower_nodeへの伝播も対応済み。詳細はnote/hardware_mapping.txt
+    「z_joint/r_jointの実機出力(RoboMas MITモード)」参照。実機での動作確認・
+    kp/kd調整は未実施。
+
 ### 残タスク
   - real_joint_bridge_nodeの実機での疎通確認(sim側と同じ/mixed_joint_states
     経由でcommand_gui_node・trajectory_follower_nodeが動くか)
+  - z/rのRoboMas MIT出力(2026-08-29実装)の実機投入前確認:
+    - real_root_theta_test.launch.py相当のlaunch引数(robomas_device_id/
+      motor1_index/motor2_index/kp/kd等)がまだ配線されていない。root_thetaの
+      launch(kp=5, kd=0.5から開始した実績)を参考に、低ゲインから実機で調整すること
+    - pause_robomas_output/resume_robomas_output経由のhoming↔MIT切り替えが
+      実機で正しく機能するか(homing_node起動時にtrajectory_follower_node側の
+      出力が本当に止まるか)の確認
   - root_theta本体Set Originコマンド(control_mode_id=5)がAK Series Module
     Product Manual V3.2.0 4.1節の実際の記載と一致するか実機投入前に要確認
     (2026-08-27時点、RPM=3/POS=4の続き番号として採用したのみで未検証。

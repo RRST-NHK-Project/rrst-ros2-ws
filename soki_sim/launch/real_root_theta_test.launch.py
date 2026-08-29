@@ -31,6 +31,14 @@ def generate_launch_description():
     値に合わせて起動時に上書きすること(例: motor_index:=0 でM1配線に変更)。
     デフォルトは2026-08-27の動作確認時点の配線(root_theta=M2)・低ゲイン
     (Kp=5, Kd=0.5)。詳細はnote/command.txt参照。
+
+    use_robomas:=true でz_joint/r_joint(motor1/motor2、ロボマスdevice_id=21、
+    note/can_mapping.txt確認済み)へもMIT指令を送る(2026-08-29追加)。
+    robomas_kp/robomas_kdは要実機調整・低ゲインから開始すること(M2006の電流
+    上限1.0A(ros2can/firmware/.../config.hppのROBOMAS_MAX_CURRENT_A)基準で
+    デフォルト値を決めてある。詳細はnote/hardware_mapping.txt「z_joint/r_jointの
+    実機出力(RoboMas MITモード)」参照)。ホーミング未実施のままだとz/rの原点は
+    未較正(生値)のままなので、先にhoming_nodeのstart_homingを実施すること。
     """
     pkg_share = get_package_share_directory('soki_sim')
     xacro_file = os.path.join(pkg_share, 'urdf', 'soki_sim.urdf.xacro')
@@ -72,6 +80,17 @@ def generate_launch_description():
     use_viz_arg = DeclareLaunchArgument(
         'use_viz', default_value='false',
         description='trueならrobot_state_publisher/joint_state_publisher/rviz2も起動する')
+    use_robomas_arg = DeclareLaunchArgument(
+        'use_robomas', default_value='false',
+        description='trueならz_joint/r_joint(motor1/motor2、ロボマスdevice_id=21)へも'
+                    'MIT指令を送る(実機出力有効化)。falseならこれまで通りsoki_sim表示のみ')
+    robomas_kp_arg = DeclareLaunchArgument(
+        'robomas_kp', default_value='0.02',
+        description='ロボマスMITモードKp[A/deg]。要実機調整、低ゲインから開始すること'
+                    '(M2006の電流上限1.0A基準、誤差10degで0.2A程度になる想定値)')
+    robomas_kd_arg = DeclareLaunchArgument(
+        'robomas_kd', default_value='0.002',
+        description='ロボマスMITモードKd[A/rpm]。要実機調整、低ゲインから開始すること')
 
     device_id = LaunchConfiguration('device_id')
     motor_index = LaunchConfiguration('motor_index')
@@ -83,6 +102,13 @@ def generate_launch_description():
     use_joy = LaunchConfiguration('use_joy')
     use_viz = LaunchConfiguration('use_viz')
     enable_button = LaunchConfiguration('enable_button')
+    use_robomas = LaunchConfiguration('use_robomas')
+    robomas_kp = LaunchConfiguration('robomas_kp')
+    robomas_kd = LaunchConfiguration('robomas_kd')
+
+    # use_robomas:=falseならrobomas_device_id=0のまま(実機出力無効、trajectory_follower_node
+    # 側のデフォルトと同じ)。trueなら21(note/can_mapping.txt確認済み)。
+    robomas_device_id = PythonExpression(["21 if '", use_robomas, "' == 'true' else 0"])
 
     # use_joy:=trueならGUI/joy両方を受け付ける。falseならGUI専用のまま
     # (joy_teleop_nodeを起動しないなら'manual'を受け付けても無意味なため)。
@@ -116,9 +142,12 @@ def generate_launch_description():
             # 文字列(concatenation)として解釈され、rclpy側の宣言型(DOUBLE_ARRAY等)
             # と衝突してノードが起動時に落ちる。ParameterValue(..., value_type=List[T])
             # で明示的に配列型として評価させること。
-            'joint_names': ['root_theta_joint'],
-            'max_velocity': ParameterValue([[max_velocity]], value_type=List[float]),
-            'max_acceleration': ParameterValue([[max_acceleration]], value_type=List[float]),
+            # z_joint/r_jointは常時joint_namesに含める(soki_sim表示上のtrap追従は
+            # use_robomasに関わらず有効。実機出力の有無はrobomas_device_idの方で
+            # 制御する、trajectory_follower_node.py参照)。
+            'joint_names': ['root_theta_joint', 'z_joint', 'r_joint'],
+            'max_velocity': ParameterValue([max_velocity, 0.05, 0.05], value_type=List[float]),
+            'max_acceleration': ParameterValue([max_acceleration, 0.1, 0.1], value_type=List[float]),
             'update_rate_hz': 50.0,
             'control_mode': control_mode,
             'cubemars_joint_names': ['root_theta_joint'],
@@ -128,6 +157,9 @@ def generate_launch_description():
             'cubemars_kd': ParameterValue([[kd]], value_type=List[float]),
             'cubemars_torque_ff': [0.0],
             'cubemars_reduction': ParameterValue([[reduction]], value_type=List[float]),
+            'robomas_device_id': ParameterValue(robomas_device_id, value_type=int),
+            'robomas_kp': ParameterValue(robomas_kp, value_type=float),
+            'robomas_kd': ParameterValue(robomas_kd, value_type=float),
         }],
     )
 
@@ -192,6 +224,9 @@ def generate_launch_description():
         use_joy_arg,
         use_viz_arg,
         enable_button_arg,
+        use_robomas_arg,
+        robomas_kp_arg,
+        robomas_kd_arg,
         ros2can_node,
         real_joint_bridge_node,
         trajectory_follower_node,

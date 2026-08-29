@@ -141,6 +141,46 @@ real_joint_bridge_node側のランタイムパラメータ(z_offset_m/r_offset_m
   start_homing/stop_homing(std_srvs/Trigger)サービスで明示的に起動・中断する。
   パラメータはreal_joint_bridge.yamlのhoming_node以下。
 
+  skip_homing(std_srvs/Trigger、2026-08-29追加): 原点センサ配線・検出値が
+  未検証(下記「未確認事項」参照)なうちの代替手段。motor1/motor2を一切駆動せず、
+  呼び出し時点のエンコーダ値をそのままz_ref_value_m/r_ref_value_mの位置と
+  みなしてoffsetを即座に反映する。呼び出し前に機体を(joy等で手動操作して)
+  原点センサ位置相当へ物理的に合わせておく必要がある点はstart_homingの
+  実際の較正結果と変わらない(センサでの自動検出をスキップするだけ)。
+
+## z_joint/r_jointの実機出力(RoboMas MITモード) (2026-08-29追加)
+ros2canのMODE_ROBOMASにMITモード(位置PD制御、firmware/xiao-esp32-s3_can2io/src/
+robomas.cpp)が実装されたことを受け、root_theta/tip_theta(CubeMars MIT)と対称的に
+z_joint/r_jointもtrajectory_follower_nodeからMIT指令を送れるようにした
+(robomas_device_id等のパラメータで有効化。未設定時は従来通り実機出力無効)。
+
+  実装: soki_sim/scripts/trajectory_follower_node.py
+  - z/rは引き続きjoint単位で台形プロファイルし、送信直前にmotor_mixer_node.pyと
+    同じ式(m1=(z+r)/(2*mix_k), m2=(z-r)/(2*mix_k))でmotor1/motor2側
+    (アクチュエータ軸、プーリ半径換算)へ変換してから送信する。
+  - スケールはcubemarsと異なるので注意: 指令(target)は1deg/LSB(cubemarsの
+    0.1deg/LSBより粗い。範囲確保のため、robomas.cppのコメント参照)、帰還(angle)は
+    0.1deg/LSB(cubemarsと同じ)。mit_kp=0.001(A/deg)/LSB、mit_kd=0.0001(A/rpm)/LSB、
+    mit_current_ff=0.001A/LSB(config.hppのROBOMAS_MIT_*と一致させること)。
+  - 位置フィードバック基準はロボマス内蔵ロータエンコーダに割り切った
+    (root_theta/tip_thetaと同じ設計判断)。z/rの真値である外付けAMTエンコーダ
+    (ENC1/ENC2)との間のバックラッシュ差分は無視する。
+
+**homing_nodeとの排他制御**: homing_nodeは起動時ホーミング中、同じ
+robomas_device_idへ独立に速度指令をpublishするため、trajectory_follower_nodeの
+MIT指令と衝突する。これを避けるため、trajectory_follower_nodeに
+pause_robomas_output/resume_robomas_output(std_srvs/Trigger)を新設し、
+homing_nodeがstart_homing時にpause、stop_homing・完了・タイムアウト失敗時に
+resumeを呼ぶ「一時停止パターン」(root_theta origin設定の_origin_pending_と同種)
+で解決した。
+
+**offsetの二重管理**: z_offset_m/r_offset_m(homing_nodeが算出する原点補正値)は
+これまでreal_joint_bridge_node(sim表示用)のみに反映していたが、
+trajectory_follower_node(実機MIT指令用)も独自にz/rの内部状態を持つため、
+robomas_z_offset_m/robomas_r_offset_mという別パラメータ名でこちらにも
+SetParametersするようhoming_node._apply_offsets()を拡張した。値・符号規約
+(z = mix_k*(m1+m2) + offset)はreal_joint_bridge_nodeと揃えてある。
+
 ## 未確認事項 (2026-08-27時点)
 - root_theta/tip_thetaの原点センサの物理位置(真の機械原点との対応)
   → 上記較正手順を実施する際に確定させる
