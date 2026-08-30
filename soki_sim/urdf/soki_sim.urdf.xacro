@@ -5,7 +5,7 @@ soki_sim: r(半径方向), 根本θ(旋回), z(昇降), 手先θ(手先回転) �
 RVizでの見た目確認用途のため、慣性(inertial)や衝突形状(collision)は持たない。
 
 関節構成 (base_link を基準に直列):
-  base_link   =[root_theta_joint (continuous, z軸)]=>  turret_link (旋回台+マスト)
+  base_link   =[root_theta_joint (revolute, z軸, ±153.5°=実機MIT可動域)]=>  turret_link (旋回台+マスト)
   turret_link =[z_joint (prismatic, z軸)]=>             lift_link (昇降キャリッジ)
   lift_link   =[r_joint (prismatic, x軸)]=>             arm_link (伸縮アーム)
   arm_link    =[tip_theta_joint (continuous, z軸)]=>    tip_link (手先)
@@ -52,6 +52,15 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
 
   <xacro:property name="joint_velocity" value="1.0"/>
   <xacro:property name="joint_effort" value="10.0"/>
+
+  <!-- root_theta: 実機CubeMars(MITモード)の指令可能範囲(±12.5rad、アクチュエータ軸、
+       AK Series Module Driver Manual由来)を外部減速比(112/24)で関節角度に変換した値。
+       MITモードのプロトコル制約上、実機は本当の意味でのcontinuous回転ができないため
+       (note/hardware_mapping.txt「root_theta/tip_thetaはMITモードの都合上そもそも
+       『continuous』ではない」参照)、simもこの範囲に制限して実機と挙動を合わせる
+       (2026-08-27)。 -->
+  <xacro:property name="root_theta_reduction" value="${112.0 / 24.0}"/>
+  <xacro:property name="root_theta_limit" value="${12.5 / root_theta_reduction}"/>
 
   <!-- マテリアル -->
   <material name="base_grey">
@@ -101,13 +110,14 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
     </visual>
   </link>
 
-  <joint name="root_theta_joint" type="continuous">
+  <joint name="root_theta_joint" type="revolute">
     <parent link="base_link"/>
     <child link="turret_link"/>
     <origin xyz="0 0 ${base_height}" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
     <dynamics damping="0.1"/>
-    <limit effort="${joint_effort}" velocity="${joint_velocity}"/>
+    <limit lower="${-root_theta_limit}" upper="${root_theta_limit}"
+           effort="${joint_effort}" velocity="${joint_velocity}"/>
   </joint>
 
   <!-- motor1_link/motor2_link: 差動機構の各モータ位置を示すインジケータ -->
@@ -208,11 +218,55 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
     <limit effort="${joint_effort}" velocity="${joint_velocity}"/>
   </joint>
 
+  <!-- ==================== 機体原点 ====================
+       base_link(旋回軸)は実機の基準点(機体原点、寸法採寸の基準)と必ずしも
+       一致しないため、そのズレをXYZオフセットとして持たせたmachine_origin_link
+       をbase_linkの子として追加する。以下のフィールド(ワーク・シューティング
+       エリア)の座標は全て実機上で機体原点を基準に採寸した値のため、
+       machine_origin_linkを基準に配置する。実機とのズレが判明・変更された場合は
+       各座標式(row1_xなど)を個別に直す必要はなく、このオフセットだけ調整すれば
+       よい。x/y/zをprismaticジョイント(machine_origin_x/y/z_joint)として
+       持たせているため、joint_state_publisher_guiのスライダーでRViz上で
+       直接調整・確認できる(display.launch.py参照)。範囲は仮に
+       ±machine_origin_offset_limit[m]としているので、実機とのズレの想定量に
+       合わせて調整すること。 -->
+  <xacro:property name="machine_origin_offset_limit" value="0.1"/>
+
+  <link name="machine_origin_x_link"/>
+  <joint name="machine_origin_x_joint" type="prismatic">
+    <parent link="base_link"/>
+    <child link="machine_origin_x_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="${-machine_origin_offset_limit}" upper="${machine_origin_offset_limit}"
+           effort="${joint_effort}" velocity="${joint_velocity}"/>
+  </joint>
+
+  <link name="machine_origin_y_link"/>
+  <joint name="machine_origin_y_joint" type="prismatic">
+    <parent link="machine_origin_x_link"/>
+    <child link="machine_origin_y_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="${-machine_origin_offset_limit}" upper="${machine_origin_offset_limit}"
+           effort="${joint_effort}" velocity="${joint_velocity}"/>
+  </joint>
+
+  <link name="machine_origin_link"/>
+  <joint name="machine_origin_z_joint" type="prismatic">
+    <parent link="machine_origin_y_link"/>
+    <child link="machine_origin_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="${-machine_origin_offset_limit}" upper="${machine_origin_offset_limit}"
+           effort="${joint_effort}" velocity="${joint_velocity}"/>
+  </joint>
+
   <!-- ==================== フィールド(ワーク配置環境) ====================
        実機のワーク設置環境をRVizで確認できるよう再現した静的モデル
-       (板・ワークとも衝突/慣性なし、視覚のみ)。base_link(旋回軸)を原点とし、
-       +X方向をワークが並ぶ奥行き方向、Y方向を幅方向(ワーク群の中心線 = 機体中心
-       = 機体が乗っている板の中心と一致)とする。
+       (板・ワークとも衝突/慣性なし、視覚のみ)。machine_origin_link(機体原点)
+       を原点とし、+X方向をワークが並ぶ奥行き方向、Y方向を幅方向(ワーク群の
+       中心線 = 機体中心 = 機体が乗っている板の中心と一致)とする。
        行(1〜4) = 奥行き方向の並び(機体に近い方が1行目)
        列(1〜6) = 幅方向の並び(横並び) -->
 
@@ -222,8 +276,8 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
   <!-- 板の厚み(実測値未確認のため仮値。前面の板も同じ高さとして扱う) -->
   <xacro:property name="field_board_thickness" value="0.01"/>
 
-  <!-- base_link(旋回軸)から、板の前端(ワーク側。以下の49mm等はここが基準)までの
-       奥行き方向オフセット。現状は板の奥行き中心にロボットが乗っている想定
+  <!-- machine_origin_link(機体原点)から、板の前端(ワーク側。以下の49mm等はここが基準)
+       までの奥行き方向オフセット。現状は板の奥行き中心にロボットが乗っている想定
        (290mm/2)。実機のロボット搭載位置に合わせてここだけ調整すればよい -->
   <xacro:property name="field_board_edge_offset" value="${field_robot_board_depth / 2}"/>
 
@@ -244,7 +298,7 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
   <xacro:property name="field_row_gap3" value="0.013"/>
   <xacro:property name="field_row4_z_lift" value="0.020"/>
 
-  <!-- 各行の近位端(機体側の底面)・遠位端のX座標(base_link基準) -->
+  <!-- 各行の近位端(機体側の底面)・遠位端のX座標(machine_origin_link基準) -->
   <xacro:property name="row1_near_x" value="${field_board_edge_offset + field_row_gap0}"/>
   <xacro:property name="row1_far_x" value="${row1_near_x + work_length}"/>
   <xacro:property name="row2_near_x" value="${row1_far_x + field_row_gap1}"/>
@@ -276,7 +330,7 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
   <xacro:property name="field_front_board_depth"
                    value="${row4_far_x - field_board_edge_offset + field_front_board_margin}"/>
 
-  <!-- 機体が乗っている板の中心X座標(base_link基準) -->
+  <!-- 機体が乗っている板の中心X座標(machine_origin_link基準) -->
   <xacro:property name="field_robot_board_center_x" value="${field_board_edge_offset - field_robot_board_depth / 2}"/>
 
   <!-- 機体が乗っている板 -->
@@ -290,7 +344,7 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
     </visual>
   </link>
   <joint name="robot_board_joint" type="fixed">
-    <parent link="base_link"/>
+    <parent link="machine_origin_link"/>
     <child link="robot_board_link"/>
   </joint>
 
@@ -305,7 +359,7 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
     </visual>
   </link>
   <joint name="front_board_joint" type="fixed">
-    <parent link="base_link"/>
+    <parent link="machine_origin_link"/>
     <child link="front_board_link"/>
   </joint>
 
@@ -321,7 +375,7 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
       </visual>
     </link>
     <joint name="${name}_joint" type="fixed">
-      <parent link="base_link"/>
+      <parent link="machine_origin_link"/>
       <child link="${name}"/>
       <origin xyz="${x} ${y} ${z}" rpy="0 0 0"/>
     </joint>
@@ -381,7 +435,7 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
       </visual>
     </link>
     <joint name="${name}_joint" type="fixed">
-      <parent link="base_link"/>
+      <parent link="machine_origin_link"/>
       <child link="${name}"/>
     </joint>
   </xacro:macro>
@@ -446,7 +500,7 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
       </visual>
     </link>
     <joint name="${name}_joint" type="fixed">
-      <parent link="base_link"/>
+      <parent link="machine_origin_link"/>
       <child link="${name}"/>
       <origin xyz="${x} ${y} 0" rpy="0 0 0"/>
     </joint>

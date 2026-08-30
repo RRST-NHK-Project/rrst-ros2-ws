@@ -17,7 +17,8 @@ max_velocity/max_accelerationで制限された現実的な速度で動くよう
 
 同じ軌道(位置・速度)を、実機のCubeMars AKシリーズ(MITモード)へもそのまま
 指令できる。cubemars_joint_names等のパラメータで対象関節・device_id・
-モータ番号(0-3, ros2canのM1-M4に対応)を指定すると、ros2canのトピック規約
+モータ番号(0-3, ros2canのM1-M4に対応)・reduction(関節<->アクチュエータ軸の
+減速比、note/hardware_mapping.txt参照)を指定すると、ros2canのトピック規約
 (serial_tx_[ID] へInt16MultiArray(24スロット)をpublishすると外部指令として
 反映される。ros2can/ros2can/ros_backend.py参照)に従ってMIT指令フレームを
 毎周期publishする。device_id/motor_indexの対応は実機配線に依存するため、
@@ -27,6 +28,20 @@ MITモードの各スロットのスケールはros2can/firmware/xiao-esp32-s3_c
 cubemars.cppのコメントと一致させること
   (target: 0.1deg/LSB, mit_velocity: 0.01rad/s/LSB, mit_kp: 0.1/LSB,
    mit_kd: 0.01/LSB, mit_torque_ff: 0.01N・m/LSB)。
+target/mit_velocityはアクチュエータ軸(CubeMars本体側)の値であり、本ノード内部の
+self.pos_/self.vel_(関節角度)に cubemars_reduction を掛けて変換してから送信する
+(real_joint_bridge_nodeの joint = actuator / reduction の逆変換、2026-08-27修正)。
+また、最初の/joint_targets受信より前は serial_rx_[device_id]_unwrapped の実機
+帰還値でself.pos_を追従させ、起動直後の内部状態(0.0)と実機の実際の角度との
+ズレによる意図しない位置ジャンプを防ぐ(_on_cubemars_feedback参照)。
+
+root_theta_jointについては、/set_root_theta_origin(std_srvs/Trigger)サービスで
+CubeMars本体(AK40-10)へSet Origin(永久原点、フラッシュ保存)CANコマンドを送信できる
+(2026-08-27追加、control_mode=3、ros2can/firmware側の対応実装はcubemars.cpp参照)。
+呼び出すと数周期(ORIGIN_HOLD_CYCLES)だけ通常のMIT指令を止めてSET_ORIGINモードを
+送る。これにより実機エンコーダ自体の原点が電源off/onを跨いで保持されるため、
+real_joint_bridge_node側のroot_theta_offset_radによるソフトウェア補正は廃止した
+(note/hardware_mapping.txt参照)。
 
 /joint_targetsの送信元は自動(command_gui_node)とjoy_teleop_node(手動操作)の
 2系統があり、control_modeパラメータ('auto'/'manual'/'both')でどちらを受け付ける
@@ -34,6 +49,25 @@ cubemars.cppのコメントと一致させること
 送信元の判別にはJointStateメッセージのheader.frame_id('auto'または'manual'、
 未設定は'auto'扱い)を使う。台形速度プロファイルによる滑らかな追従はどちらの
 送信元でも同じロジックが適用される。
+
+z_joint/r_jointについても、実機のロボマス(M2006+C610、motor1/motor2の差動機構、
+note/hardware_mapping.txt参照)へMIT(位置PD制御)モードで同時に指令できる
+(2026-08-29追加、ros2canのMODE_ROBOMASにMITモードが実装されたことを受けて
+root_theta/tip_theta(CubeMars MIT)と対称的に追加)。robomas_device_id等の
+パラメータで有効化する(未設定=device_id0のデフォルトのままなら実機出力無効)。
+z/r(joint角度)はそれぞれ独立に台形プロファイルされた後、motor_mixer_nodeと
+同じ式(m1=(z+r)/(2*mix_k), m2=(z-r)/(2*mix_k))でmotor1/motor2側(アクチュエータ軸)
+へ変換してから送信する。位置フィードバックはCubeMars側と異なりロボマス内蔵の
+ロータエンコーダを基準に割り切る(z/rの真値である外付けAMTエンコーダとの
+バックラッシュ差分は無視する設計判断、note/hardware_mapping.txt参照)。
+
+homing_node(z/rの起動時ホーミング)は本ノードと同じdevice(robomas_device_id)へ
+独立に速度指令をpublishするため、ホーミング中に本ノードのMIT指令と衝突する。
+これを避けるため、pause_robomas_output/resume_robomas_output(std_srvs/Trigger)
+サービスを設け、ホーミング中は本ノード側のrobomas出力を丸ごと止められるように
+した(root_theta原点設定の_origin_pending_と同様、外部ノードから能動的に
+出力を止めるパターン)。homing_node側がstart_homing時にpause、
+stop_homing/完了/タイムアウト失敗時にresumeを呼ぶ。
 """
 import math
 
@@ -41,10 +75,28 @@ import rclpy
 from rcl_interfaces.msg import ParameterDescriptor, SetParametersResult
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Int16MultiArray
+from std_msgs.msg import Int16MultiArray, Int32MultiArray
+from std_srvs.srv import Trigger
 
 CUBEMARS_MODE_MIT = 2
+CUBEMARS_POSITION_SCALE_DEG = 0.1  # 帰還/MIT指令とも0.1deg/LSB(cubemars.cpp参照)
+CUBEMARS_MODE_SET_ORIGIN = 3  # ros2can/firmware/.../cubemars.cppのcontrol_mode enumと一致させること
+CUBEMARS_ORIGIN_MODE_PERMANENT = 1  # target流用: 0=一時原点/1=永久原点(フラッシュ保存)/2=デフォルト復元
 CUBEMARS_SLOT_COUNT = 24
+
+# ROBOMAS(z_joint/r_joint、motor1/motor2)のMITモード。cubemarsとスケールが異なる点に
+# 注意(robomas.cpp/config.hppのROBOMAS_MIT_*参照)。
+ROBOMAS_MODE_VELOCITY = 0
+ROBOMAS_MODE_MIT = 1
+ROBOMAS_MIT_POSITION_CMD_SCALE_DEG = 1.0     # 指令(target): 1deg/LSB(帰還よりだいぶ粗い、範囲確保のため)
+ROBOMAS_FEEDBACK_POSITION_SCALE_DEG = 0.1    # 帰還(angle): 0.1deg/LSB(cubemarsの帰還と同じ)
+ROBOMAS_SLOT_COUNT = 24
+
+# /set_root_theta_originサービス呼び出し後、Set Originコマンドの送信を保証するために
+# 通常のMIT指令を止めてSET_ORIGINモードを保持する周期数(update_rate_hzでの周期数)。
+# ros2can側firmwareは実際のCANコマンド送信をエッジ検出で1回だけ行うため、この間に
+# 少なくとも1回はcubemarsTask(200Hz)の処理サイクルへ届けば十分。
+ORIGIN_HOLD_CYCLES = 10
 
 INT16_MIN, INT16_MAX = -32768, 32767
 
@@ -122,6 +174,33 @@ class TrajectoryFollowerNode(Node):
         self.declare_parameter('cubemars_kp', [], dyn)
         self.declare_parameter('cubemars_kd', [], dyn)
         self.declare_parameter('cubemars_torque_ff', [], dyn)
+        # 関節角度[joint]とCubeMars本体(アクチュエータ軸)角度[actuator]の変換比:
+        # actuator_deg = joint_deg * reduction (real_joint_bridge_nodeの
+        # joint = actuator / reduction の逆)。note/hardware_mapping.txt参照。
+        self.declare_parameter('cubemars_reduction', [], dyn)
+
+        # 実機ROBOMAS(MITモード)への同時出力。z_joint/r_jointをmotor1/motor2へ
+        # 変換して送信する(cubemars_*と異なり対象がz/r固定のためスカラーパラメータ、
+        # モジュール先頭のROBOMAS_MIT_*スケール定数参照)。device_id=0(既定)は
+        # 実機出力無効を意味する(0は実在のCAN device_idとして使わない前提)。
+        self.declare_parameter('robomas_device_id', 0)
+        self.declare_parameter('robomas_motor1_index', 0)   # M1
+        self.declare_parameter('robomas_motor2_index', 1)   # M2
+        self.declare_parameter('robomas_kp', 0.0)
+        self.declare_parameter('robomas_kd', 0.0)
+        self.declare_parameter('robomas_current_ff', 0.0)
+        self.declare_parameter('robomas_z_joint', 'z_joint')
+        self.declare_parameter('robomas_r_joint', 'r_joint')
+        self.declare_parameter('robomas_mix_k', 0.5)
+        self.declare_parameter('robomas_pulley_pitch_diameter_mm', 22.92)
+        self.declare_parameter('robomas_motor1_sign', 1.0)
+        self.declare_parameter('robomas_motor2_sign', 1.0)
+        # homing_nodeがSetParametersで実行時に更新するランタイム専用オフセット
+        # (real_joint_bridge_nodeのz_offset_m/r_offset_mと同じ役割・符号規約を、
+        # 本ノード側のMIT指令生成用に別途持つ。real_joint_bridge_node.pyの
+        # z = mix_k*(m1+m2) + z_offset_m と揃えること)。
+        self.declare_parameter('robomas_z_offset_m', 0.0)
+        self.declare_parameter('robomas_r_offset_m', 0.0)
 
         self.joint_names_ = list(self.get_parameter('joint_names').value)
         max_vel = list(self.get_parameter('max_velocity').value)
@@ -145,6 +224,8 @@ class TrajectoryFollowerNode(Node):
         self.has_target_ = False
 
         self._setup_cubemars_outputs()
+        self._setup_robomas_outputs()
+        self.create_service(Trigger, 'set_root_theta_origin', self._on_set_root_theta_origin)
 
         # max_velocity/max_accelerationは起動時にself.max_vel_/max_accel_へ
         # 取り込んだ後は参照されないため、command_gui_node等がros2 param set(GUIの
@@ -165,7 +246,8 @@ class TrajectoryFollowerNode(Node):
         self.get_logger().info(
             f'trajectory_follower_node started: {input_topic} -> {output_topic} '
             f'(joints={self.joint_names_}, rate={update_rate_hz}Hz, '
-            f'control_mode={self.control_mode_}, cubemars_joints={list(self.cubemars_.keys())})')
+            f'control_mode={self.control_mode_}, cubemars_joints={list(self.cubemars_.keys())}, '
+            f'robomas_enabled={self.robomas_ is not None})')
 
     def _setup_cubemars_outputs(self):
         names = list(self.get_parameter('cubemars_joint_names').value)
@@ -174,11 +256,14 @@ class TrajectoryFollowerNode(Node):
         kp = list(self.get_parameter('cubemars_kp').value)
         kd = list(self.get_parameter('cubemars_kd').value)
         torque_ff = list(self.get_parameter('cubemars_torque_ff').value)
+        reduction = list(self.get_parameter('cubemars_reduction').value)
 
-        lengths = {len(names), len(device_ids), len(motor_indices), len(kp), len(kd), len(torque_ff)}
+        lengths = {len(names), len(device_ids), len(motor_indices), len(kp), len(kd), len(torque_ff),
+                   len(reduction)}
         if len(names) > 0 and lengths != {len(names)}:
             raise ValueError(
-                'cubemars_joint_names/device_ids/motor_indices/kp/kd/torque_ff must all have the same length')
+                'cubemars_joint_names/device_ids/motor_indices/kp/kd/torque_ff/reduction '
+                'must all have the same length')
         for name in names:
             if name not in self.joint_names_:
                 raise ValueError(f'cubemars_joint_names entry "{name}" is not in joint_names')
@@ -188,30 +273,145 @@ class TrajectoryFollowerNode(Node):
         self.cubemars_ = {}
         self.device_buffers_ = {}
         self.device_publishers_ = {}
-        for name, device_id, motor_index, kp_v, kd_v, tff_v in zip(
-                names, device_ids, motor_indices, kp, kd, torque_ff):
+        self.device_feedback_subs_ = {}
+        for name, device_id, motor_index, kp_v, kd_v, tff_v, red_v in zip(
+                names, device_ids, motor_indices, kp, kd, torque_ff, reduction):
             self.cubemars_[name] = {
                 'device_id': int(device_id),
                 'motor_index': int(motor_index),
                 'kp': float(kp_v),
                 'kd': float(kd_v),
                 'torque_ff': float(tff_v),
+                'reduction': float(red_v),
             }
             if device_id not in self.device_buffers_:
                 self.device_buffers_[device_id] = [0] * CUBEMARS_SLOT_COUNT
                 self.device_publishers_[device_id] = self.create_publisher(
                     Int16MultiArray, f'serial_tx_{device_id}', 10)
+                self.device_feedback_subs_[device_id] = self.create_subscription(
+                    Int32MultiArray, f'serial_rx_{device_id}_unwrapped',
+                    lambda msg, did=device_id: self._on_cubemars_feedback(msg, did), 10)
+
+        # /set_root_theta_originで起動した「原点設定モード保持」の残り周期数
+        # (関節名 -> 残りcycle数)。0または未登録なら通常のMIT指令を送る。
+        self._origin_pending_ = {}
+
+    def _on_cubemars_feedback(self, msg: Int32MultiArray, device_id: int):
+        # 最初の/joint_targets受信(has_target_=True)より前は、実機からの帰還値で
+        # self.pos_を追従させておく。これをしないとノード起動直後の内部状態(0.0)と
+        # 実機の実際の角度がズレたまま最初の目標へ台形プロファイルが走り、
+        # 実機側に意図しない大きな位置ジャンプ(Kp*(p_des-p)のステップ入力)が
+        # 発生する。目標を一度でも受け取ったら以後はプロファイル側の値を信用し、
+        # 帰還での上書きはしない。
+        if self.has_target_:
+            return
+        for name, cfg in self.cubemars_.items():
+            if cfg['device_id'] != device_id:
+                continue
+            raw_deg = msg.data[cfg['motor_index']] * CUBEMARS_POSITION_SCALE_DEG
+            joint_rad = math.radians(raw_deg) / cfg['reduction']
+            self.pos_[name] = joint_rad
+            self.vel_[name] = 0.0
+            self.target_[name] = joint_rad
+
+    def _setup_robomas_outputs(self):
+        device_id = int(self.get_parameter('robomas_device_id').value)
+        self.robomas_ = None
+        self.robomas_paused_ = False
+        if device_id == 0:
+            return
+
+        z_name = self.get_parameter('robomas_z_joint').value
+        r_name = self.get_parameter('robomas_r_joint').value
+        if z_name not in self.joint_names_ or r_name not in self.joint_names_:
+            raise ValueError('robomas_z_joint/robomas_r_joint must be in joint_names')
+
+        self.robomas_ = {
+            'device_id': device_id,
+            'motor1_index': int(self.get_parameter('robomas_motor1_index').value),
+            'motor2_index': int(self.get_parameter('robomas_motor2_index').value),
+            'kp': float(self.get_parameter('robomas_kp').value),
+            'kd': float(self.get_parameter('robomas_kd').value),
+            'current_ff': float(self.get_parameter('robomas_current_ff').value),
+            'z_joint': z_name,
+            'r_joint': r_name,
+            'mix_k': float(self.get_parameter('robomas_mix_k').value),
+            'pulley_radius_m': (float(self.get_parameter('robomas_pulley_pitch_diameter_mm').value)
+                                 / 2.0 / 1000.0),
+            'motor1_sign': float(self.get_parameter('robomas_motor1_sign').value),
+            'motor2_sign': float(self.get_parameter('robomas_motor2_sign').value),
+        }
+        self.robomas_pub_ = self.create_publisher(
+            Int16MultiArray, f'serial_tx_{device_id}', 10)
+        self.create_subscription(
+            Int32MultiArray, f'serial_rx_{device_id}_unwrapped', self._on_robomas_feedback, 10)
+        self.create_service(Trigger, 'pause_robomas_output', self._on_pause_robomas_output)
+        self.create_service(Trigger, 'resume_robomas_output', self._on_resume_robomas_output)
+
+    def _on_robomas_feedback(self, msg: Int32MultiArray):
+        # _on_cubemars_feedbackと同じ理由(起動直後の位置ジャンプ防止)。
+        # motor1/motor2の帰還(内蔵ロータエンコーダ基準)からz/rを合成して初期値とする。
+        # ただしmotor1/motor2は相対エンコーダのためホーミング未実施の間は無意味な
+        # 基準値になる点に注意(robomas_z_offset_m/r_offset_mはhoming_node完了後に
+        # SetParametersで反映される。ここでの初期値はホーミング前でも安全な
+        # 「現在のロータ位置をそのままz/rの原点とみなす」フォールバックでしかない)。
+        if self.has_target_ or self.robomas_ is None:
+            return
+        cfg = self.robomas_
+        m1_deg = msg.data[cfg['motor1_index']] * ROBOMAS_FEEDBACK_POSITION_SCALE_DEG
+        m2_deg = msg.data[cfg['motor2_index']] * ROBOMAS_FEEDBACK_POSITION_SCALE_DEG
+        m1 = cfg['motor1_sign'] * math.radians(m1_deg) * cfg['pulley_radius_m']
+        m2 = cfg['motor2_sign'] * math.radians(m2_deg) * cfg['pulley_radius_m']
+        z_offset = self.get_parameter('robomas_z_offset_m').value
+        r_offset = self.get_parameter('robomas_r_offset_m').value
+        z = cfg['mix_k'] * (m1 + m2) + z_offset
+        r = cfg['mix_k'] * (m1 - m2) + r_offset
+        for name, val in ((cfg['z_joint'], z), (cfg['r_joint'], r)):
+            self.pos_[name] = val
+            self.vel_[name] = 0.0
+            self.target_[name] = val
+
+    def _on_pause_robomas_output(self, request, response):
+        """homing_node等、robomas_device_idへ独立に指令を送る外部ノードのための
+        一時停止スイッチ。呼び出している間は_publish_robomas_commands()が
+        該当deviceへのpublish自体を丸ごとスキップする(target=0固定送信すらしない。
+        homing_node側が明示的に速度指令を出しているため)。"""
+        if self.robomas_ is None:
+            response.success = False
+            response.message = 'robomas_device_id未設定のため対象外です'
+            return response
+        self.robomas_paused_ = True
+        response.success = True
+        response.message = 'robomas出力を一時停止しました'
+        return response
+
+    def _on_resume_robomas_output(self, request, response):
+        if self.robomas_ is None:
+            response.success = False
+            response.message = 'robomas_device_id未設定のため対象外です'
+            return response
+        self.robomas_paused_ = False
+        response.success = True
+        response.message = 'robomas出力を再開しました'
+        return response
 
     def _on_set_parameters(self, params):
         # add_on_set_parameters_callbackに渡されるのはrclpy.parameter.Parameter
         # (Pythonラッパー)であり、.valueはParameterValueメッセージではなく
         # 素のPython値(list等)が直接入っている点に注意。
         n = len(self.joint_names_)
+        m = len(self.cubemars_)
+        cubemars_array_params = ('cubemars_kp', 'cubemars_kd', 'cubemars_torque_ff')
+        robomas_scalar_params = ('robomas_kp', 'robomas_kd', 'robomas_current_ff')
         for p in params:
             if p.name in ('max_velocity', 'max_acceleration') and len(p.value) != n:
                 return SetParametersResult(
                     successful=False,
                     reason=f'{p.name} must have {n} elements (one per joint_names entry)')
+            if p.name in cubemars_array_params and len(p.value) != m:
+                return SetParametersResult(
+                    successful=False,
+                    reason=f'{p.name} must have {m} elements (one per cubemars_joint_names entry)')
             if p.name == 'control_mode' and p.value not in VALID_CONTROL_MODES:
                 return SetParametersResult(
                     successful=False,
@@ -223,6 +423,21 @@ class TrajectoryFollowerNode(Node):
                 self.max_accel_ = dict(zip(self.joint_names_, p.value))
             elif p.name == 'control_mode':
                 self.control_mode_ = p.value
+            elif p.name in cubemars_array_params:
+                # cubemars_*系のKp/Kd/torque_ffは_setup_cubemars_outputs()実行時に
+                # self.cubemars_[name]へキャッシュされ、_publish_cubemars_commands()は
+                # そのキャッシュ値だけを参照する(毎周期get_parameterはしない)ため、
+                # set_parametersで変更した値を実際にMIT指令へ反映させるにはここで
+                # キャッシュ側も更新する必要がある(2026-08-27、GUIからのゲイン調整用に追加)。
+                key = {'cubemars_kp': 'kp', 'cubemars_kd': 'kd',
+                       'cubemars_torque_ff': 'torque_ff'}[p.name]
+                for name, v in zip(self.cubemars_.keys(), p.value):
+                    self.cubemars_[name][key] = float(v)
+            elif p.name in robomas_scalar_params and self.robomas_ is not None:
+                # robomas_*系も同じ理由(GUI/ros2 param setでのゲイン調整をキャッシュへ反映)。
+                key = {'robomas_kp': 'kp', 'robomas_kd': 'kd',
+                       'robomas_current_ff': 'current_ff'}[p.name]
+                self.robomas_[key] = float(p.value)
         return SetParametersResult(successful=True)
 
     def target_callback(self, msg: JointState):
@@ -253,6 +468,26 @@ class TrajectoryFollowerNode(Node):
 
         self.has_target_ = True
 
+    def _on_set_root_theta_origin(self, request, response):
+        """root_theta_jointのCubeMars本体(AK40-10)へSet Origin(永久原点、
+        フラッシュ保存)コマンドを送るようリクエストする。real_joint_bridge_node側の
+        root_theta_offset_radは廃止済みのため、この操作が実機の唯一の原点設定手段になる。
+        呼び出し前に関節を原点センサの位置(真の機械原点)へ物理的に合わせておくこと。
+        """
+        name = 'root_theta_joint'
+        cfg = self.cubemars_.get(name)
+        if cfg is None:
+            response.success = False
+            response.message = (
+                f'{name} はcubemars_joint_names未設定のため実機へSet Originを送信できません')
+            return response
+        self._origin_pending_[name] = ORIGIN_HOLD_CYCLES
+        response.success = True
+        response.message = (
+            f'{name}: CubeMars(device_id={cfg["device_id"]}, motor_index={cfg["motor_index"]})'
+            f'へSet Origin(永久原点)コマンドを送信します')
+        return response
+
     def timer_callback(self):
         if not self.has_target_:
             return
@@ -269,15 +504,27 @@ class TrajectoryFollowerNode(Node):
         self.pub_.publish(out)
 
         self._publish_cubemars_commands()
+        self._publish_robomas_commands()
 
     def _publish_cubemars_commands(self):
         for name, cfg in self.cubemars_.items():
             m = cfg['motor_index']
             buf = self.device_buffers_[cfg['device_id']]
-            pos_deg = math.degrees(self.pos_[name])
-            buf[m] = clamp_int16(pos_deg * 10.0)                    # target: 0.1deg/LSB
+
+            remaining = self._origin_pending_.get(name, 0)
+            if remaining > 0:
+                # Set Origin保持中はMIT指令を送らない(ros2can側cubemars.cppがtarget
+                # スロットをorigin_modeとして解釈するため、通常のtarget/kp/kd等は書かない)。
+                buf[m] = CUBEMARS_ORIGIN_MODE_PERMANENT
+                buf[4 + m] = CUBEMARS_MODE_SET_ORIGIN
+                self._origin_pending_[name] = remaining - 1
+                continue
+
+            actuator_deg = math.degrees(self.pos_[name]) * cfg['reduction']
+            buf[m] = clamp_int16(actuator_deg * 10.0)               # target: 0.1deg/LSB(アクチュエータ軸)
             buf[4 + m] = CUBEMARS_MODE_MIT
-            buf[8 + m] = clamp_int16(self.vel_[name] * 100.0)       # mit_velocity: 0.01rad/s/LSB
+            actuator_vel_radps = self.vel_[name] * cfg['reduction']
+            buf[8 + m] = clamp_int16(actuator_vel_radps * 100.0)    # mit_velocity: 0.01rad/s/LSB(アクチュエータ軸)
             buf[12 + m] = clamp_int16(cfg['kp'] * 10.0)             # mit_kp: 0.1/LSB
             buf[16 + m] = clamp_int16(cfg['kd'] * 100.0)            # mit_kd: 0.01/LSB
             buf[20 + m] = clamp_int16(cfg['torque_ff'] * 100.0)     # mit_torque_ff: 0.01N・m/LSB
@@ -286,6 +533,51 @@ class TrajectoryFollowerNode(Node):
             msg = Int16MultiArray()
             msg.data = list(buf)
             self.device_publishers_[device_id].publish(msg)
+
+    def _publish_robomas_commands(self):
+        if self.robomas_ is None or self.robomas_paused_:
+            # pause中はhoming_node等の外部ノードがrobomas_device_idを制御している間
+            # なので、target=0固定送信すら行わずpublish自体を完全にスキップする。
+            return
+        cfg = self.robomas_
+
+        z_offset = self.get_parameter('robomas_z_offset_m').value
+        r_offset = self.get_parameter('robomas_r_offset_m').value
+        # real_joint_bridge_nodeの z = mix_k*(m1+m2) + z_offset_m の逆変換
+        # (joint側の値からモータ側の生の変位を求めるため、ここではoffsetを引く)。
+        z = self.pos_[cfg['z_joint']] - z_offset
+        r = self.pos_[cfg['r_joint']] - r_offset
+        z_vel = self.vel_[cfg['z_joint']]
+        r_vel = self.vel_[cfg['r_joint']]
+
+        m1 = (z + r) / (2.0 * cfg['mix_k'])
+        m2 = (z - r) / (2.0 * cfg['mix_k'])
+        m1_vel = (z_vel + r_vel) / (2.0 * cfg['mix_k'])
+        m2_vel = (z_vel - r_vel) / (2.0 * cfg['mix_k'])
+
+        m1_deg = cfg['motor1_sign'] * math.degrees(m1 / cfg['pulley_radius_m'])
+        m2_deg = cfg['motor2_sign'] * math.degrees(m2 / cfg['pulley_radius_m'])
+        m1_rpm = cfg['motor1_sign'] * (m1_vel / cfg['pulley_radius_m']) * (60.0 / (2.0 * math.pi))
+        m2_rpm = cfg['motor2_sign'] * (m2_vel / cfg['pulley_radius_m']) * (60.0 / (2.0 * math.pi))
+
+        i1, i2 = cfg['motor1_index'], cfg['motor2_index']
+        buf = [0] * ROBOMAS_SLOT_COUNT
+        buf[i1] = clamp_int16(m1_deg * 1.0)          # target: 1deg/LSB(アクチュエータ軸)
+        buf[i2] = clamp_int16(m2_deg * 1.0)
+        buf[4 + i1] = ROBOMAS_MODE_MIT
+        buf[4 + i2] = ROBOMAS_MODE_MIT
+        buf[8 + i1] = clamp_int16(m1_rpm * 1.0)      # mit_velocity_ff: 1rpm/LSB
+        buf[8 + i2] = clamp_int16(m2_rpm * 1.0)
+        buf[12 + i1] = clamp_int16(cfg['kp'] * 1000.0)   # mit_kp: 0.001(A/deg)/LSB
+        buf[12 + i2] = clamp_int16(cfg['kp'] * 1000.0)
+        buf[16 + i1] = clamp_int16(cfg['kd'] * 10000.0)  # mit_kd: 0.0001(A/rpm)/LSB
+        buf[16 + i2] = clamp_int16(cfg['kd'] * 10000.0)
+        buf[20 + i1] = clamp_int16(cfg['current_ff'] * 1000.0)  # mit_current_ff: 0.001A/LSB
+        buf[20 + i2] = clamp_int16(cfg['current_ff'] * 1000.0)
+
+        msg = Int16MultiArray()
+        msg.data = buf
+        self.robomas_pub_.publish(msg)
 
 
 def main(args=None):

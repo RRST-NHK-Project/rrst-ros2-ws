@@ -42,6 +42,14 @@ ARM_LENGTH = 1.244
 Z_LOWER, Z_UPPER = 0.0, 0.432
 R_LOWER, R_UPPER = -ARM_LENGTH / 2.0, ARM_LENGTH / 2.0
 
+# root_theta: 実機CubeMars(MITモード)の指令可能範囲(±12.5rad、アクチュエータ軸)を
+# 外部減速比(112/24)で関節角度に変換した値。command_gui_node.pyのROOT_THETA_*、
+# soki_sim.urdf.xacroのroot_theta_limitと一致させること。note/hardware_mapping.txt
+# 参照(2026-08-27、z/rは元々クランプされていたがthetaだけ無制限だったため追加)。
+ROOT_THETA_REDUCTION = 112.0 / 24.0
+ROOT_THETA_LIMIT = 12.5 / ROOT_THETA_REDUCTION
+ROOT_THETA_LOWER, ROOT_THETA_UPPER = -ROOT_THETA_LIMIT, ROOT_THETA_LIMIT
+
 
 def clamp(value, lower, upper):
     return max(lower, min(upper, value))
@@ -164,7 +172,9 @@ class JoyTeleopNode(Node):
         # だけでpublishに含めない(離した位置を保持する。autoモードの動作を
         # 妨げず、モード切替時の急変も防ぐ)。
         if enabled and theta_in != 0.0:
-            self.target_theta_ += theta_in * self.theta_speed_ * self.dt_
+            self.target_theta_ = clamp(
+                self.target_theta_ + theta_in * self.theta_speed_ * self.dt_,
+                ROOT_THETA_LOWER, ROOT_THETA_UPPER)
             names.append('root_theta_joint')
             positions.append(self.target_theta_)
         elif self.has_current_state_:

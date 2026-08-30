@@ -1,0 +1,189 @@
+#soki 実機ハードウェア 減速比・伝達機構メモ (2026-08-27作成)
+関節角度の実機/sim校正(note/claude_task.txt参照)のための基礎データ。
+
+## root_theta_joint (旋回)
+CubeMars AK40-10 (Servo/MITモードで直接駆動、アクチュエータ内蔵クローズドループ)
++ 外部減速ギア追加あり。減速比 = 112/24 (= 14/3 ≒ 4.666667)
+  root_theta_joint角度 = AK40-10側のエンコーダ角度 / (112/24)
+  (AK40-10自体の内蔵ギア比は別途アクチュエータ仕様通り。ここでの112/24は
+   さらに外側に付いている減速ギアの比。2026-08-27、13と5/7(96/7)から変更)
+
+tip_theta_jointは root_theta_joint とは別方式: タイミングベルト+プーリで
+モーター側20T・手先側28T(減速比 = 28/20 = 1.4 = 7/5)。
+  tip_theta_joint角度 = AK40-10エンコーダ角度 / 1.4 ( = * 5/7 )
+
+## z_joint / r_joint (motor1/motor2差動、M2006+C610)
+位置の真値はC610/M2006内蔵ロータエンコーダのCAN帰還(ROBOMASのM{n} angle)ではなく、
+外付けAMTエンコーダ(ENC1/ENC2、CAN_HOST配下ノードのローカルチャンネル、
+note/can_mapping.txt参照)を使う。ロボマス(M2006)モーター軸 →
+プーリ(ピッチ円直径22.92mm、確認済み) → タイミングベルトで機構に接続。
+  pulley_radius = 22.92 / 2 = 11.46mm (ピッチ円直径なのでこれを直径として半分にする)
+  motor1_joint/motor2_joint(線形変位、m) = motor_angle[rad] * pulley_radius[m]
+    motor_angle[rad] = ENCカウント値 / エンコーダ分解能(CPR、要確認) * 2π
+この線形変位に対して、既存の差動ミキシング(soki_sim/scripts/motor_mixer_node.py)が
+そのまま適用される:
+  z = k*(m1+m2), r = k*(m1-m2), k = 0.5
+上下限の原点センサは合成後のz/r軸それぞれに付いている(motor1/motor2の
+個別軸ではない、確認済み)。相対エンコーダのため毎起動ホーミング必須
+(詳細はnote/claude_task.txt「実機とsimの関節角度校正」参照)。
+
+## ros2can CAN_ID・スロット割当 (note/can_mapping.txt記入済み、2026-08-27。
+## デバイスIDは実機再確認により修正済み)
+MODE_CUBEMARSデバイス (device_id=11):
+  M1 (CAN_ID=101) → root_theta_joint (絶対値エンコーダ、M{n} position帰還を使用)
+  M2 (CAN_ID=102) → tip_theta_joint  (同上)
+  M3/M4 → 未使用
+MODE_ROBOMASデバイス (device_id=21):
+  M1 (CAN_ID=0x201) → motor1_joint (速度指令用。位置の真値には使わない、上記参照)
+  M2 (CAN_ID=0x202) → motor2_joint (同上)
+  M3/M4 → 未使用
+CAN_HOSTデバイス (device_id=101、xiao_esp32_s3_smd_serial_bridge):
+  配下ノード(node_index、要確認)のENC1 → motor1_joint、ENC2 → motor2_joint
+  グローバルスロット = node_index*5 + {3:ENC1, 4:ENC2}
+
+CAN_HOSTのnode_index=1、外付けAMTエンコーダの分解能=2048CPRと判明済み
+(note/can_mapping.txt、real_joint_bridge.yamlに反映済み)。
+
+## root_theta/tip_thetaの原点初期化(θの「毎起動ホーミング」は不要な設計)
+z/rと違い、CubeMars AK40-10は絶対値エンコーダなので機構の原点自体は
+電源off/onを跨いで保持される。ただしros2canの/zero_channelはオフセットが
+GUIプロセスのメモリ上限りで永続化されない(ros2canプロセスの再起動だけで
+消える)ため、これに頼ると絶対値エンコーダの利点が活きない。
+
+**方針変更(2026-08-27、ユーザー判断)**: root_thetaはソフトウェアオフセット
+(root_theta_offset_rad)方式を廃止し、CubeMars AK40-10本体へ「Set Origin」CAN
+コマンド(Servo(CAN)モードcontrol_mode_id=5、永久原点=フラッシュ保存)を直接
+送信することで、実機エンコーダ自体の原点を較正する方式に変更した。
+  実装:
+  - ros2can/firmware/xiao-esp32-s3_can2io/src/cubemars.cpp:
+    control_mode=3(CUBEMARS_MODE_SET_ORIGIN)を新設。target[m]スロットを
+    origin_mode(0=一時原点/1=永久原点/2=デフォルト復元)として流用し、
+    CUBEMARS_CMD_SET_ORIGIN(=5)でCANへ送信する。フラッシュ書き込みを伴う
+    ため、mode=3が複数周期継続してもエッジ検出で1回だけ送信する。
+    ※ control_mode_id=5がAK Series Module Product Manual V3.2.0 4.1節の
+    実際の記載と一致するかは2026-08-27時点で未検証(RPM=3/POS=4の続き番号
+    として採用)。実機投入前にR-Link/マニュアルで要確認。
+  - soki_sim/scripts/trajectory_follower_node.py: /set_root_theta_origin
+    (std_srvs/Trigger)サービスを新設。呼び出すとroot_theta_jointについて
+    数周期だけ通常のMIT指令を止め、CUBEMARS_MODE_SET_ORIGIN+永久原点を送信する。
+  - soki_sim/scripts/real_joint_bridge_node.py: root_theta_offset_rad
+    (ソフトウェアオフセット補正)を削除。root_theta = raw_angle / reduction
+    のみとなった(motor側の原点が真の機械原点と一致している前提)。
+  較正手順(実機組み立て後に1回だけ): 関節を原点センサの位置(真の機械原点)へ
+  物理的に合わせ、/set_root_theta_originを呼び出す。以後はros2can・
+  real_joint_bridge_nodeの再起動、電源off/onを跨いでも再較正不要
+  (エンコーダ自体がズレない限り。フラッシュ保存のためros2can側の
+  プロセス再起動にも依存しない)。
+
+tip_thetaは引き続き従来方式のまま: real_joint_bridge_nodeがCubeMars側の
+_zeroedではなく_unwrapped(ラップアラウンド解決済みの生の絶対値)を購読し、
+real_joint_bridge.yamlのtip_theta_offset_rad(ノード側パラメータ、yamlに
+保存されるため永続)で真の原点とのズレを補正する。
+  較正手順(実機組み立て後に1回だけ): 関節を原点センサの位置(真の機械原点)へ
+  物理的に合わせ、その瞬間の_unwrapped値から逆算したoffsetをyamlへ書き込む。
+  以後はros2can・real_joint_bridge_nodeの再起動、電源off/onを跨いでも
+  再較正不要(エンコーダ自体がズレない限り)。
+z_joint/r_jointは元々毎起動homing_nodeが/zero_channelを呼ぶ設計なので、
+こちらはros2can側オフセットが非永続でも問題ない(むしろ意図通り)。
+
+## root_theta/tip_thetaはMITモードの都合上そもそも「continuous」ではない
+## (2026-08-27、AK Seriesマニュアル確認により判明。対応方針決定済み)
+claude.txt/soki_sim.urdf.xacroではroot_theta_joint(旋回)/tip_theta_joint
+(手先回転)を無制限回転可能なcontinuous関節として扱っているが、実際には
+MITモードのプロトコル仕様そのものにより可動域が制限される。
+
+CubeMars AK SeriesのMITモード位置指令(pos_des)は、ros2can側の実装
+(firmware/xiao-esp32-s3_can2io/src/config.hpp、CUBEMARS_MIT_P_MIN_RAD/
+MAX_RAD = ±12.5f)、およびマニュアル記載のParameter range表(AK40-10含む
+全モデル共通)の両方で ±12.5rad(=±716.2°)固定と確認済み。これはMIT
+Cheetah系アクチュエータ共通のプロトコル制約(16bit固定小数点で8byteに
+position/velocity/Kp/Kd/torqueを詰め込む都合)で、ros2can側の設定ミスでは
+ない。範囲外を指令してもcubemars.cppのfloatToUint()内でクランプされる
+(x = std::min(std::max(x, x_min), x_max))。
+外部減速比を通すと指令できる範囲は
+  root_theta_joint: ±716.2°/4.6667(=112/24) ≒ ±153.5°
+  tip_theta_joint : ±716.2°/1.4    ≒ ±511.6°(約1.4回転)
+と、いずれも1回転に満たない(root_theta)か1回転強(tip_theta)程度しかない。
+
+CubeMarsのServo(CAN)帰還フレームのposition値(int16・0.1deg/LSB)も
+AK Series Module Driver Manual V1.0.18 5.2.1節により有効範囲が
+-32000~32000(=±3200°、AK40-10出力軸換算で±8.89回転)止まりと判明して
+いたが、上記の指令側の制約(±52.2°/±511.6°)のほうがずっと狭いため、
+実際の可動域では帰還側の境界には到達しない(指令できる範囲の方が先に
+尽きるため)。よってposition帰還のクランプ/ラップ挙動そのものは実運用上
+問題にならない。
+
+**方針決定(2026-08-27、ユーザー判断)**: 上記の通りMITモードのままでは
+真の意味でのcontinuous回転は不可能。デッドレコニング(速度積算による
+連続絶対位置推定)やServo(CAN)モードへの制御方式変更は行わず、
+「一旦制限つきでよい、MITモードの可動域(root_theta:±153.5°、
+tip_theta:±511.6°)の中だけで動作すればよい」という前提で運用する。
+ros2can/real_joint_bridge_node.py側のコード変更は不要(既存のposition
+帰還ベースの実装のまま)。
+  将来もし真のcontinuous回転が必要になった場合の選択肢(未着手):
+  (a) Servo(CAN) Velocity Loop Mode(mode 3、指令範囲の制約なし)+
+      ホスト側(real_joint_bridge_node.py等)での位置制御ループを新規実装
+  (b) Servo(CAN) Position-Velocity Loop Mode(mode 6、指令範囲±36000°=
+      ±100回転)へ切替。MIT特有のKp/Kdによる柔らかい制御は失う。
+  いずれもMITモードからServo(CAN)モードへの制御方式変更が必要で、
+  現状は選択していない。
+
+## z_joint/r_jointのホーミング (homing_node、2026-08-27実装)
+z=k(m1+m2)/r=k(m1-m2)という合成後の量は、ros2canの/zero_channel(ENC単体を
+ゼロ化するだけ)では正しく較正できないため、root_theta/tip_thetaと同様に
+real_joint_bridge_node側のランタイムパラメータ(z_offset_m/r_offset_m、
+ただしこちらはyaml初期値ではなく毎起動homing_nodeが計算してSetParameters
+で書き込む値)で補正する方式にした。
+  手順: motor1/motor2を同方向に駆動しz軸原点センサ検出→z_offset_m算出
+        →続けて差動方向に駆動しr軸原点センサ検出→r_offset_m算出
+        →real_joint_bridge_nodeへSetParametersで反映
+  実装: soki_sim/scripts/homing_node.py。安全のため自動起動はせず、
+  start_homing/stop_homing(std_srvs/Trigger)サービスで明示的に起動・中断する。
+  パラメータはreal_joint_bridge.yamlのhoming_node以下。
+
+  skip_homing(std_srvs/Trigger、2026-08-29追加): 原点センサ配線・検出値が
+  未検証(下記「未確認事項」参照)なうちの代替手段。motor1/motor2を一切駆動せず、
+  呼び出し時点のエンコーダ値をそのままz_ref_value_m/r_ref_value_mの位置と
+  みなしてoffsetを即座に反映する。呼び出し前に機体を(joy等で手動操作して)
+  原点センサ位置相当へ物理的に合わせておく必要がある点はstart_homingの
+  実際の較正結果と変わらない(センサでの自動検出をスキップするだけ)。
+
+## z_joint/r_jointの実機出力(RoboMas MITモード) (2026-08-29追加)
+ros2canのMODE_ROBOMASにMITモード(位置PD制御、firmware/xiao-esp32-s3_can2io/src/
+robomas.cpp)が実装されたことを受け、root_theta/tip_theta(CubeMars MIT)と対称的に
+z_joint/r_jointもtrajectory_follower_nodeからMIT指令を送れるようにした
+(robomas_device_id等のパラメータで有効化。未設定時は従来通り実機出力無効)。
+
+  実装: soki_sim/scripts/trajectory_follower_node.py
+  - z/rは引き続きjoint単位で台形プロファイルし、送信直前にmotor_mixer_node.pyと
+    同じ式(m1=(z+r)/(2*mix_k), m2=(z-r)/(2*mix_k))でmotor1/motor2側
+    (アクチュエータ軸、プーリ半径換算)へ変換してから送信する。
+  - スケールはcubemarsと異なるので注意: 指令(target)は1deg/LSB(cubemarsの
+    0.1deg/LSBより粗い。範囲確保のため、robomas.cppのコメント参照)、帰還(angle)は
+    0.1deg/LSB(cubemarsと同じ)。mit_kp=0.001(A/deg)/LSB、mit_kd=0.0001(A/rpm)/LSB、
+    mit_current_ff=0.001A/LSB(config.hppのROBOMAS_MIT_*と一致させること)。
+  - 位置フィードバック基準はロボマス内蔵ロータエンコーダに割り切った
+    (root_theta/tip_thetaと同じ設計判断)。z/rの真値である外付けAMTエンコーダ
+    (ENC1/ENC2)との間のバックラッシュ差分は無視する。
+
+**homing_nodeとの排他制御**: homing_nodeは起動時ホーミング中、同じ
+robomas_device_idへ独立に速度指令をpublishするため、trajectory_follower_nodeの
+MIT指令と衝突する。これを避けるため、trajectory_follower_nodeに
+pause_robomas_output/resume_robomas_output(std_srvs/Trigger)を新設し、
+homing_nodeがstart_homing時にpause、stop_homing・完了・タイムアウト失敗時に
+resumeを呼ぶ「一時停止パターン」(root_theta origin設定の_origin_pending_と同種)
+で解決した。
+
+**offsetの二重管理**: z_offset_m/r_offset_m(homing_nodeが算出する原点補正値)は
+これまでreal_joint_bridge_node(sim表示用)のみに反映していたが、
+trajectory_follower_node(実機MIT指令用)も独自にz/rの内部状態を持つため、
+robomas_z_offset_m/robomas_r_offset_mという別パラメータ名でこちらにも
+SetParametersするようhoming_node._apply_offsets()を拡張した。値・符号規約
+(z = mix_k*(m1+m2) + offset)はreal_joint_bridge_nodeと揃えてある。
+
+## 未確認事項 (2026-08-27時点)
+- root_theta/tip_thetaの原点センサの物理位置(真の機械原点との対応)
+  → 上記較正手順を実施する際に確定させる
+- homing_nodeが仮定しているz/r原点センサのSWチャンネル配線、センサ検出時の
+  真のz/r値、モータ回転符号とz/r移動方向の対応(note/can_mapping.txt
+  「z/r原点センサ(ホーミング用)」に記入欄あり、実機で要検証)

@@ -28,12 +28,16 @@ ament_target_dependencies(angle_gm rclcpp std_msgs sensor_msgs geometry_msgs com
 add_executable(ros2can_practice src/ros2can_practice.cpp)
 ament_target_dependencies(ros2can_practice common rclcpp std_msgs sensor_msgs)
 
+add_executable(soki_hand src/soki_hand.cpp)
+ament_target_dependencies(soki_hand rclcpp std_msgs sensor_msgs)
+
 # インストール設定
 install(TARGETS
   welcome
   angle
   angle_gm
   ros2can_practice
+  soki_hand
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)

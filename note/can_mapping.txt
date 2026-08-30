@@ -1,0 +1,97 @@
+#soki ros2can CAN_ID・スロット割当メモ (テンプレート、記入待ち 2026-08-27作成)
+実機とsimの関節角度校正(note/claude_task.txt参照)に必要。ros2can GUIの
+デバイス一覧・Monitorタブを見ながら埋めてください。
+
+参照コード:
+  ros2can/ros2can/device_profiles.py (make_cubemars_profile/make_robomas_profile、
+    M1〜M4のスロット定義)
+  ros2can/firmware/xiao-esp32-s3_can2io/src/config.hpp (CAN_ID、CUBEMARS_MOTOR_ID_1〜4)
+  ros2can/firmware/xiao-esp32-s3_can2io/src/robomas.cpp (ロボマスのCAN_ID帯:
+    C610/C620は0x201〜0x204、GM6020は0x205〜0x208。M{n}スロット = ID順で対応)
+
+## MODE_CUBEMARS デバイス (root_theta_joint / tip_theta_joint用)
+device_id (ros2can GUIのデバイス一覧に出る番号、= このボード自身のCAN_ID):
+  →11
+
+各M{n}スロット(config.hppのCUBEMARS_MOTOR_ID_n、デフォルト101/102/103/104)が
+実際にどの関節のCubeMarsモータに配線されているか:
+  M1 (デフォルトCAN_ID=101) → 対応関節:根本θ
+  M2 (デフォルトCAN_ID=102) → 対応関節:手先θ
+  M3 (デフォルトCAN_ID=103) → 対応関節:未使用
+  M4 (デフォルトCAN_ID=104) → 対応関節:未使用
+
+## MODE_ROBOMAS デバイス (motor1_joint / motor2_joint用)
+device_id (ros2can GUIのデバイス一覧に出る番号、= このボード自身のCAN_ID):
+  →　21
+
+各M{n}スロットが実際にどちらのロボマスモータ(motor1/motor2)に対応するか
+(CAN_ID自体はC610本体のID設定スイッチで決まり、0x201=M1, 0x202=M2, ...):
+  M1 (CAN_ID=0x201) → 対応: motor1_joint
+  M2 (CAN_ID=0x202) → 対応: motor2_joint
+  M3 (CAN_ID=0x203) → 対応: 未使用
+  M4 (CAN_ID=0x204) → 対応: 未使用
+
+## 外付けAMTエンコーダ (ENC1/ENC2、z_joint/r_joint用、ROBOMASのCAN帰還とは別物)
+MODE_ROBOMASのM{n} angleはC610/M2006内蔵ロータエンコーダのCAN帰還値であり、
+これとは別に外付けAMTエンコーダが存在する場合、device_profiles.pyの
+ENC1/ENC2チャンネル(MODE_CAN/MODE_CAN_HOST/MODE_IOの汎用IOノード側)経由に
+なるはず。以下を記入:
+
+device_id (このENC1/ENC2を持つCAN_HOSTボードの番号):
+  → 101
+  ※ENC1/ENC2はCAN_HOST自身の直下スロットではなく、配下の「ノード」の
+    ローカルスロット(帰還: 0=SW1,1=SW2,2=SW3,3=ENC1,4=ENC2、
+    device_profiles.py _append_generic_io_node_channels参照)。
+    グローバルスロット index = node_index*slots_per_node(既定5) + local_index
+    (例: node_index=0なら ENC1=slot3, ENC2=slot4。node_index=1ならENC1=slot8, ENC2=slot9)
+
+node_index (ENC1/ENC2がぶら下がっているノード番号、0-origin。
+ros2can GUIの当該ノード欄の「N{node_no}」表示で確認、node_no = node_index+1):
+  → 1
+
+ENC1/ENC2はそれぞれ何を測っているか(どちらか一方に◯、または直接記述):
+  (o) motor1_joint/motor2_joint軸(差動ミキシング前、モータ/プーリ軸の回転)
+  (x) z_joint/r_joint軸そのもの(ミキシング後、直動部に直接取付、リニアor別ロータリー)
+
+  ENC1 → 対応軸:motor1_joint
+  ENC2 → 対応軸:motor2_joint
+
+エンコーダ分解能(1回転あたりのカウント数、CPR/PPR。AMT系はDIPスイッチ設定値):
+  →2048
+
+上記が「z_joint/r_joint軸そのもの」の場合、カウント→距離[m]の換算係数
+(1カウントあたりの移動量、またはエンコーダ分解能とねじリード/プーリ径等の元情報):
+  →
+
+## z/r原点センサ (ホーミング用、homing_node) 2026-08-27追加
+上限・下限それぞれの原点センサは合成後のz軸/r軸に1個ずつ(motor1/motor2の
+個別軸ではない、確認済み)という前提で、homing_node.pyは以下を仮定して
+実装している。違っていたら修正するか、soki_sim/config/real_joint_bridge.yamlの
+homing_node以下を直接編集すること。
+
+z軸原点センサはCAN_HOSTのどのノード・どのSWチャンネルか
+(現状の仮定: ENC1/ENC2と同じnode_index=1のSW1):
+  node_index →1
+  local_index(SW1=0/SW2=1/SW3=2) →1
+
+r軸原点センサ(現状の仮定: 同じくnode_index=1のSW2):
+  node_index →1
+  local_index →2
+
+センサ検出時のスイッチ値(現状の仮定: 1=検出、pin_ctrl_task.cppの
+!digitalRead()相当。実機で違えば0に):
+  →1
+
+原点センサ位置での真のz_joint/r_joint値(m。soki_sim.urdf.xacroのz_joint
+可動域0.0~0.432、r_joint可動域-0.622~0.622を参照して、センサが実際に
+どちらの端に付いているか実測):
+  z_ref_value_m →
+  r_ref_value_m →
+
+motor1/motor2の速度指令符号とz/r移動方向の対応(実機で低速から試して
+向きを確認、逆なら符号を反転):
+  z軸方向へ動かす時のmotor1/motor2の回転符号(同方向のはず) →
+  r軸方向へ動かす時のmotor1/motor2の回転符号(逆方向のはず) →
+
+## 備考・その他気づいた点
+(自由記入)

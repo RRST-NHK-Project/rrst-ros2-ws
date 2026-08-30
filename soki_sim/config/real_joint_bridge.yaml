@@ -1,0 +1,87 @@
+# real_joint_bridge_node のパラメータ。
+# 実機の数値が変わった/確認が取れた場合は、コードではなくこのファイルを編集すること。
+# 各値の根拠はnote/hardware_mapping.txt・note/can_mapping.txt参照。
+real_joint_bridge_node:
+  ros__parameters:
+    # ---- CubeMars (root_theta_joint / tip_theta_joint) ----
+    cubemars_device_id: 11
+    cubemars_root_theta_index: 0   # M1
+    cubemars_tip_theta_index: 1    # M2
+    cubemars_position_scale_deg: 0.1
+    root_theta_reduction: 4.666666666666667   # 112/24 (= 14/3)
+    tip_theta_reduction: 1.4                  # 28T/20T
+    root_theta_sign: 1.0
+    tip_theta_sign: 1.0
+    # root_theta_offset_radは廃止(2026-08-27)。CubeMars本体へSet Originコマンドを
+    # 送ることで実機エンコーダ自体の原点を永続化する方式に変更した
+    # (trajectory_follower_nodeの/set_root_theta_originサービス、note/hardware_mapping.txt参照)。
+    tip_theta_offset_rad: 0.0   # 要初回較正: 原点センサ位置での_unwrapped値から逆算して設定
+
+    # ---- CAN_HOST配下ノードのENC1/ENC2 (motor1_joint / motor2_joint) ----
+    can_host_device_id: 101
+    can_host_node_index: 1    # 確認済み(note/can_mapping.txt)
+    can_host_slots_per_node: 5
+    enc1_local_index: 3
+    enc2_local_index: 4
+    enc1_is_motor1: true      # 記入済み: ENC1=motor1_joint, ENC2=motor2_joint
+    motor_encoder_counts_per_rev: 2048.0  # 確認済み(note/can_mapping.txt)
+    pulley_pitch_diameter_mm: 22.92        # 確認済み(ピッチ円直径)
+    mix_k: 0.5
+    motor1_sign: 1.0
+    motor2_sign: 1.0
+
+    # z_offset_m/r_offset_mはhoming_nodeが起動時にSetParametersで書き込む
+    # ランタイム専用値。ここでの初期値(0.0)はホーミング未実施時の値。
+    z_offset_m: 0.0
+    r_offset_m: 0.0
+
+    # ---- 出力joint名・トピック ----
+    root_theta_joint: root_theta_joint
+    tip_theta_joint: tip_theta_joint
+    z_joint: z_joint
+    r_joint: r_joint
+    output_topic: mixed_joint_states
+
+# homing_node のパラメータ。CAN_HOST/ENC/プーリー関連はreal_joint_bridge_nodeと
+# 値を一致させること(重複管理、根拠はnote/hardware_mapping.txt参照)。
+homing_node:
+  ros__parameters:
+    can_host_device_id: 101
+    can_host_node_index: 1
+    can_host_slots_per_node: 5
+    enc1_local_index: 3
+    enc2_local_index: 4
+    enc1_is_motor1: true
+    motor_encoder_counts_per_rev: 2048.0
+    pulley_pitch_diameter_mm: 22.92
+    mix_k: 0.5
+    motor1_sign: 1.0
+    motor2_sign: 1.0
+
+    # 要確認(note/can_mapping.txt「z/r原点センサ(ホーミング用)」): z軸/r軸の
+    # 原点センサがCAN_HOSTのどのノード・どのSWチャンネルに配線されているか。
+    # 現状はENC1/ENC2と同じノード(node_index=1)のSW1/SW2という仮定。
+    z_limit_switch_node_index: 1
+    z_limit_switch_local_index: 0   # SW1
+    r_limit_switch_node_index: 1
+    r_limit_switch_local_index: 1   # SW2
+    switch_triggered_value: 1        # firmwareの!digitalRead()相当(要確認)
+
+    robomas_device_id: 21
+    robomas_motor1_slot: 0   # M1 target_velocity
+    robomas_motor2_slot: 1   # M2 target_velocity
+
+    # 要実機調整。低速・短めのタイムアウトから試すこと。
+    homing_velocity_rpm: 30.0
+    homing_timeout_sec: 20.0
+    # 要実機調整: どちらの符号で回すとz/rのどちら向きに動くか
+    z_home_motor1_vel_sign: -1.0
+    z_home_motor2_vel_sign: -1.0
+    r_home_motor1_vel_sign: 1.0
+    r_home_motor2_vel_sign: -1.0
+    # 要実測: 原点センサトリガー位置での真のz/r値(z_joint/r_jointの単位、m)
+    z_ref_value_m: 0.0
+    r_ref_value_m: 0.0
+
+    bridge_node_name: real_joint_bridge_node
+    control_period_sec: 0.05
