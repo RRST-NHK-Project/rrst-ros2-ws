@@ -1,0 +1,156 @@
+/* soki_sim command GUI: モダンダークテーマ (Fusionスタイルと併用) */
+
+QWidget {
+    background-color: #2b2d31;
+    color: #e3e5e8;
+    font-size: 10pt;
+}
+
+QToolTip {
+    background-color: #1e1f22;
+    color: #e3e5e8;
+    border: 1px solid #4a90d9;
+}
+
+QGroupBox {
+    border: 1px solid #44464b;
+    border-radius: 6px;
+    margin-top: 12px;
+    padding-top: 10px;
+    font-weight: bold;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 8px;
+    padding: 0 4px;
+    color: #9aa0a6;
+}
+
+QTabWidget::pane {
+    border: 1px solid #44464b;
+    border-radius: 6px;
+    top: -1px;
+}
+
+QTabBar::tab {
+    background: #35373c;
+    color: #c7c9cc;
+    padding: 6px 16px;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+}
+
+QTabBar::tab:selected {
+    background: #4a90d9;
+    color: white;
+}
+
+QTabBar::tab:!selected:hover {
+    background: #3f4147;
+}
+
+QLineEdit, QListWidget {
+    background-color: #1e1f22;
+    border: 1px solid #44464b;
+    border-radius: 4px;
+    padding: 3px 6px;
+    color: #e3e5e8;
+    selection-background-color: #4a90d9;
+}
+
+QLineEdit:focus {
+    border: 1px solid #4a90d9;
+}
+
+QListWidget::item:selected {
+    background-color: #4a90d9;
+    color: white;
+}
+
+QPushButton {
+    background-color: #3a3d42;
+    border: 1px solid #4a4d52;
+    border-radius: 5px;
+    padding: 5px 12px;
+    color: #e3e5e8;
+}
+
+QPushButton:hover {
+    background-color: #45484e;
+}
+
+QPushButton:pressed {
+    background-color: #2f3136;
+}
+
+QPushButton[variant="primary"] {
+    background-color: #4a90d9;
+    border: 1px solid #3a78bd;
+    color: white;
+    font-weight: bold;
+}
+
+QPushButton[variant="primary"]:hover {
+    background-color: #5aa0e6;
+}
+
+QPushButton[variant="primary"]:pressed {
+    background-color: #3a78bd;
+}
+
+QPushButton[variant="danger"] {
+    background-color: #d9534f;
+    border: 1px solid #b8433f;
+    color: white;
+    font-weight: bold;
+}
+
+QPushButton[variant="danger"]:hover {
+    background-color: #e2635f;
+}
+
+QPushButton[variant="danger"]:pressed {
+    background-color: #b8433f;
+}
+
+QScrollArea {
+    border: none;
+}
+
+QScrollBar:vertical {
+    background: #2b2d31;
+    width: 12px;
+}
+
+QScrollBar::handle:vertical {
+    background: #4a4d52;
+    border-radius: 5px;
+    min-height: 24px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #5a5d63;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0;
+}
+
+QSlider::groove:vertical {
+    background: #1e1f22;
+    width: 6px;
+    border-radius: 3px;
+}
+
+QSlider::handle:vertical {
+    background: #4a90d9;
+    height: 14px;
+    margin: 0 -6px;
+    border-radius: 7px;
+}
+
+QRadioButton::indicator {
+    width: 14px;
+    height: 14px;
+}

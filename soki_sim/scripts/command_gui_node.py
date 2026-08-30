@@ -33,20 +33,20 @@ control_modeは'auto'(本GUIのみ)/'manual'(joy_teleop_nodeのみ)/'both'(併�
 3値で、「動作モード」パネルのラジオボタンから即座に切り替えられる。手動操作に
 切り替えた後で再び本GUIから送信する際は、意図しないジャンプを避けるため
 「現在位置を目標にコピー」ボタンで目標欄を実際の現在位置に合わせてから送信すること。
-購読・サービス呼び出しの処理にはspinが必要なため、Tkinterのafter()による定期
-ポーリングループの中でrclpy.spin_once(timeout_sec=0)を呼び出す(mainloopと
-同じメインスレッドで完結させるシングルスレッド構成。executorを別スレッドで
-回す構成も試したが、このROS 2 Jazzy環境ではサービスクライアントを使った
-場合にプロセス終了時のrmw層クリーンアップがスレッド競合でAborted(core dumped)
-になることを確認したため採用しなかった)。
+購読・サービス呼び出しの処理にはspinが必要なため、QTimerによる定期ポーリング
+ループの中でrclpy.spin_once(timeout_sec=0)を呼び出す(Qtのイベントループ
+(QApplication.exec_())と同じメインスレッドで完結させるシングルスレッド構成。
+executorを別スレッドで回す構成も試したが、このROS 2 Jazzy環境ではサービス
+クライアントを使った場合にプロセス終了時のrmw層クリーンアップがスレッド競合で
+Aborted(core dumped)になることを確認したため採用しなかった。Tkinter版から
+PyQt5化した際もこの制約は変わらないため、QTimerもGUIメインスレッドで回す)。
 
-tkinterが必要(未インストールの場合: sudo apt install python3-tk)。
+PyQt5が必要(未インストールの場合: sudo apt install python3-pyqt5)。
 """
 import json
 import math
 import os
-import tkinter as tk
-from tkinter import messagebox, simpledialog, ttk
+import sys
 
 from ament_index_python.packages import get_package_share_directory, PackageNotFoundError
 
@@ -56,6 +56,14 @@ from rcl_interfaces.srv import GetParameters, SetParameters
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_srvs.srv import Trigger
+
+from PyQt5.QtCore import Qt, QPointF, QTimer
+from PyQt5.QtGui import QColor, QDoubleValidator, QIcon, QPainter, QPen, QPixmap
+from PyQt5.QtWidgets import (
+    QApplication, QButtonGroup, QGridLayout, QGroupBox, QHBoxLayout,
+    QInputDialog, QLabel, QLineEdit, QListWidget, QMessageBox, QPushButton,
+    QRadioButton, QScrollArea, QSlider, QTabWidget, QVBoxLayout, QWidget,
+)
 
 # soki_sim.urdf.xacro の寸法定数と一致させること
 BASE_HEIGHT = 0.06
@@ -175,24 +183,151 @@ def joint_to_xyz(theta, zj, r):
     return x, y, z
 
 
-def _load_soki_logo_image(target_height: int):
-    """ros2can/resources/soki_logo.png と同じ画像(soki_sim/resources/soki_logo.png、
-    CMakeLists.txtでインストール)を読み込む。PIL非依存(python3-tk同梱の
-    tk.PhotoImageのみ、subsampleで整数倍率縮小)なのでtarget_heightちょうどには
-    ならない(近い倍率に丸める)。読めない場合はNoneを返す(ロゴ無しでも動作継続)。"""
+def _resource_path(filename):
+    """soki_sim/resources/配下のファイルパスを解決する(CMakeLists.txtでインストール
+    済み)。パッケージ/ファイルが見つからない場合はNoneを返す。"""
     try:
         share_dir = get_package_share_directory('soki_sim')
     except PackageNotFoundError:
         return None
-    path = os.path.join(share_dir, 'resources', 'soki_logo.png')
-    if not os.path.isfile(path):
+    path = os.path.join(share_dir, 'resources', filename)
+    return path if os.path.isfile(path) else None
+
+
+def _load_soki_logo_image(target_height: int):
+    """soki_sim/resources/soki_logo.pngを読み込み、指定の高さに縮小して返す。
+    読めない場合はNoneを返す(ロゴ無しでも動作継続)。"""
+    path = _resource_path('soki_logo.png')
+    if path is None:
         return None
+    pixmap = QPixmap(path)
+    if pixmap.isNull():
+        return None
+    return pixmap.scaledToHeight(target_height, Qt.SmoothTransformation)
+
+
+def _load_stylesheet():
+    """soki_sim/resources/style.qss(モダンダークテーマ)を読み込む。読めない場合は
+    空文字を返す(Fusionスタイルのみで動作継続)。"""
+    path = _resource_path('style.qss')
+    if path is None:
+        return ''
     try:
-        image = tk.PhotoImage(file=path)
-    except tk.TclError:
-        return None
-    factor = max(1, round(image.height() / target_height))
-    return image.subsample(factor, factor)
+        with open(path, 'r', encoding='utf-8') as f:
+            return f.read()
+    except OSError:
+        return ''
+
+
+_ROLE_COLORS = {
+    'info': '#5aa9e6',
+    'success': '#57c278',
+    'error': '#f2545b',
+    'muted': '#9aa0a6',
+}
+
+
+def _set_status(label: QLabel, text: str, role: str = 'muted'):
+    """ステータス表示用QLabelのテキストと色をまとめて設定する(Tkinter版のfg=動的
+    変更に相当)。"""
+    label.setText(text)
+    label.setStyleSheet(f'color: {_ROLE_COLORS[role]};')
+
+
+def make_float_edit(initial: float, width: int = 80) -> QLineEdit:
+    """数値入力用QLineEdit(Tkinter版のtk.Entry+DoubleVarに相当)を生成する。"""
+    edit = QLineEdit()
+    edit.setValidator(QDoubleValidator(-1.0e6, 1.0e6, 6))
+    edit.setMaximumWidth(width)
+    set_float(edit, initial)
+    return edit
+
+
+def get_float(edit: QLineEdit) -> float:
+    """QLineEditの内容をfloatとして取得する。数値でない場合はValueErrorを送出する
+    (Tkinter版のDoubleVar.get()がtk.TclErrorを送出するのに相当)。"""
+    text = edit.text().strip()
+    if text in ('', '-', '.', '-.'):
+        raise ValueError(text)
+    return float(text)
+
+
+def set_float(edit: QLineEdit, value: float):
+    edit.setText(f'{value:.6g}')
+
+
+class XYPlaneWidget(QWidget):
+    """XY平面クリックウィジェット。Tkinter版のtk.Canvas(円クリック・ピン表示・
+    現在位置マーカー)をQPainterによる自前描画で置き換えたもの。クリックされた
+    ワールド座標をon_clickコールバックへそのまま渡す(可動域クランプは呼び出し側
+    (CommandGuiApp._on_canvas_click)の責務)。"""
+
+    def __init__(self, size: int, max_radius: float, margin: int, on_click, parent=None):
+        super().__init__(parent)
+        self._max_radius = max_radius
+        self._margin = margin
+        self._on_click = on_click
+        self._pin = None
+        self._current = None
+        self.setFixedSize(size, size)
+        self.setStyleSheet('background-color: #f5f5f5; border: 1px solid #555;')
+
+    def set_pin(self, x: float, y: float):
+        self._pin = (x, y)
+        self.update()
+
+    def set_current(self, x: float, y: float):
+        self._current = (x, y)
+        self.update()
+
+    def _scale(self) -> float:
+        return (self.width() / 2.0 - self._margin) / self._max_radius
+
+    def world_to_widget(self, x: float, y: float):
+        c = self.width() / 2.0
+        s = self._scale()
+        return c + x * s, c - y * s
+
+    def widget_to_world(self, px: float, py: float):
+        c = self.width() / 2.0
+        s = self._scale()
+        return (px - c) / s, (c - py) / s
+
+    def mousePressEvent(self, event):
+        x, y = self.widget_to_world(event.pos().x(), event.pos().y())
+        self._on_click(x, y)
+
+    def paintEvent(self, _event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        c = self.width() / 2.0
+
+        painter.setPen(QColor('#cccccc'))
+        painter.drawLine(0, int(c), self.width(), int(c))
+        painter.drawLine(int(c), 0, int(c), self.height())
+
+        px_radius = self._scale() * self._max_radius
+        painter.setPen(QPen(QColor('#4a90d9'), 1, Qt.DashLine))
+        painter.drawEllipse(QPointF(c, c), px_radius, px_radius)
+
+        painter.setPen(QColor('#888888'))
+        painter.drawText(int(c) - 44, 14, 'Y+ (ワーク側)')
+        painter.drawText(int(c) - 44, self.height() - 6, 'Y- (機体後方)')
+        painter.drawText(self.width() - 28, int(c), 'X+')
+        painter.drawText(8, int(c), 'X-')
+        painter.drawText(int(c) + 10, int(c) + 16, '機体')
+
+        if self._current is not None:
+            cx, cy = self.world_to_widget(*self._current)
+            painter.setPen(QPen(QColor('#1a7a1a'), 2))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawEllipse(QPointF(cx, cy), 5, 5)
+
+        if self._pin is not None:
+            cx, cy = self.world_to_widget(*self._pin)
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QColor('red'))
+            painter.drawEllipse(QPointF(cx, cy), 5, 5)
 
 
 class CommandGuiNode(Node):
@@ -254,7 +389,7 @@ class CommandGuiNode(Node):
         非同期取得する。
 
         on_success({name: value})/on_failure(str)は、後続のrclpy.spin_once()
-        呼び出し中(Tkinterのafter()ループと同じメインスレッド)に呼ばれる。"""
+        呼び出し中(QTimerのタイムアウトループと同じメインスレッド)に呼ばれる。"""
         get_cli, _ = self._param_clients[target_node]
         if not get_cli.service_is_ready():
             return False
@@ -288,7 +423,7 @@ class CommandGuiNode(Node):
         """values: {name: [float,...] または float またはstr} をtarget_nodeへ非同期set。
 
         on_done(list[SetParametersResult] または None)は、後続のrclpy.spin_once()
-        呼び出し中(Tkinterのafter()ループと同じメインスレッド)に呼ばれる。"""
+        呼び出し中(QTimerのタイムアウトループと同じメインスレッド)に呼ばれる。"""
         _, set_cli = self._param_clients[target_node]
         if not set_cli.service_is_ready():
             return False
@@ -320,7 +455,7 @@ class CommandGuiNode(Node):
         """std_srvs/Trigger型のサービス(/set_root_theta_origin等)を非同期呼び出しする。
 
         on_done(success: bool, message: str)は、後続のrclpy.spin_once()呼び出し中
-        (Tkinterのafter()ループと同じメインスレッド)に呼ばれる。サービス未起動の
+        (QTimerのタイムアウトループと同じメインスレッド)に呼ばれる。サービス未起動の
         場合は即座にon_done(False, ...)を呼んでFalseを返す。"""
         client = self._trigger_clients.get(service_name)
         if client is None:
@@ -343,142 +478,201 @@ class CommandGuiNode(Node):
         return True
 
 
-class CommandGuiApp(tk.Tk):
-    CANVAS_SIZE = 440
-    MARGIN = 20
+class CommandGuiApp(QWidget):
+    CANVAS_SIZE = 320
+    MARGIN = 16
+    Z_SLIDER_SCALE = 1000  # QSliderは整数値のみのため、mm単位の整数で表現する
 
     def __init__(self, node: CommandGuiNode):
         super().__init__()
         self.node = node
-        self.title('soki_sim command GUI')
+        self.setWindowTitle('soki_sim command GUI')
+
+        icon_pixmap = _load_soki_logo_image(target_height=64)
+        if icon_pixmap is not None:
+            self.setWindowIcon(QIcon(icon_pixmap))
 
         self.points = self._load_points()
+        self._traj_joint_names = list(JOINT_NAMES)
+        self._mit_joint_names = []
+        self._mode_buttons = {}
 
-        self.x_var = tk.DoubleVar(value=MAX_RADIUS / 2.0)
-        self.y_var = tk.DoubleVar(value=0.0)
-        self.z_var = tk.DoubleVar(value=(WORLD_Z_LOWER + WORLD_Z_UPPER) / 2.0)
-        self.step_var = tk.DoubleVar(value=0.01)
+        self.x_edit = make_float_edit(MAX_RADIUS / 2.0)
+        self.y_edit = make_float_edit(0.0)
+        self.z_edit = make_float_edit((WORLD_Z_LOWER + WORLD_Z_UPPER) / 2.0)
+        self.step_edit = make_float_edit(0.01, width=60)
 
-        self._build_widgets()
-        # trace_addは_build_widgets()より後で登録すること: 先に登録すると、
-        # coord_frameのEntry(textvariable=x_var等)を生成した時点でTkinterが
-        # 変数の書き込みイベントを発生させ、_redraw_pin->_update_statusが
-        # self.status_label作成(_build_widgets()の終盤)より前に呼ばれてしまう。
-        for var in (self.x_var, self.y_var, self.z_var):
-            var.trace_add('write', lambda *_: self._redraw_pin())
-        self._redraw_pin()
-        self._refresh_point_list()
-        self.after(50, self._spin_ros)
+        root_layout = QVBoxLayout(self)
+        root_layout.setContentsMargins(8, 8, 8, 8)
 
-    # ---------- widgets ----------
-    def _build_widgets(self):
         # パラメータパネル(統合操作タブ)が増えるにつれ縦に伸び、ワーク/シューティング
         # ボックスのボタン(元はマニュアル操作タブ側)が画面外に押し出される問題が
-        # 起きたため、ttk.Notebookで「マニュアル操作」(円クリック・ジョグ・保存済み
+        # 起きたため、QTabWidgetで「マニュアル操作」(円クリック・ジョグ・保存済み
         # ポイント等、自由な位置への移動系)と「統合操作」(各種パラメータパネル、
-        # およびワーク/シューティングボックスの定型位置移動ボタン)を別タブに分離した
-        # (2026-08-27)。起動時に表示するタブは、動作モード切替や各種パラメータなど
-        # 主要な操作をまとめた統合操作タブをデフォルトにする(2026-08-29)。
-        self._logo_image = _load_soki_logo_image(target_height=36)
-        if self._logo_image is not None:
-            header = tk.Frame(self)
-            header.pack(fill=tk.X, side=tk.TOP, anchor='e')
-            tk.Label(header, image=self._logo_image).pack(side=tk.RIGHT, padx=6, pady=4)
+        # およびワーク/シューティングボックスの定型位置移動ボタン)を別タブに分離
+        # している。起動時に表示するタブは、動作モード切替や各種パラメータなど
+        # 主要な操作をまとめた統合操作タブをデフォルトにする。
+        logo_pixmap = _load_soki_logo_image(target_height=36)
+        if logo_pixmap is not None:
+            header = QHBoxLayout()
+            header.addStretch(1)
+            logo_label = QLabel()
+            logo_label.setPixmap(logo_pixmap)
+            header.addWidget(logo_label)
+            root_layout.addLayout(header)
 
-        notebook = ttk.Notebook(self)
-        notebook.pack(fill=tk.BOTH, expand=True)
+        self.tabs = QTabWidget()
+        root_layout.addWidget(self.tabs)
 
-        manual_tab = tk.Frame(notebook)
-        integrated_tab = tk.Frame(notebook)
-        notebook.add(manual_tab, text='マニュアル操作')
-        notebook.add(integrated_tab, text='統合操作')
+        manual_tab = QWidget()
+        integrated_tab = QWidget()
+        self.tabs.addTab(manual_tab, 'マニュアル操作')
+        self.tabs.addTab(integrated_tab, '統合操作')
 
         self._build_move_tab(manual_tab)
         self._build_settings_tab(integrated_tab)
 
-        notebook.select(integrated_tab)
+        self.tabs.setCurrentWidget(integrated_tab)
 
+        for edit in (self.x_edit, self.y_edit, self.z_edit):
+            edit.textChanged.connect(self._redraw_pin)
+        self._redraw_pin()
+        self._refresh_point_list()
+
+        self.setMinimumWidth(560)
+        self.resize(760, 820)
+
+        # rclpy.spin_once()はmixed_joint_states購読・パラメータサービスの応答処理に
+        # 必要(このタイマーのコールバック=Qtのイベントループと同じメインスレッド上で
+        # 完結する。別スレッドのexecutorにしない理由はモジュールdocstring参照)。
+        self._spin_timer = QTimer(self)
+        self._spin_timer.timeout.connect(self._spin_ros)
+        self._spin_timer.start(50)
+
+    # ---------- manual tab ----------
     def _build_move_tab(self, parent):
-        main = tk.Frame(parent, padx=8, pady=8)
-        main.pack(fill=tk.BOTH, expand=True)
+        layout = QHBoxLayout(parent)
 
-        left = tk.Frame(main)
-        left.pack(side=tk.LEFT, padx=(0, 8))
-        tk.Label(left, text='XY平面 (クリックでピン設置。上=ワーク側(Y+)、右=X+)').pack()
-        self.canvas = tk.Canvas(left, width=self.CANVAS_SIZE, height=self.CANVAS_SIZE,
-                                 background='white', highlightthickness=1,
-                                 highlightbackground='grey')
-        self.canvas.pack()
-        self.canvas.bind('<Button-1>', self._on_canvas_click)
-        self._draw_canvas_base()
+        left = QVBoxLayout()
+        left.addWidget(QLabel('XY平面 (クリックでピン設置。上=ワーク側(Y+)、右=X+)'))
+        self.xy_widget = XYPlaneWidget(self.CANVAS_SIZE, MAX_RADIUS, self.MARGIN, self._on_canvas_click)
+        left.addWidget(self.xy_widget)
+        left.addStretch(1)
+        layout.addLayout(left)
 
-        mid = tk.Frame(main)
-        mid.pack(side=tk.LEFT, padx=8, fill=tk.Y)
+        mid = QVBoxLayout()
 
-        coord_frame = tk.LabelFrame(mid, text='目標座標 [m]')
-        coord_frame.pack(fill=tk.X, pady=(0, 8))
-        for i, (label, var) in enumerate((('X', self.x_var), ('Y', self.y_var), ('Z', self.z_var))):
-            tk.Label(coord_frame, text=label).grid(row=i, column=0, sticky='w')
-            tk.Entry(coord_frame, textvariable=var, width=10).grid(row=i, column=1, padx=4, pady=2)
-        tk.Button(coord_frame, text='現在位置を目標にコピー', command=self._on_copy_current_to_target
-                  ).grid(row=3, column=0, columnspan=2, pady=(4, 2), sticky='we')
+        coord_box = QGroupBox('目標座標 [m]')
+        coord_grid = QGridLayout(coord_box)
+        for i, (label, edit) in enumerate((('X', self.x_edit), ('Y', self.y_edit), ('Z', self.z_edit))):
+            coord_grid.addWidget(QLabel(label), i, 0)
+            coord_grid.addWidget(edit, i, 1)
+        copy_btn = QPushButton('現在位置を目標にコピー')
+        copy_btn.clicked.connect(self._on_copy_current_to_target)
+        coord_grid.addWidget(copy_btn, 3, 0, 1, 2)
+        mid.addWidget(coord_box)
 
-        jog_frame = tk.LabelFrame(mid, text='ジョグ (↑ワーク側 ↓機体側 ←X- →X+)')
-        jog_frame.pack(fill=tk.X, pady=(0, 8))
-        step_row = tk.Frame(jog_frame)
-        step_row.pack(pady=(2, 4))
-        tk.Label(step_row, text='ステップ[m]').pack(side=tk.LEFT)
-        tk.Entry(step_row, textvariable=self.step_var, width=6).pack(side=tk.LEFT, padx=4)
+        jog_box = QGroupBox('ジョグ (↑ワーク側 ↓機体側 ←X- →X+)')
+        jog_layout = QVBoxLayout(jog_box)
+        step_row = QHBoxLayout()
+        step_row.addWidget(QLabel('ステップ[m]'))
+        step_row.addWidget(self.step_edit)
+        step_row.addStretch(1)
+        jog_layout.addLayout(step_row)
+        pad = QGridLayout()
+        up_btn = QPushButton('↑')
+        down_btn = QPushButton('↓')
+        left_btn = QPushButton('←')
+        right_btn = QPushButton('→')
+        up_btn.clicked.connect(lambda: self._on_jog(0, 1))
+        down_btn.clicked.connect(lambda: self._on_jog(0, -1))
+        left_btn.clicked.connect(lambda: self._on_jog(-1, 0))
+        right_btn.clicked.connect(lambda: self._on_jog(1, 0))
+        for b in (up_btn, down_btn, left_btn, right_btn):
+            b.setFixedWidth(36)
+        pad.addWidget(up_btn, 0, 1)
+        pad.addWidget(left_btn, 1, 0)
+        pad.addWidget(right_btn, 1, 2)
+        pad.addWidget(down_btn, 2, 1)
+        jog_layout.addLayout(pad)
+        mid.addWidget(jog_box)
 
-        pad = tk.Frame(jog_frame)
-        pad.pack(pady=(0, 4))
-        tk.Button(pad, text='↑', width=3, command=lambda: self._on_jog(0, 1)).grid(row=0, column=1)
-        tk.Button(pad, text='←', width=3, command=lambda: self._on_jog(-1, 0)).grid(row=1, column=0)
-        tk.Button(pad, text='→', width=3, command=lambda: self._on_jog(1, 0)).grid(row=1, column=2)
-        tk.Button(pad, text='↓', width=3, command=lambda: self._on_jog(0, -1)).grid(row=2, column=1)
+        mid.addWidget(QLabel(f'Z [{WORLD_Z_LOWER:.2f} - {WORLD_Z_UPPER:.2f} m]'))
+        self.z_slider = QSlider(Qt.Vertical)
+        self.z_slider.setMinimum(int(round(WORLD_Z_LOWER * self.Z_SLIDER_SCALE)))
+        self.z_slider.setMaximum(int(round(WORLD_Z_UPPER * self.Z_SLIDER_SCALE)))
+        self.z_slider.setSingleStep(5)
+        self.z_slider.setValue(int(round(get_float(self.z_edit) * self.Z_SLIDER_SCALE)))
+        self.z_slider.setFixedHeight(180)
+        self.z_slider.valueChanged.connect(self._on_z_slider_changed)
+        self.z_edit.textChanged.connect(self._on_z_edit_changed)
+        mid.addWidget(self.z_slider, alignment=Qt.AlignHCenter)
 
-        tk.Label(mid, text=f'Z [{WORLD_Z_LOWER:.2f} - {WORLD_Z_UPPER:.2f} m]').pack()
-        tk.Scale(mid, variable=self.z_var, from_=WORLD_Z_UPPER, to=WORLD_Z_LOWER,
-                 resolution=0.005, orient=tk.VERTICAL, length=200).pack()
+        self.status_label = QLabel('')
+        self.status_label.setWordWrap(True)
+        mid.addWidget(self.status_label)
 
-        self.status_label = tk.Label(mid, text='', fg='blue', justify=tk.LEFT)
-        self.status_label.pack(pady=4)
+        send_btn = QPushButton('送信 (Send)')
+        send_btn.setProperty('variant', 'primary')
+        send_btn.clicked.connect(self._on_send)
+        mid.addWidget(send_btn)
+        mid.addStretch(1)
+        layout.addLayout(mid)
 
-        tk.Button(mid, text='送信 (Send)', command=self._on_send,
-                  bg='#4a90d9', fg='white').pack(fill=tk.X, pady=(4, 0))
+        right = QVBoxLayout()
+        right.addWidget(QLabel('保存済みポイント (ダブルクリックで読込)'))
+        self.listbox = QListWidget()
+        self.listbox.itemDoubleClicked.connect(lambda _item: self._on_load_point())
+        right.addWidget(self.listbox)
+        btns = QHBoxLayout()
+        add_btn = QPushButton('追加')
+        send_sel_btn = QPushButton('送信')
+        del_btn = QPushButton('削除')
+        add_btn.clicked.connect(self._on_add_point)
+        send_sel_btn.clicked.connect(self._on_send_selected)
+        del_btn.clicked.connect(self._on_delete_point)
+        for b in (add_btn, send_sel_btn, del_btn):
+            btns.addWidget(b)
+        right.addLayout(btns)
+        layout.addLayout(right, 1)
 
-        right = tk.Frame(main)
-        right.pack(side=tk.LEFT, padx=(8, 0), fill=tk.BOTH, expand=True)
-        tk.Label(right, text='保存済みポイント (ダブルクリックで読込)').pack()
-        self.listbox = tk.Listbox(right, width=30, height=14)
-        self.listbox.pack(fill=tk.BOTH, expand=True)
-        self.listbox.bind('<Double-Button-1>', lambda e: self._on_load_point())
+    def _on_z_slider_changed(self, value):
+        z = value / self.Z_SLIDER_SCALE
+        self.z_edit.blockSignals(True)
+        set_float(self.z_edit, z)
+        self.z_edit.blockSignals(False)
+        self._redraw_pin()
 
-        btns = tk.Frame(right)
-        btns.pack(fill=tk.X, pady=4)
-        tk.Button(btns, text='追加', command=self._on_add_point).pack(side=tk.LEFT, expand=True, fill=tk.X)
-        tk.Button(btns, text='送信', command=self._on_send_selected).pack(side=tk.LEFT, expand=True, fill=tk.X)
-        tk.Button(btns, text='削除', command=self._on_delete_point).pack(side=tk.LEFT, expand=True, fill=tk.X)
+    def _on_z_edit_changed(self, _text):
+        try:
+            z = get_float(self.z_edit)
+        except ValueError:
+            return
+        value = clamp(int(round(z * self.Z_SLIDER_SCALE)), self.z_slider.minimum(), self.z_slider.maximum())
+        self.z_slider.blockSignals(True)
+        self.z_slider.setValue(value)
+        self.z_slider.blockSignals(False)
 
+    # ---------- settings (integrated) tab ----------
     def _build_settings_tab(self, parent):
-        # パネルが縦に長くなっても画面からはみ出さないよう、スクロール可能な
-        # 領域に入れる(2026-08-27、ワーク/シューティングボックスが画面外に
-        # 押し出された問題を受けて、今後パネルが増えても同じ罠を踏まないため)。
-        # ワーク/シューティングボックス(定型位置への移動)は「マニュアル操作」タブの
-        # 自由位置移動系(円クリック・ジョグ・保存済みポイント)とは性質が違う
-        # ("統合操作"に近い定型操作)ため、こちらへ移した(2026-08-27)。
-        settings_col = self._make_scrollable(parent)
-        self._build_field_buttons(settings_col)  # 2つのLabelFrameが横並びで幅を取るため全幅のまま
+        outer = QVBoxLayout(parent)
+        outer.setContentsMargins(0, 0, 0, 0)
 
-        # 縦一列だと画面をはみ出しやすいため、残りのパネルは2カラムに分けて
-        # 横に並べる(2026-08-27、スクロールバーだけでは気づかれにくいとの
-        # フィードバックを受けて、そもそもの縦の長さを減らす対応も追加)。
-        columns = tk.Frame(settings_col)
-        columns.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
-        left_col = tk.Frame(columns)
-        left_col.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 8), anchor='n')
-        right_col = tk.Frame(columns)
-        right_col.pack(side=tk.LEFT, fill=tk.Y, anchor='n')
+        # パネルが増えても画面からはみ出さないよう、スクロール可能な領域に入れる。
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        inner = QWidget()
+        inner_layout = QVBoxLayout(inner)
+
+        self._build_field_buttons(inner_layout)
+
+        columns = QHBoxLayout()
+        left_col = QVBoxLayout()
+        right_col = QVBoxLayout()
+        columns.addLayout(left_col)
+        columns.addLayout(right_col)
+        inner_layout.addLayout(columns)
+        inner_layout.addStretch(1)
 
         self._build_current_state_panel(left_col)
         self._build_mode_panel(left_col)
@@ -491,274 +685,287 @@ class CommandGuiApp(tk.Tk):
         self._build_robomas_gain_panel(right_col)
         self._build_homing_panel(right_col)
 
-    def _make_scrollable(self, parent):
-        """parent一杯に縦スクロール可能な内側Frameを作って返す。"""
-        canvas = tk.Canvas(parent, highlightthickness=0)
-        scrollbar = tk.Scrollbar(parent, orient=tk.VERTICAL, command=canvas.yview)
-        inner = tk.Frame(canvas, padx=8, pady=8)
-        inner.bind('<Configure>', lambda _e: canvas.configure(scrollregion=canvas.bbox('all')))
-        canvas.create_window((0, 0), window=inner, anchor='nw')
-        canvas.configure(yscrollcommand=scrollbar.set)
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        scroll.setWidget(inner)
+        outer.addWidget(scroll)
 
-        # マウスホイールでもスクロールできるようにする(スクロールバーのドラッグ
-        # だけでは気づかれにくく「スクロールできない」ように見える、2026-08-27)。
-        # カーソルがこの領域上にある間だけbind_allする(離れたら解除し、他の
-        # ウィジェットのホイール動作を奪わない)。Linux(X11/XWayland)は
-        # <Button-4/5>、Windows/macOSは<MouseWheel>(event.deltaの符号で判定)。
-        def _on_wheel(event):
-            if event.num == 4 or getattr(event, 'delta', 0) > 0:
-                canvas.yview_scroll(-1, 'units')
-            elif event.num == 5 or getattr(event, 'delta', 0) < 0:
-                canvas.yview_scroll(1, 'units')
+    def _build_current_state_panel(self, column):
+        box = QGroupBox('現在状態 (リアルタイム)')
+        layout = QVBoxLayout(box)
+        self.current_label = QLabel()
+        self.current_label.setWordWrap(True)
+        _set_status(self.current_label, '(mixed_joint_states待ち)', 'success')
+        layout.addWidget(self.current_label)
+        column.addWidget(box)
 
-        def _bind_wheel(_e):
-            canvas.bind_all('<Button-4>', _on_wheel)
-            canvas.bind_all('<Button-5>', _on_wheel)
-            canvas.bind_all('<MouseWheel>', _on_wheel)
-
-        def _unbind_wheel(_e):
-            canvas.unbind_all('<Button-4>')
-            canvas.unbind_all('<Button-5>')
-            canvas.unbind_all('<MouseWheel>')
-
-        canvas.bind('<Enter>', _bind_wheel)
-        canvas.bind('<Leave>', _unbind_wheel)
-
-        return inner
-
-    def _build_current_state_panel(self, parent):
-        frame = tk.LabelFrame(parent, text='現在状態 (リアルタイム)')
-        frame.pack(fill=tk.X)
-        self.current_label = tk.Label(frame, text='(mixed_joint_states待ち)',
-                                       fg='#1a7a1a', justify=tk.LEFT)
-        self.current_label.pack(padx=4, pady=4, anchor='w')
-
-    def _build_mode_panel(self, parent):
-        frame = tk.LabelFrame(parent, text='動作モード (trajectory_follower_node)')
-        frame.pack(fill=tk.X, pady=(8, 0))
-
-        self.mode_var = tk.StringVar(value='both')
+    def _build_mode_panel(self, column):
+        box = QGroupBox('動作モード (trajectory_follower_node)')
+        layout = QVBoxLayout(box)
+        self._mode_group = QButtonGroup(self)
         for value, label in (('auto', '自動専用 (GUI)'), ('manual', '手動専用 (joy)'), ('both', '併用')):
-            tk.Radiobutton(frame, text=label, variable=self.mode_var, value=value,
-                           command=self._on_mode_changed).pack(anchor='w', padx=4)
+            rb = QRadioButton(label)
+            if value == 'both':
+                rb.setChecked(True)
+            self._mode_group.addButton(rb)
+            self._mode_buttons[value] = rb
+            rb.toggled.connect(lambda checked, v=value: checked and self._on_mode_changed(v))
+            layout.addWidget(rb)
+        self.mode_status_label = QLabel()
+        self.mode_status_label.setWordWrap(True)
+        _set_status(self.mode_status_label, '未読込', 'muted')
+        layout.addWidget(self.mode_status_label)
+        column.addWidget(box)
 
-        self.mode_status_label = tk.Label(frame, text='未読込', fg='grey',
-                                           wraplength=220, justify=tk.LEFT)
-        self.mode_status_label.pack(padx=4, pady=(2, 4), anchor='w')
+    def _set_mode_silent(self, mode):
+        rb = self._mode_buttons.get(mode)
+        if rb is None:
+            return
+        for b in self._mode_buttons.values():
+            b.blockSignals(True)
+        rb.setChecked(True)
+        for b in self._mode_buttons.values():
+            b.blockSignals(False)
 
-    def _build_trajectory_panel(self, parent):
-        frame = tk.LabelFrame(parent, text='軌道生成パラメータ (trajectory_follower_node)')
-        frame.pack(fill=tk.X, pady=(8, 0))
+    def _build_trajectory_panel(self, column):
+        box = QGroupBox('軌道生成パラメータ (trajectory_follower_node)')
+        grid = QGridLayout(box)
+        grid.addWidget(QLabel('max_vel'), 0, 1)
+        grid.addWidget(QLabel('max_accel'), 0, 2)
 
-        tk.Label(frame, text='max_vel').grid(row=0, column=1)
-        tk.Label(frame, text='max_accel').grid(row=0, column=2)
-
-        self.traj_vel_vars = {}
-        self.traj_accel_vars = {}
+        self.traj_vel_edits = {}
+        self.traj_accel_edits = {}
         for i, name in enumerate(JOINT_NAMES):
-            tk.Label(frame, text=name).grid(row=i + 1, column=0, sticky='w')
-            vel_var = tk.DoubleVar(value=0.0)
-            accel_var = tk.DoubleVar(value=0.0)
-            self.traj_vel_vars[name] = vel_var
-            self.traj_accel_vars[name] = accel_var
-            tk.Entry(frame, textvariable=vel_var, width=8).grid(row=i + 1, column=1, padx=2, pady=2)
-            tk.Entry(frame, textvariable=accel_var, width=8).grid(row=i + 1, column=2, padx=2, pady=2)
+            grid.addWidget(QLabel(name), i + 1, 0)
+            vel_edit = make_float_edit(0.0, width=70)
+            accel_edit = make_float_edit(0.0, width=70)
+            self.traj_vel_edits[name] = vel_edit
+            self.traj_accel_edits[name] = accel_edit
+            grid.addWidget(vel_edit, i + 1, 1)
+            grid.addWidget(accel_edit, i + 1, 2)
 
-        self.traj_status_label = tk.Label(frame, text='未読込', fg='grey',
-                                           wraplength=220, justify=tk.LEFT)
-        self.traj_status_label.grid(row=len(JOINT_NAMES) + 1, column=0, columnspan=3, pady=(4, 0))
+        self.traj_status_label = QLabel()
+        self.traj_status_label.setWordWrap(True)
+        _set_status(self.traj_status_label, '未読込', 'muted')
+        grid.addWidget(self.traj_status_label, len(JOINT_NAMES) + 1, 0, 1, 3)
 
-        btn_row = tk.Frame(frame)
-        btn_row.grid(row=len(JOINT_NAMES) + 2, column=0, columnspan=3, pady=4, sticky='we')
-        tk.Button(btn_row, text='読込', command=self._on_load_traj_params).pack(
-            side=tk.LEFT, expand=True, fill=tk.X)
-        tk.Button(btn_row, text='適用', command=self._on_apply_traj_params,
-                  bg='#4a90d9', fg='white').pack(side=tk.LEFT, expand=True, fill=tk.X)
+        btn_row = QHBoxLayout()
+        load_btn = QPushButton('読込')
+        apply_btn = QPushButton('適用')
+        apply_btn.setProperty('variant', 'primary')
+        load_btn.clicked.connect(self._on_load_traj_params)
+        apply_btn.clicked.connect(self._on_apply_traj_params)
+        btn_row.addWidget(load_btn)
+        btn_row.addWidget(apply_btn)
+        grid.addLayout(btn_row, len(JOINT_NAMES) + 2, 0, 1, 3)
 
-    def _build_joy_speed_panel(self, parent):
-        frame = tk.LabelFrame(parent, text='手動操作(joy)速度 (joy_teleop_node)')
-        frame.pack(fill=tk.X, pady=(8, 0))
+        column.addWidget(box)
 
-        self.joy_speed_vars = {}
+    def _build_joy_speed_panel(self, column):
+        box = QGroupBox('手動操作(joy)速度 (joy_teleop_node)')
+        grid = QGridLayout(box)
+        self.joy_speed_edits = {}
         for i, (name, label, unit) in enumerate((
                 ('theta_speed', 'root_theta', 'rad/s'),
                 ('z_speed', 'z', 'm/s'),
                 ('r_speed', 'r', 'm/s'))):
-            tk.Label(frame, text=f'{label} [{unit}]').grid(row=i, column=0, sticky='w')
-            var = tk.DoubleVar(value=0.0)
-            self.joy_speed_vars[name] = var
-            tk.Entry(frame, textvariable=var, width=8).grid(row=i, column=1, padx=2, pady=2)
+            grid.addWidget(QLabel(f'{label} [{unit}]'), i, 0)
+            edit = make_float_edit(0.0, width=70)
+            self.joy_speed_edits[name] = edit
+            grid.addWidget(edit, i, 1)
 
-        self.joy_speed_status_label = tk.Label(frame, text='未読込', fg='grey',
-                                                wraplength=220, justify=tk.LEFT)
-        self.joy_speed_status_label.grid(row=3, column=0, columnspan=2, pady=(4, 0))
+        self.joy_speed_status_label = QLabel()
+        self.joy_speed_status_label.setWordWrap(True)
+        _set_status(self.joy_speed_status_label, '未読込', 'muted')
+        grid.addWidget(self.joy_speed_status_label, 3, 0, 1, 2)
 
-        btn_row = tk.Frame(frame)
-        btn_row.grid(row=4, column=0, columnspan=2, pady=4, sticky='we')
-        tk.Button(btn_row, text='読込', command=self._on_load_joy_speed).pack(
-            side=tk.LEFT, expand=True, fill=tk.X)
-        tk.Button(btn_row, text='適用', command=self._on_apply_joy_speed,
-                  bg='#4a90d9', fg='white').pack(side=tk.LEFT, expand=True, fill=tk.X)
+        btn_row = QHBoxLayout()
+        load_btn = QPushButton('読込')
+        apply_btn = QPushButton('適用')
+        apply_btn.setProperty('variant', 'primary')
+        load_btn.clicked.connect(self._on_load_joy_speed)
+        apply_btn.clicked.connect(self._on_apply_joy_speed)
+        btn_row.addWidget(load_btn)
+        btn_row.addWidget(apply_btn)
+        grid.addLayout(btn_row, 4, 0, 1, 2)
 
-    def _build_mit_gain_panel(self, parent):
+        column.addWidget(box)
+
+    def _build_mit_gain_panel(self, column):
         # cubemars_joint_names(実機出力対象の関節)はtrajectory_follower_nodeの
         # 起動構成次第で一部の関節だけのことがある(例: root_thetaのみ)ため、
-        # 軌道生成パラメータパネルと同じく実際のjoint_names順に読込・適用する
-        # (JOINT_NAMES固定でzipするとreal_root_theta_test.launch.py等の1関節構成で
-        # 表示が更新されない、2026-08-27発覚のバグと同じ罠を踏むため)。
-        frame = tk.LabelFrame(parent, text='MITゲイン (実機CubeMars、trajectory_follower_node)')
-        frame.pack(fill=tk.X, pady=(8, 0))
+        # 軌道生成パラメータパネルと同じく実際のjoint_names順に読込・適用する。
+        box = QGroupBox('MITゲイン (実機CubeMars、trajectory_follower_node)')
+        grid = QGridLayout(box)
+        grid.addWidget(QLabel('Kp'), 0, 1)
+        grid.addWidget(QLabel('Kd'), 0, 2)
+        grid.addWidget(QLabel('torque_ff'), 0, 3)
 
-        tk.Label(frame, text='Kp').grid(row=0, column=1)
-        tk.Label(frame, text='Kd').grid(row=0, column=2)
-        tk.Label(frame, text='torque_ff').grid(row=0, column=3)
-
-        self._mit_joint_names = []
-        self.mit_kp_vars = {}
-        self.mit_kd_vars = {}
-        self.mit_torque_vars = {}
+        self.mit_kp_edits = {}
+        self.mit_kd_edits = {}
+        self.mit_torque_edits = {}
         for i, name in enumerate(CUBEMARS_JOINT_NAMES):
-            tk.Label(frame, text=name).grid(row=i + 1, column=0, sticky='w')
-            kp_var = tk.DoubleVar(value=0.0)
-            kd_var = tk.DoubleVar(value=0.0)
-            tff_var = tk.DoubleVar(value=0.0)
-            self.mit_kp_vars[name] = kp_var
-            self.mit_kd_vars[name] = kd_var
-            self.mit_torque_vars[name] = tff_var
-            tk.Entry(frame, textvariable=kp_var, width=6).grid(row=i + 1, column=1, padx=2, pady=2)
-            tk.Entry(frame, textvariable=kd_var, width=6).grid(row=i + 1, column=2, padx=2, pady=2)
-            tk.Entry(frame, textvariable=tff_var, width=6).grid(row=i + 1, column=3, padx=2, pady=2)
+            grid.addWidget(QLabel(name), i + 1, 0)
+            kp_edit = make_float_edit(0.0, width=60)
+            kd_edit = make_float_edit(0.0, width=60)
+            tff_edit = make_float_edit(0.0, width=60)
+            self.mit_kp_edits[name] = kp_edit
+            self.mit_kd_edits[name] = kd_edit
+            self.mit_torque_edits[name] = tff_edit
+            grid.addWidget(kp_edit, i + 1, 1)
+            grid.addWidget(kd_edit, i + 1, 2)
+            grid.addWidget(tff_edit, i + 1, 3)
 
-        self.mit_gain_status_label = tk.Label(frame, text='未読込', fg='grey',
-                                               wraplength=220, justify=tk.LEFT)
-        self.mit_gain_status_label.grid(row=len(CUBEMARS_JOINT_NAMES) + 1, column=0, columnspan=4, pady=(4, 0))
+        self.mit_gain_status_label = QLabel()
+        self.mit_gain_status_label.setWordWrap(True)
+        _set_status(self.mit_gain_status_label, '未読込', 'muted')
+        grid.addWidget(self.mit_gain_status_label, len(CUBEMARS_JOINT_NAMES) + 1, 0, 1, 4)
 
-        btn_row = tk.Frame(frame)
-        btn_row.grid(row=len(CUBEMARS_JOINT_NAMES) + 2, column=0, columnspan=4, pady=4, sticky='we')
-        tk.Button(btn_row, text='読込', command=self._on_load_mit_gains).pack(
-            side=tk.LEFT, expand=True, fill=tk.X)
-        tk.Button(btn_row, text='適用', command=self._on_apply_mit_gains,
-                  bg='#d9534f', fg='white').pack(side=tk.LEFT, expand=True, fill=tk.X)
+        btn_row = QHBoxLayout()
+        load_btn = QPushButton('読込')
+        apply_btn = QPushButton('適用')
+        apply_btn.setProperty('variant', 'danger')
+        load_btn.clicked.connect(self._on_load_mit_gains)
+        apply_btn.clicked.connect(self._on_apply_mit_gains)
+        btn_row.addWidget(load_btn)
+        btn_row.addWidget(apply_btn)
+        grid.addLayout(btn_row, len(CUBEMARS_JOINT_NAMES) + 2, 0, 1, 4)
 
-    def _build_machine_origin_offset_panel(self, parent):
-        frame = tk.LabelFrame(parent, text='機体原点オフセット (soki_sim.urdf.xacro)')
-        frame.pack(fill=tk.X, pady=(8, 0))
+        column.addWidget(box)
 
-        tk.Label(frame, text=f'base_link(旋回軸)から実機の機体原点までのズレ[m]。\n'
-                              f'ワーク・シューティングボックスもこのオフセットに\n'
-                              f'追従して動く(可動範囲: 各軸±{MACHINE_ORIGIN_OFFSET_LIMIT:.2f}m)。',
-                 fg='#555', justify=tk.LEFT, wraplength=220).pack(padx=4, pady=(4, 2), anchor='w')
+    def _build_machine_origin_offset_panel(self, column):
+        box = QGroupBox('機体原点オフセット (soki_sim.urdf.xacro)')
+        layout = QVBoxLayout(box)
 
-        self.machine_origin_vars = {name: tk.DoubleVar(value=0.0) for name in MACHINE_ORIGIN_JOINT_NAMES}
-        entries = tk.Frame(frame)
-        entries.pack(padx=4, pady=(0, 2), anchor='w')
-        for i, (label, name) in enumerate((
+        desc = QLabel()
+        desc.setWordWrap(True)
+        _set_status(desc, f'base_link(旋回軸)から実機の機体原点までのズレ[m]。\n'
+                          f'ワーク・シューティングボックスもこのオフセットに\n'
+                          f'追従して動く(可動範囲: 各軸±{MACHINE_ORIGIN_OFFSET_LIMIT:.2f}m)。', 'muted')
+        layout.addWidget(desc)
+
+        self.machine_origin_edits = {name: make_float_edit(0.0, width=70) for name in MACHINE_ORIGIN_JOINT_NAMES}
+        entries = QHBoxLayout()
+        for label, name in (
                 ('X', 'machine_origin_x_joint'),
                 ('Y', 'machine_origin_y_joint'),
-                ('Z', 'machine_origin_z_joint'))):
-            tk.Label(entries, text=label).grid(row=0, column=i * 2, padx=(0 if i == 0 else 6, 2))
-            tk.Entry(entries, textvariable=self.machine_origin_vars[name], width=7).grid(
-                row=0, column=i * 2 + 1)
+                ('Z', 'machine_origin_z_joint')):
+            entries.addWidget(QLabel(label))
+            entries.addWidget(self.machine_origin_edits[name])
+        layout.addLayout(entries)
 
-        self.machine_origin_status_label = tk.Label(frame, text='未送信', fg='grey',
-                                                      wraplength=220, justify=tk.LEFT)
-        self.machine_origin_status_label.pack(padx=4, pady=(2, 4), anchor='w')
+        self.machine_origin_status_label = QLabel()
+        self.machine_origin_status_label.setWordWrap(True)
+        _set_status(self.machine_origin_status_label, '未送信', 'muted')
+        layout.addWidget(self.machine_origin_status_label)
 
-        btn_row = tk.Frame(frame)
-        btn_row.pack(fill=tk.X, padx=4, pady=(0, 4))
-        tk.Button(btn_row, text='現在値を反映', command=self._on_load_machine_origin).pack(
-            side=tk.LEFT, expand=True, fill=tk.X)
-        tk.Button(btn_row, text='適用', command=self._on_apply_machine_origin,
-                  bg='#4a90d9', fg='white').pack(side=tk.LEFT, expand=True, fill=tk.X)
+        btn_row = QHBoxLayout()
+        load_btn = QPushButton('現在値を反映')
+        apply_btn = QPushButton('適用')
+        apply_btn.setProperty('variant', 'primary')
+        load_btn.clicked.connect(self._on_load_machine_origin)
+        apply_btn.clicked.connect(self._on_apply_machine_origin)
+        btn_row.addWidget(load_btn)
+        btn_row.addWidget(apply_btn)
+        layout.addLayout(btn_row)
+
+        column.addWidget(box)
 
     def _on_load_machine_origin(self):
         if not self.node.has_current_state():
-            messagebox.showinfo('未取得', 'まだmixed_joint_statesを受信していません')
+            QMessageBox.information(self, '未取得', 'まだmixed_joint_statesを受信していません')
             return
         pos = self.node.get_current_positions()
-        for name, var in self.machine_origin_vars.items():
-            var.set(round(pos.get(name, 0.0), 4))
-        self.machine_origin_status_label.config(text='現在値を反映しました', fg='blue')
+        for name, edit in self.machine_origin_edits.items():
+            set_float(edit, round(pos.get(name, 0.0), 4))
+        _set_status(self.machine_origin_status_label, '現在値を反映しました', 'info')
 
     def _on_apply_machine_origin(self):
         try:
-            raw = {name: self.machine_origin_vars[name].get() for name in MACHINE_ORIGIN_JOINT_NAMES}
-        except tk.TclError:
-            messagebox.showerror('入力エラー', 'X/Y/Zに数値を入力してください')
+            raw = {name: get_float(self.machine_origin_edits[name]) for name in MACHINE_ORIGIN_JOINT_NAMES}
+        except ValueError:
+            QMessageBox.critical(self, '入力エラー', 'X/Y/Zに数値を入力してください')
             return
         limit = MACHINE_ORIGIN_OFFSET_LIMIT
         clamped = {name: clamp(v, -limit, limit) for name, v in raw.items()}
         for name, v in clamped.items():
-            self.machine_origin_vars[name].set(round(v, 4))
+            set_float(self.machine_origin_edits[name], round(v, 4))
         self.node.send_machine_origin(*(clamped[name] for name in MACHINE_ORIGIN_JOINT_NAMES))
         x, y, z = (clamped[name] for name in MACHINE_ORIGIN_JOINT_NAMES)
         text = f'送信しました (x={x:.3f}, y={y:.3f}, z={z:.3f})'
         if any(abs(raw[name] - clamped[name]) > 1e-9 for name in MACHINE_ORIGIN_JOINT_NAMES):
             text += '\n(可動範囲外のためクランプされました)'
-        self.machine_origin_status_label.config(text=text, fg='green')
+        _set_status(self.machine_origin_status_label, text, 'success')
 
-    def _build_origin_panel(self, parent):
-        frame = tk.LabelFrame(parent, text='root_theta原点設定 (CubeMars本体、trajectory_follower_node)')
-        frame.pack(fill=tk.X, pady=(8, 0))
+    def _build_origin_panel(self, column):
+        box = QGroupBox('root_theta原点設定 (CubeMars本体、trajectory_follower_node)')
+        layout = QVBoxLayout(box)
 
-        tk.Label(frame, text='呼び出し前に、root_theta_jointを原点センサの位置\n'
-                              '(真の機械原点)へ物理的に合わせておくこと。',
-                 fg='#a00', justify=tk.LEFT, wraplength=220).pack(padx=4, pady=(4, 2), anchor='w')
+        warn = QLabel()
+        warn.setWordWrap(True)
+        _set_status(warn, '呼び出し前に、root_theta_jointを原点センサの位置\n'
+                          '(真の機械原点)へ物理的に合わせておくこと。', 'error')
+        layout.addWidget(warn)
 
-        self.origin_status_label = tk.Label(frame, text='未実行', fg='grey',
-                                             wraplength=220, justify=tk.LEFT)
-        self.origin_status_label.pack(padx=4, pady=(0, 4), anchor='w')
+        self.origin_status_label = QLabel()
+        self.origin_status_label.setWordWrap(True)
+        _set_status(self.origin_status_label, '未実行', 'muted')
+        layout.addWidget(self.origin_status_label)
 
-        tk.Button(frame, text='/set_root_theta_origin 呼び出し',
-                  command=self._on_set_root_theta_origin, bg='#d9534f', fg='white').pack(
-            fill=tk.X, padx=4, pady=(0, 4))
+        btn = QPushButton('/set_root_theta_origin 呼び出し')
+        btn.setProperty('variant', 'danger')
+        btn.clicked.connect(self._on_set_root_theta_origin)
+        layout.addWidget(btn)
+
+        column.addWidget(box)
 
     def _on_set_root_theta_origin(self):
-        if not messagebox.askyesno(
-                '根本θ原点設定の確認',
-                'root_theta_jointをCubeMars本体(AK40-10)のフラッシュへ\n'
-                '永久原点として書き込みます。\n\n'
-                '関節は今、原点センサの位置(真の機械原点)にありますか？\n'
-                '間違った位置で実行すると、以後のすべての角度がずれます。'):
+        reply = QMessageBox.question(
+            self, '根本θ原点設定の確認',
+            'root_theta_jointをCubeMars本体(AK40-10)のフラッシュへ\n'
+            '永久原点として書き込みます。\n\n'
+            '関節は今、原点センサの位置(真の機械原点)にありますか？\n'
+            '間違った位置で実行すると、以後のすべての角度がずれます。',
+            QMessageBox.Yes | QMessageBox.No)
+        if reply != QMessageBox.Yes:
             return
-        self.origin_status_label.config(text='呼び出し中...', fg='grey')
+        _set_status(self.origin_status_label, '呼び出し中...', 'muted')
         ok = self.node.call_trigger_service(
             '/set_root_theta_origin', self._on_set_root_theta_origin_done)
         if not ok:
-            self.origin_status_label.config(text='サービス未起動です', fg='red')
+            _set_status(self.origin_status_label, 'サービス未起動です', 'error')
 
     def _on_set_root_theta_origin_done(self, success, message):
-        self.origin_status_label.config(
-            text=message, fg=('#1a7a1a' if success else 'red'))
+        _set_status(self.origin_status_label, message, 'success' if success else 'error')
 
-    def _build_field_buttons(self, parent):
-        field = tk.Frame(parent, padx=8)
-        field.pack(fill=tk.X, pady=(0, 8))
+    def _build_field_buttons(self, layout):
+        field_row = QHBoxLayout()
 
-        work_frame = tk.LabelFrame(field, text='ワーク (クリックで移動)')
-        work_frame.pack(side=tk.LEFT, padx=(0, 8))
-        self._build_button_grid(work_frame, [p for row in WORK_POINTS for p in row], header_row=1)
+        work_box = QGroupBox('ワーク (クリックで移動)')
+        work_grid = QGridLayout(work_box)
+        self._build_button_grid(work_grid, [p for row in WORK_POINTS for p in row], header_row=1)
+        field_row.addWidget(work_box)
 
-        shoot_frame = tk.LabelFrame(field, text='シューティングボックス (クリックで移動)')
-        shoot_frame.pack(side=tk.LEFT)
-        self._build_button_grid(shoot_frame, SHOOT_POINTS['L'] + SHOOT_POINTS['R'], header_row=1)
+        shoot_box = QGroupBox('シューティングボックス (クリックで移動)')
+        shoot_grid = QGridLayout(shoot_box)
+        self._build_button_grid(shoot_grid, SHOOT_POINTS['L'] + SHOOT_POINTS['R'], header_row=1)
+        field_row.addWidget(shoot_box)
 
-    def _build_button_grid(self, parent, points, header_row=0):
+        field_row.addStretch(1)
+        layout.addLayout(field_row)
+
+    def _build_button_grid(self, grid, points, header_row=0):
         """points: (label, x, y, z)のリスト。実座標を見た目通りに配置する
         (X昇順=左->右の列、Y降順=奥(ワーク方向)が上->手前が下の行)。"""
-        tk.Label(parent, text='← X- ・ X+ →').grid(row=0, column=0, columnspan=99)
+        grid.addWidget(QLabel('← X- ・ X+ →'), 0, 0, 1, 99)
         xs = sorted({round(p[1], 6) for p in points})
         ys = sorted({round(p[2], 6) for p in points}, reverse=True)
         for label, x, y, z in points:
             col = xs.index(round(x, 6))
             row = ys.index(round(y, 6)) + header_row
-            tk.Button(parent, text=label, width=5,
-                      command=lambda x=x, y=y, z=z: self._on_field_point(x, y, z)
-                      ).grid(row=row, column=col, padx=2, pady=2)
-        tk.Label(parent, text='↑ Y+ (ワーク側) ／ Y- (機体側) ↓').grid(
-            row=header_row + len(ys), column=0, columnspan=99)
+            btn = QPushButton(label)
+            btn.setFixedWidth(48)
+            btn.clicked.connect(lambda _checked=False, x=x, y=y, z=z: self._on_field_point(x, y, z))
+            grid.addWidget(btn, row, col)
+        grid.addWidget(QLabel('↑ Y+ (ワーク側) ／ Y- (機体側) ↓'), header_row + len(ys), 0, 1, 99)
 
     def _on_field_point(self, x, y, z):
         self._send_xyz(x, y, z)
@@ -766,11 +973,10 @@ class CommandGuiApp(tk.Tk):
     # ---------- realtime state / trajectory params ----------
     def _spin_ros(self):
         # rclpy.spin_once()はmixed_joint_states購読・パラメータサービスの
-        # 応答処理に必要(このメソッドの呼び出し=Tkinterのafter()ループ=
-        # mainloopと同じメインスレッド上で完結する)。
+        # 応答処理に必要(このメソッドの呼び出し=QTimer=Qtのイベントループと
+        # 同じメインスレッド上で完結する)。
         rclpy.spin_once(self.node, timeout_sec=0)
         self._refresh_current_state()
-        self.after(50, self._spin_ros)
 
     def _refresh_current_state(self):
         if not self.node.has_current_state():
@@ -780,32 +986,24 @@ class CommandGuiApp(tk.Tk):
         zj = pos['z_joint']
         r = pos['r_joint']
         x, y, z = joint_to_xyz(theta, zj, r)
-        self.current_label.config(text=(
+        self.current_label.setText(
             f'theta={math.degrees(theta):.1f}deg  z_joint={zj:.3f}  r_joint={r:.3f}\n'
-            f'X={x:.3f}  Y={y:.3f}  Z={z:.3f}'))
-        self._redraw_current_marker(x, y)
-
-    def _redraw_current_marker(self, x, y):
-        self.canvas.delete('current')
-        cx, cy = self._world_to_canvas(x, y)
-        r = 5
-        self.canvas.create_oval(cx - r, cy - r, cx + r, cy + r,
-                                 outline='#1a7a1a', width=2, tags='current')
+            f'X={x:.3f}  Y={y:.3f}  Z={z:.3f}')
+        self.xy_widget.set_current(x, y)
 
     def _on_load_traj_params(self):
         # joint_namesも取得する: trajectory_follower_nodeは実行構成によって
         # JOINT_NAMES(root_theta/z/r)の全部ではなく一部だけで起動されることがある
         # (例: real_root_theta_test.launch.pyはroot_theta_jointのみ)。max_velocity等の
-        # 配列は「そのノードの実際のjoint_names順」なので、GUI固定のJOINT_NAMESと
-        # 前提にlen比較・zipすると、一致しない構成では表示が更新されず0のままに見える
-        # (2026-08-27発覚)。
+        # 配列は「そのノードの実際のjoint_names順」なので、GUI固定のJOINT_NAMESを
+        # 前提にlen比較・zipすると、一致しない構成では表示が更新されず0のままに見える。
         ok = self.node.request_node_params(
             TRAJ_NODE_NAME, ['max_velocity', 'max_acceleration', 'control_mode', 'joint_names'],
             self._apply_loaded_traj_params,
-            lambda reason: self.traj_status_label.config(text=f'読込失敗: {reason}', fg='red'))
-        self.traj_status_label.config(
-            text='読込中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
-            fg='grey' if ok else 'red')
+            lambda reason: _set_status(self.traj_status_label, f'読込失敗: {reason}', 'error'))
+        _set_status(self.traj_status_label,
+                    '読込中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
+                    'muted' if ok else 'error')
 
     def _apply_loaded_traj_params(self, values):
         vel = values.get('max_velocity')
@@ -816,57 +1014,57 @@ class CommandGuiApp(tk.Tk):
         missing = [n for n in JOINT_NAMES if n not in names]
         if vel and len(vel) == len(names):
             for name, v in zip(names, vel):
-                if name in self.traj_vel_vars:
-                    self.traj_vel_vars[name].set(round(v, 4))
+                if name in self.traj_vel_edits:
+                    set_float(self.traj_vel_edits[name], round(v, 4))
         if accel and len(accel) == len(names):
             for name, v in zip(names, accel):
-                if name in self.traj_accel_vars:
-                    self.traj_accel_vars[name].set(round(v, 4))
+                if name in self.traj_accel_edits:
+                    set_float(self.traj_accel_edits[name], round(v, 4))
         if mode:
-            self.mode_var.set(mode)
-            self.mode_status_label.config(text=f'現在のモード: {mode}', fg='blue')
+            self._set_mode_silent(mode)
+            _set_status(self.mode_status_label, f'現在のモード: {mode}', 'info')
         status = '読込完了'
         if missing:
             status += f' (未起動構成: {", ".join(missing)}は表示更新されません)'
-        self.traj_status_label.config(text=status, fg='blue')
+        _set_status(self.traj_status_label, status, 'info')
 
     def _on_apply_traj_params(self):
         # 実際にtrajectory_follower_nodeが持つjoint_names順で配列を組む
         # (GUI固定のJOINT_NAMESで組むと、一部関節のみの構成では長さ不一致で
-        # set_parametersに拒否される。読込未実施時はJOINT_NAMES全部を仮定する)。
-        names = getattr(self, '_traj_joint_names', JOINT_NAMES)
+        # set_parametersに拒否される)。
+        names = self._traj_joint_names
         try:
-            vel = [self.traj_vel_vars[name].get() for name in names]
-            accel = [self.traj_accel_vars[name].get() for name in names]
-        except tk.TclError:
-            messagebox.showerror('入力エラー', '速度・加速度に数値を入力してください')
+            vel = [get_float(self.traj_vel_edits[name]) for name in names]
+            accel = [get_float(self.traj_accel_edits[name]) for name in names]
+        except (ValueError, KeyError):
+            QMessageBox.critical(self, '入力エラー', '速度・加速度に数値を入力してください')
             return
         ok = self.node.set_node_params(
             TRAJ_NODE_NAME, {'max_velocity': vel, 'max_acceleration': accel},
             self._apply_traj_set_result)
-        self.traj_status_label.config(
-            text='適用中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
-            fg='grey' if ok else 'red')
+        _set_status(self.traj_status_label,
+                    '適用中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
+                    'muted' if ok else 'error')
 
     def _apply_traj_set_result(self, results):
         if results is None:
-            self.traj_status_label.config(text='適用に失敗しました(応答なし)', fg='red')
+            _set_status(self.traj_status_label, '適用に失敗しました(応答なし)', 'error')
             return
         if all(r.successful for r in results):
-            self.traj_status_label.config(text='適用しました', fg='green')
+            _set_status(self.traj_status_label, '適用しました', 'success')
         else:
             reasons = '; '.join(r.reason for r in results if not r.successful)
-            self.traj_status_label.config(text=f'適用失敗: {reasons}', fg='red')
+            _set_status(self.traj_status_label, f'適用失敗: {reasons}', 'error')
 
     def _on_load_mit_gains(self):
         ok = self.node.request_node_params(
             TRAJ_NODE_NAME,
             ['cubemars_kp', 'cubemars_kd', 'cubemars_torque_ff', 'cubemars_joint_names'],
             self._apply_loaded_mit_gains,
-            lambda reason: self.mit_gain_status_label.config(text=f'読込失敗: {reason}', fg='red'))
-        self.mit_gain_status_label.config(
-            text='読込中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
-            fg='grey' if ok else 'red')
+            lambda reason: _set_status(self.mit_gain_status_label, f'読込失敗: {reason}', 'error'))
+        _set_status(self.mit_gain_status_label,
+                    '読込中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
+                    'muted' if ok else 'error')
 
     def _apply_loaded_mit_gains(self, values):
         kp = values.get('cubemars_kp')
@@ -876,350 +1074,354 @@ class CommandGuiApp(tk.Tk):
         self._mit_joint_names = list(names)
         if kp and len(kp) == len(names):
             for name, v in zip(names, kp):
-                if name in self.mit_kp_vars:
-                    self.mit_kp_vars[name].set(round(v, 4))
+                if name in self.mit_kp_edits:
+                    set_float(self.mit_kp_edits[name], round(v, 4))
         if kd and len(kd) == len(names):
             for name, v in zip(names, kd):
-                if name in self.mit_kd_vars:
-                    self.mit_kd_vars[name].set(round(v, 4))
+                if name in self.mit_kd_edits:
+                    set_float(self.mit_kd_edits[name], round(v, 4))
         if tff and len(tff) == len(names):
             for name, v in zip(names, tff):
-                if name in self.mit_torque_vars:
-                    self.mit_torque_vars[name].set(round(v, 4))
+                if name in self.mit_torque_edits:
+                    set_float(self.mit_torque_edits[name], round(v, 4))
         status = '読込完了'
         not_configured = [n for n in CUBEMARS_JOINT_NAMES if n not in names]
         if not_configured:
             status += f' (実機出力対象外: {", ".join(not_configured)})'
         if not names:
             status = '読込完了 (実機出力対象の関節が設定されていません)'
-        self.mit_gain_status_label.config(text=status, fg='blue')
+        _set_status(self.mit_gain_status_label, status, 'info')
 
     def _on_apply_mit_gains(self):
         # cubemars_joint_namesの実際の順序(_on_load_mit_gainsで取得済みのもの)で
         # 配列を組む必要がある。未読込のまま適用すると対象関節・順序が不明なため、
         # 先に読込を要求する(誤った関節にゲインを適用する事故を防ぐ)。
-        names = getattr(self, '_mit_joint_names', None)
+        names = self._mit_joint_names
         if not names:
-            messagebox.showerror('未読込', '先に「読込」を実行して対象関節を確認してください')
+            QMessageBox.critical(self, '未読込', '先に「読込」を実行して対象関節を確認してください')
             return
         try:
-            kp = [self.mit_kp_vars[name].get() for name in names]
-            kd = [self.mit_kd_vars[name].get() for name in names]
-            tff = [self.mit_torque_vars[name].get() for name in names]
-        except tk.TclError:
-            messagebox.showerror('入力エラー', 'Kp/Kd/torque_ffに数値を入力してください')
+            kp = [get_float(self.mit_kp_edits[name]) for name in names]
+            kd = [get_float(self.mit_kd_edits[name]) for name in names]
+            tff = [get_float(self.mit_torque_edits[name]) for name in names]
+        except (ValueError, KeyError):
+            QMessageBox.critical(self, '入力エラー', 'Kp/Kd/torque_ffに数値を入力してください')
             return
-        if not messagebox.askyesno(
-                'MITゲイン適用の確認',
-                f'{", ".join(names)} のMITゲインを実機へ即座に反映します。\n'
-                'Kpを大きくするほど保持力・応答性が上がりますが、\n'
-                '実機にかかる力も大きくなります。よろしいですか？'):
+        reply = QMessageBox.question(
+            self, 'MITゲイン適用の確認',
+            f'{", ".join(names)} のMITゲインを実機へ即座に反映します。\n'
+            'Kpを大きくするほど保持力・応答性が上がりますが、\n'
+            '実機にかかる力も大きくなります。よろしいですか？',
+            QMessageBox.Yes | QMessageBox.No)
+        if reply != QMessageBox.Yes:
             return
         ok = self.node.set_node_params(
             TRAJ_NODE_NAME,
             {'cubemars_kp': kp, 'cubemars_kd': kd, 'cubemars_torque_ff': tff},
             self._apply_mit_gain_set_result)
-        self.mit_gain_status_label.config(
-            text='適用中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
-            fg='grey' if ok else 'red')
+        _set_status(self.mit_gain_status_label,
+                    '適用中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
+                    'muted' if ok else 'error')
 
     def _apply_mit_gain_set_result(self, results):
         if results is None:
-            self.mit_gain_status_label.config(text='適用に失敗しました(応答なし)', fg='red')
+            _set_status(self.mit_gain_status_label, '適用に失敗しました(応答なし)', 'error')
             return
         if all(r.successful for r in results):
-            self.mit_gain_status_label.config(text='適用しました', fg='green')
+            _set_status(self.mit_gain_status_label, '適用しました', 'success')
         else:
             reasons = '; '.join(r.reason for r in results if not r.successful)
-            self.mit_gain_status_label.config(text=f'適用失敗: {reasons}', fg='red')
+            _set_status(self.mit_gain_status_label, f'適用失敗: {reasons}', 'error')
 
-    def _build_robomas_gain_panel(self, parent):
+    def _build_robomas_gain_panel(self, column):
         # robomas_kp/kd/current_ffはcubemars_*と異なりz_joint/r_joint(motor1/motor2)
         # 共通のスカラー値(joint別ではない、trajectory_follower_node.py参照)なので、
         # MITゲインパネルのような関節ごとの行ではなく単一行で表示する。
-        frame = tk.LabelFrame(parent, text='MITゲイン (実機ロボマス、trajectory_follower_node)')
-        frame.pack(fill=tk.X, pady=(8, 0))
+        box = QGroupBox('MITゲイン (実機ロボマス、trajectory_follower_node)')
+        layout = QVBoxLayout(box)
 
-        tk.Label(frame, text='motor1/motor2(z/r)共通の値。robomas_device_id未設定なら'
-                              '実機出力無効。', fg='#555', justify=tk.LEFT,
-                 wraplength=220).grid(row=0, column=0, columnspan=2, sticky='w', padx=4)
+        desc = QLabel()
+        desc.setWordWrap(True)
+        _set_status(desc, 'motor1/motor2(z/r)共通の値。robomas_device_id未設定なら'
+                          '実機出力無効。', 'muted')
+        layout.addWidget(desc)
 
-        self.robomas_kp_var = tk.DoubleVar(value=0.0)
-        self.robomas_kd_var = tk.DoubleVar(value=0.0)
-        self.robomas_current_ff_var = tk.DoubleVar(value=0.0)
-        for i, (label, var) in enumerate((
-                ('Kp [A/deg]', self.robomas_kp_var),
-                ('Kd [A/rpm]', self.robomas_kd_var),
-                ('current_ff [A]', self.robomas_current_ff_var))):
-            tk.Label(frame, text=label).grid(row=i + 1, column=0, sticky='w', padx=4)
-            tk.Entry(frame, textvariable=var, width=8).grid(row=i + 1, column=1, padx=2, pady=2)
+        grid = QGridLayout()
+        self.robomas_kp_edit = make_float_edit(0.0, width=70)
+        self.robomas_kd_edit = make_float_edit(0.0, width=70)
+        self.robomas_current_ff_edit = make_float_edit(0.0, width=70)
+        for i, (label, edit) in enumerate((
+                ('Kp [A/deg]', self.robomas_kp_edit),
+                ('Kd [A/rpm]', self.robomas_kd_edit),
+                ('current_ff [A]', self.robomas_current_ff_edit))):
+            grid.addWidget(QLabel(label), i, 0)
+            grid.addWidget(edit, i, 1)
+        layout.addLayout(grid)
 
-        self.robomas_gain_status_label = tk.Label(frame, text='未読込', fg='grey',
-                                                    wraplength=220, justify=tk.LEFT)
-        self.robomas_gain_status_label.grid(row=4, column=0, columnspan=2, pady=(4, 0))
+        self.robomas_gain_status_label = QLabel()
+        self.robomas_gain_status_label.setWordWrap(True)
+        _set_status(self.robomas_gain_status_label, '未読込', 'muted')
+        layout.addWidget(self.robomas_gain_status_label)
 
-        btn_row = tk.Frame(frame)
-        btn_row.grid(row=5, column=0, columnspan=2, pady=4, sticky='we')
-        tk.Button(btn_row, text='読込', command=self._on_load_robomas_gains).pack(
-            side=tk.LEFT, expand=True, fill=tk.X)
-        tk.Button(btn_row, text='適用', command=self._on_apply_robomas_gains,
-                  bg='#d9534f', fg='white').pack(side=tk.LEFT, expand=True, fill=tk.X)
+        btn_row = QHBoxLayout()
+        load_btn = QPushButton('読込')
+        apply_btn = QPushButton('適用')
+        apply_btn.setProperty('variant', 'danger')
+        load_btn.clicked.connect(self._on_load_robomas_gains)
+        apply_btn.clicked.connect(self._on_apply_robomas_gains)
+        btn_row.addWidget(load_btn)
+        btn_row.addWidget(apply_btn)
+        layout.addLayout(btn_row)
 
         # homing_node実行中はtrajectory_follower_node側が自動でpause/resumeするが
         # (note/hardware_mapping.txt参照)、実機調整時に手動で止めたい場合用に
         # root_theta原点パネルと同じTriggerボタンの型でも操作できるようにする。
-        pause_row = tk.Frame(frame)
-        pause_row.grid(row=6, column=0, columnspan=2, pady=(4, 4), sticky='we')
-        tk.Button(pause_row, text='出力を一時停止', command=lambda: self._on_robomas_pause_resume(
-            '/pause_robomas_output')).pack(side=tk.LEFT, expand=True, fill=tk.X)
-        tk.Button(pause_row, text='出力を再開', command=lambda: self._on_robomas_pause_resume(
-            '/resume_robomas_output')).pack(side=tk.LEFT, expand=True, fill=tk.X)
+        pause_row = QHBoxLayout()
+        pause_btn = QPushButton('出力を一時停止')
+        resume_btn = QPushButton('出力を再開')
+        pause_btn.clicked.connect(lambda: self._on_robomas_pause_resume('/pause_robomas_output'))
+        resume_btn.clicked.connect(lambda: self._on_robomas_pause_resume('/resume_robomas_output'))
+        pause_row.addWidget(pause_btn)
+        pause_row.addWidget(resume_btn)
+        layout.addLayout(pause_row)
+
+        column.addWidget(box)
 
     def _on_load_robomas_gains(self):
         ok = self.node.request_node_params(
             TRAJ_NODE_NAME, ['robomas_kp', 'robomas_kd', 'robomas_current_ff', 'robomas_device_id'],
             self._apply_loaded_robomas_gains,
-            lambda reason: self.robomas_gain_status_label.config(text=f'読込失敗: {reason}', fg='red'))
-        self.robomas_gain_status_label.config(
-            text='読込中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
-            fg='grey' if ok else 'red')
+            lambda reason: _set_status(self.robomas_gain_status_label, f'読込失敗: {reason}', 'error'))
+        _set_status(self.robomas_gain_status_label,
+                    '読込中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
+                    'muted' if ok else 'error')
 
     def _apply_loaded_robomas_gains(self, values):
         if 'robomas_kp' in values:
-            self.robomas_kp_var.set(round(values['robomas_kp'], 6))
+            set_float(self.robomas_kp_edit, round(values['robomas_kp'], 6))
         if 'robomas_kd' in values:
-            self.robomas_kd_var.set(round(values['robomas_kd'], 6))
+            set_float(self.robomas_kd_edit, round(values['robomas_kd'], 6))
         if 'robomas_current_ff' in values:
-            self.robomas_current_ff_var.set(round(values['robomas_current_ff'], 6))
+            set_float(self.robomas_current_ff_edit, round(values['robomas_current_ff'], 6))
         device_id = values.get('robomas_device_id', 0)
         status = '読込完了'
         if not device_id:
             status += ' (実機出力無効: robomas_device_id未設定)'
         else:
             status += f' (device_id={device_id})'
-        self.robomas_gain_status_label.config(text=status, fg='blue')
+        _set_status(self.robomas_gain_status_label, status, 'info')
 
     def _on_apply_robomas_gains(self):
         try:
             values = {
-                'robomas_kp': self.robomas_kp_var.get(),
-                'robomas_kd': self.robomas_kd_var.get(),
-                'robomas_current_ff': self.robomas_current_ff_var.get(),
+                'robomas_kp': get_float(self.robomas_kp_edit),
+                'robomas_kd': get_float(self.robomas_kd_edit),
+                'robomas_current_ff': get_float(self.robomas_current_ff_edit),
             }
-        except tk.TclError:
-            messagebox.showerror('入力エラー', 'Kp/Kd/current_ffに数値を入力してください')
+        except ValueError:
+            QMessageBox.critical(self, '入力エラー', 'Kp/Kd/current_ffに数値を入力してください')
             return
-        if not messagebox.askyesno(
-                'MITゲイン適用の確認',
-                'motor1/motor2(z/r)のMITゲインを実機へ即座に反映します。\n'
-                'Kpを大きくするほど保持力・応答性が上がりますが、\n'
-                '実機にかかる力も大きくなります。よろしいですか？'):
+        reply = QMessageBox.question(
+            self, 'MITゲイン適用の確認',
+            'motor1/motor2(z/r)のMITゲインを実機へ即座に反映します。\n'
+            'Kpを大きくするほど保持力・応答性が上がりますが、\n'
+            '実機にかかる力も大きくなります。よろしいですか？',
+            QMessageBox.Yes | QMessageBox.No)
+        if reply != QMessageBox.Yes:
             return
         ok = self.node.set_node_params(TRAJ_NODE_NAME, values, self._apply_robomas_gain_set_result)
-        self.robomas_gain_status_label.config(
-            text='適用中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
-            fg='grey' if ok else 'red')
+        _set_status(self.robomas_gain_status_label,
+                    '適用中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
+                    'muted' if ok else 'error')
 
     def _apply_robomas_gain_set_result(self, results):
         if results is None:
-            self.robomas_gain_status_label.config(text='適用に失敗しました(応答なし)', fg='red')
+            _set_status(self.robomas_gain_status_label, '適用に失敗しました(応答なし)', 'error')
             return
         if all(r.successful for r in results):
-            self.robomas_gain_status_label.config(text='適用しました', fg='green')
+            _set_status(self.robomas_gain_status_label, '適用しました', 'success')
         else:
             reasons = '; '.join(r.reason for r in results if not r.successful)
-            self.robomas_gain_status_label.config(text=f'適用失敗: {reasons}', fg='red')
+            _set_status(self.robomas_gain_status_label, f'適用失敗: {reasons}', 'error')
 
     def _on_robomas_pause_resume(self, service_name):
-        self.robomas_gain_status_label.config(text=f'{service_name} 呼び出し中...', fg='grey')
+        _set_status(self.robomas_gain_status_label, f'{service_name} 呼び出し中...', 'muted')
         ok = self.node.call_trigger_service(
             service_name, self._on_robomas_pause_resume_done)
         if not ok:
-            self.robomas_gain_status_label.config(text='サービス未起動です', fg='red')
+            _set_status(self.robomas_gain_status_label, 'サービス未起動です', 'error')
 
     def _on_robomas_pause_resume_done(self, success, message):
-        self.robomas_gain_status_label.config(
-            text=message, fg=('#1a7a1a' if success else 'red'))
+        _set_status(self.robomas_gain_status_label, message, 'success' if success else 'error')
 
-    def _build_homing_panel(self, parent):
-        frame = tk.LabelFrame(parent, text='z/rホーミング (homing_node)')
-        frame.pack(fill=tk.X, pady=(8, 0))
+    def _build_homing_panel(self, column):
+        box = QGroupBox('z/rホーミング (homing_node)')
+        layout = QVBoxLayout(box)
 
-        tk.Label(frame, text='開始: motor1/motor2を低速駆動し原点センサまで動かす。\n'
-                              'スキップ: 機体を先に原点センサ位置相当へ手動で\n'
-                              '合わせてから使うこと(モータは駆動しない)。',
-                 fg='#555', justify=tk.LEFT, wraplength=220).pack(padx=4, pady=(4, 2), anchor='w')
+        desc = QLabel()
+        desc.setWordWrap(True)
+        _set_status(desc, '開始: motor1/motor2を低速駆動し原点センサまで動かす。\n'
+                          'スキップ: 機体を先に原点センサ位置相当へ手動で\n'
+                          '合わせてから使うこと(モータは駆動しない)。', 'muted')
+        layout.addWidget(desc)
 
-        self.homing_status_label = tk.Label(frame, text='未実行', fg='grey',
-                                             wraplength=220, justify=tk.LEFT)
-        self.homing_status_label.pack(padx=4, pady=(0, 4), anchor='w')
+        self.homing_status_label = QLabel()
+        self.homing_status_label.setWordWrap(True)
+        _set_status(self.homing_status_label, '未実行', 'muted')
+        layout.addWidget(self.homing_status_label)
 
-        btn_row = tk.Frame(frame)
-        btn_row.pack(fill=tk.X, padx=4, pady=(0, 4))
-        tk.Button(btn_row, text='開始', command=self._on_start_homing,
-                  bg='#4a90d9', fg='white').pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 2))
-        tk.Button(btn_row, text='中断', command=self._on_stop_homing).pack(
-            side=tk.LEFT, expand=True, fill=tk.X, padx=2)
-        tk.Button(btn_row, text='スキップ', command=self._on_skip_homing,
-                  bg='#d9534f', fg='white').pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(2, 0))
+        btn_row = QHBoxLayout()
+        start_btn = QPushButton('開始')
+        start_btn.setProperty('variant', 'primary')
+        stop_btn = QPushButton('中断')
+        skip_btn = QPushButton('スキップ')
+        skip_btn.setProperty('variant', 'danger')
+        start_btn.clicked.connect(self._on_start_homing)
+        stop_btn.clicked.connect(self._on_stop_homing)
+        skip_btn.clicked.connect(self._on_skip_homing)
+        btn_row.addWidget(start_btn)
+        btn_row.addWidget(stop_btn)
+        btn_row.addWidget(skip_btn)
+        layout.addLayout(btn_row)
+
+        column.addWidget(box)
 
     def _on_start_homing(self):
-        if not messagebox.askyesno(
-                'ホーミング開始の確認',
-                'motor1/motor2を低速駆動してz/r原点センサまで動かします。\n'
-                '周囲に人・障害物がないか確認してください。'):
+        reply = QMessageBox.question(
+            self, 'ホーミング開始の確認',
+            'motor1/motor2を低速駆動してz/r原点センサまで動かします。\n'
+            '周囲に人・障害物がないか確認してください。',
+            QMessageBox.Yes | QMessageBox.No)
+        if reply != QMessageBox.Yes:
             return
-        self.homing_status_label.config(text='開始中...', fg='grey')
+        _set_status(self.homing_status_label, '開始中...', 'muted')
         ok = self.node.call_trigger_service('/start_homing', self._on_homing_service_done)
         if not ok:
-            self.homing_status_label.config(text='サービス未起動です(homing_node起動確認)', fg='red')
+            _set_status(self.homing_status_label, 'サービス未起動です(homing_node起動確認)', 'error')
 
     def _on_stop_homing(self):
-        self.homing_status_label.config(text='中断中...', fg='grey')
+        _set_status(self.homing_status_label, '中断中...', 'muted')
         ok = self.node.call_trigger_service('/stop_homing', self._on_homing_service_done)
         if not ok:
-            self.homing_status_label.config(text='サービス未起動です(homing_node起動確認)', fg='red')
+            _set_status(self.homing_status_label, 'サービス未起動です(homing_node起動確認)', 'error')
 
     def _on_skip_homing(self):
-        if not messagebox.askyesno(
-                'ホーミングスキップの確認',
-                'motor1/motor2は駆動せず、現在位置を原点センサ位置(z_ref_value_m/\n'
-                'r_ref_value_m)とみなしてoffsetを即座に反映します。\n\n'
-                '機体は今、原点センサ位置相当にありますか？\n'
-                '間違った位置で実行すると以後のz/r値が全てズレます。'):
+        reply = QMessageBox.question(
+            self, 'ホーミングスキップの確認',
+            'motor1/motor2は駆動せず、現在位置を原点センサ位置(z_ref_value_m/\n'
+            'r_ref_value_m)とみなしてoffsetを即座に反映します。\n\n'
+            '機体は今、原点センサ位置相当にありますか？\n'
+            '間違った位置で実行すると以後のz/r値が全てズレます。',
+            QMessageBox.Yes | QMessageBox.No)
+        if reply != QMessageBox.Yes:
             return
-        self.homing_status_label.config(text='スキップ処理中...', fg='grey')
+        _set_status(self.homing_status_label, 'スキップ処理中...', 'muted')
         ok = self.node.call_trigger_service('/skip_homing', self._on_homing_service_done)
         if not ok:
-            self.homing_status_label.config(text='サービス未起動です(homing_node起動確認)', fg='red')
+            _set_status(self.homing_status_label, 'サービス未起動です(homing_node起動確認)', 'error')
 
     def _on_homing_service_done(self, success, message):
-        self.homing_status_label.config(text=message, fg=('#1a7a1a' if success else 'red'))
+        _set_status(self.homing_status_label, message, 'success' if success else 'error')
 
     def _on_load_joy_speed(self):
         ok = self.node.request_node_params(
             JOY_NODE_NAME, ['theta_speed', 'z_speed', 'r_speed'],
             self._apply_loaded_joy_speed,
-            lambda reason: self.joy_speed_status_label.config(text=f'読込失敗: {reason}', fg='red'))
-        self.joy_speed_status_label.config(
-            text='読込中...' if ok else 'joy_teleop_nodeに接続できません(use_joy:=trueで起動?)',
-            fg='grey' if ok else 'red')
+            lambda reason: _set_status(self.joy_speed_status_label, f'読込失敗: {reason}', 'error'))
+        _set_status(self.joy_speed_status_label,
+                    '読込中...' if ok else 'joy_teleop_nodeに接続できません(use_joy:=trueで起動?)',
+                    'muted' if ok else 'error')
 
     def _apply_loaded_joy_speed(self, values):
         for name in ('theta_speed', 'z_speed', 'r_speed'):
             if name in values:
-                self.joy_speed_vars[name].set(round(values[name], 4))
-        self.joy_speed_status_label.config(text='読込完了', fg='blue')
+                set_float(self.joy_speed_edits[name], round(values[name], 4))
+        _set_status(self.joy_speed_status_label, '読込完了', 'info')
 
     def _on_apply_joy_speed(self):
         try:
-            values = {name: var.get() for name, var in self.joy_speed_vars.items()}
-        except tk.TclError:
-            messagebox.showerror('入力エラー', '速度に数値を入力してください')
+            values = {name: get_float(edit) for name, edit in self.joy_speed_edits.items()}
+        except ValueError:
+            QMessageBox.critical(self, '入力エラー', '速度に数値を入力してください')
             return
         ok = self.node.set_node_params(JOY_NODE_NAME, values, self._apply_joy_speed_set_result)
-        self.joy_speed_status_label.config(
-            text='適用中...' if ok else 'joy_teleop_nodeに接続できません(use_joy:=trueで起動?)',
-            fg='grey' if ok else 'red')
+        _set_status(self.joy_speed_status_label,
+                    '適用中...' if ok else 'joy_teleop_nodeに接続できません(use_joy:=trueで起動?)',
+                    'muted' if ok else 'error')
 
     def _apply_joy_speed_set_result(self, results):
         if results is None:
-            self.joy_speed_status_label.config(text='適用に失敗しました(応答なし)', fg='red')
+            _set_status(self.joy_speed_status_label, '適用に失敗しました(応答なし)', 'error')
             return
         if all(r.successful for r in results):
-            self.joy_speed_status_label.config(text='適用しました', fg='green')
+            _set_status(self.joy_speed_status_label, '適用しました', 'success')
         else:
             reasons = '; '.join(r.reason for r in results if not r.successful)
-            self.joy_speed_status_label.config(text=f'適用失敗: {reasons}', fg='red')
+            _set_status(self.joy_speed_status_label, f'適用失敗: {reasons}', 'error')
 
-    def _on_mode_changed(self):
-        mode = self.mode_var.get()
+    def _on_mode_changed(self, mode):
         ok = self.node.set_node_params(TRAJ_NODE_NAME, {'control_mode': mode}, self._apply_mode_set_result)
-        self.mode_status_label.config(
-            text='適用中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
-            fg='grey' if ok else 'red')
+        _set_status(self.mode_status_label,
+                    '適用中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
+                    'muted' if ok else 'error')
 
     def _apply_mode_set_result(self, results):
         if results is None or not all(r.successful for r in results):
             reason = results[0].reason if results else '応答なし'
-            self.mode_status_label.config(text=f'適用失敗: {reason}', fg='red')
+            _set_status(self.mode_status_label, f'適用失敗: {reason}', 'error')
             return
-        self.mode_status_label.config(text=f'現在のモード: {self.mode_var.get()}', fg='green')
+        current = next((v for v, rb in self._mode_buttons.items() if rb.isChecked()), '?')
+        _set_status(self.mode_status_label, f'現在のモード: {current}', 'success')
 
     def _on_copy_current_to_target(self):
         if not self.node.has_current_state():
-            messagebox.showinfo('未取得', 'まだ現在位置を受信していません')
+            QMessageBox.information(self, '未取得', 'まだ現在位置を受信していません')
             return
         pos = self.node.get_current_positions()
         x, y, z = joint_to_xyz(pos['root_theta_joint'], pos['z_joint'], pos['r_joint'])
-        self.x_var.set(round(x, 3))
-        self.y_var.set(round(y, 3))
-        self.z_var.set(round(z, 3))
+        set_float(self.x_edit, round(x, 3))
+        set_float(self.y_edit, round(y, 3))
+        set_float(self.z_edit, round(z, 3))
 
-    def _draw_canvas_base(self):
-        c = self.CANVAS_SIZE / 2.0
-        self.canvas.create_line(0, c, self.CANVAS_SIZE, c, fill='#ccc')
-        self.canvas.create_line(c, 0, c, self.CANVAS_SIZE, fill='#ccc')
-        px_radius = self._world_to_px_scale() * MAX_RADIUS
-        self.canvas.create_oval(c - px_radius, c - px_radius, c + px_radius, c + px_radius,
-                                 outline='#4a90d9', dash=(3, 2))
-        self.canvas.create_text(c, 10, text='Y+ (ワーク側)', fill='#888')
-        self.canvas.create_text(c, self.CANVAS_SIZE - 10, text='Y- (機体後方)', fill='#888')
-        self.canvas.create_text(self.CANVAS_SIZE - 28, c, text='X+', fill='#888')
-        self.canvas.create_text(28, c, text='X-', fill='#888')
-        self.canvas.create_text(c + 14, c + 12, text='機体', fill='#888')
-
-    def _world_to_px_scale(self):
-        return (self.CANVAS_SIZE / 2.0 - self.MARGIN) / MAX_RADIUS
-
-    # ---------- coordinate <-> canvas ----------
-    def _world_to_canvas(self, x, y):
-        c = self.CANVAS_SIZE / 2.0
-        s = self._world_to_px_scale()
-        return c + x * s, c - y * s
-
-    def _canvas_to_world(self, cx, cy):
-        c = self.CANVAS_SIZE / 2.0
-        s = self._world_to_px_scale()
-        return (cx - c) / s, (c - cy) / s
-
-    def _on_canvas_click(self, event):
-        x, y = self._canvas_to_world(event.x, event.y)
+    # ---------- coordinate handling ----------
+    def _on_canvas_click(self, x, y):
         radius = math.hypot(x, y)
         if radius > MAX_RADIUS:
             x *= MAX_RADIUS / radius
             y *= MAX_RADIUS / radius
-        self.x_var.set(round(x, 3))
-        self.y_var.set(round(y, 3))
+        set_float(self.x_edit, round(x, 3))
+        set_float(self.y_edit, round(y, 3))
 
-    def _redraw_pin(self):
-        self.canvas.delete('pin')
+    def _redraw_pin(self, *_args):
         try:
-            x, y = self.x_var.get(), self.y_var.get()
-        except tk.TclError:
+            x = get_float(self.x_edit)
+            y = get_float(self.y_edit)
+        except ValueError:
             return
-        cx, cy = self._world_to_canvas(x, y)
-        r = 5
-        self.canvas.create_oval(cx - r, cy - r, cx + r, cy + r, fill='red', outline='', tags='pin')
+        self.xy_widget.set_pin(x, y)
         self._update_status()
 
     def _update_status(self):
         try:
-            x, y, z = self.x_var.get(), self.y_var.get(), self.z_var.get()
-        except tk.TclError:
+            x = get_float(self.x_edit)
+            y = get_float(self.y_edit)
+            z = get_float(self.z_edit)
+        except ValueError:
             return
         theta, zj, r, clamped = xyz_to_joint(x, y, z)
         text = f'theta={math.degrees(theta):.1f}deg  z_joint={zj:.3f}  r_joint={r:.3f}'
         if clamped:
             text += '\n(可動域外のためクランプされました)'
-        self.status_label.config(text=text, fg='red' if clamped else 'blue')
+        _set_status(self.status_label, text, 'error' if clamped else 'info')
 
     # ---------- send ----------
     def _on_send(self):
         try:
-            x, y, z = self.x_var.get(), self.y_var.get(), self.z_var.get()
-        except tk.TclError:
-            messagebox.showerror('入力エラー', 'X/Y/Zに数値を入力してください')
+            x = get_float(self.x_edit)
+            y = get_float(self.y_edit)
+            z = get_float(self.z_edit)
+        except ValueError:
+            QMessageBox.critical(self, '入力エラー', 'X/Y/Zに数値を入力してください')
             return
         theta, zj, r, _ = xyz_to_joint(x, y, z)
         self.node.send_target(theta, zj, r)
@@ -1227,67 +1429,69 @@ class CommandGuiApp(tk.Tk):
 
     def _on_jog(self, dx, dy):
         try:
-            step = self.step_var.get()
-            x = self.x_var.get() + dx * step
-            y = self.y_var.get() + dy * step
-        except tk.TclError:
-            messagebox.showerror('入力エラー', 'X/Y/ステップに数値を入力してください')
+            step = get_float(self.step_edit)
+            x = get_float(self.x_edit) + dx * step
+            y = get_float(self.y_edit) + dy * step
+        except ValueError:
+            QMessageBox.critical(self, '入力エラー', 'X/Y/ステップに数値を入力してください')
             return
-        self.x_var.set(round(x, 4))
-        self.y_var.set(round(y, 4))
+        set_float(self.x_edit, round(x, 4))
+        set_float(self.y_edit, round(y, 4))
         self._on_send()
 
     def _send_xyz(self, x, y, z):
-        self.x_var.set(x)
-        self.y_var.set(y)
-        self.z_var.set(z)
+        set_float(self.x_edit, x)
+        set_float(self.y_edit, y)
+        set_float(self.z_edit, z)
         self._on_send()
 
     # ---------- points list ----------
     def _on_add_point(self):
         try:
-            x, y, z = self.x_var.get(), self.y_var.get(), self.z_var.get()
-        except tk.TclError:
-            messagebox.showerror('入力エラー', 'X/Y/Zに数値を入力してください')
+            x = get_float(self.x_edit)
+            y = get_float(self.y_edit)
+            z = get_float(self.z_edit)
+        except ValueError:
+            QMessageBox.critical(self, '入力エラー', 'X/Y/Zに数値を入力してください')
             return
-        name = simpledialog.askstring('ポイント名', '保存する名前を入力してください',
-                                       initialvalue=f'Point{len(self.points) + 1}',
-                                       parent=self)
-        if not name:
+        name, ok = QInputDialog.getText(
+            self, 'ポイント名', '保存する名前を入力してください',
+            text=f'Point{len(self.points) + 1}')
+        if not ok or not name:
             return
         self.points.append({'name': name, 'x': x, 'y': y, 'z': z})
         self._save_points()
         self._refresh_point_list()
 
     def _on_delete_point(self):
-        sel = self.listbox.curselection()
-        if not sel:
+        row = self.listbox.currentRow()
+        if row < 0:
             return
-        del self.points[sel[0]]
+        del self.points[row]
         self._save_points()
         self._refresh_point_list()
 
     def _on_load_point(self):
-        sel = self.listbox.curselection()
-        if not sel:
+        row = self.listbox.currentRow()
+        if row < 0:
             return
-        p = self.points[sel[0]]
-        self.x_var.set(p['x'])
-        self.y_var.set(p['y'])
-        self.z_var.set(p['z'])
+        p = self.points[row]
+        set_float(self.x_edit, p['x'])
+        set_float(self.y_edit, p['y'])
+        set_float(self.z_edit, p['z'])
 
     def _on_send_selected(self):
-        sel = self.listbox.curselection()
-        if not sel:
-            messagebox.showinfo('未選択', '一覧からポイントを選択してください')
+        row = self.listbox.currentRow()
+        if row < 0:
+            QMessageBox.information(self, '未選択', '一覧からポイントを選択してください')
             return
-        p = self.points[sel[0]]
+        p = self.points[row]
         self._send_xyz(p['x'], p['y'], p['z'])
 
     def _refresh_point_list(self):
-        self.listbox.delete(0, tk.END)
+        self.listbox.clear()
         for p in self.points:
-            self.listbox.insert(tk.END, f"{p['name']}  ({p['x']:.3f}, {p['y']:.3f}, {p['z']:.3f})")
+            self.listbox.addItem(f"{p['name']}  ({p['x']:.3f}, {p['y']:.3f}, {p['z']:.3f})")
 
     # ---------- persistence ----------
     @staticmethod
@@ -1308,10 +1512,14 @@ class CommandGuiApp(tk.Tk):
 
 def main(args=None):
     rclpy.init(args=args)
+    app = QApplication(sys.argv)
+    app.setStyle('Fusion')
+    app.setStyleSheet(_load_stylesheet())
     node = CommandGuiNode()
-    app = CommandGuiApp(node)
+    window = CommandGuiApp(node)
+    window.show()
     try:
-        app.mainloop()
+        app.exec_()
     finally:
         node.destroy_node()
         rclpy.shutdown()
