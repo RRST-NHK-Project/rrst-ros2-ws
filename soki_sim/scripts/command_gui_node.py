@@ -58,7 +58,7 @@ from sensor_msgs.msg import JointState
 from std_srvs.srv import Trigger
 
 from PyQt5.QtCore import Qt, QPointF, QTimer
-from PyQt5.QtGui import QColor, QDoubleValidator, QIcon, QPainter, QPen, QPixmap
+from PyQt5.QtGui import QColor, QDoubleValidator, QFontMetrics, QIcon, QPainter, QPen, QPixmap
 from PyQt5.QtWidgets import (
     QApplication, QButtonGroup, QGridLayout, QGroupBox, QHBoxLayout,
     QInputDialog, QLabel, QLineEdit, QListWidget, QMessageBox, QPushButton,
@@ -220,10 +220,10 @@ def _load_stylesheet():
 
 
 _ROLE_COLORS = {
-    'info': '#5aa9e6',
-    'success': '#57c278',
-    'error': '#f2545b',
-    'muted': '#9aa0a6',
+    'info': '#1a73e8',
+    'success': '#1e8e3e',
+    'error': '#d93025',
+    'muted': '#5f6368',
 }
 
 
@@ -956,13 +956,20 @@ class CommandGuiApp(QWidget):
         """points: (label, x, y, z)のリスト。実座標を見た目通りに配置する
         (X昇順=左->右の列、Y降順=奥(ワーク方向)が上->手前が下の行)。"""
         grid.addWidget(QLabel('← X- ・ X+ →'), 0, 0, 1, 99)
+        grid.setHorizontalSpacing(4)
         xs = sorted({round(p[1], 6) for p in points})
         ys = sorted({round(p[2], 6) for p in points}, reverse=True)
+        # ラベル文字列("4-6"等)がボタン内に収まるよう、実際の文字幅+variant="grid"の
+        # 詰めたpadding(QSS参照。4px*2+border2px)分の余白から幅を決める。
+        # 固定48pxだと桁数が増えたラベルが見切れていた。
+        metrics = QFontMetrics(QPushButton().font())
+        btn_width = max(metrics.horizontalAdvance(label) for label, _, _, _ in points) + 14
         for label, x, y, z in points:
             col = xs.index(round(x, 6))
             row = ys.index(round(y, 6)) + header_row
             btn = QPushButton(label)
-            btn.setFixedWidth(48)
+            btn.setProperty('variant', 'grid')
+            btn.setFixedWidth(btn_width)
             btn.clicked.connect(lambda _checked=False, x=x, y=y, z=z: self._on_field_point(x, y, z))
             grid.addWidget(btn, row, col)
         grid.addWidget(QLabel('↑ Y+ (ワーク側) ／ Y- (機体側) ↓'), header_row + len(ys), 0, 1, 99)

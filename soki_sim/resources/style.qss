@@ -1,19 +1,19 @@
-/* soki_sim command GUI: モダンダークテーマ (Fusionスタイルと併用) */
+/* soki_sim command GUI: ライトテーマ (Fusionスタイルと併用) */
 
 QWidget {
-    background-color: #2b2d31;
-    color: #e3e5e8;
+    background-color: #f3f4f6;
+    color: #1f2124;
     font-size: 10pt;
 }
 
 QToolTip {
-    background-color: #1e1f22;
-    color: #e3e5e8;
+    background-color: #ffffff;
+    color: #1f2124;
     border: 1px solid #4a90d9;
 }
 
 QGroupBox {
-    border: 1px solid #44464b;
+    border: 1px solid #c9cbce;
     border-radius: 6px;
     margin-top: 12px;
     padding-top: 10px;
@@ -24,18 +24,18 @@ QGroupBox::title {
     subcontrol-origin: margin;
     left: 8px;
     padding: 0 4px;
-    color: #9aa0a6;
+    color: #5f6368;
 }
 
 QTabWidget::pane {
-    border: 1px solid #44464b;
+    border: 1px solid #c9cbce;
     border-radius: 6px;
     top: -1px;
 }
 
 QTabBar::tab {
-    background: #35373c;
-    color: #c7c9cc;
+    background: #e3e5e8;
+    color: #3c4043;
     padding: 6px 16px;
     border-top-left-radius: 6px;
     border-top-right-radius: 6px;
@@ -47,15 +47,15 @@ QTabBar::tab:selected {
 }
 
 QTabBar::tab:!selected:hover {
-    background: #3f4147;
+    background: #d5d8dc;
 }
 
 QLineEdit, QListWidget {
-    background-color: #1e1f22;
-    border: 1px solid #44464b;
+    background-color: #ffffff;
+    border: 1px solid #c9cbce;
     border-radius: 4px;
     padding: 3px 6px;
-    color: #e3e5e8;
+    color: #1f2124;
     selection-background-color: #4a90d9;
 }
 
@@ -69,19 +69,19 @@ QListWidget::item:selected {
 }
 
 QPushButton {
-    background-color: #3a3d42;
-    border: 1px solid #4a4d52;
+    background-color: #e8e9eb;
+    border: 1px solid #c2c4c7;
     border-radius: 5px;
     padding: 5px 12px;
-    color: #e3e5e8;
+    color: #1f2124;
 }
 
 QPushButton:hover {
-    background-color: #45484e;
+    background-color: #dcdee1;
 }
 
 QPushButton:pressed {
-    background-color: #2f3136;
+    background-color: #cfd1d4;
 }
 
 QPushButton[variant="primary"] {
@@ -114,23 +114,30 @@ QPushButton[variant="danger"]:pressed {
     background-color: #b8433f;
 }
 
+/* フィールド定型位置ボタン(ワーク/シューティングボックスのグリッド)用の
+   コンパクト余白。通常ボタンのpadding(12px)だと項目数が多いグリッドの
+   横幅が不必要に広がるため、詰めたpaddingを使う。 */
+QPushButton[variant="grid"] {
+    padding: 4px 6px;
+}
+
 QScrollArea {
     border: none;
 }
 
 QScrollBar:vertical {
-    background: #2b2d31;
+    background: #f3f4f6;
     width: 12px;
 }
 
 QScrollBar::handle:vertical {
-    background: #4a4d52;
+    background: #c2c4c7;
     border-radius: 5px;
     min-height: 24px;
 }
 
 QScrollBar::handle:vertical:hover {
-    background: #5a5d63;
+    background: #aeb0b3;
 }
 
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
@@ -138,7 +145,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
 }
 
 QSlider::groove:vertical {
-    background: #1e1f22;
+    background: #d5d8dc;
     width: 6px;
     border-radius: 3px;
 }
