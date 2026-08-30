@@ -87,6 +87,10 @@ WORLD_Z_UPPER = Z_OFFSET + Z_UPPER
 MAX_RADIUS = R_UPPER + ARM_LENGTH / 2.0
 
 POINTS_FILE = os.path.expanduser('~/.config/soki_sim/points.json')
+# 軌道生成パラメータ・MIT/robomasゲイン・joy速度のGUI保持値。読込(GetParameters)を
+# 経由しなくても起動直後からGUI側の値をそのまま「適用」できるよう、GUI側で
+# 最後に適用/読込した値をここに永続化しておく(node起動時のyamlデフォルトとは独立)。
+GAINS_FILE = os.path.expanduser('~/.config/soki_sim/gains.json')
 
 # ---- フィールド(ワーク配置環境)・シューティングエリアの寸法定数 ----
 # soki_sim.urdf.xacro の該当プロパティと一致させること(ワンクリック移動ボタン用)
@@ -493,8 +497,14 @@ class CommandGuiApp(QWidget):
             self.setWindowIcon(QIcon(icon_pixmap))
 
         self.points = self._load_points()
+        # trajectory/MITとも、対象joint名は本来ノード側の実行構成次第だが、
+        # 「読込」を経なくても起動直後からGUI保持値をそのまま適用できるように、
+        # GUI側で既知の定数(JOINT_NAMES/CUBEMARS_JOINT_NAMES)を初期値にしておく。
+        # 「読込」を実行した場合はノードの実際の構成(一部関節のみ等)で上書きされる。
         self._traj_joint_names = list(JOINT_NAMES)
-        self._mit_joint_names = []
+        self._mit_joint_names = list(CUBEMARS_JOINT_NAMES)
+        self._saved_gains = self._load_gains_file()
+        self._apply_all_results = {}
         self._mode_buttons = {}
 
         self.x_edit = make_float_edit(MAX_RADIUS / 2.0)
@@ -531,6 +541,7 @@ class CommandGuiApp(QWidget):
 
         self._build_move_tab(manual_tab)
         self._build_settings_tab(integrated_tab)
+        self._restore_saved_gains()
 
         self.tabs.setCurrentWidget(integrated_tab)
 
@@ -664,6 +675,7 @@ class CommandGuiApp(QWidget):
         inner = QWidget()
         inner_layout = QVBoxLayout(inner)
 
+        self._build_apply_all_panel(inner_layout)
         self._build_field_buttons(inner_layout)
 
         columns = QHBoxLayout()
@@ -687,6 +699,107 @@ class CommandGuiApp(QWidget):
 
         scroll.setWidget(inner)
         outer.addWidget(scroll)
+
+    def _build_apply_all_panel(self, layout):
+        # 各ゲインパネル個別の「適用」を毎回押す代わりに、GUIが保持している
+        # 軌道生成・MIT・robomas・joy速度の全ゲインを一括で実機へ送る「実機接続」
+        # ボタン。読込を経由しなくても、GUI側の値(前回適用/読込時にgains.jsonへ
+        # 保存された値、またはその場での編集値)をそのまま送信する。
+        box = QGroupBox('実機接続 (GUI保持ゲインを一括適用)')
+        box_layout = QVBoxLayout(box)
+
+        desc = QLabel()
+        desc.setWordWrap(True)
+        _set_status(desc, 'GUIが保持している軌道生成・MIT・robomas・joy速度の\n'
+                          '全ゲインを、個別の「適用」なしでまとめて実機へ送信する。', 'muted')
+        box_layout.addWidget(desc)
+
+        self.apply_all_status_label = QLabel()
+        self.apply_all_status_label.setWordWrap(True)
+        _set_status(self.apply_all_status_label, '未送信', 'muted')
+        box_layout.addWidget(self.apply_all_status_label)
+
+        btn = QPushButton('実機接続 (全ゲイン適用)')
+        btn.setProperty('variant', 'danger')
+        btn.clicked.connect(self._on_apply_all_gains)
+        box_layout.addWidget(btn)
+
+        layout.addWidget(box)
+
+    def _on_apply_all_gains(self):
+        try:
+            traj = self._collect_traj_values()
+            mit = self._collect_mit_values()
+            robomas = self._collect_robomas_values()
+            joy = self._collect_joy_speed_values()
+        except (ValueError, KeyError):
+            QMessageBox.critical(
+                self, '入力エラー',
+                '軌道生成・MIT・robomas・joy速度のいずれかに数値以外の入力があります')
+            return
+
+        reply = QMessageBox.question(
+            self, '全ゲイン一括適用の確認',
+            'GUIが保持している軌道生成パラメータ・MITゲイン・robomasゲイン・\n'
+            'joy速度を、まとめて実機(trajectory_follower_node/joy_teleop_node)\n'
+            'へ即座に反映します。\n\n'
+            'Kpを大きくするほど保持力・応答性が上がりますが、\n'
+            '実機にかかる力も大きくなります。よろしいですか？',
+            QMessageBox.Yes | QMessageBox.No)
+        if reply != QMessageBox.Yes:
+            return
+
+        self._persist_traj_values(traj)
+        self._persist_mit_values(mit)
+        self._persist_gains('robomas_gain', robomas)
+        self._persist_gains('joy_speed', joy)
+
+        traj_node_values = dict(traj)
+        traj_node_values.update(mit)
+        traj_node_values.update(robomas)
+        self._apply_all_results = {}
+        ok_traj = self.node.set_node_params(TRAJ_NODE_NAME, traj_node_values, self._apply_all_traj_result)
+        ok_joy = self.node.set_node_params(JOY_NODE_NAME, joy, self._apply_all_joy_result)
+        if ok_traj and ok_joy:
+            _set_status(self.apply_all_status_label, '送信中...', 'muted')
+        else:
+            missing = []
+            if not ok_traj:
+                missing.append('trajectory_follower_node')
+                self._apply_all_results['traj'] = None
+            if not ok_joy:
+                missing.append('joy_teleop_node')
+                self._apply_all_results['joy'] = None
+            _set_status(self.apply_all_status_label,
+                        f'{"・".join(missing)}に接続できません(未起動?)', 'error')
+        # 両方未接続の場合はコールバックが一つも発火しないため、ここで確定させる
+        # (片方のみ未接続の場合はもう片方のコールバックが後から発火してfinalizeする)。
+        self._finalize_apply_all()
+
+    def _apply_all_traj_result(self, results):
+        self._apply_all_results['traj'] = results
+        self._finalize_apply_all()
+
+    def _apply_all_joy_result(self, results):
+        self._apply_all_results['joy'] = results
+        self._finalize_apply_all()
+
+    def _finalize_apply_all(self):
+        if 'traj' not in self._apply_all_results or 'joy' not in self._apply_all_results:
+            return
+        problems = []
+        for label, results in (
+                ('trajectory_follower_node', self._apply_all_results['traj']),
+                ('joy_teleop_node', self._apply_all_results['joy'])):
+            if results is None:
+                problems.append(f'{label}: 応答なし')
+            elif not all(r.successful for r in results):
+                reasons = '; '.join(r.reason for r in results if not r.successful)
+                problems.append(f'{label}: {reasons}')
+        if problems:
+            _set_status(self.apply_all_status_label, '一部失敗: ' + ' / '.join(problems), 'error')
+        else:
+            _set_status(self.apply_all_status_label, '全ゲインを適用しました', 'success')
 
     def _build_current_state_panel(self, column):
         box = QGroupBox('現在状態 (リアルタイム)')
@@ -1030,25 +1143,29 @@ class CommandGuiApp(QWidget):
         if mode:
             self._set_mode_silent(mode)
             _set_status(self.mode_status_label, f'現在のモード: {mode}', 'info')
+        if vel and accel and len(vel) == len(names) and len(accel) == len(names):
+            self._persist_traj_values({'max_velocity': vel, 'max_acceleration': accel})
         status = '読込完了'
         if missing:
             status += f' (未起動構成: {", ".join(missing)}は表示更新されません)'
         _set_status(self.traj_status_label, status, 'info')
 
-    def _on_apply_traj_params(self):
-        # 実際にtrajectory_follower_nodeが持つjoint_names順で配列を組む
-        # (GUI固定のJOINT_NAMESで組むと、一部関節のみの構成では長さ不一致で
-        # set_parametersに拒否される)。
+    def _collect_traj_values(self):
+        """軌道生成パラメータをGUI入力欄から取得する(self._traj_joint_names順)。
+        「読込」未実行でもGUI固定のJOINT_NAMESを対象に動作する(__init__参照)。"""
         names = self._traj_joint_names
+        vel = [get_float(self.traj_vel_edits[name]) for name in names]
+        accel = [get_float(self.traj_accel_edits[name]) for name in names]
+        return {'max_velocity': vel, 'max_acceleration': accel}
+
+    def _on_apply_traj_params(self):
         try:
-            vel = [get_float(self.traj_vel_edits[name]) for name in names]
-            accel = [get_float(self.traj_accel_edits[name]) for name in names]
+            traj = self._collect_traj_values()
         except (ValueError, KeyError):
             QMessageBox.critical(self, '入力エラー', '速度・加速度に数値を入力してください')
             return
-        ok = self.node.set_node_params(
-            TRAJ_NODE_NAME, {'max_velocity': vel, 'max_acceleration': accel},
-            self._apply_traj_set_result)
+        self._persist_traj_values(traj)
+        ok = self.node.set_node_params(TRAJ_NODE_NAME, traj, self._apply_traj_set_result)
         _set_status(self.traj_status_label,
                     '適用中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
                     'muted' if ok else 'error')
@@ -1097,22 +1214,31 @@ class CommandGuiApp(QWidget):
             status += f' (実機出力対象外: {", ".join(not_configured)})'
         if not names:
             status = '読込完了 (実機出力対象の関節が設定されていません)'
+        else:
+            self._persist_mit_values(self._collect_mit_values())
         _set_status(self.mit_gain_status_label, status, 'info')
 
-    def _on_apply_mit_gains(self):
-        # cubemars_joint_namesの実際の順序(_on_load_mit_gainsで取得済みのもの)で
-        # 配列を組む必要がある。未読込のまま適用すると対象関節・順序が不明なため、
-        # 先に読込を要求する(誤った関節にゲインを適用する事故を防ぐ)。
+    def _collect_mit_values(self):
+        """MITゲインをGUI入力欄から取得する(self._mit_joint_names順)。「読込」
+        未実行の場合はCUBEMARS_JOINT_NAMES(GUI固定の対象関節)を用いる(__init__参照)。
+        読込済みでノードが対象関節0件を報告した場合はself._mit_joint_names==[]と
+        なり、長さ0の配列(=実質何もしない)を返す。"""
         names = self._mit_joint_names
-        if not names:
-            QMessageBox.critical(self, '未読込', '先に「読込」を実行して対象関節を確認してください')
-            return
+        kp = [get_float(self.mit_kp_edits[name]) for name in names]
+        kd = [get_float(self.mit_kd_edits[name]) for name in names]
+        tff = [get_float(self.mit_torque_edits[name]) for name in names]
+        return {'cubemars_kp': kp, 'cubemars_kd': kd, 'cubemars_torque_ff': tff}
+
+    def _on_apply_mit_gains(self):
+        names = self._mit_joint_names
         try:
-            kp = [get_float(self.mit_kp_edits[name]) for name in names]
-            kd = [get_float(self.mit_kd_edits[name]) for name in names]
-            tff = [get_float(self.mit_torque_edits[name]) for name in names]
+            mit = self._collect_mit_values()
         except (ValueError, KeyError):
             QMessageBox.critical(self, '入力エラー', 'Kp/Kd/torque_ffに数値を入力してください')
+            return
+        if not names:
+            _set_status(self.mit_gain_status_label,
+                        '実機出力対象の関節が設定されていないため送信をスキップしました', 'muted')
             return
         reply = QMessageBox.question(
             self, 'MITゲイン適用の確認',
@@ -1122,10 +1248,8 @@ class CommandGuiApp(QWidget):
             QMessageBox.Yes | QMessageBox.No)
         if reply != QMessageBox.Yes:
             return
-        ok = self.node.set_node_params(
-            TRAJ_NODE_NAME,
-            {'cubemars_kp': kp, 'cubemars_kd': kd, 'cubemars_torque_ff': tff},
-            self._apply_mit_gain_set_result)
+        self._persist_mit_values(mit)
+        ok = self.node.set_node_params(TRAJ_NODE_NAME, mit, self._apply_mit_gain_set_result)
         _set_status(self.mit_gain_status_label,
                     '適用中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
                     'muted' if ok else 'error')
@@ -1216,15 +1340,19 @@ class CommandGuiApp(QWidget):
             status += ' (実機出力無効: robomas_device_id未設定)'
         else:
             status += f' (device_id={device_id})'
+        self._persist_gains('robomas_gain', self._collect_robomas_values())
         _set_status(self.robomas_gain_status_label, status, 'info')
+
+    def _collect_robomas_values(self):
+        return {
+            'robomas_kp': get_float(self.robomas_kp_edit),
+            'robomas_kd': get_float(self.robomas_kd_edit),
+            'robomas_current_ff': get_float(self.robomas_current_ff_edit),
+        }
 
     def _on_apply_robomas_gains(self):
         try:
-            values = {
-                'robomas_kp': get_float(self.robomas_kp_edit),
-                'robomas_kd': get_float(self.robomas_kd_edit),
-                'robomas_current_ff': get_float(self.robomas_current_ff_edit),
-            }
+            values = self._collect_robomas_values()
         except ValueError:
             QMessageBox.critical(self, '入力エラー', 'Kp/Kd/current_ffに数値を入力してください')
             return
@@ -1236,6 +1364,7 @@ class CommandGuiApp(QWidget):
             QMessageBox.Yes | QMessageBox.No)
         if reply != QMessageBox.Yes:
             return
+        self._persist_gains('robomas_gain', values)
         ok = self.node.set_node_params(TRAJ_NODE_NAME, values, self._apply_robomas_gain_set_result)
         _set_status(self.robomas_gain_status_label,
                     '適用中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
@@ -1343,14 +1472,19 @@ class CommandGuiApp(QWidget):
         for name in ('theta_speed', 'z_speed', 'r_speed'):
             if name in values:
                 set_float(self.joy_speed_edits[name], round(values[name], 4))
+        self._persist_gains('joy_speed', self._collect_joy_speed_values())
         _set_status(self.joy_speed_status_label, '読込完了', 'info')
+
+    def _collect_joy_speed_values(self):
+        return {name: get_float(edit) for name, edit in self.joy_speed_edits.items()}
 
     def _on_apply_joy_speed(self):
         try:
-            values = {name: get_float(edit) for name, edit in self.joy_speed_edits.items()}
+            values = self._collect_joy_speed_values()
         except ValueError:
             QMessageBox.critical(self, '入力エラー', '速度に数値を入力してください')
             return
+        self._persist_gains('joy_speed', values)
         ok = self.node.set_node_params(JOY_NODE_NAME, values, self._apply_joy_speed_set_result)
         _set_status(self.joy_speed_status_label,
                     '適用中...' if ok else 'joy_teleop_nodeに接続できません(use_joy:=trueで起動?)',
@@ -1515,6 +1649,72 @@ class CommandGuiApp(QWidget):
         os.makedirs(os.path.dirname(POINTS_FILE), exist_ok=True)
         with open(POINTS_FILE, 'w', encoding='utf-8') as f:
             json.dump(self.points, f, ensure_ascii=False, indent=2)
+
+    # ---------- gain persistence ----------
+    # 軌道生成・MIT・robomas・joy速度の各ゲインは、「読込」(GetParameters)を
+    # 経由しなくても起動直後からGUI保持値を使えるよう、最後に適用/読込した値を
+    # gains.jsonへ保存し、起動時にGUI入力欄の初期値として復元する。ノード側の
+    # yamlデフォルトとは独立した「GUIが最後に確認した値」のキャッシュである。
+    @staticmethod
+    def _load_gains_file():
+        if not os.path.exists(GAINS_FILE):
+            return {}
+        try:
+            with open(GAINS_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return {}
+
+    def _persist_gains(self, section, data):
+        self._saved_gains[section] = data
+        os.makedirs(os.path.dirname(GAINS_FILE), exist_ok=True)
+        with open(GAINS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(self._saved_gains, f, ensure_ascii=False, indent=2)
+
+    def _persist_traj_values(self, traj):
+        names = self._traj_joint_names
+        self._persist_gains('trajectory', {
+            'max_velocity': dict(zip(names, traj['max_velocity'])),
+            'max_acceleration': dict(zip(names, traj['max_acceleration'])),
+        })
+
+    def _persist_mit_values(self, mit):
+        names = self._mit_joint_names
+        self._persist_gains('mit_gain', {
+            'cubemars_kp': dict(zip(names, mit['cubemars_kp'])),
+            'cubemars_kd': dict(zip(names, mit['cubemars_kd'])),
+            'cubemars_torque_ff': dict(zip(names, mit['cubemars_torque_ff'])),
+        })
+
+    def _restore_saved_gains(self):
+        """__init__終盤(各パネル構築後)に一度だけ呼び、gains.jsonの内容を各
+        入力欄の初期値へ反映する。ファイルが無い/壊れている場合は0.0のまま
+        (make_float_editの初期値)とする。"""
+        traj = self._saved_gains.get('trajectory', {})
+        for key, edits in (('max_velocity', self.traj_vel_edits), ('max_acceleration', self.traj_accel_edits)):
+            for name, v in traj.get(key, {}).items():
+                if name in edits:
+                    set_float(edits[name], v)
+
+        mit = self._saved_gains.get('mit_gain', {})
+        for key, edits in (('cubemars_kp', self.mit_kp_edits), ('cubemars_kd', self.mit_kd_edits),
+                           ('cubemars_torque_ff', self.mit_torque_edits)):
+            for name, v in mit.get(key, {}).items():
+                if name in edits:
+                    set_float(edits[name], v)
+
+        robomas = self._saved_gains.get('robomas_gain', {})
+        if 'robomas_kp' in robomas:
+            set_float(self.robomas_kp_edit, robomas['robomas_kp'])
+        if 'robomas_kd' in robomas:
+            set_float(self.robomas_kd_edit, robomas['robomas_kd'])
+        if 'robomas_current_ff' in robomas:
+            set_float(self.robomas_current_ff_edit, robomas['robomas_current_ff'])
+
+        joy = self._saved_gains.get('joy_speed', {})
+        for name, edit in self.joy_speed_edits.items():
+            if name in joy:
+                set_float(edit, joy[name])
 
 
 def main(args=None):
