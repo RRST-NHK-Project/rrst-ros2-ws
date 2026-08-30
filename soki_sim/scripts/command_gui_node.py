@@ -536,8 +536,10 @@ class CommandGuiApp(QWidget):
 
         manual_tab = QWidget()
         integrated_tab = QWidget()
-        self.tabs.addTab(manual_tab, 'マニュアル操作')
+        # 統合操作を既定表示にするだけでなく、タブの並びも一番左にする
+        # (先に追加した方が左側になる)。
         self.tabs.addTab(integrated_tab, '統合操作')
+        self.tabs.addTab(manual_tab, 'マニュアル操作')
 
         self._build_move_tab(manual_tab)
         self._build_settings_tab(integrated_tab)
@@ -550,8 +552,11 @@ class CommandGuiApp(QWidget):
         self._redraw_pin()
         self._refresh_point_list()
 
-        self.setMinimumWidth(560)
-        self.resize(760, 820)
+        # 統合操作タブは軌道生成/MIT/robomasゲイン等のグリッドが左右2列に並ぶため、
+        # 940pxだとまだ右端が少し欠けて横スクロールが発生していた。実測で2列とも
+        # 横スクロール無しで収まる幅(約1160px)を既定値にする。
+        self.setMinimumWidth(660)
+        self.resize(1180, 820)
 
         # rclpy.spin_once()はmixed_joint_states購読・パラメータサービスの応答処理に
         # 必要(このタイマーのコールバック=Qtのイベントループと同じメインスレッド上で
@@ -678,11 +683,18 @@ class CommandGuiApp(QWidget):
         self._build_apply_all_panel(inner_layout)
         self._build_field_buttons(inner_layout)
 
+        # ストレッチ比を指定しないとQBoxLayoutは余った横幅を両列に均等配分して
+        # しまい、内容が小さい左列だけ不自然に広がっていた。かといって右列に
+        # stretch=1を与えると、今度は右列内のQGridLayout(ラベル列)が余白を
+        # 吸ってラベルと入力欄の間に大きな隙間ができてしまう。どちらの列も
+        # 中身ぴったりのサイズに留め、余った横幅は列の外側(末尾のstretch)へ
+        # 逃がすのが正しい。
         columns = QHBoxLayout()
         left_col = QVBoxLayout()
         right_col = QVBoxLayout()
-        columns.addLayout(left_col)
-        columns.addLayout(right_col)
+        columns.addLayout(left_col, 0)
+        columns.addLayout(right_col, 0)
+        columns.addStretch(1)
         inner_layout.addLayout(columns)
         inner_layout.addStretch(1)
 
@@ -690,12 +702,16 @@ class CommandGuiApp(QWidget):
         self._build_mode_panel(left_col)
         self._build_machine_origin_offset_panel(left_col)
         self._build_origin_panel(left_col)
+        # 同様に縦方向も、右列(パネル数が多く縦に長い)に合わせて左列の各パネルが
+        # 間延びして伸びないよう、余った縦幅は末尾のstretchへ逃がす。
+        left_col.addStretch(1)
 
         self._build_trajectory_panel(right_col)
         self._build_joy_speed_panel(right_col)
         self._build_mit_gain_panel(right_col)
         self._build_robomas_gain_panel(right_col)
         self._build_homing_panel(right_col)
+        right_col.addStretch(1)
 
         scroll.setWidget(inner)
         outer.addWidget(scroll)
@@ -847,7 +863,9 @@ class CommandGuiApp(QWidget):
         self.traj_vel_edits = {}
         self.traj_accel_edits = {}
         for i, name in enumerate(JOINT_NAMES):
-            grid.addWidget(QLabel(name), i + 1, 0)
+            # 行ラベルは"_joint"を省いて表示(ボックス見出しで対象は自明なため、
+            # 列幅を無駄に広げないようにする)。辞書キーは元のjoint名のまま。
+            grid.addWidget(QLabel(name.removesuffix('_joint')), i + 1, 0)
             vel_edit = make_float_edit(0.0, width=70)
             accel_edit = make_float_edit(0.0, width=70)
             self.traj_vel_edits[name] = vel_edit
@@ -916,7 +934,7 @@ class CommandGuiApp(QWidget):
         self.mit_kd_edits = {}
         self.mit_torque_edits = {}
         for i, name in enumerate(CUBEMARS_JOINT_NAMES):
-            grid.addWidget(QLabel(name), i + 1, 0)
+            grid.addWidget(QLabel(name.removesuffix('_joint')), i + 1, 0)
             kp_edit = make_float_edit(0.0, width=60)
             kd_edit = make_float_edit(0.0, width=60)
             tff_edit = make_float_edit(0.0, width=60)
@@ -1068,10 +1086,17 @@ class CommandGuiApp(QWidget):
     def _build_button_grid(self, grid, points, header_row=0):
         """points: (label, x, y, z)のリスト。実座標を見た目通りに配置する
         (X昇順=左->右の列、Y降順=奥(ワーク方向)が上->手前が下の行)。"""
-        grid.addWidget(QLabel('← X- ・ X+ →'), 0, 0, 1, 99)
         grid.setHorizontalSpacing(4)
         xs = sorted({round(p[1], 6) for p in points})
         ys = sorted({round(p[2], 6) for p in points}, reverse=True)
+        # ヘッダーラベルのcolSpanは実際の列数ぴったりにする。以前は"とりあえず
+        # 十分大きい値"として99を指定していたが、QGridLayoutはcolSpanの終端列まで
+        # 実在する列として扱うため、ボタンが無い列が90個以上生まれ、
+        # setHorizontalSpacing(4)による列間隙間(4px×約98列分)がそのまま
+        # ボックスの余分な横幅になっていた(ワーク/シューティングボックスが
+        # 中身に対して不自然に広く見えていた原因)。
+        ncols = len(xs)
+        grid.addWidget(QLabel('← X- ・ X+ →'), 0, 0, 1, ncols)
         # ラベル文字列("4-6"等)がボタン内に収まるよう、実際の文字幅+variant="grid"の
         # 詰めたpadding(QSS参照。4px*2+border2px)分の余白から幅を決める。
         # 固定48pxだと桁数が増えたラベルが見切れていた。
@@ -1085,7 +1110,7 @@ class CommandGuiApp(QWidget):
             btn.setFixedWidth(btn_width)
             btn.clicked.connect(lambda _checked=False, x=x, y=y, z=z: self._on_field_point(x, y, z))
             grid.addWidget(btn, row, col)
-        grid.addWidget(QLabel('↑ Y+ (ワーク側) ／ Y- (機体側) ↓'), header_row + len(ys), 0, 1, 99)
+        grid.addWidget(QLabel('↑ Y+ (ワーク側) ／ Y- (機体側) ↓'), header_row + len(ys), 0, 1, ncols)
 
     def _on_field_point(self, x, y, z):
         self._send_xyz(x, y, z)
