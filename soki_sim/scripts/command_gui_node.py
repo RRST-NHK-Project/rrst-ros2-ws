@@ -1068,24 +1068,34 @@ class CommandGuiApp(QWidget):
         _set_status(self.origin_status_label, message, 'success' if success else 'error')
 
     def _build_field_buttons(self, layout):
-        field_row = QHBoxLayout()
+        # 以前はワーク/シューティングボックスを別々のボックス(別々の座標系)で
+        # 描画していたため、両者の実際の左右・奥行き関係(シューティングボックスは
+        # ワークより機体側(Y-)にあり、X方向はワークの可動列よりさらに外側にある)が
+        # GUI上で見た目に対応していなかった。1つのグリッドに統合し、実座標
+        # (WORK_POINTS/SHOOT_POINTSのx,y)でボタン位置を決めることで、実際の
+        # フィールド配置(奥からワーク4列・機体・シューティングボックス4列の順)と
+        # 対応する見た目にする。
+        box = QGroupBox('ワーク・シューティングボックス (クリックで移動、実フィールド配置)')
+        grid = QGridLayout(box)
+        work_points = [p for row in WORK_POINTS for p in row]
+        shoot_points = SHOOT_POINTS['L'] + SHOOT_POINTS['R']
+        n_work_rows = len({round(p[2], 6) for p in work_points})
+        self._build_button_grid(grid, work_points + shoot_points, header_row=1,
+                                 gap_after_rank=n_work_rows - 1, gap_label='(機体)')
+        # QVBoxLayoutへ直接addWidgetすると幅いっぱいに引き伸ばされてしまう
+        # (グリッド内容は中身ぴったりのまま、右側だけ間延びした余白ができる)ため、
+        # 横方向はQHBoxLayout+末尾stretchで中身ぴったりの幅に留める。
+        row = QHBoxLayout()
+        row.addWidget(box)
+        row.addStretch(1)
+        layout.addLayout(row)
 
-        work_box = QGroupBox('ワーク (クリックで移動)')
-        work_grid = QGridLayout(work_box)
-        self._build_button_grid(work_grid, [p for row in WORK_POINTS for p in row], header_row=1)
-        field_row.addWidget(work_box)
-
-        shoot_box = QGroupBox('シューティングボックス (クリックで移動)')
-        shoot_grid = QGridLayout(shoot_box)
-        self._build_button_grid(shoot_grid, SHOOT_POINTS['L'] + SHOOT_POINTS['R'], header_row=1)
-        field_row.addWidget(shoot_box)
-
-        field_row.addStretch(1)
-        layout.addLayout(field_row)
-
-    def _build_button_grid(self, grid, points, header_row=0):
+    def _build_button_grid(self, grid, points, header_row=0, gap_after_rank=None, gap_label=''):
         """points: (label, x, y, z)のリスト。実座標を見た目通りに配置する
-        (X昇順=左->右の列、Y降順=奥(ワーク方向)が上->手前が下の行)。"""
+        (X昇順=左->右の列、Y降順=奥(ワーク方向)が上->手前が下の行)。
+        gap_after_rankを指定すると、Y順位でその順位を超えた行を1行分下にずらし、
+        間にgap_labelを挟む(ワーク行とシューティングボックス行の間に機体分の
+        空白を作るため)。"""
         grid.setHorizontalSpacing(4)
         xs = sorted({round(p[1], 6) for p in points})
         ys = sorted({round(p[2], 6) for p in points}, reverse=True)
@@ -1104,13 +1114,24 @@ class CommandGuiApp(QWidget):
         btn_width = max(metrics.horizontalAdvance(label) for label, _, _, _ in points) + 14
         for label, x, y, z in points:
             col = xs.index(round(x, 6))
-            row = ys.index(round(y, 6)) + header_row
+            rank = ys.index(round(y, 6))
+            if gap_after_rank is not None and rank > gap_after_rank:
+                rank += 1
             btn = QPushButton(label)
             btn.setProperty('variant', 'grid')
             btn.setFixedWidth(btn_width)
             btn.clicked.connect(lambda _checked=False, x=x, y=y, z=z: self._on_field_point(x, y, z))
-            grid.addWidget(btn, row, col)
-        grid.addWidget(QLabel('↑ Y+ (ワーク側) ／ Y- (機体側) ↓'), header_row + len(ys), 0, 1, ncols)
+            grid.addWidget(btn, rank + header_row, col)
+
+        has_gap = gap_after_rank is not None
+        if has_gap and gap_label:
+            gap_widget = QLabel(gap_label)
+            gap_widget.setAlignment(Qt.AlignCenter)
+            _set_status(gap_widget, gap_label, 'muted')
+            grid.addWidget(gap_widget, header_row + gap_after_rank + 1, 0, 1, ncols)
+
+        total_rows = len(ys) + (1 if has_gap else 0)
+        grid.addWidget(QLabel('↑ Y+ (ワーク側) ／ Y- (機体側) ↓'), header_row + total_rows, 0, 1, ncols)
 
     def _on_field_point(self, x, y, z):
         self._send_xyz(x, y, z)
