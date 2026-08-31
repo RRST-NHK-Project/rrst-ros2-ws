@@ -355,7 +355,16 @@ class TrajectoryFollowerNode(Node):
         # 基準値になる点に注意(robomas_z_offset_m/r_offset_mはhoming_node完了後に
         # SetParametersで反映される。ここでの初期値はホーミング前でも安全な
         # 「現在のロータ位置をそのままz/rの原点とみなす」フォールバックでしかない)。
-        if self.has_target_ or self.robomas_ is None:
+        #
+        # robomas_paused_中(homing_node等がrobomas_device_idを直接制御している間)も
+        # 帰還を使ってpos_/target_を追従させ続ける。これをしないと、ホーミング中に
+        # 実機が物理的に動いてもpos_/target_はホーミング開始前の値(通常0付近)に
+        # 凍結されたままになり、resume_robomas_output時にMITコントローラがその
+        # 凍結値へ向けて急激な位置ステップ(=中断すると0付近へ戻ろうとする現象)を
+        # 送ってしまう。
+        if self.robomas_ is None:
+            return
+        if self.has_target_ and not self.robomas_paused_:
             return
         cfg = self.robomas_
         m1_deg = msg.data[cfg['motor1_index']] * ROBOMAS_FEEDBACK_POSITION_SCALE_DEG

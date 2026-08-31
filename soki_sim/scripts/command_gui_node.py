@@ -742,6 +742,13 @@ class CommandGuiApp(QWidget):
         self._spin_timer.timeout.connect(self._spin_ros)
         self._spin_timer.start(50)
 
+        # trajectory_follower_nodeがGUIより後に立ち上がることもあるため、
+        # サービスが使えるようになるまで一定間隔でリトライし、使えた時点で
+        # 一度だけ自動読込する(_try_auto_load_traj_params参照)。
+        self._traj_auto_load_timer = QTimer(self)
+        self._traj_auto_load_timer.timeout.connect(self._try_auto_load_traj_params)
+        self._traj_auto_load_timer.start(500)
+
     # ---------- manual tab ----------
     def _build_move_tab(self, parent):
         layout = QHBoxLayout(parent)
@@ -1508,6 +1515,17 @@ class CommandGuiApp(QWidget):
         _set_status(self.traj_status_label,
                     '読込中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
                     'muted' if ok else 'error')
+        return ok
+
+    def _try_auto_load_traj_params(self):
+        # real_all_axes_test.launch.py等、tip_theta_jointを含む4関節構成では、
+        # 「読込」未実行のままGUI固定の3関節(JOINT_NAMES)で「適用」すると
+        # trajectory_follower_node側で「4要素必要」と拒否されてしまう
+        # (_collect_traj_values/__init__のコメント参照)。起動直後にサービスが
+        # 使えるようになり次第自動で一度「読込」し、実際のjoint_names構成を
+        # GUI側に反映しておくことでこれを防ぐ。
+        if self._on_load_traj_params():
+            self._traj_auto_load_timer.stop()
 
     def _apply_loaded_traj_params(self, values):
         vel = values.get('max_velocity')

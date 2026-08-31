@@ -52,9 +52,9 @@ homing_node:
 
     # 確認済み(note/can_mapping.txt「z/r原点センサ(ホーミング用)」): z軸=SW1、
     # r軸=SW2、どちらも同じノード(node_index=1)に載っている。
-    z_limit_switch_node_index: 1
+    z_limit_switch_node_index: 0
     z_limit_switch_local_index: 0   # SW1
-    r_limit_switch_node_index: 1
+    r_limit_switch_node_index: 0
     r_limit_switch_local_index: 1   # SW2
     switch_triggered_value: 1        # firmwareの!digitalRead()相当(要確認)
 
