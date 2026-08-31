@@ -48,6 +48,7 @@ import math
 import os
 import re
 import sys
+import unicodedata
 
 import yaml
 
@@ -357,10 +358,40 @@ def _set_status(label: QLabel, text: str, role: str = 'muted'):
     label.setStyleSheet(f'color: {_ROLE_COLORS[role]};')
 
 
+_ZENKAKU_SIGN_TRANSLATION = str.maketrans({'－': '-', '−': '-', '．': '.'})
+
+
+def _normalize_numeral_text(text: str) -> str:
+    """全角数字・全角マイナス・全角ピリオドを半角へ正規化する。
+
+    日本語IME確定直後は全角文字のままのことがあり、QDoubleValidator/
+    QIntValidatorは全角文字をInvalidとして入力自体を弾いてしまう
+    (キー入力が反映されず、気づかないまま欄が空/不完全になり適用時に
+    「数値を入力してください」エラーになる)。入力の検証前に正規化して
+    半角数字として扱えるようにする。"""
+    return unicodedata.normalize('NFKC', text).translate(_ZENKAKU_SIGN_TRANSLATION)
+
+
+class _NormalizingDoubleValidator(QDoubleValidator):
+    """全角入力を正規化してから検証するQDoubleValidator。"""
+
+    def validate(self, input_str, pos):
+        normalized = _normalize_numeral_text(input_str)
+        return super().validate(normalized, min(pos, len(normalized)))
+
+
+class _NormalizingIntValidator(QIntValidator):
+    """全角入力を正規化してから検証するQIntValidator。"""
+
+    def validate(self, input_str, pos):
+        normalized = _normalize_numeral_text(input_str)
+        return super().validate(normalized, min(pos, len(normalized)))
+
+
 def make_float_edit(initial: float, width: int = 80) -> QLineEdit:
     """数値入力用QLineEdit(Tkinter版のtk.Entry+DoubleVarに相当)を生成する。"""
     edit = QLineEdit()
-    edit.setValidator(QDoubleValidator(-1.0e6, 1.0e6, 6))
+    edit.setValidator(_NormalizingDoubleValidator(-1.0e6, 1.0e6, 6))
     edit.setMaximumWidth(width)
     set_float(edit, initial)
     return edit
@@ -369,7 +400,7 @@ def make_float_edit(initial: float, width: int = 80) -> QLineEdit:
 def get_float(edit: QLineEdit) -> float:
     """QLineEditの内容をfloatとして取得する。数値でない場合はValueErrorを送出する
     (Tkinter版のDoubleVar.get()がtk.TclErrorを送出するのに相当)。"""
-    text = edit.text().strip()
+    text = _normalize_numeral_text(edit.text().strip())
     if text in ('', '-', '.', '-.'):
         raise ValueError(text)
     return float(text)
@@ -382,14 +413,14 @@ def set_float(edit: QLineEdit, value: float):
 def make_int_edit(initial: int, width: int = 60) -> QLineEdit:
     """整数入力用QLineEdit(device_id/motor_index等、yamlの型がintのもの用)。"""
     edit = QLineEdit()
-    edit.setValidator(QIntValidator(-1_000_000, 1_000_000))
+    edit.setValidator(_NormalizingIntValidator(-1_000_000, 1_000_000))
     edit.setMaximumWidth(width)
     set_int(edit, initial)
     return edit
 
 
 def get_int(edit: QLineEdit) -> int:
-    text = edit.text().strip()
+    text = _normalize_numeral_text(edit.text().strip())
     if text in ('', '-'):
         raise ValueError(text)
     return int(text)
@@ -641,6 +672,13 @@ class CommandGuiApp(QWidget):
         # GUI側で既知の定数(JOINT_NAMES/CUBEMARS_JOINT_NAMES)を初期値にしておく。
         # 「読込」を実行した場合はノードの実際の構成(一部関節のみ等)で上書きされる。
         self._traj_joint_names = list(JOINT_NAMES)
+        # tip_theta_joint等、JOINT_NAMES(GUIの軌道パネルが編集欄を持つ関節)に
+        # 含まれない関節がノード側のjoint_namesに含まれる場合(real_all_axes_test.
+        # launch.py等)に、その関節の最後に読み込んだ値を保持しておく。GUIに編集欄が
+        # 無いため「適用」時にその関節の値だけ書き変えずに送り直すために使う
+        # (無いと_collect_traj_valuesがKeyErrorになり、実際は数値の問題ではないのに
+        # 「速度・加速度に数値を入力してください」と誤表示される)。
+        self._traj_loaded_extra = {}
         self._mit_joint_names = list(CUBEMARS_JOINT_NAMES)
         self._saved_gains = self._load_gains_file()
         self._apply_all_results = {}
@@ -1478,14 +1516,19 @@ class CommandGuiApp(QWidget):
         names = values.get('joint_names') or JOINT_NAMES
         self._traj_joint_names = list(names)
         missing = [n for n in JOINT_NAMES if n not in names]
+        self._traj_loaded_extra = {}
         if vel and len(vel) == len(names):
             for name, v in zip(names, vel):
                 if name in self.traj_vel_edits:
                     set_float(self.traj_vel_edits[name], round(v, 4))
+                else:
+                    self._traj_loaded_extra.setdefault(name, {})['max_velocity'] = v
         if accel and len(accel) == len(names):
             for name, v in zip(names, accel):
                 if name in self.traj_accel_edits:
                     set_float(self.traj_accel_edits[name], round(v, 4))
+                else:
+                    self._traj_loaded_extra.setdefault(name, {})['max_acceleration'] = v
         if mode:
             self._set_mode_silent(mode)
             _set_status(self.mode_status_label, f'現在のモード: {mode}', 'info')
@@ -1498,10 +1541,22 @@ class CommandGuiApp(QWidget):
 
     def _collect_traj_values(self):
         """軌道生成パラメータをGUI入力欄から取得する(self._traj_joint_names順)。
-        「読込」未実行でもGUI固定のJOINT_NAMESを対象に動作する(__init__参照)。"""
+        「読込」未実行でもGUI固定のJOINT_NAMESを対象に動作する(__init__参照)。
+        tip_theta_joint等、GUIに編集欄が無い関節(JOINT_NAMES対象外)がノード側の
+        joint_namesに含まれる場合は、_traj_loaded_extraに保持した読込時の値を
+        そのまま使い、その関節の設定値を変更せず送り直す(real_all_axes_test.
+        launch.py参照)。"""
         names = self._traj_joint_names
-        vel = [get_float(self.traj_vel_edits[name]) for name in names]
-        accel = [get_float(self.traj_accel_edits[name]) for name in names]
+        vel = [
+            get_float(self.traj_vel_edits[name]) if name in self.traj_vel_edits
+            else self._traj_loaded_extra[name]['max_velocity']
+            for name in names
+        ]
+        accel = [
+            get_float(self.traj_accel_edits[name]) if name in self.traj_accel_edits
+            else self._traj_loaded_extra[name]['max_acceleration']
+            for name in names
+        ]
         return {'max_velocity': vel, 'max_acceleration': accel}
 
     def _on_apply_traj_params(self):
