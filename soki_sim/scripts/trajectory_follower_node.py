@@ -68,6 +68,13 @@ homing_node(z/rの起動時ホーミング)は本ノードと同じdevice(roboma
 した(root_theta原点設定の_origin_pending_と同様、外部ノードから能動的に
 出力を止めるパターン)。homing_node側がstart_homing時にpause、
 stop_homing/完了/タイムアウト失敗時にresumeを呼ぶ。
+
+z/r軸にはそれぞれ上限・下限のリミットスイッチがある(homing_nodeが原点較正に
+使う下限側とは別に、上限側は過走防止の安全停止専用、2026-08-31追加)。
+本ノードは*_limit_switch_device_id/*_node_index/*_local_indexパラメータ
+(z/r × lower/upper の4系統、device_id=0で該当スイッチ無効)でCAN_HOSTの
+帰還を直接監視し、timer_callbackでトリガーされている方向への移動だけを
+ロックする(反対方向への後退は許可、_limit_triggered参照)。
 """
 import math
 
@@ -202,6 +209,22 @@ class TrajectoryFollowerNode(Node):
         self.declare_parameter('robomas_z_offset_m', 0.0)
         self.declare_parameter('robomas_r_offset_m', 0.0)
 
+        # z/r軸それぞれの上限・下限リミットスイッチ(CAN_HOST経由、過走防止の
+        # 安全停止用、2026-08-31追加)。homing_nodeが原点較正に使う原点センサ
+        # (通常は下限側)とは別に、本ノードは4個(z上限/z下限/r上限/r下限)を
+        # 独立に監視し、トリガーされた方向への移動だけをロックする(反対方向への
+        # 後退は許可、_limit_triggered/timer_callback参照)。device_id=0(既定)は
+        # そのスイッチ未配線・無効を意味する。node_index/local_indexの意味は
+        # homing_node.py/note/can_mapping.txtの原点センサと同じ
+        # (local_index: 0=SW1/1=SW2/2=SW3)。
+        self.declare_parameter('limit_switch_can_host_slots_per_node', 5)
+        self.declare_parameter('limit_switch_triggered_value', 1)
+        for _axis, _direction in (('z', 'lower'), ('z', 'upper'), ('r', 'lower'), ('r', 'upper')):
+            _prefix = f'{_axis}_{_direction}_limit_switch'
+            self.declare_parameter(f'{_prefix}_device_id', 0)
+            self.declare_parameter(f'{_prefix}_node_index', 0)
+            self.declare_parameter(f'{_prefix}_local_index', 0)
+
         self.joint_names_ = list(self.get_parameter('joint_names').value)
         max_vel = list(self.get_parameter('max_velocity').value)
         max_accel = list(self.get_parameter('max_acceleration').value)
@@ -225,6 +248,7 @@ class TrajectoryFollowerNode(Node):
 
         self._setup_cubemars_outputs()
         self._setup_robomas_outputs()
+        self._setup_limit_switches()
         self.create_service(Trigger, 'set_root_theta_origin', self._on_set_root_theta_origin)
 
         # max_velocity/max_accelerationは起動時にself.max_vel_/max_accel_へ
@@ -247,7 +271,8 @@ class TrajectoryFollowerNode(Node):
             f'trajectory_follower_node started: {input_topic} -> {output_topic} '
             f'(joints={self.joint_names_}, rate={update_rate_hz}Hz, '
             f'control_mode={self.control_mode_}, cubemars_joints={list(self.cubemars_.keys())}, '
-            f'robomas_enabled={self.robomas_ is not None})')
+            f'robomas_enabled={self.robomas_ is not None}, '
+            f'limit_switches={sorted("_".join(k) for k in self._limit_switches_.keys())})')
 
     def _setup_cubemars_outputs(self):
         names = list(self.get_parameter('cubemars_joint_names').value)
@@ -347,6 +372,64 @@ class TrajectoryFollowerNode(Node):
             Int32MultiArray, f'serial_rx_{device_id}_unwrapped', self._on_robomas_feedback, 10)
         self.create_service(Trigger, 'pause_robomas_output', self._on_pause_robomas_output)
         self.create_service(Trigger, 'resume_robomas_output', self._on_resume_robomas_output)
+
+    def _setup_limit_switches(self):
+        """z/r軸それぞれの上限・下限リミットスイッチ(CAN_HOST経由)を監視する。
+        robomas_device_id未設定(実機出力無効)なら対象のz_joint/r_joint自体が
+        無いため何もしない。"""
+        self._limit_switches_ = {}
+        self._limit_switch_can_host_data_ = {}
+        self._limit_switch_subs_ = {}
+        self._limit_switch_prev_triggered_ = {}
+        if self.robomas_ is None:
+            return
+
+        slots_per_node = int(self.get_parameter('limit_switch_can_host_slots_per_node').value)
+        self.limit_switch_triggered_value_ = int(
+            self.get_parameter('limit_switch_triggered_value').value)
+        joint_for_axis = {'z': self.robomas_['z_joint'], 'r': self.robomas_['r_joint']}
+
+        for axis, direction in (('z', 'lower'), ('z', 'upper'), ('r', 'lower'), ('r', 'upper')):
+            prefix = f'{axis}_{direction}_limit_switch'
+            device_id = int(self.get_parameter(f'{prefix}_device_id').value)
+            if device_id == 0:
+                continue
+            node_index = int(self.get_parameter(f'{prefix}_node_index').value)
+            local_index = int(self.get_parameter(f'{prefix}_local_index').value)
+            key = (axis, direction)
+            self._limit_switches_[key] = {
+                'device_id': device_id,
+                'slot': node_index * slots_per_node + local_index,
+                'joint': joint_for_axis[axis],
+            }
+            self._limit_switch_prev_triggered_[key] = False
+            if device_id not in self._limit_switch_subs_:
+                self._limit_switch_can_host_data_[device_id] = None
+                self._limit_switch_subs_[device_id] = self.create_subscription(
+                    Int32MultiArray, f'serial_rx_{device_id}_unwrapped',
+                    lambda msg, did=device_id: self._on_limit_switch_feedback(msg, did), 10)
+
+    def _on_limit_switch_feedback(self, msg: Int32MultiArray, device_id: int):
+        self._limit_switch_can_host_data_[device_id] = msg.data
+
+    def _limit_triggered(self, axis, direction):
+        """axis('z'/'r')のdirection('lower'/'upper')側リミットスイッチが現在
+        トリガーされているか。未配線(device_id=0)・帰還未受信ならFalse。"""
+        info = self._limit_switches_.get((axis, direction))
+        if info is None:
+            return False
+        data = self._limit_switch_can_host_data_.get(info['device_id'])
+        if data is None:
+            return False
+        triggered = bool(data[info['slot']] == self.limit_switch_triggered_value_)
+        key = (axis, direction)
+        if triggered and not self._limit_switch_prev_triggered_.get(key, False):
+            self.get_logger().warning(
+                f"trajectory_follower_node: {axis}_{direction} limit switch triggered "
+                f"(device_id={info['device_id']}, slot={info['slot']}). blocking further "
+                f"{'increase' if direction == 'upper' else 'decrease'} of {info['joint']}.")
+        self._limit_switch_prev_triggered_[key] = triggered
+        return triggered
 
     def _on_robomas_feedback(self, msg: Int32MultiArray):
         # _on_cubemars_feedbackと同じ理由(起動直後の位置ジャンプ防止)。
@@ -501,9 +584,26 @@ class TrajectoryFollowerNode(Node):
         if not self.has_target_:
             return
 
+        # z/rはリミットスイッチがトリガーされている方向への移動だけをロックする
+        # (反対方向への後退はそのまま許可)。target_自体は書き換えず、この周期の
+        # trap_stepに渡す目標だけを現在位置にクランプすることで、スイッチが
+        # 外れれば追加のtarget送信なしに自動で元のtarget_へ向けて再開する。
+        axis_for_joint = {}
+        if self.robomas_ is not None:
+            axis_for_joint[self.robomas_['z_joint']] = 'z'
+            axis_for_joint[self.robomas_['r_joint']] = 'r'
+
         for name in self.joint_names_:
+            target = self.target_[name]
+            axis = axis_for_joint.get(name)
+            if axis is not None:
+                pos = self.pos_[name]
+                if target > pos and self._limit_triggered(axis, 'upper'):
+                    target = pos
+                elif target < pos and self._limit_triggered(axis, 'lower'):
+                    target = pos
             self.pos_[name], self.vel_[name] = trap_step(
-                self.pos_[name], self.vel_[name], self.target_[name],
+                self.pos_[name], self.vel_[name], target,
                 self.eff_max_vel_[name], self.eff_max_accel_[name], self.dt_)
 
         out = JointState()

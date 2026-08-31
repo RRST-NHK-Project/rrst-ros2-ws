@@ -182,37 +182,92 @@ MACHINE_ORIGIN_OFFSET_LIMIT = 0.1
 # homing_node.py参照)ため、ENC1/ENC2配線設定パネルは廃止した。CAN_HOSTは
 # z/r原点センサ(SW1/SW2のリミットスイッチ)専用になったため、その設定は
 # HOMING_WIRING_FIELDSへ統合した。
+# field_specsの形式: [(行見出し または None, [(key, ラベル, 型), ...]), ...]。
+# 1タプルが1行に横並びで描画される(ID・ノード・スロット等、意味のある単位を
+# 1行にまとめるため。2026-08-31、それまでは単純に2個ずつ機械的に折り返していた
+# だけで、関連する項目が別行に分かれてしまっていた)。
 ROBOMAS_WIRING_FIELDS = [
-    ('robomas_device_id', 'RoboMas ID', 'int'),
-    ('robomas_motor1_index', 'motor1スロット', 'int'),
-    ('robomas_motor2_index', 'motor2スロット', 'int'),
-    ('motor1_sign', 'motor1回転方向(±1)', 'float'),
-    ('motor2_sign', 'motor2回転方向(±1)', 'float'),
+    (None, [
+        ('robomas_device_id', 'ID', 'int'),
+        ('robomas_motor1_index', 'motor1スロット', 'int'),
+        ('robomas_motor2_index', 'motor2スロット', 'int'),
+    ]),
+    (None, [
+        ('motor1_sign', 'motor1回転方向(±1)', 'float'),
+        ('motor2_sign', 'motor2回転方向(±1)', 'float'),
+    ]),
 ]
 CUBEMARS_WIRING_FIELDS = [
-    ('cubemars_device_id', 'CubeMars ID', 'int'),
-    ('cubemars_root_theta_index', 'root_thetaスロット', 'int'),
-    ('cubemars_tip_theta_index', 'tip_thetaスロット', 'int'),
-    ('root_theta_sign', 'root_theta回転方向(±1)', 'float'),
-    ('tip_theta_sign', 'tip_theta回転方向(±1)', 'float'),
+    (None, [
+        ('cubemars_device_id', 'ID', 'int'),
+        ('cubemars_root_theta_index', 'root_thetaスロット', 'int'),
+        ('cubemars_tip_theta_index', 'tip_thetaスロット', 'int'),
+    ]),
+    (None, [
+        ('root_theta_sign', 'root_theta回転方向(±1)', 'float'),
+        ('tip_theta_sign', 'tip_theta回転方向(±1)', 'float'),
+    ]),
 ]
 HOMING_WIRING_FIELDS = [
-    ('can_host_device_id', 'CAN_HOST ID', 'int'),
-    ('can_host_slots_per_node', 'ノードあたりスロット数', 'int'),
-    ('z_limit_switch_node_index', 'z原点センサ ノード番号', 'int'),
-    ('z_limit_switch_local_index', 'z原点センサ スロット', 'int'),
-    ('r_limit_switch_node_index', 'r原点センサ ノード番号', 'int'),
-    ('r_limit_switch_local_index', 'r原点センサ スロット', 'int'),
-    ('switch_triggered_value', 'SW検出値', 'int'),
-    ('robomas_device_id', 'RoboMas ID(ホーミング用)', 'int'),
-    ('robomas_motor1_index', 'RoboMas motor1スロット', 'int'),
-    ('robomas_motor2_index', 'RoboMas motor2スロット', 'int'),
-    ('z_home_motor1_vel_sign', 'zホーミング時RoboMas motor1回転方向(±1)', 'float'),
-    ('z_home_motor2_vel_sign', 'zホーミング時RoboMas motor2回転方向(±1)', 'float'),
-    ('r_home_motor1_vel_sign', 'rホーミング時RoboMas motor1回転方向(±1)', 'float'),
-    ('r_home_motor2_vel_sign', 'rホーミング時RoboMas motor2回転方向(±1)', 'float'),
-    ('z_ref_value_m', 'z原点センサ位置の真値[m]', 'float'),
-    ('r_ref_value_m', 'r原点センサ位置の真値[m]', 'float'),
+    (None, [
+        ('can_host_device_id', 'CAN_HOST ID', 'int'),
+        ('can_host_slots_per_node', 'ノードあたりスロット数', 'int'),
+        ('switch_triggered_value', 'SW検出値', 'int'),
+    ]),
+    ('z原点センサ', [
+        ('z_limit_switch_node_index', 'ノード', 'int'),
+        ('z_limit_switch_local_index', 'スロット', 'int'),
+    ]),
+    ('r原点センサ', [
+        ('r_limit_switch_node_index', 'ノード', 'int'),
+        ('r_limit_switch_local_index', 'スロット', 'int'),
+    ]),
+    (None, [
+        ('robomas_device_id', 'RoboMas ID', 'int'),
+        ('robomas_motor1_index', 'motor1スロット', 'int'),
+        ('robomas_motor2_index', 'motor2スロット', 'int'),
+    ]),
+    ('zホーミング回転方向(±1)', [
+        ('z_home_motor1_vel_sign', 'motor1', 'float'),
+        ('z_home_motor2_vel_sign', 'motor2', 'float'),
+    ]),
+    ('rホーミング回転方向(±1)', [
+        ('r_home_motor1_vel_sign', 'motor1', 'float'),
+        ('r_home_motor2_vel_sign', 'motor2', 'float'),
+    ]),
+    (None, [
+        ('z_ref_value_m', 'z原点センサ位置の真値[m]', 'float'),
+        ('r_ref_value_m', 'r原点センサ位置の真値[m]', 'float'),
+    ]),
+]
+# z/r上限・下限リミットスイッチ(過走防止の安全停止、trajectory_follower_node、
+# 2026-08-31追加)。HOMING_WIRING_FIELDSのz/r原点センサ(下限側、homing_node用)
+# とは別パラメータ(同じ配線を指してよいが、ノードが別なので値も別管理)。
+LIMIT_SWITCH_WIRING_FIELDS = [
+    (None, [
+        ('limit_switch_can_host_slots_per_node', 'ノードあたりスロット数', 'int'),
+        ('limit_switch_triggered_value', 'SW検出値', 'int'),
+    ]),
+    ('z下限', [
+        ('z_lower_limit_switch_device_id', 'ID', 'int'),
+        ('z_lower_limit_switch_node_index', 'ノード', 'int'),
+        ('z_lower_limit_switch_local_index', 'スロット', 'int'),
+    ]),
+    ('z上限', [
+        ('z_upper_limit_switch_device_id', 'ID', 'int'),
+        ('z_upper_limit_switch_node_index', 'ノード', 'int'),
+        ('z_upper_limit_switch_local_index', 'スロット', 'int'),
+    ]),
+    ('r下限', [
+        ('r_lower_limit_switch_device_id', 'ID', 'int'),
+        ('r_lower_limit_switch_node_index', 'ノード', 'int'),
+        ('r_lower_limit_switch_local_index', 'スロット', 'int'),
+    ]),
+    ('r上限', [
+        ('r_upper_limit_switch_device_id', 'ID', 'int'),
+        ('r_upper_limit_switch_node_index', 'ノード', 'int'),
+        ('r_upper_limit_switch_local_index', 'スロット', 'int'),
+    ]),
 ]
 
 
@@ -233,6 +288,14 @@ def _resolve_real_joint_bridge_yaml_path():
     if not os.path.isfile(path):
         return None
     return os.path.realpath(path)
+
+
+def _iter_wiring_fields(field_specs):
+    """[(行見出し, [(key,label,kind), ...]), ...]形式のfield_specsを
+    (key,label,kind)の並びへ平坦化する(読込/保存はグループ行を意識せず
+    key単位で処理するため)。"""
+    for _row_title, fields in field_specs:
+        yield from fields
 
 
 def _flatten_yaml_node_params(data):
@@ -897,6 +960,7 @@ class CommandGuiApp(QWidget):
         self._build_mit_gain_panel(right_col)
         self._build_robomas_gain_panel(right_col)
         self._build_homing_wiring_panel(right_col)
+        self._build_limit_switch_wiring_panel(right_col)
         self._build_homing_panel(right_col)
         right_col.addStretch(1)
 
@@ -1289,6 +1353,17 @@ class CommandGuiApp(QWidget):
             description='homing_node起動時のみ反映。実行中には反映されません。',
             field_specs=HOMING_WIRING_FIELDS)
 
+    def _build_limit_switch_wiring_panel(self, column):
+        self._build_yaml_wiring_panel(
+            column, attr_prefix='limit_switch_wiring',
+            title='z/r安全停止センサ配線設定 (real_joint_bridge.yaml)',
+            note='原点較正(ホーミング)用の下限センサとは別に、z/r軸それぞれの\n'
+                 '上限・下限リミットスイッチをtrajectory_follower_nodeが直接監視し、\n'
+                 'トリガーされた方向への移動だけをロックする(過走防止)。\n'
+                 'IDを0のままにするとそのスイッチは無効(未配線)扱い。',
+            description='trajectory_follower_node起動時のみ反映。実行中には反映されません。',
+            field_specs=LIMIT_SWITCH_WIRING_FIELDS)
+
     def _build_yaml_wiring_panel(self, column, attr_prefix, title, description, field_specs, note=None):
         box = QGroupBox(title)
         layout = QVBoxLayout(box)
@@ -1304,19 +1379,30 @@ class CommandGuiApp(QWidget):
         _set_status(desc, description, 'error')
         layout.addWidget(desc)
 
+        # field_specsは[(行見出し またはNone, [(key,ラベル,型), ...]), ...]。
+        # 1タプル=1行で、ID・ノード・スロット等の関連する項目がまとめて
+        # 横並びになるようにする(2026-08-31、それまでは項目数で機械的に
+        # 2列へ折り返していたため、関連項目が別行に分かれることがあった)。
         grid = QGridLayout()
+        grid.setHorizontalSpacing(6)
         edits = {}
-        for i, (key, label, kind) in enumerate(field_specs):
-            r, c = divmod(i, 2)
-            grid.addWidget(QLabel(label), r, c * 2)
-            if kind == 'bool':
-                widget = QCheckBox()
-            elif kind == 'int':
-                widget = make_int_edit(0, width=70)
-            else:
-                widget = make_float_edit(0.0, width=70)
-            edits[key] = widget
-            grid.addWidget(widget, r, c * 2 + 1)
+        for r, (row_title, fields) in enumerate(field_specs):
+            c = 0
+            if row_title:
+                grid.addWidget(QLabel(row_title), r, c)
+                c += 1
+            for key, label, kind in fields:
+                grid.addWidget(QLabel(label), r, c)
+                if kind == 'bool':
+                    widget = QCheckBox()
+                elif kind == 'int':
+                    # ID/ノード/スロットは小さい数値(数桁)なので70pxは無駄に広い。
+                    widget = make_int_edit(0, width=44)
+                else:
+                    widget = make_float_edit(0.0, width=56)
+                edits[key] = widget
+                grid.addWidget(widget, r, c + 1)
+                c += 2
         layout.addLayout(grid)
         setattr(self, f'_{attr_prefix}_edits', edits)
 
@@ -1353,7 +1439,7 @@ class CommandGuiApp(QWidget):
             return
         values = _flatten_yaml_node_params(data)
         missing = []
-        for key, _label, kind in field_specs:
+        for key, _label, kind in _iter_wiring_fields(field_specs):
             if key not in values:
                 missing.append(key)
                 continue
@@ -1378,7 +1464,7 @@ class CommandGuiApp(QWidget):
             return
         try:
             updates = {}
-            for key, _label, kind in field_specs:
+            for key, _label, kind in _iter_wiring_fields(field_specs):
                 widget = edits[key]
                 if kind == 'bool':
                     updates[key] = _format_yaml_bool(widget.isChecked())

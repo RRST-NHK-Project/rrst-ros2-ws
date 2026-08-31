@@ -134,29 +134,37 @@ def generate_launch_description():
         executable='trajectory_follower_node',
         name='trajectory_follower_node',
         output='screen',
-        parameters=[{
-            # root_thetaはjoint_namesに含めるがcubemars_joint_names=[]のため
-            # 実機出力はしない(soki_sim表示のみ、このlaunchではCubeMars側に
-            # 触れない)。max_velocity/max_accelerationはjoint_names全要素分
-            # 必要なため、root_theta分もダミーで入れておく(出力しないので安全)。
-            'joint_names': ['root_theta_joint', 'z_joint', 'r_joint'],
-            'max_velocity': ParameterValue(
-                [0.1, z_max_velocity, r_max_velocity], value_type=List[float]),
-            'max_acceleration': ParameterValue(
-                [0.2, z_max_acceleration, r_max_acceleration], value_type=List[float]),
-            'update_rate_hz': 50.0,
-            'control_mode': control_mode,
-            # 空配列はlaunch_rosが要素型を推定できずエラーになるため
-            # (real_root_theta_test.launch.py等の単一要素配列と同じ理由)、
-            # ParameterValueでList[str]と明示する。
-            'cubemars_joint_names': ParameterValue([], value_type=List[str]),
-            # z/rは常時実機出力を有効化する(このlaunchの目的そのものなのでトグルなし。
-            # note/can_mapping.txt確認済みのdevice_id=21固定)。
-            'robomas_device_id': 21,
-            'robomas_kp': ParameterValue(robomas_kp, value_type=float),
-            'robomas_kd': ParameterValue(robomas_kd, value_type=float),
-            'robomas_current_ff': ParameterValue(robomas_current_ff, value_type=float),
-        }],
+        # real_joint_bridge_yamlを先に読ませ、z/r上限・下限リミットスイッチ
+        # (*_limit_switch_*)をyaml側から供給する(GUI「z/r安全停止センサ配線」
+        # パネルで編集可能にするため)。同名キーは後に来る辞書側が勝つが、
+        # このyamlのtrajectory_follower_node節にはlimit_switch系しか無いため
+        # 以下の値と衝突しない。
+        parameters=[
+            real_joint_bridge_yaml,
+            {
+                # root_thetaはjoint_namesに含めるがcubemars_joint_names=[]のため
+                # 実機出力はしない(soki_sim表示のみ、このlaunchではCubeMars側に
+                # 触れない)。max_velocity/max_accelerationはjoint_names全要素分
+                # 必要なため、root_theta分もダミーで入れておく(出力しないので安全)。
+                'joint_names': ['root_theta_joint', 'z_joint', 'r_joint'],
+                'max_velocity': ParameterValue(
+                    [0.1, z_max_velocity, r_max_velocity], value_type=List[float]),
+                'max_acceleration': ParameterValue(
+                    [0.2, z_max_acceleration, r_max_acceleration], value_type=List[float]),
+                'update_rate_hz': 50.0,
+                'control_mode': control_mode,
+                # 空配列はlaunch_rosが要素型を推定できずエラーになるため
+                # (real_root_theta_test.launch.py等の単一要素配列と同じ理由)、
+                # ParameterValueでList[str]と明示する。
+                'cubemars_joint_names': ParameterValue([], value_type=List[str]),
+                # z/rは常時実機出力を有効化する(このlaunchの目的そのものなのでトグルなし。
+                # note/can_mapping.txt確認済みのdevice_id=21固定)。
+                'robomas_device_id': 21,
+                'robomas_kp': ParameterValue(robomas_kp, value_type=float),
+                'robomas_kd': ParameterValue(robomas_kd, value_type=float),
+                'robomas_current_ff': ParameterValue(robomas_current_ff, value_type=float),
+            },
+        ],
     )
 
     command_gui_node = Node(

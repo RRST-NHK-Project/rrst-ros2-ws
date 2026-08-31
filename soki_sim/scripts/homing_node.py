@@ -7,10 +7,14 @@ motor1/motor2はROBOMAS(C610/M2006)内蔵ロータエンコーダのCAN帰還(M{
 ため、電源投入毎に基準を喪失する(詳細はnote/hardware_mapping.txt、
 note/can_mapping.txt参照)。
 
-原点センサはz軸・r軸それぞれに1個ずつ(motor1/motor2の個別軸ではない、
-soki本体で確認済み)。ただし z = mix_k*(m1+m2), r = mix_k*(m1-m2) という
-合成後の量なので、ros2canの/zero_channel(motor1またはmotor2を単体でゼロ化する
-だけの機能)では正しく較正できない。そこで本ノードは:
+z軸・r軸それぞれに上限・下限2個ずつ、合計4個のセンサが実機にある
+(motor1/motor2の個別軸ではなく、合成後の軸に対して。2026-08-31確認)。
+本ノードが原点較正に使うのは各軸1個(下限側)だけで、上限側は
+trajectory_follower_node側で過走防止の安全停止用として別途監視している
+(note/can_mapping.txt「z/r上限リミットスイッチ」参照)。
+ただし z = mix_k*(m1+m2), r = mix_k*(m1-m2) という合成後の量なので、
+ros2canの/zero_channel(motor1またはmotor2を単体でゼロ化するだけの機能)
+では正しく較正できない。そこで本ノードは:
 
   1. motor1/motor2を同方向に駆動してz軸の原点センサに当たるまで動かす
      (rが変化しないよう2モータを同じ向きに動かす)

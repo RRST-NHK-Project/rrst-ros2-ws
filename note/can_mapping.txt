@@ -66,20 +66,23 @@ ENC1/ENC2はそれぞれ何を測っているか(どちらか一方に◯、ま�
 (1カウントあたりの移動量、またはエンコーダ分解能とねじリード/プーリ径等の元情報):
   →
 
-## z/r原点センサ (ホーミング用、homing_node) 2026-08-27追加
-上限・下限それぞれの原点センサは合成後のz軸/r軸に1個ずつ(motor1/motor2の
-個別軸ではない、確認済み)という前提で、homing_node.pyは以下を仮定して
-実装している。違っていたら修正するか、soki_sim/config/real_joint_bridge.yamlの
-homing_node以下を直接編集すること。
+## z/r原点センサ (ホーミング用、homing_node) 2026-08-27追加、2026-08-31訂正
+z軸・r軸それぞれに上限・下限2個ずつ、合計4個のセンサが実機にある(motor1/motor2の
+個別軸ではなく、合成後のz軸/r軸に対して。2026-08-31確認: 以前「1個ずつ」と
+記載していたのは誤り)。このうちhoming_nodeが原点較正に使うのは各軸1個
+(下限側)だけで、以下はその下限センサの配線を仮定している。違っていたら
+修正するか、soki_sim/config/real_joint_bridge.yamlのhoming_node以下を
+直接編集すること。上限側センサ(過走防止の安全停止用)は
+##「z/r上限リミットスイッチ」節を参照。
 
 z軸原点センサはCAN_HOSTのどのノード・どのSWチャンネルか
-(現状の仮定: node_index=1のSW1。real_joint_bridge.yamlの値が正、2026-08-31確認。
-以前ここの記入値がSW1=0/SW2=1/SW3=2の凡例と矛盾していたので訂正した):
-  node_index →1
+(node_index=0のSW1。real_joint_bridge.yamlの値が正、2026-08-31訂正:
+以前ここはnode_index=1と記載していたが誤りで、実際はnode_index=0):
+  node_index →0
   local_index(SW1=0/SW2=1/SW3=2) →0
 
-r軸原点センサ(現状の仮定: 同じくnode_index=1のSW2):
-  node_index →1
+r軸原点センサ(同じくnode_index=0のSW2):
+  node_index →0
   local_index →1
 
 センサ検出時のスイッチ値(現状の仮定: 1=検出、pin_ctrl_task.cppの
@@ -96,6 +99,39 @@ motor1/motor2の速度指令符号とz/r移動方向の対応(実機で低速か
 向きを確認、逆なら符号を反転):
   z軸方向へ動かす時のmotor1/motor2の回転符号(同方向のはず) →
   r軸方向へ動かす時のmotor1/motor2の回転符号(逆方向のはず) →
+
+## z/r上限リミットスイッチ (過走防止の安全停止用、trajectory_follower_node) 2026-08-31追加
+上記の原点センサ(下限側、homing_node用)とは別に、反対側(上限側)にもz軸・r軸
+それぞれ1個ずつセンサがある。trajectory_follower_nodeがこれらを直接監視し、
+トリガーされている方向への移動だけをロックする(反対方向への後退は許可)。
+soki_sim/config/real_joint_bridge.yamlのtrajectory_follower_node:セクションに
+これらのパラメータ(*_device_id/*_node_index/*_local_index、device_id=0で無効)
+がある(既定は全て0=未配線)。command_gui_nodeの「z/r安全停止センサ配線設定」
+パネルからも読込・編集・保存できる(他のyaml配線パネルと同様、次回
+trajectory_follower_node起動から反映、実行中には反映されない)。下限側も
+homing_nodeとは別パラメータとしてtrajectory_follower_node側に持たせているので、
+安全停止を有効にするならそちらも合わせて設定する
+(z_lower_limit_switch_*/r_lower_limit_switch_*)。
+
+z軸上限センサ:
+  z_upper_limit_switch_device_id →
+  z_upper_limit_switch_node_index →
+  z_upper_limit_switch_local_index(SW1=0/SW2=1/SW3=2) →
+
+r軸上限センサ:
+  r_upper_limit_switch_device_id →
+  r_upper_limit_switch_node_index →
+  r_upper_limit_switch_local_index →
+
+z軸下限センサ(trajectory_follower_node側、通常は上のz軸原点センサと同じ配線):
+  z_lower_limit_switch_device_id →
+  z_lower_limit_switch_node_index →
+  z_lower_limit_switch_local_index →
+
+r軸下限センサ(trajectory_follower_node側、通常は上のr軸原点センサと同じ配線):
+  r_lower_limit_switch_device_id →
+  r_lower_limit_switch_node_index →
+  r_lower_limit_switch_local_index →
 
 ## 備考・その他気づいた点
 (自由記入)

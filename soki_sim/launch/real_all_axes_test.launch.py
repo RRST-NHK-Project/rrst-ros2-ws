@@ -221,27 +221,35 @@ def generate_launch_description():
             executable='trajectory_follower_node',
             name='trajectory_follower_node',
             output='screen',
-            parameters=[{
-                'joint_names': ['root_theta_joint', 'tip_theta_joint', 'z_joint', 'r_joint'],
-                'max_velocity': [root_theta_vel, tip_theta_vel, z_vel, r_vel],
-                'max_acceleration': [root_theta_accel, tip_theta_accel, z_accel, r_accel],
-                'update_rate_hz': 50.0,
-                'control_mode': control_mode,
-                # 4軸ともCubeMars/RoboMasへのMIT実機出力を常時有効化する
-                # (本launchの目的そのものなのでトグルなし)。
-                'cubemars_joint_names': ['root_theta_joint', 'tip_theta_joint'],
-                'cubemars_device_ids': [device_id, device_id],
-                'cubemars_motor_indices': [root_index, tip_index],
-                'cubemars_kp': [root_kp, tip_kp],
-                'cubemars_kd': [root_kd, tip_kd],
-                'cubemars_torque_ff': [0.0, 0.0],
-                'cubemars_reduction': [root_reduction, tip_reduction],
-                # note/can_mapping.txt確認済みのdevice_id=21固定。
-                'robomas_device_id': 21,
-                'robomas_kp': float(robomas_kp.perform(context)),
-                'robomas_kd': float(robomas_kd.perform(context)),
-                'robomas_current_ff': float(robomas_current_ff.perform(context)),
-            }],
+            # real_joint_bridge_yamlを先に読ませ、z/r上限・下限リミットスイッチ
+            # (*_limit_switch_*)をyaml側から供給する(GUI「z/r安全停止センサ配線」
+            # パネルで編集可能にするため)。同名キーは後に来る辞書側が勝つが、
+            # このyamlのtrajectory_follower_node節にはlimit_switch系しか無いため
+            # 以下の値と衝突しない。
+            parameters=[
+                real_joint_bridge_yaml,
+                {
+                    'joint_names': ['root_theta_joint', 'tip_theta_joint', 'z_joint', 'r_joint'],
+                    'max_velocity': [root_theta_vel, tip_theta_vel, z_vel, r_vel],
+                    'max_acceleration': [root_theta_accel, tip_theta_accel, z_accel, r_accel],
+                    'update_rate_hz': 50.0,
+                    'control_mode': control_mode,
+                    # 4軸ともCubeMars/RoboMasへのMIT実機出力を常時有効化する
+                    # (本launchの目的そのものなのでトグルなし)。
+                    'cubemars_joint_names': ['root_theta_joint', 'tip_theta_joint'],
+                    'cubemars_device_ids': [device_id, device_id],
+                    'cubemars_motor_indices': [root_index, tip_index],
+                    'cubemars_kp': [root_kp, tip_kp],
+                    'cubemars_kd': [root_kd, tip_kd],
+                    'cubemars_torque_ff': [0.0, 0.0],
+                    'cubemars_reduction': [root_reduction, tip_reduction],
+                    # note/can_mapping.txt確認済みのdevice_id=21固定。
+                    'robomas_device_id': 21,
+                    'robomas_kp': float(robomas_kp.perform(context)),
+                    'robomas_kd': float(robomas_kd.perform(context)),
+                    'robomas_current_ff': float(robomas_current_ff.perform(context)),
+                },
+            ],
         )]
 
     trajectory_follower_node = OpaqueFunction(function=_make_trajectory_follower_node)
