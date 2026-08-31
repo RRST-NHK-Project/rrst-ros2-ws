@@ -157,9 +157,10 @@ command_gui_node/trajectory_follower_nodeはsim/実機を区別せず同じ
     実測値はnote/can_mapping.txtにまとめてある。
   - root_theta/tip_theta(CubeMars AK40-10、絶対値エンコーダ)はMODE_CUBEMARS
     (device_id=11)のM{n} position帰還を使用。z/r(motor1/2差動、M2006+C610)は
-    ROBOMAS(device_id=21)のCAN帰還ではなく、CAN_HOST(device_id=101)配下ノードの
-    外付けAMTエンコーダ(ENC1/ENC2)を位置の真値として使う設計
-    (詳細はnote/claude_task.txt参照)。
+    ROBOMAS(device_id=21)内蔵ロータエンコーダのCAN帰還(M{n} angle)を位置の
+    真値として使う設計(2026-08-31方針転換。以前はCAN_HOST(device_id=101)配下
+    ノードの外付けAMTエンコーダ(ENC1/ENC2)を真値としていたが不使用に変更した。
+    詳細はnote/claude_task.txt、note/hardware_mapping.txt参照)。
   - z/r起動時ホーミングノード(homing_node)も実装済み(soki_sim/scripts/
     homing_node.py)。motor1/2を同方向/差動方向に低速駆動して原点センサを
     検出し、z_offset_m/r_offset_mをreal_joint_bridge_nodeへSetParametersで

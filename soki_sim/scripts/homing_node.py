@@ -1,23 +1,25 @@
 #!/usr/bin/env python3
 """z_joint/r_joint(motor1/motor2差動、M2006+C610)の起動時ホーミングノード。
 
-motor1/motor2は外付けAMTエンコーダ(ENC1/ENC2、CAN_HOST配下ノード)による
-相対(インクリメンタル)エンコーダのため、電源投入毎に基準を喪失する
-(詳細はnote/hardware_mapping.txt、note/can_mapping.txt参照)。
+motor1/motor2はROBOMAS(C610/M2006)内蔵ロータエンコーダのCAN帰還(M{n} angle)を
+使う(2026-08-31方針転換、以前は外付けAMTエンコーダ(ENC1/ENC2、CAN_HOST配下
+ノード)を使っていたが不使用に変更した)。相対(インクリメンタル)エンコーダの
+ため、電源投入毎に基準を喪失する(詳細はnote/hardware_mapping.txt、
+note/can_mapping.txt参照)。
 
 原点センサはz軸・r軸それぞれに1個ずつ(motor1/motor2の個別軸ではない、
 soki本体で確認済み)。ただし z = mix_k*(m1+m2), r = mix_k*(m1-m2) という
-合成後の量なので、ros2canの/zero_channel(ENC1またはENC2を単体でゼロ化する
+合成後の量なので、ros2canの/zero_channel(motor1またはmotor2を単体でゼロ化する
 だけの機能)では正しく較正できない。そこで本ノードは:
 
   1. motor1/motor2を同方向に駆動してz軸の原点センサに当たるまで動かす
      (rが変化しないよう2モータを同じ向きに動かす)
-  2. センサ検出時点の生ENC値から z_raw を計算し、z_offset_m = z_ref_value_m -
-     z_raw を求める
+  2. センサ検出時点のロボマス内蔵エンコーダ帰還値から z_raw を計算し、
+     z_offset_m = z_ref_value_m - z_raw を求める
   3. 続けてmotor1/motor2を差動方向に駆動してr軸の原点センサに当たるまで動かす
      (zが変化しないよう2モータを逆向きに動かす)
-  4. センサ検出時点の生ENC値から r_raw を計算し、r_offset_m = r_ref_value_m -
-     r_raw を求める
+  4. センサ検出時点のロボマス内蔵エンコーダ帰還値から r_raw を計算し、
+     r_offset_m = r_ref_value_m - r_raw を求める
   5. z_offset_m/r_offset_mをreal_joint_bridge_node・trajectory_follower_nodeの
      両方へSetParametersサービスで反映する(前者はsim表示用、後者は実機への
      MIT指令生成用。どちらもyamlではなくランタイムパラメータとして保持する設計。
@@ -46,17 +48,21 @@ pause_robomas_output(std_srvs/Trigger)を呼んで出力を止め、stop_homing�
 失敗するだけで安全(ログ警告のみ、ホーミング自体は継続)。
 
 ros2can側の前提:
-  - ROBOMAS device(motor1/motor2の速度指令)の`topic_passthrough`をGUIで
-    ONにしておかないと、本ノードの/serial_tx_[id]への指令が反映されない。
+  - ROBOMAS device(motor1/motor2の速度指令・内蔵エンコーダ帰還)の
+    `topic_passthrough`をGUIでONにしておかないと、本ノードの/serial_tx_[id]への
+    指令や/serial_rx_[id]_unwrappedの帰還が反映されない。
   - CAN_HOST device配下ノードのSW1/SW2をz軸/r軸の原点センサ入力として
     割り当てている想定(note/can_mapping.txt「z/r原点センサ(ホーミング用)」
-    参照、未確認なら要修正)。
+    参照、未確認なら要修正)。CAN_HOSTはこの原点センサ(リミットスイッチ)の
+    ためだけに使う(motor1/motor2の位置取得にはROBOMAS内蔵エンコーダを使うため
+    ENC1/ENC2は不使用)。
   - モータ回転方向とz/r方向の対応(*_home_motor*_vel_sign)、原点センサ検出時の
     真値(z_ref_value_m/r_ref_value_m)は実測が必要。実機で少しずつ検証しながら
     調整すること。低速(デフォルト30rpm)・タイムアウト(デフォルト20秒)を
     必ず設定した状態で試すこと。
 """
 
+import math
 import time
 
 import rclpy
@@ -73,6 +79,9 @@ STATE_DONE = 'done'
 STATE_FAILED = 'failed'
 
 SLOT_COUNT = 24
+# ROBOMASの帰還(angle)スケール。real_joint_bridge_node.py/trajectory_follower_node.pyの
+# ROBOMAS_FEEDBACK_POSITION_SCALE_DEGと一致させること(0.1deg/LSB、robomas.cpp参照)。
+ROBOMAS_FEEDBACK_POSITION_SCALE_DEG = 0.1
 
 
 class HomingNode(Node):
@@ -80,31 +89,27 @@ class HomingNode(Node):
     def __init__(self):
         super().__init__('homing_node')
 
-        # ---- CAN_HOST配下ノードのENC1/ENC2・SW1/SW2 (motor1/motor2, z/r原点センサ) ----
+        # ---- CAN_HOST配下ノードのSW1/SW2 (z/r原点センサのみ。motor1/motor2の位置は
+        # ROBOMAS内蔵エンコーダを使うためCAN_HOSTのENC1/ENC2は不使用、2026-08-31方針転換) ----
         self.declare_parameter('can_host_device_id', 101)
-        self.declare_parameter('can_host_node_index', 1)
         self.declare_parameter('can_host_slots_per_node', 5)
-        self.declare_parameter('enc1_local_index', 3)
-        self.declare_parameter('enc2_local_index', 4)
-        self.declare_parameter('enc1_is_motor1', True)
-        self.declare_parameter('motor_encoder_counts_per_rev', 2048.0)
-        self.declare_parameter('pulley_pitch_diameter_mm', 22.92)
-        self.declare_parameter('mix_k', 0.5)
-        self.declare_parameter('motor1_sign', 1.0)
-        self.declare_parameter('motor2_sign', 1.0)
         # 要確認(note/can_mapping.txt「z/r原点センサ(ホーミング用)」)。
-        # 現状の仮定: z軸原点センサ=SW1、r軸原点センサ=SW2、どちらもENC1/ENC2と
-        # 同じノード(node_index)に載っている。
+        # 現状の仮定: z軸原点センサ=SW1、r軸原点センサ=SW2、どちらも同じノード
+        # (node_index=1)に載っている。
         self.declare_parameter('z_limit_switch_node_index', 1)
         self.declare_parameter('z_limit_switch_local_index', 0)   # SW1
         self.declare_parameter('r_limit_switch_node_index', 1)
         self.declare_parameter('r_limit_switch_local_index', 1)   # SW2
         self.declare_parameter('switch_triggered_value', 1)       # !digitalRead()相当
 
-        # ---- ROBOMAS device(motor1/motor2の速度指令) ----
+        # ---- ROBOMAS device(motor1/motor2の速度指令・内蔵エンコーダ帰還) ----
         self.declare_parameter('robomas_device_id', 21)
-        self.declare_parameter('robomas_motor1_slot', 0)   # M1 target_velocity
-        self.declare_parameter('robomas_motor2_slot', 1)   # M2 target_velocity
+        self.declare_parameter('robomas_motor1_index', 0)   # M1 target_velocity/angle
+        self.declare_parameter('robomas_motor2_index', 1)   # M2 target_velocity/angle
+        self.declare_parameter('pulley_pitch_diameter_mm', 22.92)
+        self.declare_parameter('mix_k', 0.5)
+        self.declare_parameter('motor1_sign', 1.0)
+        self.declare_parameter('motor2_sign', 1.0)
 
         # ---- ホーミング動作パラメータ(要実機調整) ----
         self.declare_parameter('homing_velocity_rpm', 30.0)
@@ -122,16 +127,7 @@ class HomingNode(Node):
 
         gp = self.get_parameter
         self.can_host_device_id_ = gp('can_host_device_id').value
-        self.can_host_node_index_ = gp('can_host_node_index').value
         self.can_host_slots_per_node_ = gp('can_host_slots_per_node').value
-        self.enc1_local_index_ = gp('enc1_local_index').value
-        self.enc2_local_index_ = gp('enc2_local_index').value
-        self.enc1_is_motor1_ = gp('enc1_is_motor1').value
-        self.motor_cpr_ = gp('motor_encoder_counts_per_rev').value
-        self.pulley_radius_m_ = (gp('pulley_pitch_diameter_mm').value / 2.0) / 1000.0
-        self.mix_k_ = gp('mix_k').value
-        self.motor1_sign_ = gp('motor1_sign').value
-        self.motor2_sign_ = gp('motor2_sign').value
 
         self.z_sw_node_index_ = gp('z_limit_switch_node_index').value
         self.z_sw_local_index_ = gp('z_limit_switch_local_index').value
@@ -140,8 +136,12 @@ class HomingNode(Node):
         self.switch_triggered_value_ = gp('switch_triggered_value').value
 
         self.robomas_device_id_ = gp('robomas_device_id').value
-        self.robomas_motor1_slot_ = gp('robomas_motor1_slot').value
-        self.robomas_motor2_slot_ = gp('robomas_motor2_slot').value
+        self.robomas_motor1_index_ = gp('robomas_motor1_index').value
+        self.robomas_motor2_index_ = gp('robomas_motor2_index').value
+        self.pulley_radius_m_ = (gp('pulley_pitch_diameter_mm').value / 2.0) / 1000.0
+        self.mix_k_ = gp('mix_k').value
+        self.motor1_sign_ = gp('motor1_sign').value
+        self.motor2_sign_ = gp('motor2_sign').value
 
         self.homing_velocity_rpm_ = gp('homing_velocity_rpm').value
         self.homing_timeout_sec_ = gp('homing_timeout_sec').value
@@ -156,12 +156,11 @@ class HomingNode(Node):
         trajectory_follower_node_name = gp('trajectory_follower_node_name').value
         control_period = gp('control_period_sec').value
 
-        self.enc1_slot_ = self.can_host_node_index_ * self.can_host_slots_per_node_ + self.enc1_local_index_
-        self.enc2_slot_ = self.can_host_node_index_ * self.can_host_slots_per_node_ + self.enc2_local_index_
         self.z_sw_slot_ = self.z_sw_node_index_ * self.can_host_slots_per_node_ + self.z_sw_local_index_
         self.r_sw_slot_ = self.r_sw_node_index_ * self.can_host_slots_per_node_ + self.r_sw_local_index_
 
         self.can_host_data_ = None
+        self.robomas_data_ = None
         self.state_ = STATE_IDLE
         self.phase_start_time_ = None
         self.z_offset_m_ = None
@@ -169,6 +168,9 @@ class HomingNode(Node):
         self.create_subscription(
             Int32MultiArray, f'serial_rx_{self.can_host_device_id_}_unwrapped',
             self._on_can_host, 10)
+        self.create_subscription(
+            Int32MultiArray, f'serial_rx_{self.robomas_device_id_}_unwrapped',
+            self._on_robomas_feedback, 10)
         self.tx_pub_ = self.create_publisher(
             Int16MultiArray, f'serial_tx_{self.robomas_device_id_}', 10)
 
@@ -186,9 +188,9 @@ class HomingNode(Node):
         self.create_timer(control_period, self._on_tick)
 
         self.get_logger().info(
-            f'homing_node started (idle): ENC1=slot{self.enc1_slot_}, ENC2=slot{self.enc2_slot_}, '
-            f'z_sw=slot{self.z_sw_slot_}, r_sw=slot{self.r_sw_slot_}, '
-            f'robomas device_id={self.robomas_device_id_}. '
+            f'homing_node started (idle): z_sw=slot{self.z_sw_slot_}, r_sw=slot{self.r_sw_slot_}, '
+            f'robomas device_id={self.robomas_device_id_} '
+            f'(motor1_index={self.robomas_motor1_index_}, motor2_index={self.robomas_motor2_index_}). '
             f"call 'start_homing' service to begin.")
 
     # ---------------- サービス ----------------
@@ -198,7 +200,7 @@ class HomingNode(Node):
             response.success = False
             response.message = f'already running (state={self.state_})'
             return response
-        if self.can_host_data_ is None:
+        if self.can_host_data_ is None or self.robomas_data_ is None:
             response.success = False
             response.message = 'serial_rx_*_unwrapped not received yet'
             return response
@@ -228,7 +230,7 @@ class HomingNode(Node):
             response.success = False
             response.message = f'ホーミング動作中は使えません(state={self.state_})'
             return response
-        if self.can_host_data_ is None:
+        if self.can_host_data_ is None or self.robomas_data_ is None:
             response.success = False
             response.message = 'serial_rx_*_unwrapped not received yet'
             return response
@@ -272,17 +274,14 @@ class HomingNode(Node):
     def _on_can_host(self, msg: Int32MultiArray):
         self.can_host_data_ = msg.data
 
+    def _on_robomas_feedback(self, msg: Int32MultiArray):
+        self.robomas_data_ = msg.data
+
     def _current_motor_joints(self):
-        enc1_count = self.can_host_data_[self.enc1_slot_]
-        enc2_count = self.can_host_data_[self.enc2_slot_]
-        enc1_rad = (enc1_count / self.motor_cpr_) * 2.0 * 3.141592653589793
-        enc2_rad = (enc2_count / self.motor_cpr_) * 2.0 * 3.141592653589793
-        if self.enc1_is_motor1_:
-            motor1_rad, motor2_rad = enc1_rad, enc2_rad
-        else:
-            motor1_rad, motor2_rad = enc2_rad, enc1_rad
-        motor1_joint = self.motor1_sign_ * motor1_rad * self.pulley_radius_m_
-        motor2_joint = self.motor2_sign_ * motor2_rad * self.pulley_radius_m_
+        m1_deg = self.robomas_data_[self.robomas_motor1_index_] * ROBOMAS_FEEDBACK_POSITION_SCALE_DEG
+        m2_deg = self.robomas_data_[self.robomas_motor2_index_] * ROBOMAS_FEEDBACK_POSITION_SCALE_DEG
+        motor1_joint = self.motor1_sign_ * math.radians(m1_deg) * self.pulley_radius_m_
+        motor2_joint = self.motor2_sign_ * math.radians(m2_deg) * self.pulley_radius_m_
         return motor1_joint, motor2_joint
 
     def _switch_triggered(self, slot):
@@ -292,8 +291,8 @@ class HomingNode(Node):
 
     def _send_velocity(self, motor1_rpm, motor2_rpm):
         data = [0] * SLOT_COUNT
-        data[self.robomas_motor1_slot_] = int(motor1_rpm)
-        data[self.robomas_motor2_slot_] = int(motor2_rpm)
+        data[self.robomas_motor1_index_] = int(motor1_rpm)
+        data[self.robomas_motor2_index_] = int(motor2_rpm)
         msg = Int16MultiArray()
         msg.data = data
         self.tx_pub_.publish(msg)
@@ -301,7 +300,7 @@ class HomingNode(Node):
     def _on_tick(self):
         if self.state_ not in (STATE_HOMING_Z, STATE_HOMING_R):
             return
-        if self.can_host_data_ is None:
+        if self.can_host_data_ is None or self.robomas_data_ is None:
             return
 
         elapsed = time.monotonic() - self.phase_start_time_

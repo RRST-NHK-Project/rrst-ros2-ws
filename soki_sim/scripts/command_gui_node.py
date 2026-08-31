@@ -46,7 +46,10 @@ PyQt5が必要(未インストールの場合: sudo apt install python3-pyqt5)�
 import json
 import math
 import os
+import re
 import sys
+
+import yaml
 
 from ament_index_python.packages import get_package_share_directory, PackageNotFoundError
 
@@ -58,9 +61,9 @@ from sensor_msgs.msg import JointState
 from std_srvs.srv import Trigger
 
 from PyQt5.QtCore import Qt, QPointF, QTimer
-from PyQt5.QtGui import QColor, QDoubleValidator, QFontMetrics, QIcon, QPainter, QPen, QPixmap
+from PyQt5.QtGui import QColor, QDoubleValidator, QFontMetrics, QIcon, QIntValidator, QPainter, QPen, QPixmap
 from PyQt5.QtWidgets import (
-    QApplication, QButtonGroup, QGridLayout, QGroupBox, QHBoxLayout,
+    QApplication, QButtonGroup, QCheckBox, QGridLayout, QGroupBox, QHBoxLayout,
     QInputDialog, QLabel, QLineEdit, QListWidget, QMessageBox, QPushButton,
     QRadioButton, QScrollArea, QSlider, QTabWidget, QVBoxLayout, QWidget,
 )
@@ -153,6 +156,122 @@ JOY_NODE_NAME = 'joy_teleop_node'
 MACHINE_ORIGIN_JOINT_NAMES = ['machine_origin_x_joint', 'machine_origin_y_joint', 'machine_origin_z_joint']
 # soki_sim.urdf.xacroのmachine_origin_offset_limitと一致させること
 MACHINE_ORIGIN_OFFSET_LIMIT = 0.1
+
+# ---- real_joint_bridge.yaml配線設定(初期化用センサID・CubeMars/RoboMasのID・
+# 回転方向)----
+# これらはreal_joint_bridge_node/homing_nodeが起動時に一度だけ読み込む値で、
+# trajectory_follower_nodeのKp/Kd等と違いSetParametersでは実行中ノードに反映
+# されない(ノードを再起動してもros2 param setした値は残らず、yamlの値に戻る)。
+# GUIの値を実際に使わせるには設定の保存先そのもの、すなわち
+# soki_sim/config/real_joint_bridge.yaml(real_joint_bridge_node/homing_nodeの
+# 両方が読み込む、コメントで「コードではなくこのファイルを編集すること」と
+# 明記されている設定ファイル)を直接書き換える必要がある。
+# (key, 表示ラベル, 型) の3つ組。型は 'int'/'float'/'bool'。
+# キー名はreal_joint_bridge_node.py/homing_node.pyのdeclare_parameter名と一致させること。
+#
+# 表示ラベルの用語はnote/can_mapping.txtの記法に合わせて統一する
+# (「ID」「番号」「スロット」が場当たり的に混在すると分かりにくいため):
+#   ID    = CAN上のデバイス自体を指すCAN_ID(device_id系)
+#   番号  = デバイス配下の「ノード」を指す番号(node_index系、0-origin)
+#   スロット = ノード(またはデバイス)内の個々のチャンネル/motor位置
+#           (local_index系・CubeMars/RoboMasのM{n}位置。note/can_mapping.txtの
+#           「ローカルスロット」「M{n}スロット」に対応)
+# 2026-08-31方針転換: z_joint/r_jointの位置真値がCAN_HOST外付けENC1/ENC2から
+# ROBOMAS内蔵ロータエンコーダのCAN帰還に変わった(real_joint_bridge_node.py/
+# homing_node.py参照)ため、ENC1/ENC2配線設定パネルは廃止した。CAN_HOSTは
+# z/r原点センサ(SW1/SW2のリミットスイッチ)専用になったため、その設定は
+# HOMING_WIRING_FIELDSへ統合した。
+ROBOMAS_WIRING_FIELDS = [
+    ('robomas_device_id', 'RoboMas ID', 'int'),
+    ('robomas_motor1_index', 'motor1スロット', 'int'),
+    ('robomas_motor2_index', 'motor2スロット', 'int'),
+    ('motor1_sign', 'motor1回転方向(±1)', 'float'),
+    ('motor2_sign', 'motor2回転方向(±1)', 'float'),
+]
+CUBEMARS_WIRING_FIELDS = [
+    ('cubemars_device_id', 'CubeMars ID', 'int'),
+    ('cubemars_root_theta_index', 'root_thetaスロット', 'int'),
+    ('cubemars_tip_theta_index', 'tip_thetaスロット', 'int'),
+    ('root_theta_sign', 'root_theta回転方向(±1)', 'float'),
+    ('tip_theta_sign', 'tip_theta回転方向(±1)', 'float'),
+]
+HOMING_WIRING_FIELDS = [
+    ('can_host_device_id', 'CAN_HOST ID', 'int'),
+    ('can_host_slots_per_node', 'ノードあたりスロット数', 'int'),
+    ('z_limit_switch_node_index', 'z原点センサ ノード番号', 'int'),
+    ('z_limit_switch_local_index', 'z原点センサ スロット', 'int'),
+    ('r_limit_switch_node_index', 'r原点センサ ノード番号', 'int'),
+    ('r_limit_switch_local_index', 'r原点センサ スロット', 'int'),
+    ('switch_triggered_value', 'SW検出値', 'int'),
+    ('robomas_device_id', 'RoboMas ID(ホーミング用)', 'int'),
+    ('robomas_motor1_index', 'RoboMas motor1スロット', 'int'),
+    ('robomas_motor2_index', 'RoboMas motor2スロット', 'int'),
+    ('z_home_motor1_vel_sign', 'zホーミング時RoboMas motor1回転方向(±1)', 'float'),
+    ('z_home_motor2_vel_sign', 'zホーミング時RoboMas motor2回転方向(±1)', 'float'),
+    ('r_home_motor1_vel_sign', 'rホーミング時RoboMas motor1回転方向(±1)', 'float'),
+    ('r_home_motor2_vel_sign', 'rホーミング時RoboMas motor2回転方向(±1)', 'float'),
+    ('z_ref_value_m', 'z原点センサ位置の真値[m]', 'float'),
+    ('r_ref_value_m', 'r原点センサ位置の真値[m]', 'float'),
+]
+
+
+def _resolve_real_joint_bridge_yaml_path():
+    """soki_sim/config/real_joint_bridge.yamlの実ファイルパスを解決する。
+    command_gui_node自体がインストール後のパスから実行される(CMakeLists.txtで
+    RENAMEインストール)ため、__file__相対ではなくget_package_share_directory経由
+    で解決する(_resource_pathと同じ理由)。symlink-installならrealpath()で
+    ソースツリー側のファイルが返るため、そちらを直接編集する
+    (「コードではなくこのファイルを編集すること」というyaml内コメントの
+    運用と一致させる。colcon buildをsymlink-installで行っていない場合は
+    次回launchには反映されるがソースツリー側は更新されない)。"""
+    try:
+        share_dir = get_package_share_directory('soki_sim')
+    except PackageNotFoundError:
+        return None
+    path = os.path.join(share_dir, 'config', 'real_joint_bridge.yaml')
+    if not os.path.isfile(path):
+        return None
+    return os.path.realpath(path)
+
+
+def _flatten_yaml_node_params(data):
+    """{node_name: {ros__parameters: {...}}}形式のyamlを1つのdictにまとめる
+    (real_joint_bridge_node/homing_nodeの両方に同名キーがある項目は、正しく
+    運用されていれば同じ値のはずなので後勝ちで問題ない)。"""
+    flat = {}
+    if not isinstance(data, dict):
+        return flat
+    for node_cfg in data.values():
+        if isinstance(node_cfg, dict) and isinstance(node_cfg.get('ros__parameters'), dict):
+            flat.update(node_cfg['ros__parameters'])
+    return flat
+
+
+def _format_yaml_int(value) -> str:
+    return str(int(value))
+
+
+def _format_yaml_float(value) -> str:
+    s = f'{float(value):.6g}'
+    if 'e' in s or 'E' in s:
+        s = f'{float(value):.10f}'.rstrip('0')
+    if '.' not in s:
+        s += '.0'
+    return s
+
+
+def _format_yaml_bool(value) -> str:
+    return 'true' if value else 'false'
+
+
+def _replace_yaml_scalar(text: str, key: str, value_str: str) -> str:
+    """text中の`key: value  # comment`形式の行(複数ブロックにまたがる同名キー
+    全て)について、value部分だけをvalue_strに置き換える。インデント・コメントは
+    完全に保持する(yaml.safe_load+dumpだとコメントが全て失われるため、この
+    ファイル特有の1行1パラメータという単純な書式を前提に正規表現で置換する)。"""
+    pattern = re.compile(
+        r'^([ \t]*' + re.escape(key) + r':[ \t]*)([^\s#]+)', re.MULTILINE)
+    return pattern.sub(lambda m: m.group(1) + value_str, text)
 
 
 def clamp(value, lower, upper):
@@ -258,6 +377,26 @@ def get_float(edit: QLineEdit) -> float:
 
 def set_float(edit: QLineEdit, value: float):
     edit.setText(f'{value:.6g}')
+
+
+def make_int_edit(initial: int, width: int = 60) -> QLineEdit:
+    """整数入力用QLineEdit(device_id/motor_index等、yamlの型がintのもの用)。"""
+    edit = QLineEdit()
+    edit.setValidator(QIntValidator(-1_000_000, 1_000_000))
+    edit.setMaximumWidth(width)
+    set_int(edit, initial)
+    return edit
+
+
+def get_int(edit: QLineEdit) -> int:
+    text = edit.text().strip()
+    if text in ('', '-'):
+        raise ValueError(text)
+    return int(text)
+
+
+def set_int(edit: QLineEdit, value: int):
+    edit.setText(str(int(value)))
 
 
 class XYPlaneWidget(QWidget):
@@ -702,6 +841,8 @@ class CommandGuiApp(QWidget):
         self._build_mode_panel(left_col)
         self._build_machine_origin_offset_panel(left_col)
         self._build_origin_panel(left_col)
+        self._build_robomas_wiring_panel(left_col)
+        self._build_cubemars_wiring_panel(left_col)
         # 同様に縦方向も、右列(パネル数が多く縦に長い)に合わせて左列の各パネルが
         # 間延びして伸びないよう、余った縦幅は末尾のstretchへ逃がす。
         left_col.addStretch(1)
@@ -710,6 +851,7 @@ class CommandGuiApp(QWidget):
         self._build_joy_speed_panel(right_col)
         self._build_mit_gain_panel(right_col)
         self._build_robomas_gain_panel(right_col)
+        self._build_homing_wiring_panel(right_col)
         self._build_homing_panel(right_col)
         right_col.addStretch(1)
 
@@ -1066,6 +1208,164 @@ class CommandGuiApp(QWidget):
 
     def _on_set_root_theta_origin_done(self, success, message):
         _set_status(self.origin_status_label, message, 'success' if success else 'error')
+
+    # ---------- real_joint_bridge.yaml配線設定(センサID・CubeMars/RoboMasのID・
+    # 回転方向)----
+    # Kp/Kd等と違い、この節のパラメータはreal_joint_bridge_node/homing_nodeが
+    # 起動時に一度だけ読み込む「起動時設定」で、SetParametersでは実行中ノードに
+    # 反映されない(モジュール先頭のROBOMAS_WIRING_FIELDS等のコメント参照)。
+    # そのためros2パラメータサービスではなく、設定の保存先そのもの
+    # (soki_sim/config/real_joint_bridge.yaml)を直接読み書きする。
+    def _build_robomas_wiring_panel(self, column):
+        self._build_yaml_wiring_panel(
+            column, attr_prefix='robomas_wiring',
+            title='RoboMas ID・回転方向 (real_joint_bridge.yaml)',
+            note='motor1/motor2は、z_joint(昇降)・r_joint(伸縮)を差動駆動する\n'
+                 '2基のRoboMas(M2006+C610)モータ(z=mix_k*(m1+m2)、r=mix_k*(m1-m2))。\n'
+                 '内蔵ロータエンコーダのCAN帰還を位置の真値として使う。',
+            description='real_joint_bridge_node/homing_node共通。次回ノード起動から\n'
+                        '反映されます(実行中には反映されません)。',
+            field_specs=ROBOMAS_WIRING_FIELDS)
+
+    def _build_cubemars_wiring_panel(self, column):
+        self._build_yaml_wiring_panel(
+            column, attr_prefix='cubemars_wiring',
+            title='CubeMars ID・回転方向 (real_joint_bridge.yaml)',
+            description='real_joint_bridge_node起動時のみ反映。実行中には反映されません。',
+            field_specs=CUBEMARS_WIRING_FIELDS)
+
+    def _build_homing_wiring_panel(self, column):
+        self._build_yaml_wiring_panel(
+            column, attr_prefix='homing_wiring',
+            title='原点センサ・ホーミング配線設定 (real_joint_bridge.yaml)',
+            note='CAN_HOSTはz/r原点センサ(SW1/SW2のリミットスイッチ)専用。\n'
+                 'motor1/motor2の位置取得にはROBOMAS内蔵エンコーダを使うため、\n'
+                 'CAN_HOSTのENC1/ENC2は使わない。',
+            description='homing_node起動時のみ反映。実行中には反映されません。',
+            field_specs=HOMING_WIRING_FIELDS)
+
+    def _build_yaml_wiring_panel(self, column, attr_prefix, title, description, field_specs, note=None):
+        box = QGroupBox(title)
+        layout = QVBoxLayout(box)
+
+        if note:
+            note_label = QLabel()
+            note_label.setWordWrap(True)
+            _set_status(note_label, note, 'muted')
+            layout.addWidget(note_label)
+
+        desc = QLabel()
+        desc.setWordWrap(True)
+        _set_status(desc, description, 'error')
+        layout.addWidget(desc)
+
+        grid = QGridLayout()
+        edits = {}
+        for i, (key, label, kind) in enumerate(field_specs):
+            r, c = divmod(i, 2)
+            grid.addWidget(QLabel(label), r, c * 2)
+            if kind == 'bool':
+                widget = QCheckBox()
+            elif kind == 'int':
+                widget = make_int_edit(0, width=70)
+            else:
+                widget = make_float_edit(0.0, width=70)
+            edits[key] = widget
+            grid.addWidget(widget, r, c * 2 + 1)
+        layout.addLayout(grid)
+        setattr(self, f'_{attr_prefix}_edits', edits)
+
+        status_label = QLabel()
+        status_label.setWordWrap(True)
+        _set_status(status_label, '未読込', 'muted')
+        setattr(self, f'_{attr_prefix}_status_label', status_label)
+        layout.addWidget(status_label)
+
+        btn_row = QHBoxLayout()
+        load_btn = QPushButton('読込')
+        save_btn = QPushButton('yamlへ保存')
+        save_btn.setProperty('variant', 'danger')
+        load_btn.clicked.connect(lambda: self._on_load_yaml_wiring(attr_prefix, field_specs))
+        save_btn.clicked.connect(lambda: self._on_save_yaml_wiring(attr_prefix, field_specs, title))
+        btn_row.addWidget(load_btn)
+        btn_row.addWidget(save_btn)
+        layout.addLayout(btn_row)
+
+        column.addWidget(box)
+
+    def _on_load_yaml_wiring(self, attr_prefix, field_specs):
+        edits = getattr(self, f'_{attr_prefix}_edits')
+        status_label = getattr(self, f'_{attr_prefix}_status_label')
+        path = _resolve_real_joint_bridge_yaml_path()
+        if path is None:
+            _set_status(status_label, 'real_joint_bridge.yamlが見つかりません', 'error')
+            return
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = yaml.safe_load(f)
+        except (OSError, yaml.YAMLError) as exc:
+            _set_status(status_label, f'読込失敗: {exc}', 'error')
+            return
+        values = _flatten_yaml_node_params(data)
+        missing = []
+        for key, _label, kind in field_specs:
+            if key not in values:
+                missing.append(key)
+                continue
+            widget = edits[key]
+            if kind == 'bool':
+                widget.setChecked(bool(values[key]))
+            elif kind == 'int':
+                set_int(widget, int(values[key]))
+            else:
+                set_float(widget, float(values[key]))
+        status = f'読込完了 ({path})'
+        if missing:
+            status += f'\n(yamlに無い項目: {", ".join(missing)})'
+        _set_status(status_label, status, 'info')
+
+    def _on_save_yaml_wiring(self, attr_prefix, field_specs, title):
+        edits = getattr(self, f'_{attr_prefix}_edits')
+        status_label = getattr(self, f'_{attr_prefix}_status_label')
+        path = _resolve_real_joint_bridge_yaml_path()
+        if path is None:
+            _set_status(status_label, 'real_joint_bridge.yamlが見つかりません', 'error')
+            return
+        try:
+            updates = {}
+            for key, _label, kind in field_specs:
+                widget = edits[key]
+                if kind == 'bool':
+                    updates[key] = _format_yaml_bool(widget.isChecked())
+                elif kind == 'int':
+                    updates[key] = _format_yaml_int(get_int(widget))
+                else:
+                    updates[key] = _format_yaml_float(get_float(widget))
+        except ValueError:
+            QMessageBox.critical(self, '入力エラー', '数値項目を確認してください')
+            return
+
+        reply = QMessageBox.question(
+            self, f'{title}の保存確認',
+            f'{path}\n\nを直接書き換えます。real_joint_bridge_node/homing_nodeの\n'
+            '次回起動から反映されます(実行中のノードには影響しません)。\n'
+            'git管理下のファイルです。保存後はgit diffで変更内容を確認してください。\n'
+            'よろしいですか?',
+            QMessageBox.Yes | QMessageBox.No)
+        if reply != QMessageBox.Yes:
+            return
+
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                text = f.read()
+            for key, value_str in updates.items():
+                text = _replace_yaml_scalar(text, key, value_str)
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(text)
+        except OSError as exc:
+            _set_status(status_label, f'保存失敗: {exc}', 'error')
+            return
+        _set_status(status_label, f'保存しました ({path})\ngit diffで変更内容を確認してください', 'success')
 
     def _build_field_buttons(self, layout):
         # 以前はワーク/シューティングボックスを別々のボックス(別々の座標系)で

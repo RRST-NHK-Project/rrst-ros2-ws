@@ -32,6 +32,9 @@ device_id (ros2can GUIのデバイス一覧に出る番号、= このボード�
   M4 (CAN_ID=0x204) → 対応: 未使用
 
 ## 外付けAMTエンコーダ (ENC1/ENC2、z_joint/r_joint用、ROBOMASのCAN帰還とは別物)
+**2026-08-31時点で不使用(方針変更、note/hardware_mapping.txt参照)**: z_joint/
+r_jointの位置真値はROBOMAS内蔵ロータエンコーダのCAN帰還(M{n} angle)に統一され、
+このENC1/ENC2は使わなくなった。配線情報は記録として以下に残す。
 MODE_ROBOMASのM{n} angleはC610/M2006内蔵ロータエンコーダのCAN帰還値であり、
 これとは別に外付けAMTエンコーダが存在する場合、device_profiles.pyの
 ENC1/ENC2チャンネル(MODE_CAN/MODE_CAN_HOST/MODE_IOの汎用IOノード側)経由に
@@ -70,13 +73,14 @@ ENC1/ENC2はそれぞれ何を測っているか(どちらか一方に◯、ま�
 homing_node以下を直接編集すること。
 
 z軸原点センサはCAN_HOSTのどのノード・どのSWチャンネルか
-(現状の仮定: ENC1/ENC2と同じnode_index=1のSW1):
+(現状の仮定: node_index=1のSW1。real_joint_bridge.yamlの値が正、2026-08-31確認。
+以前ここの記入値がSW1=0/SW2=1/SW3=2の凡例と矛盾していたので訂正した):
   node_index →1
-  local_index(SW1=0/SW2=1/SW3=2) →1
+  local_index(SW1=0/SW2=1/SW3=2) →0
 
 r軸原点センサ(現状の仮定: 同じくnode_index=1のSW2):
   node_index →1
-  local_index →2
+  local_index →1
 
 センサ検出時のスイッチ値(現状の仮定: 1=検出、pin_ctrl_task.cppの
 !digitalRead()相当。実機で違えば0に):

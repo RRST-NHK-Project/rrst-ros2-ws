@@ -17,14 +17,12 @@ real_joint_bridge_node:
     # (trajectory_follower_nodeの/set_root_theta_originサービス、note/hardware_mapping.txt参照)。
     tip_theta_offset_rad: 0.0   # 要初回較正: 原点センサ位置での_unwrapped値から逆算して設定
 
-    # ---- CAN_HOST配下ノードのENC1/ENC2 (motor1_joint / motor2_joint) ----
-    can_host_device_id: 101
-    can_host_node_index: 1    # 確認済み(note/can_mapping.txt)
-    can_host_slots_per_node: 5
-    enc1_local_index: 3
-    enc2_local_index: 4
-    enc1_is_motor1: true      # 記入済み: ENC1=motor1_joint, ENC2=motor2_joint
-    motor_encoder_counts_per_rev: 2048.0  # 確認済み(note/can_mapping.txt)
+    # ---- ROBOMAS (motor1_joint / motor2_joint、内蔵ロータエンコーダのCAN帰還を
+    # 位置の真値として使う。2026-08-31方針転換で外付けAMTエンコーダ(ENC1/ENC2、
+    # CAN_HOST配下ノード)は不使用に変更した) ----
+    robomas_device_id: 21
+    robomas_motor1_index: 0   # M1 angle帰還スロット
+    robomas_motor2_index: 1   # M2 angle帰還スロット
     pulley_pitch_diameter_mm: 22.92        # 確認済み(ピッチ円直径)
     mix_k: 0.5
     motor1_sign: 1.0
@@ -42,25 +40,18 @@ real_joint_bridge_node:
     r_joint: r_joint
     output_topic: mixed_joint_states
 
-# homing_node のパラメータ。CAN_HOST/ENC/プーリー関連はreal_joint_bridge_nodeと
+# homing_node のパラメータ。ROBOMAS/プーリー関連はreal_joint_bridge_nodeと
 # 値を一致させること(重複管理、根拠はnote/hardware_mapping.txt参照)。
 homing_node:
   ros__parameters:
+    # z/r原点センサ(リミットスイッチ)のみCAN_HOSTを使う。motor1/motor2の位置は
+    # ROBOMAS内蔵エンコーダを使うためCAN_HOSTのENC1/ENC2は不使用
+    # (2026-08-31方針転換)。
     can_host_device_id: 101
-    can_host_node_index: 1
     can_host_slots_per_node: 5
-    enc1_local_index: 3
-    enc2_local_index: 4
-    enc1_is_motor1: true
-    motor_encoder_counts_per_rev: 2048.0
-    pulley_pitch_diameter_mm: 22.92
-    mix_k: 0.5
-    motor1_sign: 1.0
-    motor2_sign: 1.0
 
-    # 要確認(note/can_mapping.txt「z/r原点センサ(ホーミング用)」): z軸/r軸の
-    # 原点センサがCAN_HOSTのどのノード・どのSWチャンネルに配線されているか。
-    # 現状はENC1/ENC2と同じノード(node_index=1)のSW1/SW2という仮定。
+    # 確認済み(note/can_mapping.txt「z/r原点センサ(ホーミング用)」): z軸=SW1、
+    # r軸=SW2、どちらも同じノード(node_index=1)に載っている。
     z_limit_switch_node_index: 1
     z_limit_switch_local_index: 0   # SW1
     r_limit_switch_node_index: 1
@@ -68,8 +59,12 @@ homing_node:
     switch_triggered_value: 1        # firmwareの!digitalRead()相当(要確認)
 
     robomas_device_id: 21
-    robomas_motor1_slot: 0   # M1 target_velocity
-    robomas_motor2_slot: 1   # M2 target_velocity
+    robomas_motor1_index: 0   # M1 target_velocity/angle
+    robomas_motor2_index: 1   # M2 target_velocity/angle
+    pulley_pitch_diameter_mm: 22.92
+    mix_k: 0.5
+    motor1_sign: 1.0
+    motor2_sign: 1.0
 
     # 要実機調整。低速・短めのタイムアウトから試すこと。
     homing_velocity_rpm: 30.0
