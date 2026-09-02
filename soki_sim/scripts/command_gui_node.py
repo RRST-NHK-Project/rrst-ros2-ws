@@ -755,13 +755,16 @@ class CommandGuiApp(QWidget):
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(8, 8, 8, 8)
 
-        # パラメータパネル(統合操作タブ)が増えるにつれ縦に伸び、ワーク/シューティング
-        # ボックスのボタン(元はマニュアル操作タブ側)が画面外に押し出される問題が
-        # 起きたため、QTabWidgetで「マニュアル操作」(円クリック・ジョグ・保存済み
-        # ポイント等、自由な位置への移動系)と「統合操作」(各種パラメータパネル、
-        # およびワーク/シューティングボックスの定型位置移動ボタン)を別タブに分離
-        # している。起動時に表示するタブは、動作モード切替や各種パラメータなど
-        # 主要な操作をまとめた統合操作タブをデフォルトにする。
+        # パラメータパネルが増えるにつれ縦に伸び、ワーク/シューティングボックスの
+        # ボタン(元はマニュアル操作タブ側)が画面外に押し出される問題が起きたため、
+        # QTabWidgetで機能ごとにタブを分離している。「マニュアル操作」(円クリック・
+        # ジョグ・保存済みポイント等、自由な位置への移動系)、「統合操作」(現在状態・
+        # 動作モード・ワーク/シューティングボックスの定型位置移動ボタン)、
+        # 「ゲイン調整」(軌道生成・joy速度・MIT・robomasの各ゲインと全ゲイン一括
+        # 読込/適用)、「原点校正」(機体原点オフセット・root_theta原点設定・
+        # ホーミング)、「配線設定」(robomas/cubemars/homing/リミットスイッチの
+        # real_joint_bridge.yaml配線設定)の5タブ構成。起動時に表示するタブは、
+        # 動作モード切替など主要な操作をまとめた統合操作タブをデフォルトにする。
         logo_pixmap = _load_soki_logo_image(target_height=36)
         if logo_pixmap is not None:
             header = QHBoxLayout()
@@ -775,24 +778,33 @@ class CommandGuiApp(QWidget):
         root_layout.addWidget(self.tabs)
 
         manual_tab = QWidget()
-        integrated_tab = QWidget()
+        overview_tab = QWidget()
+        gain_tab = QWidget()
+        calibration_tab = QWidget()
+        wiring_tab = QWidget()
         # 統合操作を既定表示にするだけでなく、タブの並びも一番左にする
         # (先に追加した方が左側になる)。
-        self.tabs.addTab(integrated_tab, '統合操作')
+        self.tabs.addTab(overview_tab, '統合操作')
+        self.tabs.addTab(gain_tab, 'ゲイン調整')
+        self.tabs.addTab(calibration_tab, '原点校正')
+        self.tabs.addTab(wiring_tab, '配線設定')
         self.tabs.addTab(manual_tab, 'マニュアル操作')
 
         self._build_move_tab(manual_tab)
-        self._build_settings_tab(integrated_tab)
+        self._build_overview_tab(overview_tab)
+        self._build_gain_tab(gain_tab)
+        self._build_calibration_tab(calibration_tab)
+        self._build_wiring_tab(wiring_tab)
         self._restore_saved_gains()
 
-        self.tabs.setCurrentWidget(integrated_tab)
+        self.tabs.setCurrentWidget(overview_tab)
 
         for edit in (self.x_edit, self.y_edit, self.z_edit):
             edit.textChanged.connect(self._redraw_pin)
         self._redraw_pin()
         self._refresh_point_list()
 
-        # 統合操作タブは軌道生成/MIT/robomasゲイン等のグリッドが左右2列に並ぶため、
+        # ゲイン調整タブは軌道生成/MIT/robomasゲイン等のグリッドが左右2列に並ぶため、
         # 940pxだとまだ右端が少し欠けて横スクロールが発生していた。実測で2列とも
         # 横スクロール無しで収まる幅(約1160px)を既定値にする。
         self.setMinimumWidth(660)
@@ -916,8 +928,12 @@ class CommandGuiApp(QWidget):
         self.z_slider.setValue(value)
         self.z_slider.blockSignals(False)
 
-    # ---------- settings (integrated) tab ----------
-    def _build_settings_tab(self, parent):
+    # ---------- panel tabs (統合操作・ゲイン調整・原点校正・配線設定) ----------
+    def _build_panel_tab(self, parent, top_funcs=(), left_funcs=(), right_funcs=()):
+        """指定したパネル構築関数群(いずれも_build_current_state_panel等、column用の
+        QVBoxLayoutを1つ受け取る形式)を、スクロール可能な領域に配置する共通ヘルパー。
+        元は統合操作タブ1枚に全パネルを詰めていたが、機能ごとにタブを分割する際の
+        重複を避けるため関数化した。right_funcsを渡さない場合は単一列になる。"""
         outer = QVBoxLayout(parent)
         outer.setContentsMargins(0, 0, 0, 0)
 
@@ -927,45 +943,63 @@ class CommandGuiApp(QWidget):
         inner = QWidget()
         inner_layout = QVBoxLayout(inner)
 
-        self._build_apply_all_panel(inner_layout)
-        self._build_field_buttons(inner_layout)
+        for func in top_funcs:
+            func(inner_layout)
 
         # ストレッチ比を指定しないとQBoxLayoutは余った横幅を両列に均等配分して
-        # しまい、内容が小さい左列だけ不自然に広がっていた。かといって右列に
-        # stretch=1を与えると、今度は右列内のQGridLayout(ラベル列)が余白を
+        # しまい、内容が小さい列だけ不自然に広がっていた。かといって片方の列に
+        # stretch=1を与えると、今度はその列内のQGridLayout(ラベル列)が余白を
         # 吸ってラベルと入力欄の間に大きな隙間ができてしまう。どちらの列も
         # 中身ぴったりのサイズに留め、余った横幅は列の外側(末尾のstretch)へ
         # 逃がすのが正しい。
         columns = QHBoxLayout()
         left_col = QVBoxLayout()
-        right_col = QVBoxLayout()
         columns.addLayout(left_col, 0)
-        columns.addLayout(right_col, 0)
+        if right_funcs:
+            right_col = QVBoxLayout()
+            columns.addLayout(right_col, 0)
         columns.addStretch(1)
         inner_layout.addLayout(columns)
         inner_layout.addStretch(1)
 
-        self._build_current_state_panel(left_col)
-        self._build_mode_panel(left_col)
-        self._build_machine_origin_offset_panel(left_col)
-        self._build_origin_panel(left_col)
-        self._build_robomas_wiring_panel(left_col)
-        self._build_cubemars_wiring_panel(left_col)
-        # 同様に縦方向も、右列(パネル数が多く縦に長い)に合わせて左列の各パネルが
-        # 間延びして伸びないよう、余った縦幅は末尾のstretchへ逃がす。
+        for func in left_funcs:
+            func(left_col)
+        # 同様に縦方向も、もう片方の列に合わせて各パネルが間延びして伸びないよう、
+        # 余った縦幅は末尾のstretchへ逃がす。
         left_col.addStretch(1)
 
-        self._build_trajectory_panel(right_col)
-        self._build_joy_speed_panel(right_col)
-        self._build_mit_gain_panel(right_col)
-        self._build_robomas_gain_panel(right_col)
-        self._build_homing_wiring_panel(right_col)
-        self._build_limit_switch_wiring_panel(right_col)
-        self._build_homing_panel(right_col)
-        right_col.addStretch(1)
+        if right_funcs:
+            for func in right_funcs:
+                func(right_col)
+            right_col.addStretch(1)
 
         scroll.setWidget(inner)
         outer.addWidget(scroll)
+
+    def _build_overview_tab(self, parent):
+        self._build_panel_tab(
+            parent,
+            top_funcs=[self._build_field_buttons],
+            left_funcs=[self._build_current_state_panel, self._build_mode_panel])
+
+    def _build_gain_tab(self, parent):
+        self._build_panel_tab(
+            parent,
+            top_funcs=[self._build_apply_all_panel],
+            left_funcs=[self._build_trajectory_panel, self._build_joy_speed_panel],
+            right_funcs=[self._build_mit_gain_panel, self._build_robomas_gain_panel])
+
+    def _build_calibration_tab(self, parent):
+        self._build_panel_tab(
+            parent,
+            left_funcs=[self._build_machine_origin_offset_panel, self._build_origin_panel,
+                        self._build_homing_panel])
+
+    def _build_wiring_tab(self, parent):
+        self._build_panel_tab(
+            parent,
+            left_funcs=[self._build_robomas_wiring_panel, self._build_cubemars_wiring_panel],
+            right_funcs=[self._build_homing_wiring_panel, self._build_limit_switch_wiring_panel])
 
     def _build_apply_all_panel(self, layout):
         # 各ゲインパネル個別の「適用」を毎回押す代わりに、GUIが保持している
