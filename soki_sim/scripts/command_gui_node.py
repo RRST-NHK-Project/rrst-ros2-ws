@@ -282,10 +282,44 @@ LIMIT_SWITCH_WIRING_FIELDS = [
         ('r_upper_limit_switch_local_index', 'スロット', 'int'),
     ]),
 ]
+# ハンド(吸着パッド展開・ワークピッチ変更の2サーボ、ダイヤフラムポンプ)の配線設定
+# (hand.yaml、2026-09-03追加)。note/can_mapping.txt「## ハンド」参照。
+HAND_WIRING_FIELDS = [
+    (None, [
+        ('can_slots_per_node', 'ノードあたりスロット数', 'int'),
+    ]),
+    ('吸着パッド展開サーボ', [
+        ('deploy_servo_device_id', 'ID', 'int'),
+        ('deploy_servo_node_index', 'ノード', 'int'),
+        ('deploy_servo_local_index', 'SERVOスロット', 'int'),
+    ]),
+    (None, [
+        ('deploy_servo_retracted_deg', '収納角度[deg]', 'int'),
+        ('deploy_servo_deployed_deg', '展開角度[deg]', 'int'),
+    ]),
+    ('ワークピッチ変更サーボ', [
+        ('pitch_servo_device_id', 'ID', 'int'),
+        ('pitch_servo_node_index', 'ノード', 'int'),
+        ('pitch_servo_local_index', 'SERVOスロット', 'int'),
+    ]),
+    (None, [
+        ('pitch_servo_hold_deg', '保持角度[deg]', 'int'),
+        ('pitch_servo_insert_deg', '投入角度[deg]', 'int'),
+    ]),
+    ('ダイヤフラムポンプ(MD)', [
+        ('pump_device_id', 'ID', 'int'),
+        ('pump_node_index', 'ノード', 'int'),
+        ('pump_local_index', 'MDスロット', 'int'),
+    ]),
+    (None, [
+        ('pump_duty_percent', 'デューティ[%]', 'float'),
+        ('pump_md_pwm_max', 'PWM最大値', 'int'),
+    ]),
+]
 
 
-def _resolve_real_joint_bridge_yaml_path():
-    """soki_sim/config/real_joint_bridge.yamlの実ファイルパスを解決する。
+def _resolve_config_yaml_path(filename):
+    """soki_sim/config/{filename}の実ファイルパスを解決する。
     command_gui_node自体がインストール後のパスから実行される(CMakeLists.txtで
     RENAMEインストール)ため、__file__相対ではなくget_package_share_directory経由
     で解決する(_resource_pathと同じ理由)。symlink-installならrealpath()で
@@ -297,10 +331,14 @@ def _resolve_real_joint_bridge_yaml_path():
         share_dir = get_package_share_directory('soki_sim')
     except PackageNotFoundError:
         return None
-    path = os.path.join(share_dir, 'config', 'real_joint_bridge.yaml')
+    path = os.path.join(share_dir, 'config', filename)
     if not os.path.isfile(path):
         return None
     return os.path.realpath(path)
+
+
+def _resolve_real_joint_bridge_yaml_path():
+    return _resolve_config_yaml_path('real_joint_bridge.yaml')
 
 
 def _resolve_gains_file_path():
@@ -1047,7 +1085,7 @@ class CommandGuiApp(QWidget):
             parent,
             top_funcs=[self._build_field_buttons],
             left_funcs=[self._build_machine_status_panel, self._build_current_state_panel,
-                        self._build_mode_panel],
+                        self._build_mode_panel, self._build_hand_panel],
             right_funcs=[self._build_setup_checklist_panel])
 
     def _build_gain_tab(self, parent):
@@ -1066,7 +1104,8 @@ class CommandGuiApp(QWidget):
     def _build_wiring_tab(self, parent):
         self._build_panel_tab(
             parent,
-            left_funcs=[self._build_robomas_wiring_panel, self._build_cubemars_wiring_panel],
+            left_funcs=[self._build_robomas_wiring_panel, self._build_cubemars_wiring_panel,
+                        self._build_hand_wiring_panel],
             right_funcs=[self._build_homing_wiring_panel, self._build_limit_switch_wiring_panel])
 
     def _build_apply_all_panel(self, layout):
@@ -1418,6 +1457,50 @@ class CommandGuiApp(QWidget):
         for b in self._mode_buttons.values():
             b.blockSignals(False)
 
+    def _build_hand_panel(self, column):
+        # ハンド(吸着パッド展開・ワークピッチ変更の2サーボ、ダイヤフラムポンプ)の
+        # 操作パネル。配線・角度・デューティの編集は配線設定タブの
+        # 「ハンド配線設定」で行い、ここでは4つのサービス(hand_node)を
+        # 呼ぶだけにする(定型位置移動ボタンと同様、確認ダイアログは付けない。
+        # 展開/収納・ピッチ切替は試合中に繰り返し使う通常操作のため)。
+        box = QGroupBox('ハンド (hand_node)')
+        layout = QVBoxLayout(box)
+
+        self.hand_status_label = QLabel()
+        self.hand_status_label.setWordWrap(True)
+        _set_status(self.hand_status_label, '未実行', 'muted')
+        layout.addWidget(self.hand_status_label)
+
+        pad_row = QHBoxLayout()
+        deploy_btn = QPushButton('吸着パッド展開(吸着ON)')
+        deploy_btn.setProperty('variant', 'primary')
+        retract_btn = QPushButton('吸着パッド収納(吸着OFF)')
+        deploy_btn.clicked.connect(lambda: self._on_hand_trigger('/hand_deploy_pads'))
+        retract_btn.clicked.connect(lambda: self._on_hand_trigger('/hand_retract_pads'))
+        pad_row.addWidget(deploy_btn)
+        pad_row.addWidget(retract_btn)
+        layout.addLayout(pad_row)
+
+        pitch_row = QHBoxLayout()
+        hold_btn = QPushButton('ピッチ: 保持姿勢')
+        insert_btn = QPushButton('ピッチ: 投入姿勢')
+        hold_btn.clicked.connect(lambda: self._on_hand_trigger('/hand_set_pitch_hold'))
+        insert_btn.clicked.connect(lambda: self._on_hand_trigger('/hand_set_pitch_insert'))
+        pitch_row.addWidget(hold_btn)
+        pitch_row.addWidget(insert_btn)
+        layout.addLayout(pitch_row)
+
+        column.addWidget(box)
+
+    def _on_hand_trigger(self, service_name):
+        _set_status(self.hand_status_label, f'{service_name} 呼び出し中...', 'muted')
+        ok = self.node.call_trigger_service(service_name, self._on_hand_trigger_done)
+        if not ok:
+            _set_status(self.hand_status_label, 'hand_nodeに接続できません(未起動?)', 'error')
+
+    def _on_hand_trigger_done(self, success, message):
+        _set_status(self.hand_status_label, message, 'success' if success else 'error')
+
     def _build_trajectory_panel(self, column):
         box = QGroupBox('軌道生成パラメータ (trajectory_follower_node)')
         grid = QGridLayout(box)
@@ -1677,7 +1760,19 @@ class CommandGuiApp(QWidget):
             description='trajectory_follower_node起動時のみ反映。実行中には反映されません。',
             field_specs=LIMIT_SWITCH_WIRING_FIELDS)
 
-    def _build_yaml_wiring_panel(self, column, attr_prefix, title, description, field_specs, note=None):
+    def _build_hand_wiring_panel(self, column):
+        self._build_yaml_wiring_panel(
+            column, attr_prefix='hand_wiring',
+            title='ハンド配線設定 (hand.yaml)',
+            note='吸着パッド展開・ワークピッチ変更の2サーボ(SERVOn、角度[deg])と、\n'
+                 'ダイヤフラムポンプ(MDn、PWM+DIR)の配線・角度・デューティを設定する。\n'
+                 'IDを0のままにするとその出力は無効(未配線)扱い。',
+            description='hand_node起動時のみ反映。実行中には反映されません。',
+            field_specs=HAND_WIRING_FIELDS,
+            yaml_filename='hand.yaml')
+
+    def _build_yaml_wiring_panel(self, column, attr_prefix, title, description, field_specs, note=None,
+                                  yaml_filename='real_joint_bridge.yaml'):
         box = QGroupBox(title)
         layout = QVBoxLayout(box)
 
@@ -1729,20 +1824,20 @@ class CommandGuiApp(QWidget):
         load_btn = QPushButton('読込')
         save_btn = QPushButton('yamlへ保存')
         save_btn.setProperty('variant', 'danger')
-        load_btn.clicked.connect(lambda: self._on_load_yaml_wiring(attr_prefix, field_specs))
-        save_btn.clicked.connect(lambda: self._on_save_yaml_wiring(attr_prefix, field_specs, title))
+        load_btn.clicked.connect(lambda: self._on_load_yaml_wiring(attr_prefix, field_specs, yaml_filename))
+        save_btn.clicked.connect(lambda: self._on_save_yaml_wiring(attr_prefix, field_specs, title, yaml_filename))
         btn_row.addWidget(load_btn)
         btn_row.addWidget(save_btn)
         layout.addLayout(btn_row)
 
         column.addWidget(box)
 
-    def _on_load_yaml_wiring(self, attr_prefix, field_specs):
+    def _on_load_yaml_wiring(self, attr_prefix, field_specs, yaml_filename='real_joint_bridge.yaml'):
         edits = getattr(self, f'_{attr_prefix}_edits')
         status_label = getattr(self, f'_{attr_prefix}_status_label')
-        path = _resolve_real_joint_bridge_yaml_path()
+        path = _resolve_config_yaml_path(yaml_filename)
         if path is None:
-            _set_status(status_label, 'real_joint_bridge.yamlが見つかりません', 'error')
+            _set_status(status_label, f'{yaml_filename}が見つかりません', 'error')
             return
         try:
             with open(path, 'r', encoding='utf-8') as f:
@@ -1768,12 +1863,12 @@ class CommandGuiApp(QWidget):
             status += f'\n(yamlに無い項目: {", ".join(missing)})'
         _set_status(status_label, status, 'info')
 
-    def _on_save_yaml_wiring(self, attr_prefix, field_specs, title):
+    def _on_save_yaml_wiring(self, attr_prefix, field_specs, title, yaml_filename='real_joint_bridge.yaml'):
         edits = getattr(self, f'_{attr_prefix}_edits')
         status_label = getattr(self, f'_{attr_prefix}_status_label')
-        path = _resolve_real_joint_bridge_yaml_path()
+        path = _resolve_config_yaml_path(yaml_filename)
         if path is None:
-            _set_status(status_label, 'real_joint_bridge.yamlが見つかりません', 'error')
+            _set_status(status_label, f'{yaml_filename}が見つかりません', 'error')
             return
         try:
             updates = {}
@@ -1791,9 +1886,9 @@ class CommandGuiApp(QWidget):
 
         reply = QMessageBox.question(
             self, f'{title}の保存確認',
-            f'{path}\n\nを直接書き換えます。real_joint_bridge_node/homing_nodeの\n'
-            '次回起動から反映されます(実行中のノードには影響しません)。\n'
-            'git管理下のファイルです。保存後はgit diffで変更内容を確認してください。\n'
+            f'{path}\n\nを直接書き換えます。対象ノードの次回起動から反映されます\n'
+            '(実行中のノードには影響しません)。git管理下のファイルです。\n'
+            '保存後はgit diffで変更内容を確認してください。\n'
             'よろしいですか?',
             QMessageBox.Yes | QMessageBox.No)
         if reply != QMessageBox.Yes:

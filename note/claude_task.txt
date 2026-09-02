@@ -1,5 +1,37 @@
 soki: 未着手の課題・制約メモ(claude.txtは現状把握用、こちらは今後対応が要る課題を並べる場所)
 
+## ハンド(エンドエフェクタ)実装 (2026-09-03新規着手)
+構成はnote/claude.txt「##ハンド」、配線テンプレートはnote/can_mapping.txt
+「## ハンド」参照。
+
+実装済み(2026-09-03):
+  - 制御ノードhand_node(soki_sim/scripts/hand_node.py)を新規作成。
+    real_joint_bridge_node/trajectory_follower_nodeとは独立(方針決定済み)。
+    Triggerサービス4つ(/hand_deploy_pads・/hand_retract_pads・
+    /hand_set_pitch_hold・/hand_set_pitch_insert)を提供。ダイヤフラムポンプは
+    吸着パッド展開/収納と連動してON(pump_duty_percent)/OFF(duty=0)する
+    方針で実装済み(方針決定済み)
+  - パラメータファイルsoki_sim/config/hand.yaml(device_id等は全て既定0=
+    未配線・無効。実機配線判明後に書き換えること)
+  - command_gui_nodeへのGUI統合:
+    - 統合操作タブに「ハンド」操作パネル(展開/収納・ピッチ切替の4ボタン、
+      _build_hand_panel)を追加。定型位置移動ボタンと同様、確認ダイアログなし
+    - 配線設定タブに「ハンド配線設定」パネル(_build_hand_wiring_panel、
+      hand.yamlの読込/編集/保存)を追加。既存のyaml配線パネル機構
+      (_build_yaml_wiring_panel)をyaml_filename引数で汎用化して流用
+  - real_all_axes_test.launch.py(本番でそのまま使うlaunch)にhand_nodeを追加
+    (config/hand.yamlを読み込む)
+
+未着手・未確定事項:
+  - 実機配線(サーボ2個・ダイヤフラムポンプMDのdevice_id/node_index/
+    local_index)をros2can GUIで確認し、can_mapping.txt・hand.yamlへ記入すること
+  - URDF(soki_sim.urdf.xacro)にtip_link以降のハンド機構(吸着パッド3個・
+    展開サーボ・ピッチサーボ)を追加するか、視覚のみで妥協するかを検討
+  - サーボの角度範囲(収納⇔展開、保持⇔投入姿勢のそれぞれの角度、hand.yamlの
+    *_deg系パラメータ)が未確定(実機で要調整)
+  - hand_node自体の実機動作確認(topic_passthrough、SERVOn/SWnやENCn/MDnの
+    ピン共有設定(MULTIn/ENCn_MD)が正しく切り替わっているか)が未実施
+
 ## シューティングボックスへの移動時の衝突回避 (2026-08-27新規)
 soki_simのワンクリック移動ボタン(command_gui_node.py)やcommand_gui_nodeの目標送信は、
 現在IK計算した目標角度へtrajectory_follower_nodeが各関節を独立に(同時到達するよう

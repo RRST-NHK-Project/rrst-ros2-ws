@@ -27,6 +27,8 @@ def generate_launch_description():
     エンコーダに統一済み、2026-08-31方針転換。note/hardware_mapping.txt参照)、
     trajectory_follower_node(4軸とも実機出力あり)、homing_node(z/rの起動時
     ホーミング。自動開始はしない、start_homing serviceで明示的に起動すること)、
+    hand_node(吸着ハンド。吸着パッド展開/収納・ワークピッチ変更のTriggerサービスを
+    提供、config/hand.yaml参照。実機配線未確認のうちはdevice_id=0のまま何もしない)、
     command_gui_node。
     use_joy:=true でjoy_node/joy_teleop_nodeも起動する(control_modeは自動的に
     'both'になる)。enable_buttonでデッドマンスイッチを指定できる(デフォルト-1=
@@ -58,6 +60,7 @@ def generate_launch_description():
     xacro_file = os.path.join(pkg_share, 'urdf', 'soki_sim.urdf.xacro')
     rviz_config = os.path.join(pkg_share, 'rviz', 'soki_sim.rviz')
     real_joint_bridge_yaml = os.path.join(pkg_share, 'config', 'real_joint_bridge.yaml')
+    hand_yaml = os.path.join(pkg_share, 'config', 'hand.yaml')
 
     # ---- root_theta / tip_theta (CubeMars、同一device_id上のM1/M2) ----
     cubemars_device_id_arg = DeclareLaunchArgument(
@@ -198,6 +201,14 @@ def generate_launch_description():
         name='homing_node',
         output='screen',
         parameters=[real_joint_bridge_yaml],
+    )
+
+    hand_node = Node(
+        package='soki_sim',
+        executable='hand_node',
+        name='hand_node',
+        output='screen',
+        parameters=[hand_yaml],
     )
 
     def _make_trajectory_follower_node(context, *args, **kwargs):
@@ -342,6 +353,7 @@ def generate_launch_description():
         ros2can_node,
         real_joint_bridge_node,
         homing_node,
+        hand_node,
         trajectory_follower_node,
         command_gui_node,
         joy_node,

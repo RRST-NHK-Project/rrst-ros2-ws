@@ -21,6 +21,27 @@ motor_mixer_nodeが/joint_statesを監視し、motor1/2側とz/r側どちらが
 command_gui_node(2026-08-27新規作成)はX/Y/Zの目標値をGUI指定→逆運動学で
 theta/z/rに変換して/mixed_joint_statesへpublishする指令送信GUI。
 
+##ハンド(エンドエフェクタ、2026-09-03新規・実装未着手)
+tip_link(tip_theta_jointの先)に取り付く吸着ハンド。構成:
+  - 手先θ回転: 既存のtip_theta_joint(CubeMars AK40-10)がハンド全体を回転させる
+  - 吸着パッド展開サーボ x1: ワーク回収のため3つの吸着パッドを展開する
+  - ワークピッチ変更サーボ x1: シューティングボックスへ縦向きに投入するため、
+    保持したワークの向き(ピッチ)を変える
+  - ダイヤフラムポンプ x1: 3つの吸着パッドの真空吸着源。ros2canのMD(モーター
+    ドライバ、PWM+DIR出力)チャンネル経由で50%デューティ固定で駆動する想定
+  - 吸着パッドは3個、同時に3ワークを保持する仕様(パッド自体は受動部品)
+
+実装方式の想定(ros2can/ros2can/device_profiles.py参照): xiao-esp32-s3_can2io
+のMODE_CAN_HOST配下「汎用IOノード」がSERVOx3/MDx2/SWx3/ENCx2チャンネルを
+持つ。SERVOnとSWnはピン共有(ファームウェアのMULTIn設定で0=スイッチ入力/
+1=サーボ出力を切替)、ENCnとMDnもピン共有(0=エンコーダ入力/1=MD出力)。
+2026-08-31の方針転換でz/r外付けAMTエンコーダ(ENC1/ENC2、node_index=1)は
+不使用になっているため、そのENC1(またはENC2)のピンをMD出力へ切り替えて
+ダイヤフラムポンプに使う、という再利用が候補になる(要実機配線確認)。
+サーボ2個は、z/r原点センサ(SW1/SW2、node_index=0)が使っていないSW3/SERVO3、
+または別ノードのSERVO1-3を使う想定。詳細な device_id/node_index/local_index
+はnote/can_mapping.txt「## ハンド」節に記入すること(未記入、実機確認待ち)。
+
 ##soki_simフィールド(ワーク配置環境)反映 (2026-08-27新規追加)
 実機のワーク配置環境をURDF(soki_sim.urdf.xacro)に静的モデルとして追加(衝突/慣性なし、視覚のみ)。
 base_link原点、+X=奥行き(ワーク側)、Y=幅方向(ワーク群中心線=機体中心=機体の乗っている板の中心と一致)。
