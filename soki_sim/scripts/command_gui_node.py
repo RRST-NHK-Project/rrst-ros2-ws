@@ -1091,7 +1091,7 @@ class CommandGuiApp(QWidget):
         _set_status(self.apply_all_status_label, '未送信', 'muted')
         box_layout.addWidget(self.apply_all_status_label)
 
-        btn = QPushButton('実機接続 (全ゲイン適用)')
+        btn = QPushButton('全ゲイン適用')
         btn.setProperty('variant', 'danger')
         btn.clicked.connect(self._on_apply_all_gains)
         box_layout.addWidget(btn)
