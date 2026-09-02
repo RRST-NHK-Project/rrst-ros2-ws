@@ -1,0 +1,40 @@
+{
+  "trajectory": {
+    "max_velocity": {
+      "root_theta_joint": 8.0,
+      "tip_theta_joint": 0.1,
+      "z_joint": 0.05,
+      "r_joint": 0.05
+    },
+    "max_acceleration": {
+      "root_theta_joint": 8.0,
+      "tip_theta_joint": 0.2,
+      "z_joint": 0.1,
+      "r_joint": 0.1
+    }
+  },
+  "joy_speed": {
+    "theta_speed": 1.0,
+    "z_speed": 0.2,
+    "r_speed": 0.2
+  },
+  "mit_gain": {
+    "cubemars_kp": {
+      "root_theta_joint": 5.0,
+      "tip_theta_joint": 5.0
+    },
+    "cubemars_kd": {
+      "root_theta_joint": 0.5,
+      "tip_theta_joint": 0.5
+    },
+    "cubemars_torque_ff": {
+      "root_theta_joint": 0.0,
+      "tip_theta_joint": 0.0
+    }
+  },
+  "robomas_gain": {
+    "robomas_kp": 0.02,
+    "robomas_kd": 0.002,
+    "robomas_current_ff": 0.0
+  }
+}

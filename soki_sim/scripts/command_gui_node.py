@@ -47,6 +47,8 @@ import json
 import math
 import os
 import re
+import signal
+import subprocess
 import sys
 import unicodedata
 
@@ -91,10 +93,6 @@ WORLD_Z_UPPER = Z_OFFSET + Z_UPPER
 MAX_RADIUS = R_UPPER + ARM_LENGTH / 2.0
 
 POINTS_FILE = os.path.expanduser('~/.config/soki_sim/points.json')
-# 軌道生成パラメータ・MIT/robomasゲイン・joy速度のGUI保持値。読込(GetParameters)を
-# 経由しなくても起動直後からGUI側の値をそのまま「適用」できるよう、GUI側で
-# 最後に適用/読込した値をここに永続化しておく(node起動時のyamlデフォルトとは独立)。
-GAINS_FILE = os.path.expanduser('~/.config/soki_sim/gains.json')
 
 # ---- フィールド(ワーク配置環境)・シューティングエリアの寸法定数 ----
 # soki_sim.urdf.xacro の該当プロパティと一致させること(ワンクリック移動ボタン用)
@@ -150,6 +148,21 @@ JOINT_NAMES = ['root_theta_joint', 'z_joint', 'r_joint']
 CUBEMARS_JOINT_NAMES = ['root_theta_joint', 'tip_theta_joint']
 TRAJ_NODE_NAME = 'trajectory_follower_node'
 JOY_NODE_NAME = 'joy_teleop_node'
+HOMING_NODE_NAME = 'homing_node'
+REAL_JOINT_BRIDGE_NODE_NAME = 'real_joint_bridge_node'
+# 統合操作タブの「機体ステータス」パネルで起動状況を表示するノード
+# (command_gui_nodeがサービス/パラメータ経由で直接やり取りする4つ)。
+STATUS_NODE_NAMES = [TRAJ_NODE_NAME, JOY_NODE_NAME, HOMING_NODE_NAME, REAL_JOINT_BRIDGE_NODE_NAME]
+
+# 統合操作タブの「試合前セットアップ」パネルから起動する、本番でそのまま使う
+# launch構成(note/command.txt「4軸(root_theta/tip_theta/z/r)全軸の実機動作確認。
+# 本番でそのまま使う想定」のコマンドと同じ)。real_all_axes_test.launch.pyは
+# command_gui_nodeも起動するが、既にこのGUIプロセス自身が動いているため
+# launch_gui:=falseでGUIの二重起動を防ぐ。
+ALL_AXES_LAUNCH_CMD = [
+    'ros2', 'launch', 'soki_sim', 'real_all_axes_test.launch.py',
+    'use_joy:=true', 'use_viz:=true', 'launch_gui:=false',
+]
 
 # 機体原点オフセット(soki_sim.urdf.xacroのmachine_origin_x/y/z_joint、base_linkの
 # 子であるprismaticジョイント)。trajectory_follower_nodeの管理対象外(滑らか追従は
@@ -288,6 +301,25 @@ def _resolve_real_joint_bridge_yaml_path():
     if not os.path.isfile(path):
         return None
     return os.path.realpath(path)
+
+
+def _resolve_gains_file_path():
+    """軌道生成パラメータ・MIT/robomasゲイン・joy速度のGUI保持値を書き込む
+    gains.jsonの実ファイルパスを解決する。実機で有効だった値をホーム
+    ディレクトリではなくリポジトリ内(soki_sim/config/gains.json)に置き、
+    git管理下でバックアップ・共有できるようにするため、
+    _resolve_real_joint_bridge_yaml_pathと同じ方式(get_package_share_directory
+    経由、symlink-installならソースツリー側を直接編集)で解決する。パッケージ/
+    ファイルが見つからない場合(colcon build未実行の単体起動等)はホーム
+    ディレクトリ側にフォールバックする。"""
+    try:
+        share_dir = get_package_share_directory('soki_sim')
+        path = os.path.join(share_dir, 'config', 'gains.json')
+        if os.path.isfile(path):
+            return os.path.realpath(path)
+    except PackageNotFoundError:
+        pass
+    return os.path.expanduser('~/.config/soki_sim/gains.json')
 
 
 def _iter_wiring_fields(field_specs):
@@ -601,6 +633,11 @@ class CommandGuiNode(Node):
     def has_current_state(self):
         return self._current_received
 
+    def get_active_node_names(self):
+        """現在ROSグラフに存在するノード名の集合を返す(機体ステータスパネルの
+        起動状況表示用)。"""
+        return set(self.get_node_names())
+
     def get_current_positions(self):
         return dict(self._current_positions)
 
@@ -746,6 +783,8 @@ class CommandGuiApp(QWidget):
         self._saved_gains = self._load_gains_file()
         self._apply_all_results = {}
         self._mode_buttons = {}
+        # 試合前セットアップパネルからros2 launchで起動する子プロセス(未起動ならNone)。
+        self._launch_process = None
 
         self.x_edit = make_float_edit(MAX_RADIUS / 2.0)
         self.y_edit = make_float_edit(0.0)
@@ -756,8 +795,8 @@ class CommandGuiApp(QWidget):
         root_layout.setContentsMargins(8, 8, 8, 8)
 
         # パラメータパネルが増えるにつれ縦に伸び、ワーク/シューティングボックスの
-        # ボタン(元はマニュアル操作タブ側)が画面外に押し出される問題が起きたため、
-        # QTabWidgetで機能ごとにタブを分離している。「マニュアル操作」(円クリック・
+        # ボタン(元は座標指定操作タブ側)が画面外に押し出される問題が起きたため、
+        # QTabWidgetで機能ごとにタブを分離している。「座標指定操作」(円クリック・
         # ジョグ・保存済みポイント等、自由な位置への移動系)、「統合操作」(現在状態・
         # 動作モード・ワーク/シューティングボックスの定型位置移動ボタン)、
         # 「ゲイン調整」(軌道生成・joy速度・MIT・robomasの各ゲインと全ゲイン一括
@@ -788,7 +827,7 @@ class CommandGuiApp(QWidget):
         self.tabs.addTab(gain_tab, 'ゲイン調整')
         self.tabs.addTab(calibration_tab, '原点校正')
         self.tabs.addTab(wiring_tab, '配線設定')
-        self.tabs.addTab(manual_tab, 'マニュアル操作')
+        self.tabs.addTab(manual_tab, '座標指定操作')
 
         self._build_move_tab(manual_tab)
         self._build_overview_tab(overview_tab)
@@ -823,6 +862,13 @@ class CommandGuiApp(QWidget):
         self._traj_auto_load_timer = QTimer(self)
         self._traj_auto_load_timer.timeout.connect(self._try_auto_load_traj_params)
         self._traj_auto_load_timer.start(500)
+
+        # 統合操作タブの機体ステータスパネル(ノード起動状況・適用ゲイン・校正状態・
+        # 試合前セットアップの全ノード起動プロセス)を1秒間隔でポーリング更新する。
+        self._refresh_machine_status()
+        self._machine_status_timer = QTimer(self)
+        self._machine_status_timer.timeout.connect(self._refresh_machine_status)
+        self._machine_status_timer.start(1000)
 
     # ---------- manual tab ----------
     def _build_move_tab(self, parent):
@@ -980,7 +1026,9 @@ class CommandGuiApp(QWidget):
         self._build_panel_tab(
             parent,
             top_funcs=[self._build_field_buttons],
-            left_funcs=[self._build_current_state_panel, self._build_mode_panel])
+            left_funcs=[self._build_machine_status_panel, self._build_current_state_panel,
+                        self._build_mode_panel],
+            right_funcs=[self._build_setup_checklist_panel])
 
     def _build_gain_tab(self, parent):
         self._build_panel_tab(
@@ -1127,6 +1175,185 @@ class CommandGuiApp(QWidget):
             _set_status(self.apply_all_status_label, '一部失敗: ' + ' / '.join(problems), 'error')
         else:
             _set_status(self.apply_all_status_label, '全ゲインを適用しました', 'success')
+
+    def _build_machine_status_panel(self, column):
+        # 統合操作タブに一目で機体の稼働状況が分かるサマリを置く。ノード起動状況は
+        # GUIが直接やり取りする4ノード(STATUS_NODE_NAMES)をget_node_names()で
+        # ポーリングして判定する(_refresh_machine_status参照)。適用ゲインは
+        # ゲイン調整タブの各パネルが既に持つstatus_label(読込/適用結果)の文言・色を
+        # そのままミラーするだけで、値の二重管理を避けている。
+        box = QGroupBox('機体ステータス')
+        layout = QVBoxLayout(box)
+
+        layout.addWidget(QLabel('ノード起動状況'))
+        node_grid = QGridLayout()
+        self.node_status_labels = {}
+        for i, name in enumerate(STATUS_NODE_NAMES):
+            node_grid.addWidget(QLabel(name), i, 0)
+            label = QLabel()
+            _set_status(label, '確認中...', 'muted')
+            self.node_status_labels[name] = label
+            node_grid.addWidget(label, i, 1)
+        layout.addLayout(node_grid)
+
+        layout.addWidget(QLabel('適用ゲイン'))
+        gain_grid = QGridLayout()
+        self.gain_summary_labels = {}
+        for i, (key, title) in enumerate((
+                ('traj', '軌道生成'), ('mit', 'MIT'), ('robomas', 'robomas'), ('joy', 'joy速度'))):
+            gain_grid.addWidget(QLabel(title), i, 0)
+            label = QLabel()
+            label.setWordWrap(True)
+            _set_status(label, '未読込', 'muted')
+            self.gain_summary_labels[key] = label
+            gain_grid.addWidget(label, i, 1)
+        layout.addLayout(gain_grid)
+
+        layout.addWidget(QLabel('校正状態'))
+        calib_grid = QGridLayout()
+        self.calibration_summary_labels = {}
+        for i, (key, title) in enumerate((
+                ('machine_origin', '機体原点オフセット'), ('root_theta', 'root_theta原点'),
+                ('homing', 'z/rホーミング'))):
+            calib_grid.addWidget(QLabel(title), i, 0)
+            label = QLabel()
+            label.setWordWrap(True)
+            _set_status(label, '未実行', 'muted')
+            self.calibration_summary_labels[key] = label
+            calib_grid.addWidget(label, i, 1)
+        layout.addLayout(calib_grid)
+
+        column.addWidget(box)
+
+    def _refresh_machine_status(self):
+        active = self.node.get_active_node_names()
+        for name, label in self.node_status_labels.items():
+            if name in active:
+                _set_status(label, '起動中', 'success')
+            else:
+                _set_status(label, '未起動', 'error')
+
+        for key, source_label in (
+                ('traj', self.traj_status_label), ('mit', self.mit_gain_status_label),
+                ('robomas', self.robomas_gain_status_label), ('joy', self.joy_speed_status_label)):
+            target = self.gain_summary_labels[key]
+            target.setText(source_label.text())
+            target.setStyleSheet(source_label.styleSheet())
+
+        for key, source_label in (
+                ('machine_origin', self.machine_origin_status_label),
+                ('root_theta', self.origin_status_label),
+                ('homing', self.homing_status_label)):
+            target = self.calibration_summary_labels[key]
+            target.setText(source_label.text())
+            target.setStyleSheet(source_label.styleSheet())
+
+        if self._launch_process is not None:
+            code = self._launch_process.poll()
+            if code is None:
+                _set_status(self.launch_status_label, '起動中', 'success')
+            elif code == 0:
+                _set_status(self.launch_status_label, '終了しました', 'muted')
+            else:
+                _set_status(self.launch_status_label, f'終了しました(code={code})', 'error')
+
+    def _build_setup_checklist_panel(self, column):
+        # 試合開始前に毎回行う一連の操作(全ノード起動・全ゲイン適用・原点校正)を
+        # 統合操作タブから離れずに実行できるようにするチェックリスト。各ボタンは
+        # ゲイン調整/原点校正タブの既存ハンドラをそのまま呼ぶだけで、値の入力欄自体は
+        # 元のタブに残す(二重管理を避ける)。実行結果は機体ステータスパネル
+        # (適用ゲイン・校正状態)にミラー表示される。
+        box = QGroupBox('試合前セットアップ')
+        layout = QVBoxLayout(box)
+
+        desc = QLabel()
+        desc.setWordWrap(True)
+        _set_status(desc, '上から順に実行する想定(ノード起動→ゲイン適用→原点校正)。\n'
+                          '各操作の詳細な値編集はゲイン調整・原点校正タブで行う。', 'muted')
+        layout.addWidget(desc)
+
+        launch_row = QHBoxLayout()
+        launch_btn = QPushButton('全ノード起動')
+        stop_launch_btn = QPushButton('停止')
+        launch_btn.clicked.connect(self._on_launch_all_nodes)
+        stop_launch_btn.clicked.connect(self._on_stop_all_nodes)
+        launch_row.addWidget(launch_btn)
+        launch_row.addWidget(stop_launch_btn)
+        layout.addLayout(launch_row)
+        self.launch_status_label = QLabel()
+        self.launch_status_label.setWordWrap(True)
+        _set_status(self.launch_status_label, '未起動', 'muted')
+        layout.addWidget(self.launch_status_label)
+
+        gain_row = QHBoxLayout()
+        load_gain_btn = QPushButton('全ゲイン読込')
+        apply_gain_btn = QPushButton('全ゲイン適用')
+        apply_gain_btn.setProperty('variant', 'danger')
+        load_gain_btn.clicked.connect(self._on_load_all_gains)
+        apply_gain_btn.clicked.connect(self._on_apply_all_gains)
+        gain_row.addWidget(load_gain_btn)
+        gain_row.addWidget(apply_gain_btn)
+        layout.addLayout(gain_row)
+
+        origin_row = QHBoxLayout()
+        machine_origin_btn = QPushButton('機体原点オフセット適用')
+        root_theta_btn = QPushButton('root_theta原点設定')
+        root_theta_btn.setProperty('variant', 'danger')
+        machine_origin_btn.clicked.connect(self._on_apply_machine_origin)
+        root_theta_btn.clicked.connect(self._on_set_root_theta_origin)
+        origin_row.addWidget(machine_origin_btn)
+        origin_row.addWidget(root_theta_btn)
+        layout.addLayout(origin_row)
+
+        homing_row = QHBoxLayout()
+        homing_start_btn = QPushButton('ホーミング開始')
+        homing_start_btn.setProperty('variant', 'primary')
+        homing_stop_btn = QPushButton('中断')
+        homing_skip_btn = QPushButton('スキップ')
+        homing_skip_btn.setProperty('variant', 'danger')
+        homing_start_btn.clicked.connect(self._on_start_homing)
+        homing_stop_btn.clicked.connect(self._on_stop_homing)
+        homing_skip_btn.clicked.connect(self._on_skip_homing)
+        homing_row.addWidget(homing_start_btn)
+        homing_row.addWidget(homing_stop_btn)
+        homing_row.addWidget(homing_skip_btn)
+        layout.addLayout(homing_row)
+
+        column.addWidget(box)
+
+    def _on_launch_all_nodes(self):
+        if self._launch_process is not None and self._launch_process.poll() is None:
+            QMessageBox.information(self, '起動済み', '既に起動中です(先に停止してください)')
+            return
+        reply = QMessageBox.question(
+            self, '全ノード起動の確認',
+            '{}\n\n'
+            '実機を駆動するノード群(real_joint_bridge_node/homing_node/\n'
+            'trajectory_follower_node等)を起動します。\n'
+            '周囲に人・障害物がないか確認してください。'.format(' '.join(ALL_AXES_LAUNCH_CMD)),
+            QMessageBox.Yes | QMessageBox.No)
+        if reply != QMessageBox.Yes:
+            return
+        try:
+            self._launch_process = subprocess.Popen(ALL_AXES_LAUNCH_CMD)
+        except OSError as exc:
+            _set_status(self.launch_status_label, f'起動失敗: {exc}', 'error')
+            return
+        _set_status(self.launch_status_label, '起動処理中...', 'muted')
+
+    def _on_stop_all_nodes(self):
+        if self._launch_process is None or self._launch_process.poll() is not None:
+            _set_status(self.launch_status_label, '起動していません', 'muted')
+            return
+        reply = QMessageBox.question(
+            self, '全ノード停止の確認',
+            '起動中のノード群を停止します(ros2 launchへSIGINTを送信し、\n'
+            '通常のCtrl+Cと同様に各ノードを終了させます)。よろしいですか？',
+            QMessageBox.Yes | QMessageBox.No)
+        if reply != QMessageBox.Yes:
+            return
+        self._launch_process.send_signal(signal.SIGINT)
+        _set_status(self.launch_status_label, '停止処理中...', 'muted')
 
     def _build_current_state_panel(self, column):
         box = QGroupBox('現在状態 (リアルタイム)')
@@ -2223,20 +2450,24 @@ class CommandGuiApp(QWidget):
     # 経由しなくても起動直後からGUI保持値を使えるよう、最後に適用/読込した値を
     # gains.jsonへ保存し、起動時にGUI入力欄の初期値として復元する。ノード側の
     # yamlデフォルトとは独立した「GUIが最後に確認した値」のキャッシュである。
+    # soki_sim/config/gains.json(git管理下、_resolve_gains_file_path参照)に
+    # 保存することで、実機で有効だった値を失わずバックアップ・共有できる。
     @staticmethod
     def _load_gains_file():
-        if not os.path.exists(GAINS_FILE):
+        path = _resolve_gains_file_path()
+        if not os.path.exists(path):
             return {}
         try:
-            with open(GAINS_FILE, 'r', encoding='utf-8') as f:
+            with open(path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except (json.JSONDecodeError, OSError):
             return {}
 
     def _persist_gains(self, section, data):
         self._saved_gains[section] = data
-        os.makedirs(os.path.dirname(GAINS_FILE), exist_ok=True)
-        with open(GAINS_FILE, 'w', encoding='utf-8') as f:
+        path = _resolve_gains_file_path()
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w', encoding='utf-8') as f:
             json.dump(self._saved_gains, f, ensure_ascii=False, indent=2)
 
     def _persist_traj_values(self, traj):
@@ -2283,6 +2514,23 @@ class CommandGuiApp(QWidget):
         for name, edit in self.joy_speed_edits.items():
             if name in joy:
                 set_float(edit, joy[name])
+
+    def closeEvent(self, event):
+        """試合前セットアップパネルで起動したros2 launch子プロセスが残っている場合、
+        GUI終了時に道連れで放置されないよう確認して停止する(通常のCtrl+Cと同様の
+        SIGINTで、ros2 launch側に配下ノードをまとめて終了させる)。"""
+        if self._launch_process is not None and self._launch_process.poll() is None:
+            reply = QMessageBox.question(
+                self, '終了確認',
+                '試合前セットアップで起動したノード群がまだ動作中です。\n'
+                '停止してから終了しますか？',
+                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
+            if reply == QMessageBox.Cancel:
+                event.ignore()
+                return
+            if reply == QMessageBox.Yes:
+                self._launch_process.send_signal(signal.SIGINT)
+        event.accept()
 
 
 def main(args=None):

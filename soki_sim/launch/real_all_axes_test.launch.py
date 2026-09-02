@@ -33,6 +33,9 @@ def generate_launch_description():
     常時有効。real_root_theta_test.launch.py参照、デッドマンスイッチなしでの
     実機テストは非推奨)。
     use_viz:=true でrobot_state_publisher/joint_state_publisher/rviz2も起動する。
+    launch_gui:=false でcommand_gui_nodeを起動しない(command_gui_node自身が
+    本launchを起動する場合に、GUIの二重起動を防ぐために使う。デフォルトtrueで
+    従来通りcommand_gui_nodeも起動する)。
 
     root_theta/tip_theta用のdevice_id/motor_index/reduction/kp/kdは実機配線に
     合わせて起動時に上書きすること(root_theta/tip_thetaは同一CubeMarsデバイス
@@ -133,6 +136,11 @@ def generate_launch_description():
     use_viz_arg = DeclareLaunchArgument(
         'use_viz', default_value='false',
         description='trueならrobot_state_publisher/joint_state_publisher/rviz2も起動する')
+    launch_gui_arg = DeclareLaunchArgument(
+        'launch_gui', default_value='true',
+        description='falseならcommand_gui_nodeを起動しない。command_gui_node自身が'
+                    '本launchを起動する場合(統合操作タブの「試合前セットアップ」)に、'
+                    'GUIが二重に立ち上がるのを防ぐために使う')
 
     cubemars_device_id = LaunchConfiguration('cubemars_device_id')
     root_theta_motor_index = LaunchConfiguration('root_theta_motor_index')
@@ -157,6 +165,7 @@ def generate_launch_description():
     use_joy = LaunchConfiguration('use_joy')
     use_viz = LaunchConfiguration('use_viz')
     enable_button = LaunchConfiguration('enable_button')
+    launch_gui = LaunchConfiguration('launch_gui')
 
     # use_joy:=trueならGUI/joy両方を受け付ける。falseならGUI専用のまま
     control_mode = PythonExpression(["'both' if '", use_joy, "' == 'true' else 'auto'"])
@@ -258,6 +267,7 @@ def generate_launch_description():
         package='soki_sim',
         executable='command_gui_node',
         name='command_gui_node',
+        condition=IfCondition(launch_gui),
     )
 
     joy_node = Node(
@@ -328,6 +338,7 @@ def generate_launch_description():
         use_joy_arg,
         use_viz_arg,
         enable_button_arg,
+        launch_gui_arg,
         ros2can_node,
         real_joint_bridge_node,
         homing_node,
