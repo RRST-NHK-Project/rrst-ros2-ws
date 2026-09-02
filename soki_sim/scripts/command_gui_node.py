@@ -154,7 +154,7 @@ REAL_JOINT_BRIDGE_NODE_NAME = 'real_joint_bridge_node'
 # (command_gui_nodeがサービス/パラメータ経由で直接やり取りする4つ)。
 STATUS_NODE_NAMES = [TRAJ_NODE_NAME, JOY_NODE_NAME, HOMING_NODE_NAME, REAL_JOINT_BRIDGE_NODE_NAME]
 
-# 統合操作タブの「試合前セットアップ」パネルから起動する、本番でそのまま使う
+# 統合操作タブの「実機セットアップ」パネルから起動する、本番でそのまま使う
 # launch構成(note/command.txt「4軸(root_theta/tip_theta/z/r)全軸の実機動作確認。
 # 本番でそのまま使う想定」のコマンドと同じ)。real_all_axes_test.launch.pyは
 # command_gui_nodeも起動するが、既にこのGUIプロセス自身が動いているため
@@ -162,6 +162,20 @@ STATUS_NODE_NAMES = [TRAJ_NODE_NAME, JOY_NODE_NAME, HOMING_NODE_NAME, REAL_JOINT
 ALL_AXES_LAUNCH_CMD = [
     'ros2', 'launch', 'soki_sim', 'real_all_axes_test.launch.py',
     'use_joy:=true', 'use_viz:=true', 'launch_gui:=false',
+]
+
+# 統合操作タブ「実機セットアップ」の手順チェックリスト(上のボタン列と対応する
+# 実行順序を表す)。ボタンで自動化できない物理確認(周囲確認・原点センサ位置への
+# 位置合わせ等)も含むため、実行結果に連動させず手動でチェックするだけの
+# チェックボックスにしている。
+SETUP_PROCEDURE_STEPS = [
+    '周囲に人・障害物がないか確認する',
+    '「全ノード起動」を実行し、上の「ノード起動状況」で\n4ノードとも起動中になったことを確認する',
+    '「全ゲイン読込」で現在値を確認してから「全ゲイン適用」を実行する',
+    '機体を原点センサ位置相当へ物理的に合わせてから\n「機体原点オフセット適用」を実行する',
+    'root_theta_jointを原点センサ位置へ合わせてから\n「root_theta原点設定」を実行する',
+    '「ホーミング開始」を実行し、z/rホーミング完了を確認する\n(既に原点センサ位置相当なら「スキップ」でも可)',
+    '動作モード(自動/手動/併用)を確認する',
 ]
 
 # 機体原点オフセット(soki_sim.urdf.xacroのmachine_origin_x/y/z_joint、base_linkの
@@ -783,7 +797,7 @@ class CommandGuiApp(QWidget):
         self._saved_gains = self._load_gains_file()
         self._apply_all_results = {}
         self._mode_buttons = {}
-        # 試合前セットアップパネルからros2 launchで起動する子プロセス(未起動ならNone)。
+        # 実機セットアップパネルからros2 launchで起動する子プロセス(未起動ならNone)。
         self._launch_process = None
 
         self.x_edit = make_float_edit(MAX_RADIUS / 2.0)
@@ -864,7 +878,7 @@ class CommandGuiApp(QWidget):
         self._traj_auto_load_timer.start(500)
 
         # 統合操作タブの機体ステータスパネル(ノード起動状況・適用ゲイン・校正状態・
-        # 試合前セットアップの全ノード起動プロセス)を1秒間隔でポーリング更新する。
+        # 実機セットアップの全ノード起動プロセス)を1秒間隔でポーリング更新する。
         self._refresh_machine_status()
         self._machine_status_timer = QTimer(self)
         self._machine_status_timer.timeout.connect(self._refresh_machine_status)
@@ -1028,7 +1042,7 @@ class CommandGuiApp(QWidget):
             top_funcs=[self._build_field_buttons],
             left_funcs=[self._build_machine_status_panel, self._build_current_state_panel,
                         self._build_mode_panel],
-            right_funcs=[self._build_setup_checklist_panel])
+            right_funcs=[self._build_setup_checklist_panel, self._build_setup_procedure_panel])
 
     def _build_gain_tab(self, parent):
         self._build_panel_tab(
@@ -1259,11 +1273,11 @@ class CommandGuiApp(QWidget):
 
     def _build_setup_checklist_panel(self, column):
         # 試合開始前に毎回行う一連の操作(全ノード起動・全ゲイン適用・原点校正)を
-        # 統合操作タブから離れずに実行できるようにするチェックリスト。各ボタンは
+        # 統合操作タブから離れずに実行できるようにする実行ボタン群。各ボタンは
         # ゲイン調整/原点校正タブの既存ハンドラをそのまま呼ぶだけで、値の入力欄自体は
         # 元のタブに残す(二重管理を避ける)。実行結果は機体ステータスパネル
         # (適用ゲイン・校正状態)にミラー表示される。
-        box = QGroupBox('試合前セットアップ')
+        box = QGroupBox('実機セットアップ')
         layout = QVBoxLayout(box)
 
         desc = QLabel()
@@ -1354,6 +1368,30 @@ class CommandGuiApp(QWidget):
             return
         self._launch_process.send_signal(signal.SIGINT)
         _set_status(self.launch_status_label, '停止処理中...', 'muted')
+
+    def _build_setup_procedure_panel(self, column):
+        # 実機セットアップパネルのボタンだけでは自動化できない物理確認(周囲確認・
+        # 原点センサ位置への位置合わせ等)も含めた手順をチェックリスト表示する。
+        # 実行結果とは連動しない、操作者向けの手動チェック用(試合前に毎回
+        # リセットして使う想定)。
+        box = QGroupBox('セットアップ手順')
+        layout = QVBoxLayout(box)
+
+        self._setup_procedure_checks = []
+        for step in SETUP_PROCEDURE_STEPS:
+            check = QCheckBox(step)
+            layout.addWidget(check)
+            self._setup_procedure_checks.append(check)
+
+        reset_btn = QPushButton('チェックをリセット')
+        reset_btn.clicked.connect(self._on_reset_setup_procedure)
+        layout.addWidget(reset_btn)
+
+        column.addWidget(box)
+
+    def _on_reset_setup_procedure(self):
+        for check in self._setup_procedure_checks:
+            check.setChecked(False)
 
     def _build_current_state_panel(self, column):
         box = QGroupBox('現在状態 (リアルタイム)')
@@ -2516,13 +2554,13 @@ class CommandGuiApp(QWidget):
                 set_float(edit, joy[name])
 
     def closeEvent(self, event):
-        """試合前セットアップパネルで起動したros2 launch子プロセスが残っている場合、
+        """実機セットアップパネルで起動したros2 launch子プロセスが残っている場合、
         GUI終了時に道連れで放置されないよう確認して停止する(通常のCtrl+Cと同様の
         SIGINTで、ros2 launch側に配下ノードをまとめて終了させる)。"""
         if self._launch_process is not None and self._launch_process.poll() is None:
             reply = QMessageBox.question(
                 self, '終了確認',
-                '試合前セットアップで起動したノード群がまだ動作中です。\n'
+                '実機セットアップで起動したノード群がまだ動作中です。\n'
                 '停止してから終了しますか？',
                 QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
             if reply == QMessageBox.Cancel:
