@@ -230,7 +230,7 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
        直接調整・確認できる(display.launch.py参照)。範囲は仮に
        ±machine_origin_offset_limit[m]としているので、実機とのズレの想定量に
        合わせて調整すること。 -->
-  <xacro:property name="machine_origin_offset_limit" value="0.1"/>
+  <xacro:property name="machine_origin_offset_limit" value="1.0"/>
 
   <link name="machine_origin_x_link"/>
   <joint name="machine_origin_x_joint" type="prismatic">

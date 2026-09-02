@@ -156,7 +156,7 @@ JOY_NODE_NAME = 'joy_teleop_node'
 # 不要な較正値)のため、motor_mixer_nodeと同様/mixed_joint_statesへ直接publishする。
 MACHINE_ORIGIN_JOINT_NAMES = ['machine_origin_x_joint', 'machine_origin_y_joint', 'machine_origin_z_joint']
 # soki_sim.urdf.xacroのmachine_origin_offset_limitと一致させること
-MACHINE_ORIGIN_OFFSET_LIMIT = 0.1
+MACHINE_ORIGIN_OFFSET_LIMIT = 1.0
 
 # ---- real_joint_bridge.yaml配線設定(初期化用センサID・CubeMars/RoboMasのID・
 # 回転方向)----
