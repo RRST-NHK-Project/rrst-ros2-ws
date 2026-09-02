@@ -49,6 +49,11 @@ note/can_mapping.txt「## ハンド」節と、soki_sim/config/hand.yamlのパ�
   /hand_set_pitch_hold   : ピッチサーボを保持姿勢へ
   /hand_set_pitch_insert : ピッチサーボを投入姿勢へ
 
+ポンプの現在ON/OFF状態は`hand_pump_state`(std_msgs/Bool)としてpublishする
+(2026-09-03追加)。GUIハンドパネルの「ポンプON/OFF」ボタンとjoy_teleop_nodeの
+PSコン丸ボタン(トグル)の両方から独立に操作できるようにするため、状態の真値は
+hand_node側に一元化し、joy_teleop_node側ではローカルに状態を推測しない。
+
 ros2can側の前提: 対象CAN_HOSTデバイスのtopic_passthroughをGUIでONにしておかないと
 本ノードの/serial_tx_[id]への指令が実機へ反映されない(homing_node等と同様)。
 
@@ -70,8 +75,9 @@ import math
 
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Int16MultiArray
+from std_msgs.msg import Bool, Int16MultiArray
 from std_srvs.srv import Trigger
 
 SLOT_COUNT = 24
@@ -152,6 +158,18 @@ class HandNode(Node):
         # モジュールdocstring参照)。実機配線(device_id)の有無に関わらず送る。
         self.joint_pub_ = self.create_publisher(JointState, 'mixed_joint_states', 10)
 
+        # ポンプの現在ON/OFF状態(2026-09-03追加)。GUIハンドパネルとPSコン丸ボタン
+        # (joy_teleop_node)の両方から独立にポンプを操作できるようにするため、
+        # hand_node側が真値を持ちBoolでpublishする(joy_teleop_node側でトグル
+        # 判定に使う。自分でローカルに状態を推測させるとGUI操作とズレるため)。
+        self._pump_on = False
+        # transient_local(いわゆるlatched)にしておくことで、command_gui_node/
+        # joy_teleop_nodeがhand_node起動後に立ち上がった場合でも、次のON/OFF操作を
+        # 待たずに起動時点のポンプ状態を受け取れるようにする(2026-09-03、
+        # 「ポンプON自動化」対応でこの状態を待つ側が増えたため必要になった)。
+        pump_state_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self.pump_state_pub_ = self.create_publisher(Bool, 'hand_pump_state', pump_state_qos)
+
         self.create_service(Trigger, 'hand_spread_pads', self._on_spread_pads)
         self.create_service(Trigger, 'hand_gather_pads', self._on_gather_pads)
         self.create_service(Trigger, 'hand_pump_on', self._on_pump_on)
@@ -167,6 +185,7 @@ class HandNode(Node):
         self._publish_pad_states(gathered=True)
         self._publish_joint_state(
             HAND_PITCH_JOINT, int(self.get_parameter('pitch_servo_hold_deg').value))
+        self._publish_pump_state()
 
         self.get_logger().info(
             'hand_node started: '
@@ -263,11 +282,21 @@ class HandNode(Node):
         sim_deg = int(self.get_parameter('deploy_servo_retracted_deg').value)
         return self._set_deploy(sim_deg, True, response, '収納')
 
+    def _publish_pump_state(self):
+        msg = Bool()
+        msg.data = self._pump_on
+        self.pump_state_pub_.publish(msg)
+
     def _on_pump_on(self, request, response):
         duty_percent = float(self.get_parameter('pump_duty_percent').value)
         pwm_max = int(self.get_parameter('pump_md_pwm_max').value)
         duty_raw = round(pwm_max * duty_percent / 100.0)
         response.success = self._send(self._pump, duty_raw)
+        # RViz表示用publish等と同様、CAN送信の成否(device_id未配線か)に関わらず
+        # 論理状態は更新する(配線前でもjoy_teleop_node側のトグル判定が正しく動く
+        # ようにするため)。
+        self._pump_on = True
+        self._publish_pump_state()
         response.message = (
             f'ポンプON({duty_percent:.0f}%)' if response.success
             else 'ポンプON: device_id未設定のためCAN送信できませんでした')
@@ -275,6 +304,8 @@ class HandNode(Node):
 
     def _on_pump_off(self, request, response):
         response.success = self._send(self._pump, 0)
+        self._pump_on = False
+        self._publish_pump_state()
         response.message = 'ポンプOFF' if response.success else 'ポンプOFF: device_id未設定のためCAN送信できませんでした'
         return response
 

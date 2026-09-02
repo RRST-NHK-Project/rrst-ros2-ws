@@ -35,9 +35,11 @@ self.pos_/self.vel_(関節角度)に cubemars_reduction を掛けて変換して
 帰還値でself.pos_を追従させ、起動直後の内部状態(0.0)と実機の実際の角度との
 ズレによる意図しない位置ジャンプを防ぐ(_on_cubemars_feedback参照)。
 
-root_theta_jointについては、/set_root_theta_origin(std_srvs/Trigger)サービスで
-CubeMars本体(AK40-10)へSet Origin(永久原点、フラッシュ保存)CANコマンドを送信できる
-(2026-08-27追加、control_mode=3、ros2can/firmware側の対応実装はcubemars.cpp参照)。
+root_theta_joint/tip_theta_jointについては、/set_root_theta_origin・
+/set_tip_theta_origin(いずれもstd_srvs/Trigger)サービスでCubeMars本体(AK40-10)へ
+Set Origin(永久原点、フラッシュ保存)CANコマンドを送信できる(root_thetaは
+2026-08-27追加、tip_thetaは2026-09-03追加。同じ仕組みを共有する(_set_cubemars_origin
+参照)。control_mode=3、ros2can/firmware側の対応実装はcubemars.cpp参照)。
 呼び出すと数周期(ORIGIN_HOLD_CYCLES)だけ通常のMIT指令を止めてSET_ORIGINモードを
 送る。これにより実機エンコーダ自体の原点が電源off/onを跨いで保持されるため、
 real_joint_bridge_node側のroot_theta_offset_radによるソフトウェア補正は廃止した
@@ -250,6 +252,7 @@ class TrajectoryFollowerNode(Node):
         self._setup_robomas_outputs()
         self._setup_limit_switches()
         self.create_service(Trigger, 'set_root_theta_origin', self._on_set_root_theta_origin)
+        self.create_service(Trigger, 'set_tip_theta_origin', self._on_set_tip_theta_origin)
 
         # max_velocity/max_accelerationは起動時にself.max_vel_/max_accel_へ
         # 取り込んだ後は参照されないため、command_gui_node等がros2 param set(GUIの
@@ -560,13 +563,12 @@ class TrajectoryFollowerNode(Node):
 
         self.has_target_ = True
 
-    def _on_set_root_theta_origin(self, request, response):
-        """root_theta_jointのCubeMars本体(AK40-10)へSet Origin(永久原点、
-        フラッシュ保存)コマンドを送るようリクエストする。real_joint_bridge_node側の
-        root_theta_offset_radは廃止済みのため、この操作が実機の唯一の原点設定手段になる。
+    def _set_cubemars_origin(self, name, response):
+        """nameのCubeMars本体(AK40-10)へSet Origin(永久原点、フラッシュ保存)
+        コマンドを送るようリクエストする。root_theta_joint/tip_theta_jointどちらも
+        同じ仕組み(_on_set_root_theta_origin/_on_set_tip_theta_origin参照)。
         呼び出し前に関節を原点センサの位置(真の機械原点)へ物理的に合わせておくこと。
         """
-        name = 'root_theta_joint'
         cfg = self.cubemars_.get(name)
         if cfg is None:
             response.success = False
@@ -579,6 +581,14 @@ class TrajectoryFollowerNode(Node):
             f'{name}: CubeMars(device_id={cfg["device_id"]}, motor_index={cfg["motor_index"]})'
             f'へSet Origin(永久原点)コマンドを送信します')
         return response
+
+    def _on_set_root_theta_origin(self, request, response):
+        # real_joint_bridge_node側のroot_theta_offset_radは廃止済みのため、
+        # この操作が実機の唯一の原点設定手段になる(_set_cubemars_origin参照)。
+        return self._set_cubemars_origin('root_theta_joint', response)
+
+    def _on_set_tip_theta_origin(self, request, response):
+        return self._set_cubemars_origin('tip_theta_joint', response)
 
     def timer_callback(self):
         if not self.has_target_:

@@ -2,13 +2,13 @@
   "trajectory": {
     "max_velocity": {
       "root_theta_joint": 8.0,
-      "tip_theta_joint": 0.1,
+      "tip_theta_joint": 8.0,
       "z_joint": 1.0,
       "r_joint": 1.0
     },
     "max_acceleration": {
       "root_theta_joint": 8.0,
-      "tip_theta_joint": 0.2,
+      "tip_theta_joint": 8.0,
       "z_joint": 1.0,
       "r_joint": 1.0
     }
@@ -36,5 +36,13 @@
     "robomas_kp": 0.5,
     "robomas_kd": 0.1,
     "robomas_current_ff": 0.0
+  },
+  "sequence": {
+    "safe_transit_z_m": 0.332,
+    "r_retract_m": -0.422,
+    "pickup_z_offset_m": 0.05,
+    "pickup_approach_clearance_m": 0.15,
+    "shoot_approach_depth_m": 0.0,
+    "pump_settle_sec": 0.4
   }
 }

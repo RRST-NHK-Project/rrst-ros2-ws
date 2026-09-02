@@ -20,6 +20,12 @@ motor_mixer_nodeが/joint_statesを監視し、motor1/2側とz/r側どちらが
 (joint_state_publisher(_gui)のsource_listで取り込む)。
 command_gui_node(2026-08-27新規作成)はX/Y/Zの目標値をGUI指定→逆運動学で
 theta/z/rに変換して/mixed_joint_statesへpublishする指令送信GUI。
+「ワーク・シューティングボックス」パネルの「自動シーケンスで実行」ON時は、
+work/shootボタンから回収/投入の半自動シーケンスを起動できる(2026-09-03新規、
+同日中に運用フローを再設計: 「移動とZをある程度下げる動作は自動、そこから先
+(ワークへの接触・シューティングボックスへの最終投入)は人間の明示的な指示
+(GUIボタンまたはPSコン)」という2段階方式。詳細はnote/claude_task.txt
+「## ピック/投入 自動シーケンス」参照)。
 
 ##ハンド(エンドエフェクタ、2026-09-03新規、hand_node実装済み・実機配線は未確認)
 tip_link(tip_theta_jointの先、赤い円筒)の関節原点(下端)に取り付く吸着ハンド。
@@ -212,6 +218,23 @@ command_gui_node/trajectory_follower_nodeはsim/実機を区別せず同じ
     のみ起動(自動起動なし)。センサ配線・回転符号・基準値は仮定のままなので
     実機検証が必要(note/can_mapping.txt「z/r原点センサ」参照)。
   - 未着手: 実機での疎通確認・homing_nodeの調整全般。
+
+## 実機セッションとの混線事故 (2026-09-03、Claudeの動作確認手順に関する教訓)
+ピック/投入自動シーケンスの動作確認のため、Claudeが`ros2 run soki_sim
+trajectory_follower_node`/`hand_node`をサブプロセスで実起動してテストしていたところ、
+ユーザーが同じマシン上の別ターミナル(pts/7)で既に実機用の構成(real_joint_bridge.yaml
+読込・実機のCAN device_id・ros2can_gui込み)を起動していたことが判明した。ROS 2は
+ノード名・トピック名が同じであればROS_DOMAIN_IDが同じ限りプロセスを跨いで混線する
+ため、Claudeのテスト用の関節目標がユーザーの実機用trajectory_follower_nodeにも
+届いていた可能性があり、さらにClaudeのGUIインスタンスが自動読込・自動適用する
+gains.json(git管理下)を、テスト用の簡易構成(tip_theta_joint無し)を基準に上書き
+保存してしまい、実際のチューニング値の一部を欠落させる事故が発生した(該当コミット
+前に発覚・git checkoutで復旧。実機は接続されていなかったため物理的な誤動作は
+無かったことをユーザーに確認済み)。
+教訓: soki_simのノードをサブプロセスで実起動して動作確認する際は、必ず
+`ROS_DOMAIN_ID`をテスト専用の値(実機セッションと異なる値)に設定してから行うこと。
+また、テスト前に`ps aux`で同名ノードが既に稼働していないか確認し、動作確認後は
+自分が起動したプロセスを確実に終了(process groupごとkillするなど)すること。
 
 ##未確認・要確認事項
 - soki_simのURDF寸法(base_height/lift_size_z/arm_length等)と実機寸法の対応

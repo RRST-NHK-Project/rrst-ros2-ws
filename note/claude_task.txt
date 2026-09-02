@@ -96,7 +96,131 @@ soki: 未着手の課題・制約メモ(claude.txtは現状把握用、こちら
     ピン共有設定(MULTIn/ENCn_MD)が正しく切り替わっているか)が未実施
   - URDFのハンド形状の寸法・取付位置・正三角形の一辺(hand_gather_side)の実測合わせ
   - ポンプON/OFFの具体的な呼び出しタイミング(展開→吸着ON→収納→ピッチ投入→
-    ポンプOFFという想定でよいか)を実運用のシーケンスとして確定すること
+    ポンプOFFという想定でよいか)は、下記「ピック/投入 自動シーケンス」として
+    2026-09-03に実装した(RVizでの動作確認のみ、実機での妥当性検証はまだ)。
+
+## ピック/投入 自動シーケンス (command_gui_node、2026-09-03新規、同日中に運用フローを再設計)
+「移動はGUIで半自動化し、微調整・吸着ON・シュート実行(ポンプOFF)の判断は人間が行う」
+という運用イメージに沿って一連の操作を半自動化した。新規ノードは追加せず、
+command_gui_node.py(既存の50ms QTimerポーリングループ)にステップリスト方式の
+簡易状態機械を追加する形で実装(詳細はスクリプト内コメント参照)。
+offscreen Qt(QT_QPA_PLATFORM=offscreen)でtrajectory_follower_node/hand_nodeを
+実起動し、回収・投入シーケンスの状態遷移を自動テストで確認済み(2026-09-03、
+2回のテストでユーザーの実機セッションとROSグラフが混線する事故を起こしたため、
+以後はROS_DOMAIN_IDをテスト専用の値に分離してから実行している。note/claude.txt
+「実機セッションとの混線事故」参照)。
+
+現在の設計(2026-09-03、ユーザー指示で当初案から変更): 「移動とZをある程度下げる
+動作は自動、そこから先(ワークへの接触・シューティングボックスへの最終投入)は
+人間の明示的な指示」という2段階方式。
+  - GUI: 「ワーク・シューティングボックス」パネルに「自動シーケンスで実行」
+    チェックボックスを追加(既定OFF)。OFF時は従来通りwork/shootボタンが即時移動の
+    みを行う(挙動変更なし)。ONにすると、workボタンで回収シーケンス、shootボタンで
+    投入シーケンスを開始する。「ピック/投入 自動シーケンス」パネルは統合操作タブの
+    「ワーク・シューティングボックス」パネルの隣に配置(2026-09-03、ユーザー指定で
+    左列下部から移動)。状態表示・「回収実行」ボタン・「中断」ボタン・7つの
+    チューニング値(安全高度Z・R退避量・回収Zオフセット・回収アプローチ余裕・
+    投入アプローチ深さ・投入時手先θ・ポンプON後の待ち時間)の入力欄(gains.jsonへ
+    永続化、他のゲイン類と同じ_persist_gains機構を流用)がある。シーケンス開始時の
+    確認ダイアログは廃止済み(2026-09-03、ユーザー指定。ワンクリック移動・
+    ハンドパネルの各種ボタンと同様、確認なしで即座に開始する)。
+  - 根本θ回転前にRを退避させる(ユーザー指定: 腕を旋回軸に近づけてから回転すること
+    で機械的負荷を軽減)。範囲は本シーケンスのみに限定し、既存のワンクリック移動/
+    XYクリック/保存済みポイント送信の経路は変更していない(ユーザー判断)。
+  - 回収シーケンス: 安全高度退避→R退避→θ回転→R伸長→パッド展開→ワーク手前
+    (pickup_z_offset_m+pickup_approach_clearance_m、対象ワーク高さより一段高い
+    アプローチ高さ)まで自動降下→**ここで自動区間は一旦止まり、人間の「回収実行」
+    指示を待つ**(GUIの「回収実行」ボタン、またはPSコンの回収確認ボタン
+    (×ボタン想定、joy_teleop_nodeのpickup_confirm_buttonパラメータ)→
+    command_gui_nodeが新規に公開するTriggerサービス`/pick_sequence_confirm`経由)
+    →指示後、ワークに当たる高さ(pickup_z_offset_m)まで自動降下→ポンプON(自動、
+    pump_settle_sec秒待ってから)→安全高度へ上昇→パッド収納→完了。
+  - 投入シーケンス: 安全高度退避→R退避→θ回転→R伸長→ピッチ投入姿勢→
+    シューティングボックス手前(shoot_approach_depth_m、箱開口部上端からの
+    差し引き)まで自動降下して**そこで自動制御は終わり**。以降の細かい位置調整
+    (コントローラーのスティックジョグ)とポンプOFF(投入実行)は完全に手動操作
+    (2026-09-03、ユーザー指定で仕様変更: 当初はここでポンプOFF待ちにして
+    ピッチ保持姿勢への復帰・安全高度への再上昇まで自動化していたが、「シュートに
+    向かう、ある程度Zを下げて待機、細かい位置調整はコントローラーで行い
+    コントローラーで吸着をオフにして終了」との指示を受け、待機以降は一切
+    自動制御しない方式に変更。理由: 手動ジョグで実際の位置が事前計算値からズレた
+    状態のまま、シーケンス側が古い計算値へ自動で戻そうとすると危険なため)。
+  - GUI/PSコンどちらから操作されても状態がズレないように統一する設計は、投入側の
+    ポンプON/OFF(hand_node、hand_pump_state Bool、transient_local QoS)に続き、
+    回収側の「回収実行」指示にも同じ考え方を適用した(command_gui_node側が
+    /pick_sequence_confirmを公開し、GUIボタンとjoy_teleop_node両方から同じ
+    ハンドラ(CommandGuiApp._on_pick_confirm_requested)を呼ぶ)。
+  - 手先θ(tip_theta_joint)の自動制御(2026-09-03新規、ユーザー指摘: 「ハンドは
+    3つ一気に回収するので手先θはワークの行と平行になるように動く必要がある。
+    シュート時はRと垂直になるように」)。吸着パッド3個の展開軸は、
+    tip_theta_joint=0の姿勢でr方向(アーム伸縮方向)に垂直(hand_indicator_link、
+    soki_sim.urdf.xacro参照)。root_theta_jointが機体を旋回させると手先ごと
+    同じ角度だけ回るため、パッド展開軸を常にワークの行(GUIのワールドX軸、
+    WORK_POINTSは同一行内でX方向に並ぶ)と平行に保つには、回収シーケンスの
+    θ回転レグ以降でtip_theta_joint = -root_theta_jointを同時に指令する
+    (command_gui_node.CommandGuiNode.send_targetにtip_theta引数を追加、
+    trajectory_follower_nodeの同時到達スケーリングでroot_theta/tip_thetaが
+    揃って動く)。投入シーケンスは逆に一切打ち消さずtip_theta_joint=一定値
+    (shoot_tip_theta_rad、既定0.0)を使う(root_thetaの値によらず幾何学的に
+    r方向に垂直となる。この具体的な値は実機未検証の暫定値、ユーザー指摘:
+    「シュート時の角度は暫定値である」)。
+  - hand_node呼び出し(spread/gather/pitch_insert)がdevice_id未配線で
+    response.success=Falseになっても(hand_node側の仕様、RViz表示は既に更新済み)
+    シーケンスは中断せず警告表示のみで続行する。hand_nodeサービス自体に接続できない
+    場合(未起動)はシーケンスを中断する。
+  - PSコンのボタン割り当て(joy_teleop_node、2026-09-03追加、実機で要確認):
+    ○(丸)ボタン(pump_toggle_button、既定1)=ポンプON/OFFトグル、×(バツ)ボタン
+    (pickup_confirm_button、既定0)=回収実行の指示。いずれも実際のLinuxドライバの
+    ボタン番号は`ros2 topic echo /joy`で確認が必要(仮定値のまま)。
+
+## tip_theta_jointの軌道生成パラメータ・joy手動速度が編集不可だった件 (2026-09-03発覚・修正)
+ピック/投入シーケンス導入でtip_theta_jointを初めて能動的に駆動するようになったが、
+tip_theta_jointが遅い(かつ回収シーケンス中はroot_theta_jointまで連動して遅くなる)
+とユーザーから報告があった。原因はtrajectory_follower_node.target_callbackの
+同時到達スケーリング: 1つのJointStateメッセージ内の全関節をt_sync(最も時間が
+かかる関節の所要時間)に合わせるため、tip_theta_jointのmax_velocity/
+max_accelerationが低い(gains.jsonの初期値0.1rad/s・0.2rad/s²のまま、root_thetaの
+チューニング済み8.0/8.0よりずっと低かった)と、回収シーケンスが両関節を同時に
+指令する区間ではroot_theta_jointの実効速度までtip_theta_joint側に引きずり下げられて
+いた。さらに調べると、command_gui_nodeの「軌道生成パラメータ」パネル
+(_build_trajectory_panel)はJOINT_NAMES(root_theta/z/r)しかループしておらず、
+tip_theta_jointの編集欄がGUIに存在しなかった(そのため誰も値を上げられなかった)。
+同様に「手動操作(joy)速度」パネルにもtip_theta用の欄が無く、joy_teleop_node自体
+tip_theta_jointを手動ジョグする軸を一切持っていなかった(これまでtip_thetaは
+どこからも能動的に駆動されていなかったため、UIが用意されていなかった)。
+対応(2026-09-03):
+  - command_gui_node.py: TRAJ_PANEL_JOINT_NAMES(=JOINT_NAMES+['tip_theta_joint'])
+    を新設し、「軌道生成パラメータ」パネルをこれでループするよう変更。これにより
+    tip_theta_jointのmax_velocity/max_accelerationがGUIから編集・gains.jsonへ
+    永続化できるようになった(以前は_traj_loaded_extra経由で読込時の値を無変更で
+    送り直すだけだった)。
+  - joy_teleop_node.py: axis_tip_theta(既定3、右スティック左右)・
+    tip_theta_speed(既定1.0rad/s)パラメータを追加し、右スティックでtip_theta_joint
+    も手動ジョグできるようにした(z=右スティック上下と対にした)。
+  - command_gui_node.py: 「手動操作(joy)速度」パネルにtip_theta_speed欄を追加
+    (_on_load_joy_speed/_apply_loaded_joy_speedを特定3関節のハードコードから
+    self.joy_speed_edits全体を対象にする汎用実装へ変更)。
+  - 対応が必要だったのは値を上げること自体ではなく「上げる手段がGUIに無かった」
+    ことなので、コード変更はUIの追加のみ。実際の推奨速度値(root_thetaと揃える、
+    または安全マージンを取った値にするか)はユーザーが実機で判断・設定すること。
+
+未着手・未確定事項:
+  - 安全高度Z・R退避量・回収Zオフセット・回収アプローチ余裕・投入アプローチ深さ・
+    投入時手先θ(shoot_tip_theta_rad)の実機での妥当な値の決定(現状は安全側の
+    既定値のみ、hand_gather_side等と同様に実測合わせが必要)
+  - tip_theta_jointのmax_velocity/max_acceleration(gains.json、現状0.1rad/s・
+    0.2rad/s²の低速値のまま)を実機で妥当な値に上げること(上記「tip_theta_jointの
+    軌道生成パラメータ・joy手動速度が編集不可だった件」参照。GUIから編集可能には
+    なったが、値自体はまだ調整されていない)
+  - tip_theta_joint = -root_theta_jointという回収時の打ち消し式が、実機の
+    tip_theta回転方向(real_joint_bridge.yaml tip_theta_sign等)・ハンドの
+    実際の取付向きと符号が一致しているか実機で要検証(sim/kinematicモデル上の
+    想定のみで未確認)
+  - PSコンの実際のボタン番号(pump_toggle_button/pickup_confirm_button)の実機確認
+  - 実機でのシーケンス動作確認(hand_node/trajectory_follower_nodeの実機出力込み)
+  - 下記「シューティングボックスへの移動時の衝突回避」の根本対応(経路上の障害物との
+    衝突判定)はまだ未実装。本シーケンスの安全高度退避はワーク/シューティングボックス
+    "上面"をクリアする簡易ウェイポイントに過ぎず、経路上の他の障害物までは考慮していない。
 
 ## シューティングボックスへの移動時の衝突回避 (2026-08-27新規)
 soki_simのワンクリック移動ボタン(command_gui_node.py)やcommand_gui_nodeの目標送信は、
@@ -112,6 +236,11 @@ soki_simのワンクリック移動ボタン(command_gui_node.py)やcommand_gui_
     通ってしまうケースが起こり得る。
   - 対応方針は未検討(実装まだ)。候補としては経由点(ウェイポイント)を挟む、
     Z方向に十分持ち上げてから水平移動する、等の単純な回避策から検討することになりそう。
+  - 上記「ピック/投入 自動シーケンス」(2026-09-03)で、安全高度まで上げてから
+    水平移動する簡易ウェイポイントを導入したが、これは新規シーケンス経由の移動のみに
+    限定され、ワンクリック移動ボタン(自動シーケンスOFF時)やXYクリック・保存済み
+    ポイント送信には適用されない。経路上の障害物そのものを判定する根本対応にも
+    なっていない(あくまで「フィールド/箱の上面をクリアする」という簡易策)。
 
 ## 実機とsimの関節角度校正(進行中、2026-08-27にreal_joint_bridge_node実装済み)
 減速比・CAN_ID/device_id割当は判明済み(note/hardware_mapping.txt、
@@ -130,13 +259,19 @@ soki_sim/config/real_joint_bridge.yamlのパラメータ変更のみで数値を
     原点センサあり(合成後のz軸/r軸それぞれに1個、motor1/motor2の個別軸では
     ない、確認済み)。毎起動ホーミングが必須。
   - ros2canの「エンコーダ原点セット」機能(zero_channel)はz/rの毎起動
-    ホーミングにのみ使う。tip_thetaはzero_channelのオフセットが非永続な
-    ことに依存せず、real_joint_bridge_node側で永続パラメータ
-    (tip_theta_offset_rad)による初回較正のみの方式にしている。root_thetaは
-    さらに一歩進めて2026-08-27にsoftwareオフセット方式自体を廃止し、CubeMars
-    本体へSet Origin CANコマンドを送って実機エンコーダの原点を直接較正する
+    ホーミングにのみ使う。root_thetaは2026-08-27にsoftwareオフセット方式を廃止し、
+    CubeMars本体へSet Origin CANコマンドを送って実機エンコーダの原点を直接較正する
     方式に変更済み(/set_root_theta_originサービス、詳細はnote/hardware_mapping.txt
-    「root_theta/tip_thetaの原点初期化」参照)。
+    「root_theta/tip_thetaの原点初期化」参照)。tip_thetaは従来
+    real_joint_bridge_node側の永続パラメータ(tip_theta_offset_rad)による
+    初回較正のみだったが、2026-09-03にroot_thetaと全く同じCubeMars Set Origin
+    方式(/set_tip_theta_originサービス、trajectory_follower_node._set_cubemars_origin
+    共通実装、command_gui_nodeの「原点校正」タブに「tip_theta原点設定」ボタン
+    追加)にも対応した(ユーザー指摘: 「root_theta原点設定と同様に手先θの原点合わせ
+    用も追加」)。tip_theta_offset_rad(real_joint_bridge_node側)は廃止しておらず、
+    2つの較正手段が併存している状態のため、実機投入前にどちらを正とするか整理が
+    必要(root_thetaは既にsoftwareオフセットを廃止済みなので、同様にtip_theta_
+    offset_radも廃止してSet Origin方式に一本化するのが自然だが未対応)。
 
   - z_joint/r_jointについても、ros2canのMODE_ROBOMASにMITモードが実装された
     ことを受け、2026-08-29にtrajectory_follower_node経由でのMIT位置制御出力を
@@ -162,8 +297,9 @@ soki_sim/config/real_joint_bridge.yamlのパラメータ変更のみで数値を
     (2026-08-27時点、RPM=3/POS=4の続き番号として採用したのみで未検証。
     note/hardware_mapping.txt参照)
   - root_thetaの初回較正の実施(原点センサ位置で/set_root_theta_originを呼ぶ)
-  - tip_thetaの初回較正の実施(原点センサ位置で_unwrapped値を読み、
-    tip_theta_offset_radをreal_joint_bridge.yamlに記入)
+  - tip_thetaの初回較正の実施。2026-09-03に/set_tip_theta_origin(root_thetaと
+    同じCubeMars Set Origin方式)を追加したため、こちらを使うか、従来の
+    tip_theta_offset_rad(real_joint_bridge.yaml)方式を使うか要整理(上記参照)
   - homing_node(z/r起動時ホーミング)は実装済み(2026-08-27、soki_sim/scripts/
     homing_node.py)だが、以下は仮定のまま実機未検証:
     - z軸/r軸原点センサのSWチャンネル配線(node_index/local_index、

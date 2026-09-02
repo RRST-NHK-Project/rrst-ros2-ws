@@ -43,6 +43,7 @@ PyQt5化した際もこの制約は変わらないため、QTimerもGUIメイン
 
 PyQt5が必要(未インストールの場合: sudo apt install python3-pyqt5)。
 """
+import functools
 import json
 import math
 import os
@@ -50,6 +51,7 @@ import re
 import signal
 import subprocess
 import sys
+import time
 import unicodedata
 
 import yaml
@@ -146,6 +148,17 @@ JOINT_NAMES = ['root_theta_joint', 'z_joint', 'r_joint']
 # MITゲインパネル(CubeMars)対象関節。JOINT_NAMESとは別物: root_theta/tip_thetaの
 # 2つがCubeMars駆動(z/rはロボマス駆動、note/hardware_mapping.txt参照)。
 CUBEMARS_JOINT_NAMES = ['root_theta_joint', 'tip_theta_joint']
+# 軌道生成パラメータパネル(max_velocity/max_acceleration)の対象関節。JOINT_NAMES
+# (座標指定操作パネルが編集欄を持つ関節)にtip_theta_jointを加えたもの。
+# ピック/投入シーケンス(2026-09-03新規)がroot_theta_jointと同時にtip_theta_joint
+# も指令するようになったが、tip_theta_jointの速度・加速度は元々GUIから編集する
+# 手段が無く、launchファイルの初期値(低速)のまま変更できなかったため、
+# 「回収シーケンス中にroot_thetaまで一緒に遅くなる」不具合が発生した(2026-09-03、
+# ユーザー報告: trajectory_follower_node.target_callbackの同時到達スケーリングは
+# 1メッセージ内の全関節をt_sync=最も時間がかかる関節に合わせるため、
+# tip_theta_jointの低いmax_velocity/max_accelerationがroot_theta_jointの実効速度
+# まで引きずり下げていた)。
+TRAJ_PANEL_JOINT_NAMES = JOINT_NAMES + ['tip_theta_joint']
 TRAJ_NODE_NAME = 'trajectory_follower_node'
 JOY_NODE_NAME = 'joy_teleop_node'
 HOMING_NODE_NAME = 'homing_node'
@@ -177,6 +190,59 @@ MACHINE_ORIGIN_OFFSET_LIMIT = 1.0
 HAND_OFFSET_JOINT_NAMES = ['hand_offset_x_joint', 'hand_offset_y_joint', 'hand_offset_z_joint']
 # soki_sim.urdf.xacroのhand_offset_limitと一致させること
 HAND_OFFSET_LIMIT = 0.1
+
+# ---- ピック/投入 自動シーケンス(2026-09-03新規) ----
+# 「移動のみGUIで自動化し、吸着ON/シュート実行(ポンプOFF)の判断は人間が行う」という
+# 運用イメージに合わせ、根本θ回転前にRを退避させる安全な移動(_safe_move_legs)と、
+# 吸着/投入の一時停止(WAIT_HUMAN)を組み合わせたシーケンサ。この退避ロジックは
+# ワンクリック移動・XYクリック・保存済みポイント送信等の既存の移動経路には適用しない
+# (2026-09-03、ユーザー判断: 新規シーケンスのみに限定)。
+SEQ_MOVE_THETA_TOL = 0.02  # rad、到達判定の許容誤差
+SEQ_MOVE_LINEAR_TOL = 0.003  # m(z_joint/r_joint共通)、到達判定の許容誤差
+SEQ_MOVE_TIMEOUT_SEC = 20.0  # 1レグあたりのタイムアウト(homing_nodeの既定値に合わせる)
+
+# 手先θ(tip_theta_joint)の自動制御(2026-09-03新規、ユーザー指摘: 「ハンドは3つ
+# 一気に回収するので手先θはワークの行と平行になるように動く必要がある。シュート時は
+# Rと垂直になるように」)。
+# 吸着パッド3個の展開軸は、tip_theta_joint=0の姿勢でr方向(アーム伸縮方向)に垂直
+# (=hand_indicator_linkの向き、soki_sim.urdf.xacro参照)。root_theta_jointが機体を
+# 旋回させると手先ごと同じ角度だけ回るため、パッド展開軸を常にワークの行(GUIの
+# ワールドX軸、WORK_POINTSは同一行内でX方向にWORK_COL_PITCH間隔で並ぶ)と平行に
+# 保つには、tip_theta_jointをroot_theta_jointと逆方向に同じ量だけ回して打ち消す
+# 必要がある(tip_theta_target = -root_theta_target)。_start_pick_sequence参照。
+# シュート時は逆に一切打ち消さずtip_theta_joint=一定値(=常にr方向に垂直、
+# root_thetaの値によらず幾何学的に成立する)を使うが、この値はまだ実機で検証して
+# いない暫定値のため、DEFAULT_SEQUENCE_SETTINGSの'shoot_tip_theta_rad'として
+# GUIから調整可能にする(ユーザー指摘: 「シュート時の角度は暫定値である」)。
+
+# GUIのQLineEditへ復元できない場合(gains.json未保存の初回起動時)に使う既定値。
+# safe_transit_z_mは安全側(可動範囲上限)に倒しておき、実機確認後に低い値へ調整する想定。
+# r_retract_mはradius=0(旋回軸に最も近い位置)。
+DEFAULT_SEQUENCE_SETTINGS = {
+    'safe_transit_z_m': WORLD_Z_UPPER,
+    'r_retract_m': R_LOWER,
+    'pickup_z_offset_m': 0.0,
+    # 回収シーケンスの自動区間は、ワークに当たる高さ(pickup_z_offset_m基準)まで
+    # 一気に降ろさず、その手前(この分だけ高い位置)で一旦止めて人間の「回収実行」
+    # 指示を待つ(2026-09-03、ユーザー指摘: 「移動とZをある程度下げる動作は自動、
+    # 次にPSコンまたはGUIのボタンで回収を指示、これでワークに当たる高さまで下げる」)。
+    'pickup_approach_clearance_m': 0.15,
+    # 投入シーケンスの自動区間が止まる高さ(シューティングボックスのZ基準からの
+    # 差し引き)。ここで自動区間は終わり、以降の微調整(コントローラーでのジョグ)と
+    # 吸着OFF(投入実行)は完全に手動で行う(2026-09-03、ユーザー指摘: 「シュートに
+    # 向かう、ある程度Zを下げて待機、細かい位置調整はコントローラーで行い
+    # コントローラーで吸着をオフにして終了」。以前は自動でここまで降ろしてから
+    # ポンプOFF待ちにしていたが、この待機以降は一切自動制御しない方式に変更)。
+    'shoot_approach_depth_m': 0.0,
+    # 投入時の手先θ(tip_theta_joint)目標[rad]。r方向(アーム伸縮方向)に垂直となる
+    # 値だが、実機で未検証の暫定値(2026-09-03、ユーザー指摘)。
+    'shoot_tip_theta_rad': 0.0,
+    # ポンプON(吸着)は回収シーケンスの「回収実行」後に自動的に呼ぶ(2026-09-03、
+    # ユーザー指摘: 「ポンプの始動は自動で始まっていい、オフのみコントローラーで」)。
+    # ONを呼んでから即座に上昇すると実際に吸着し切る前に持ち上げてしまう恐れが
+    # あるため、上昇前にこの秒数だけ待つ。
+    'pump_settle_sec': 0.4,
+}
 
 # ---- real_joint_bridge.yaml配線設定(初期化用センサID・CubeMars/RoboMasのID・
 # 回転方向)----
@@ -447,6 +513,17 @@ def xyz_to_joint(x, y, z):
     return theta, zj, r, clamped
 
 
+def _theta_r_from_xy(x, y):
+    """xyz_to_jointのtheta/r算出部分のみを取り出したもの(z非依存)。ピック/投入
+    シーケンスで、安全高度を保ったまま先にtheta/rを決めるために使う。"""
+    theta_raw = math.atan2(-x, y)
+    theta = clamp(theta_raw, ROOT_THETA_LOWER, ROOT_THETA_UPPER)
+    radius = math.hypot(x, y)
+    raw_r = radius - ARM_LENGTH / 2.0
+    r = clamp(raw_r, R_LOWER, R_UPPER)
+    return theta, r
+
+
 def joint_to_xyz(theta, zj, r):
     """xyz_to_jointの逆変換(順運動学): (theta, z_joint, r_joint) -> ワールド座標(X,Y,Z)。
     現在の関節角度から手先座標をリアルタイム表示するために使う。"""
@@ -661,10 +738,23 @@ class CommandGuiNode(Node):
         self.pub_ = self.create_publisher(JointState, 'joint_targets', 10)
         self.mixed_pub_ = self.create_publisher(JointState, 'mixed_joint_states', 10)
 
+        # tip_theta_jointはJOINT_NAMES(手動XY移動が編集欄を持つ関節)には含めないが、
+        # ピック/投入シーケンスの到達判定用に現在値を追跡する(2026-09-03追加、
+        # _advance_move_step参照)。
         self._current_positions = {
-            name: 0.0 for name in JOINT_NAMES + MACHINE_ORIGIN_JOINT_NAMES + HAND_OFFSET_JOINT_NAMES}
+            name: 0.0 for name in
+            JOINT_NAMES + ['tip_theta_joint'] + MACHINE_ORIGIN_JOINT_NAMES + HAND_OFFSET_JOINT_NAMES}
         self._current_received = False
         self.create_subscription(JointState, 'mixed_joint_states', self._on_mixed_joint_state, 10)
+
+        # 回収シーケンスが「ワーク手前で自動停止→人間の回収実行指示待ち」の状態に
+        # なっているとき、GUIの「回収実行」ボタンだけでなくPSコン(joy_teleop_node)
+        # の回収確認ボタンからも進めさせるためのTriggerサービス(2026-09-03追加)。
+        # シーケンス状態自体はCommandGuiApp側にあるため、実際の判定・進行処理は
+        # set_pick_confirm_handlerで登録されたコールバック(CommandGuiApp._on_pick_
+        # confirm_requested)に委譲する。
+        self._pick_confirm_handler = None
+        self.create_service(Trigger, 'pick_sequence_confirm', self._on_pick_sequence_confirm_srv)
 
         # trajectory_follower_node/joy_teleop_nodeいずれのros2パラメータも同じ
         # get_parameters/set_parametersサービス経由でGUIから読込・変更できるよう、
@@ -689,6 +779,20 @@ class CommandGuiNode(Node):
     def has_current_state(self):
         return self._current_received
 
+    def set_pick_confirm_handler(self, handler):
+        """CommandGuiApp._on_pick_confirm_requested(引数無し、bool返却)を登録する。"""
+        self._pick_confirm_handler = handler
+
+    def _on_pick_sequence_confirm_srv(self, request, response):
+        if self._pick_confirm_handler is None:
+            response.success = False
+            response.message = 'GUI未初期化です'
+            return response
+        response.success = self._pick_confirm_handler()
+        response.message = (
+            '回収を実行します' if response.success else '現在「回収実行」待ちの状態ではありません')
+        return response
+
     def get_active_node_names(self):
         """現在ROSグラフに存在するノード名の集合を返す(機体ステータスパネルの
         起動状況表示用)。"""
@@ -697,12 +801,21 @@ class CommandGuiNode(Node):
     def get_current_positions(self):
         return dict(self._current_positions)
 
-    def send_target(self, theta, zj, r):
+    def send_target(self, theta, zj, r, tip_theta=None):
+        """tip_theta(手先θ)はNoneなら含めない(=trajectory_follower_node側が
+        保持している現在の目標のまま、他の呼び出し元(手動XY移動・ジョグ等)は
+        従来通りtip_thetaに触れない)。ピック/投入シーケンスのみワークの行との
+        平行/シュート方向との垂直を保つためtip_thetaも指定する
+        (2026-09-03、_start_pick_sequence/_start_shoot_sequence参照)。"""
         msg = JointState()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.header.frame_id = 'auto'
-        msg.name = list(JOINT_NAMES)
-        msg.position = [theta, zj, r]
+        if tip_theta is None:
+            msg.name = list(JOINT_NAMES)
+            msg.position = [theta, zj, r]
+        else:
+            msg.name = list(JOINT_NAMES) + ['tip_theta_joint']
+            msg.position = [theta, zj, r, tip_theta]
         self.pub_.publish(msg)
 
     def send_machine_origin(self, x, y, z):
@@ -851,6 +964,16 @@ class CommandGuiApp(QWidget):
         # 実機セットアップパネルからros2 launchで起動する子プロセス(未起動ならNone)。
         self._launch_process = None
 
+        # ピック/投入自動シーケンスの実行状態(_advance_sequence参照)。
+        self._seq_active = False
+        self._seq_steps = []
+        self._seq_index = 0
+        self._seq_kind = None
+        self._seq_waiting_service = None
+        self._seq_leg_target = None
+        self._seq_leg_start_time = None
+        self._seq_delay_start_time = None
+
         self.x_edit = make_float_edit(MAX_RADIUS / 2.0)
         self.y_edit = make_float_edit(0.0)
         self.z_edit = make_float_edit((WORLD_Z_LOWER + WORLD_Z_UPPER) / 2.0)
@@ -900,6 +1023,9 @@ class CommandGuiApp(QWidget):
         self._build_calibration_tab(calibration_tab)
         self._build_wiring_tab(wiring_tab)
         self._restore_saved_gains()
+        # PSコン(joy_teleop_node)の回収確認ボタンから/pick_sequence_confirmサービス
+        # 経由で呼ばれた際、GUIの「回収実行」ボタンと同じ処理を行わせる(2026-09-03)。
+        self.node.set_pick_confirm_handler(self._on_pick_confirm_requested)
 
         self.tabs.setCurrentWidget(overview_tab)
 
@@ -1300,7 +1426,7 @@ class CommandGuiApp(QWidget):
         self.calibration_summary_labels = {}
         for i, (key, title) in enumerate((
                 ('machine_origin', '機体原点オフセット'), ('root_theta', 'root_theta原点'),
-                ('homing', 'z/rホーミング'))):
+                ('tip_theta', 'tip_theta原点'), ('homing', 'z/rホーミング'))):
             calib_grid.addWidget(QLabel(title), i, 0)
             label = QLabel()
             label.setWordWrap(True)
@@ -1329,6 +1455,7 @@ class CommandGuiApp(QWidget):
         for key, source_label in (
                 ('machine_origin', self.machine_origin_status_label),
                 ('root_theta', self.origin_status_label),
+                ('tip_theta', self.tip_theta_origin_status_label),
                 ('homing', self.homing_status_label)):
             target = self.calibration_summary_labels[key]
             target.setText(source_label.text())
@@ -1366,6 +1493,7 @@ class CommandGuiApp(QWidget):
 
         launch_row = QHBoxLayout()
         launch_btn = QPushButton('全ノード起動')
+        launch_btn.setProperty('variant', 'primary')  # よく使う操作のため目立つ色に(2026-09-03)
         stop_launch_btn = QPushButton('停止')
         launch_btn.clicked.connect(self._on_launch_all_nodes)
         stop_launch_btn.clicked.connect(self._on_stop_all_nodes)
@@ -1391,10 +1519,14 @@ class CommandGuiApp(QWidget):
         machine_origin_btn = QPushButton('機体原点オフセット適用')
         root_theta_btn = QPushButton('root_theta原点設定')
         root_theta_btn.setProperty('variant', 'danger')
+        tip_theta_btn = QPushButton('tip_theta原点設定')
+        tip_theta_btn.setProperty('variant', 'danger')
         machine_origin_btn.clicked.connect(self._on_apply_machine_origin)
         root_theta_btn.clicked.connect(self._on_set_root_theta_origin)
+        tip_theta_btn.clicked.connect(self._on_set_tip_theta_origin)
         origin_row.addWidget(machine_origin_btn)
         origin_row.addWidget(root_theta_btn)
+        origin_row.addWidget(tip_theta_btn)
         layout.addLayout(origin_row)
 
         homing_row = QHBoxLayout()
@@ -1533,12 +1665,337 @@ class CommandGuiApp(QWidget):
 
     def _on_hand_trigger(self, service_name):
         _set_status(self.hand_status_label, f'{service_name} 呼び出し中...', 'muted')
-        ok = self.node.call_trigger_service(service_name, self._on_hand_trigger_done)
+        ok = self.node.call_trigger_service(
+            service_name, functools.partial(self._on_hand_trigger_done, service_name))
         if not ok:
             _set_status(self.hand_status_label, 'hand_nodeに接続できません(未起動?)', 'error')
+            # 自動シーケンス側がこのサービスの応答待ちだった場合、応答が永久に
+            # 来ないままシーケンスが止まり続けるのを防ぐため中断する。
+            if self._seq_active and self._seq_waiting_service == service_name:
+                self._abort_sequence(
+                    f'{self._seq_kind}: {service_name} に接続できません(hand_node未起動?)')
 
-    def _on_hand_trigger_done(self, success, message):
+    def _on_hand_trigger_done(self, service_name, success, message):
         _set_status(self.hand_status_label, message, 'success' if success else 'error')
+        # ピック/投入シーケンスが'call'ステップとしてこのサービスを自ら呼んでいた
+        # 場合(_advance_hand_step参照。'wait_pick_confirm'は/pick_sequence_confirm
+        # サービス経由で別途判定するため、ここは通らない)、次のステップへ進める。
+        # response.success=Falseはhand_node側の設計上「device_id未配線でCAN送信を
+        # スキップした」ことを意味するだけで、RViz表示用のpublishはその場合でも
+        # 既に行われている(hand_node.py _set_deploy/_set_pitch参照)。配線前でも
+        # シーケンスをRVizのみで最後まで確認できるよう、これはシーケンスを中断せず
+        # 警告表示のみに留める(サービス自体に到達できない場合は_on_hand_triggerの
+        # ok=False側で中断する)。
+        if self._seq_active and self._seq_waiting_service == service_name:
+            self._seq_waiting_service = None
+            self._seq_index += 1
+            if not success:
+                _set_status(self.sequence_status_label,
+                            f'{self._seq_kind}: {service_name} 警告(配線未設定?): {message}', 'error')
+
+    # ---------- ピック/投入 自動シーケンス ----------
+    def _build_sequence_settings_panel(self, column):
+        # ワーク・シューティングボックスパネル(_build_field_buttons)の隣に置く
+        # 設定・状態パネル(2026-09-03、ユーザー指定でこの位置に変更)。
+        # 「自動シーケンスで実行」チェックボックスと連動する。各数値はGUIの
+        # QLineEditが真値で、「適用」はgains.jsonへの永続化のみ行う(他のゲイン系
+        # パネルと違いリモートノードへのSetParametersは無い。シーケンス開始時に
+        # このGUIプロセス自身が_collect_sequence_valuesで直接読み出すため)。
+        box = QGroupBox('ピック/投入 自動シーケンス')
+        layout = QVBoxLayout(box)
+
+        desc = QLabel()
+        desc.setWordWrap(True)
+        _set_status(
+            desc,
+            '「ワーク・シューティングボックス」パネルの「自動シーケンスで実行」を\n'
+            'ONにしてボタンを押すと使える。\n'
+            '回収: ワーク手前(アプローチ高さ)までは自動、そこから先(接触・吸着ON)\n'
+            'は下の「回収実行」ボタンまたはPSコンの回収確認ボタンを押すまで進まない。\n'
+            '投入: シューティングボックス手前まで自動で近づいて待機し、そこから先の\n'
+            '細かい位置調整とポンプOFF(投入実行)はコントローラーで完全に手動操作する\n'
+            '(このシーケンスは自動で行わない)。', 'muted')
+        layout.addWidget(desc)
+
+        self.sequence_status_label = QLabel()
+        self.sequence_status_label.setWordWrap(True)
+        _set_status(self.sequence_status_label, '待機中', 'muted')
+        layout.addWidget(self.sequence_status_label)
+
+        btn_row = QHBoxLayout()
+        pick_confirm_btn = QPushButton('回収実行')
+        pick_confirm_btn.setProperty('variant', 'primary')
+        pick_confirm_btn.clicked.connect(self._on_pick_confirm_button_clicked)
+        btn_row.addWidget(pick_confirm_btn)
+        abort_btn = QPushButton('中断')
+        abort_btn.setProperty('variant', 'danger')
+        abort_btn.clicked.connect(self._on_abort_sequence)
+        btn_row.addWidget(abort_btn)
+        layout.addLayout(btn_row)
+
+        grid = QGridLayout()
+        self.sequence_edits = {}
+        for i, (key, label) in enumerate((
+                ('safe_transit_z_m', '安全高度Z[m]'),
+                ('r_retract_m', 'R退避量[m]'),
+                ('pickup_z_offset_m', '回収Zオフセット[m]'),
+                ('pickup_approach_clearance_m', '回収アプローチ余裕[m]'),
+                ('shoot_approach_depth_m', '投入アプローチ深さ[m]'),
+                ('shoot_tip_theta_rad', '投入時手先θ[rad](暫定)'),
+                ('pump_settle_sec', 'ポンプON後の待ち時間[s]'))):
+            grid.addWidget(QLabel(label), i, 0)
+            edit = make_float_edit(DEFAULT_SEQUENCE_SETTINGS[key])
+            self.sequence_edits[key] = edit
+            grid.addWidget(edit, i, 1)
+        layout.addLayout(grid)
+
+        apply_btn = QPushButton('適用(値を保存)')
+        apply_btn.clicked.connect(self._on_apply_sequence_settings)
+        layout.addWidget(apply_btn)
+
+        column.addWidget(box)
+
+    def _collect_sequence_values(self):
+        return {key: get_float(edit) for key, edit in self.sequence_edits.items()}
+
+    def _on_apply_sequence_settings(self):
+        try:
+            values = self._collect_sequence_values()
+        except ValueError:
+            QMessageBox.critical(self, '入力エラー', 'シーケンス設定パネルの各欄に数値を入力してください')
+            return
+        self._persist_gains('sequence', values)
+        _set_status(self.sequence_status_label, '設定を保存しました', 'success')
+
+    def _start_pick_sequence(self, x, y, z):
+        """workボタン用: 安全高度退避→R退避→θ回転→R伸長→パッド展開→ワーク手前
+        (アプローチ高さ)まで自動降下→(人間の「回収実行」指示待ち。GUIの
+        「回収実行」ボタンまたはPSコンの回収確認ボタン)→ワークに当たる高さまで
+        降下→ポンプON(自動)→上昇→パッド収納、という回収シーケンス。
+        「移動とZをある程度下げる動作は自動、そこから先(接触・吸着)は人間の
+        明示的な指示で実行する」というユーザー指定の運用に合わせている
+        (2026-09-03)。ポンプON自体は指示後に自動で行う(オフのみ人間が
+        コントローラーで判断する、という以前からの方針は投入側で維持)。
+        theta回転以降は手先θ(tip_theta_joint)も同時に制御し、吸着パッド3個の
+        展開軸がワークの行と平行になるよう自動で打ち消す(2026-09-03、ユーザー
+        指摘: 「ハンドは3つ一気に回収するので手先θはワークの行と平行になるように
+        動く必要がある」)。"""
+        if not self._guard_sequence_start():
+            return
+        try:
+            settings = self._collect_sequence_values()
+        except ValueError:
+            QMessageBox.critical(self, '入力エラー', 'シーケンス設定パネルの数値を確認してください')
+            return
+
+        pos = self.node.get_current_positions()
+        theta0, r0 = pos['root_theta_joint'], pos['r_joint']
+        target_theta, target_r = _theta_r_from_xy(x, y)
+        safe_zj = clamp(settings['safe_transit_z_m'] - Z_OFFSET, Z_LOWER, Z_UPPER)
+        final_zj = clamp((z + settings['pickup_z_offset_m']) - Z_OFFSET, Z_LOWER, Z_UPPER)
+        approach_zj = clamp(
+            (z + settings['pickup_z_offset_m'] + settings['pickup_approach_clearance_m']) - Z_OFFSET,
+            Z_LOWER, Z_UPPER)
+        r_retract = clamp(settings['r_retract_m'], R_LOWER, R_UPPER)
+        # 吸着パッド3個の展開軸をワークの行(ワールドX軸)と平行に保つため、
+        # 手先θ(tip_theta_joint)をroot_thetaと逆方向に同じ量だけ回して打ち消す
+        # (SHOOT_TIP_THETA_RAD付近のコメント参照、2026-09-03ユーザー指摘)。
+        # theta回転を始めるレグ(パッドが目的の行へ向く前)から適用する。
+        tip_theta_pick = -target_theta
+
+        steps = [
+            ('move', theta0, safe_zj, r0),               # 現在地のまま安全高度へ
+            ('move', theta0, safe_zj, r_retract),         # Rを旋回軸近くへ退避
+            ('move', target_theta, safe_zj, r_retract, tip_theta_pick),  # theta回転(手先θも同時に打ち消し)
+            ('move', target_theta, safe_zj, target_r, tip_theta_pick),   # Rを目標半径まで伸長
+            ('call', '/hand_spread_pads'),
+            ('move', target_theta, approach_zj, target_r, tip_theta_pick),  # ワーク手前まで自動降下
+            ('wait_pick_confirm',),                       # 人間の「回収実行」指示待ち
+            ('move', target_theta, final_zj, target_r, tip_theta_pick),  # ワークに当たる高さまで降下
+            ('call', '/hand_pump_on'),                    # 吸着ON(自動)
+            ('delay', settings['pump_settle_sec']),       # 吸着が効くまで少し待つ
+            ('move', target_theta, safe_zj, target_r, tip_theta_pick),  # 安全高度へ上昇
+            ('call', '/hand_gather_pads'),
+        ]
+        self._begin_sequence('回収', steps)
+
+    def _start_shoot_sequence(self, x, y, z):
+        """shootボタン用: 安全高度退避→R退避→θ回転→R伸長→ピッチ投入姿勢→
+        ある程度Zを下げて待機、という投入シーケンス。ここで自動区間は終わりで、
+        以降の細かい位置調整とポンプOFF(投入実行)は完全に手動(コントローラーの
+        ジョグ・丸ボタン)で行う(2026-09-03、ユーザー指定: 「シュートに向かう、
+        ある程度Zを下げて待機、細かい位置調整はコントローラーで行い
+        コントローラーで吸着をオフにして終了」。以前は自動でポンプOFFを待って
+        ピッチを戻す所まで自動化していたが、待機以降は一切自動制御しない方式に
+        変更)。theta回転以降は手先θ(tip_theta_joint)もr方向に垂直な一定値
+        (shoot_tip_theta_rad)へ制御する(2026-09-03、ユーザー指摘: 「シュート時は
+        Rと垂直になるように」。この値自体は実機未検証の暫定値)。"""
+        if not self._guard_sequence_start():
+            return
+        try:
+            settings = self._collect_sequence_values()
+        except ValueError:
+            QMessageBox.critical(self, '入力エラー', 'シーケンス設定パネルの数値を確認してください')
+            return
+
+        pos = self.node.get_current_positions()
+        theta0, r0 = pos['root_theta_joint'], pos['r_joint']
+        target_theta, target_r = _theta_r_from_xy(x, y)
+        safe_zj = clamp(settings['safe_transit_z_m'] - Z_OFFSET, Z_LOWER, Z_UPPER)
+        # ユーザー指定通り「シューティングボックス底面からの距離」で定義する。
+        # SHOOT_POINTSのzは箱の開口部上端(SHOOT_BOX_HEIGHT)を指すため、そこから
+        # shoot_approach_depth_m分だけ差し引いて底面側へ寄せる(ここで自動区間は
+        # 終わり、最終的な投入深さの追い込みは手動ジョグで行う)。
+        approach_zj = clamp((z - settings['shoot_approach_depth_m']) - Z_OFFSET, Z_LOWER, Z_UPPER)
+        r_retract = clamp(settings['r_retract_m'], R_LOWER, R_UPPER)
+        # 投入時はr方向に垂直な姿勢(root_thetaの値によらず一定のtip_theta)にする
+        # (SHOOT_TIP_THETA_RAD付近のコメント参照、ユーザー指摘:「シュート時はRと
+        # 垂直になるように」。値自体は未検証の暫定値)。
+        tip_theta_shoot = settings['shoot_tip_theta_rad']
+
+        steps = [
+            ('move', theta0, safe_zj, r0),
+            ('move', theta0, safe_zj, r_retract),
+            ('move', target_theta, safe_zj, r_retract, tip_theta_shoot),
+            ('move', target_theta, safe_zj, target_r, tip_theta_shoot),
+            ('call', '/hand_set_pitch_insert'),
+            ('move', target_theta, approach_zj, target_r, tip_theta_shoot),  # ある程度降下して待機
+        ]
+        self._begin_sequence('投入', steps)
+
+    def _guard_sequence_start(self):
+        if self._seq_active:
+            QMessageBox.information(self, 'シーケンス実行中', '実行中のシーケンスを中断してから開始してください')
+            return False
+        if not self.node.has_current_state():
+            QMessageBox.information(self, '未取得', 'まだ現在位置を受信していません')
+            return False
+        return True
+
+    def _begin_sequence(self, kind, steps):
+        self._seq_kind = kind
+        self._seq_steps = steps
+        self._seq_index = 0
+        self._seq_active = True
+        self._seq_waiting_service = None
+        self._seq_leg_target = None
+        self._seq_leg_start_time = None
+        self._seq_delay_start_time = None
+        _set_status(self.sequence_status_label, f'{kind}シーケンス開始', 'muted')
+
+    def _advance_sequence(self):
+        """_spin_ros(50ms QTimer)から毎tick呼ばれる。実行中のシーケンスが無ければ
+        即座に戻る(通常のGUI操作には一切影響しない)。"""
+        if not self._seq_active:
+            return
+        if self._seq_index >= len(self._seq_steps):
+            _set_status(self.sequence_status_label, f'{self._seq_kind}シーケンス完了', 'success')
+            self._seq_active = False
+            self._seq_steps = []
+            self._seq_index = 0
+            return
+        step = self._seq_steps[self._seq_index]
+        if step[0] == 'move':
+            self._advance_move_step(step)
+        elif step[0] == 'call':
+            self._advance_hand_step(step)
+        elif step[0] == 'wait_pick_confirm':
+            self._advance_wait_pick_confirm_step(step)
+        elif step[0] == 'delay':
+            self._advance_delay_step(step)
+
+    def _advance_move_step(self, step):
+        # 5要素目(tip_theta)は任意。指定時のみsend_target/到達判定に加える
+        # (ピック/投入シーケンス専用、_start_pick_sequence/_start_shoot_sequence参照)。
+        theta, zj, r = step[1], step[2], step[3]
+        tip_theta = step[4] if len(step) > 4 else None
+        if self._seq_leg_target is None:
+            self.node.send_target(theta, zj, r, tip_theta)
+            self._seq_leg_target = (theta, zj, r, tip_theta)
+            self._seq_leg_start_time = time.monotonic()
+            _set_status(self.sequence_status_label,
+                        f'{self._seq_kind}: 移動中 (ステップ{self._seq_index + 1}/{len(self._seq_steps)})',
+                        'muted')
+            return
+        if not self.node.has_current_state():
+            return
+        pos = self.node.get_current_positions()
+        reached = (
+            abs(pos['root_theta_joint'] - theta) <= SEQ_MOVE_THETA_TOL
+            and abs(pos['z_joint'] - zj) <= SEQ_MOVE_LINEAR_TOL
+            and abs(pos['r_joint'] - r) <= SEQ_MOVE_LINEAR_TOL
+            and (tip_theta is None or abs(pos['tip_theta_joint'] - tip_theta) <= SEQ_MOVE_THETA_TOL))
+        if reached:
+            self._seq_leg_target = None
+            self._seq_index += 1
+            return
+        if time.monotonic() - self._seq_leg_start_time > SEQ_MOVE_TIMEOUT_SEC:
+            self._abort_sequence(f'{self._seq_kind}: 移動タイムアウト(ステップ{self._seq_index + 1})')
+
+    def _advance_delay_step(self, step):
+        """指定秒数だけ待って次のステップへ進む(現状はポンプON後の吸着settle待ちの
+        み用途、_start_pick_sequence参照)。"""
+        _, seconds = step
+        if self._seq_delay_start_time is None:
+            self._seq_delay_start_time = time.monotonic()
+            _set_status(self.sequence_status_label, f'{self._seq_kind}: 待機中...', 'muted')
+            return
+        if time.monotonic() - self._seq_delay_start_time >= seconds:
+            self._seq_delay_start_time = None
+            self._seq_index += 1
+
+    def _advance_hand_step(self, step):
+        """'call'ステップ(人間の判断を要しない自動実行分)。実際の呼び出し結果は
+        _on_hand_trigger_doneで受け取り、_seq_waiting_serviceと一致すれば
+        _advance_sequenceが次のステップへ進める。"""
+        _, service_name = step
+        if self._seq_waiting_service is not None:
+            return
+        self._seq_waiting_service = service_name
+        _set_status(self.sequence_status_label,
+                    f'{self._seq_kind}: {service_name} 呼び出し中...', 'muted')
+        self._on_hand_trigger(service_name)
+
+    def _advance_wait_pick_confirm_step(self, step):
+        """'wait_pick_confirm'ステップ: 人間が「回収実行」を指示する(GUIの
+        「回収実行」ボタン、またはPSコンの回収確認ボタン経由でcommand_gui_nodeの
+        /pick_sequence_confirmサービスを呼ぶ)まで一時停止する。実際の解除は
+        _on_pick_confirm_requestedで行う(ここでは表示のみ)。"""
+        if self._seq_waiting_service is None:
+            self._seq_waiting_service = '(pick_confirm)'
+            _set_status(
+                self.sequence_status_label,
+                f'{self._seq_kind}: 回収実行の指示待ち(GUIの「回収実行」ボタンまたは'
+                'PSコンで操作してください)', 'muted')
+
+    def _on_pick_confirm_requested(self):
+        """GUIの「回収実行」ボタン、またはCommandGuiNodeの/pick_sequence_confirm
+        サービス経由(PSコンの回収確認ボタン、joy_teleop_node)から呼ばれる。
+        現在wait_pick_confirmで一時停止中の場合のみ次のステップへ進め、Trueを返す。"""
+        if self._seq_active and self._seq_waiting_service == '(pick_confirm)':
+            self._seq_waiting_service = None
+            self._seq_index += 1
+            return True
+        return False
+
+    def _on_pick_confirm_button_clicked(self):
+        if not self._on_pick_confirm_requested():
+            _set_status(self.sequence_status_label, '現在「回収実行」待ちの状態ではありません', 'error')
+
+    def _abort_sequence(self, message):
+        self._seq_active = False
+        self._seq_steps = []
+        self._seq_index = 0
+        self._seq_waiting_service = None
+        self._seq_leg_target = None
+        self._seq_delay_start_time = None
+        _set_status(self.sequence_status_label, message, 'error')
+
+    def _on_abort_sequence(self):
+        if not self._seq_active:
+            _set_status(self.sequence_status_label, '実行中のシーケンスはありません', 'muted')
+            return
+        self._abort_sequence(f'{self._seq_kind}シーケンスを中断しました')
 
     def _build_trajectory_panel(self, column):
         box = QGroupBox('軌道生成パラメータ (trajectory_follower_node)')
@@ -1548,7 +2005,7 @@ class CommandGuiApp(QWidget):
 
         self.traj_vel_edits = {}
         self.traj_accel_edits = {}
-        for i, name in enumerate(JOINT_NAMES):
+        for i, name in enumerate(TRAJ_PANEL_JOINT_NAMES):
             # 行ラベルは"_joint"を省いて表示(ボックス見出しで対象は自明なため、
             # 列幅を無駄に広げないようにする)。辞書キーは元のjoint名のまま。
             grid.addWidget(QLabel(name.removesuffix('_joint')), i + 1, 0)
@@ -1562,7 +2019,7 @@ class CommandGuiApp(QWidget):
         self.traj_status_label = QLabel()
         self.traj_status_label.setWordWrap(True)
         _set_status(self.traj_status_label, '未読込', 'muted')
-        grid.addWidget(self.traj_status_label, len(JOINT_NAMES) + 1, 0, 1, 3)
+        grid.addWidget(self.traj_status_label, len(TRAJ_PANEL_JOINT_NAMES) + 1, 0, 1, 3)
 
         btn_row = QHBoxLayout()
         load_btn = QPushButton('読込')
@@ -1572,7 +2029,7 @@ class CommandGuiApp(QWidget):
         apply_btn.clicked.connect(self._on_apply_traj_params)
         btn_row.addWidget(load_btn)
         btn_row.addWidget(apply_btn)
-        grid.addLayout(btn_row, len(JOINT_NAMES) + 2, 0, 1, 3)
+        grid.addLayout(btn_row, len(TRAJ_PANEL_JOINT_NAMES) + 2, 0, 1, 3)
 
         column.addWidget(box)
 
@@ -1580,10 +2037,15 @@ class CommandGuiApp(QWidget):
         box = QGroupBox('手動操作(joy)速度 (joy_teleop_node)')
         grid = QGridLayout(box)
         self.joy_speed_edits = {}
-        for i, (name, label, unit) in enumerate((
-                ('theta_speed', 'root_theta', 'rad/s'),
-                ('z_speed', 'z', 'm/s'),
-                ('r_speed', 'r', 'm/s'))):
+        # tip_theta_speedは2026-09-03追加(joy_teleop_nodeのtip_theta_joint手動
+        # ジョグに合わせて、この編集欄も必要になった)。
+        fields = (
+            ('theta_speed', 'root_theta', 'rad/s'),
+            ('z_speed', 'z', 'm/s'),
+            ('r_speed', 'r', 'm/s'),
+            ('tip_theta_speed', 'tip_theta', 'rad/s'),
+        )
+        for i, (name, label, unit) in enumerate(fields):
             grid.addWidget(QLabel(f'{label} [{unit}]'), i, 0)
             edit = make_float_edit(0.0, width=70)
             self.joy_speed_edits[name] = edit
@@ -1592,7 +2054,7 @@ class CommandGuiApp(QWidget):
         self.joy_speed_status_label = QLabel()
         self.joy_speed_status_label.setWordWrap(True)
         _set_status(self.joy_speed_status_label, '未読込', 'muted')
-        grid.addWidget(self.joy_speed_status_label, 3, 0, 1, 2)
+        grid.addWidget(self.joy_speed_status_label, len(fields), 0, 1, 2)
 
         btn_row = QHBoxLayout()
         load_btn = QPushButton('読込')
@@ -1602,7 +2064,7 @@ class CommandGuiApp(QWidget):
         apply_btn.clicked.connect(self._on_apply_joy_speed)
         btn_row.addWidget(load_btn)
         btn_row.addWidget(apply_btn)
-        grid.addLayout(btn_row, 4, 0, 1, 2)
+        grid.addLayout(btn_row, len(fields) + 1, 0, 1, 2)
 
         column.addWidget(box)
 
@@ -1776,12 +2238,12 @@ class CommandGuiApp(QWidget):
         _set_status(self.hand_offset_status_label, text, 'success')
 
     def _build_origin_panel(self, column):
-        box = QGroupBox('root_theta原点設定 (CubeMars本体、trajectory_follower_node)')
+        box = QGroupBox('root_theta / tip_theta 原点設定 (CubeMars本体、trajectory_follower_node)')
         layout = QVBoxLayout(box)
 
         warn = QLabel()
         warn.setWordWrap(True)
-        _set_status(warn, '呼び出し前に、root_theta_jointを原点センサの位置\n'
+        _set_status(warn, '呼び出し前に、対象の関節を原点センサの位置\n'
                           '(真の機械原点)へ物理的に合わせておくこと。', 'error')
         layout.addWidget(warn)
 
@@ -1790,10 +2252,23 @@ class CommandGuiApp(QWidget):
         _set_status(self.origin_status_label, '未実行', 'muted')
         layout.addWidget(self.origin_status_label)
 
-        btn = QPushButton('/set_root_theta_origin 呼び出し')
-        btn.setProperty('variant', 'danger')
-        btn.clicked.connect(self._on_set_root_theta_origin)
-        layout.addWidget(btn)
+        root_theta_origin_btn = QPushButton('/set_root_theta_origin 呼び出し')
+        root_theta_origin_btn.setProperty('variant', 'danger')
+        root_theta_origin_btn.clicked.connect(self._on_set_root_theta_origin)
+        layout.addWidget(root_theta_origin_btn)
+
+        # tip_theta_joint原点設定(2026-09-03新規、root_thetaと全く同じ仕組み
+        # (trajectory_follower_node._set_cubemars_origin)をtip_theta_jointにも
+        # 使えるようにした/set_tip_theta_originサービスへ対応)。
+        self.tip_theta_origin_status_label = QLabel()
+        self.tip_theta_origin_status_label.setWordWrap(True)
+        _set_status(self.tip_theta_origin_status_label, '未実行', 'muted')
+        layout.addWidget(self.tip_theta_origin_status_label)
+
+        tip_theta_origin_btn = QPushButton('/set_tip_theta_origin 呼び出し')
+        tip_theta_origin_btn.setProperty('variant', 'danger')
+        tip_theta_origin_btn.clicked.connect(self._on_set_tip_theta_origin)
+        layout.addWidget(tip_theta_origin_btn)
 
         column.addWidget(box)
 
@@ -1815,6 +2290,25 @@ class CommandGuiApp(QWidget):
 
     def _on_set_root_theta_origin_done(self, success, message):
         _set_status(self.origin_status_label, message, 'success' if success else 'error')
+
+    def _on_set_tip_theta_origin(self):
+        reply = QMessageBox.question(
+            self, '手先θ原点設定の確認',
+            'tip_theta_jointをCubeMars本体(AK40-10)のフラッシュへ\n'
+            '永久原点として書き込みます。\n\n'
+            '関節は今、原点センサの位置(真の機械原点)にありますか？\n'
+            '間違った位置で実行すると、以後のすべての角度がずれます。',
+            QMessageBox.Yes | QMessageBox.No)
+        if reply != QMessageBox.Yes:
+            return
+        _set_status(self.tip_theta_origin_status_label, '呼び出し中...', 'muted')
+        ok = self.node.call_trigger_service(
+            '/set_tip_theta_origin', self._on_set_tip_theta_origin_done)
+        if not ok:
+            _set_status(self.tip_theta_origin_status_label, 'サービス未起動です', 'error')
+
+    def _on_set_tip_theta_origin_done(self, success, message):
+        _set_status(self.tip_theta_origin_status_label, message, 'success' if success else 'error')
 
     # ---------- real_joint_bridge.yaml配線設定(センサID・CubeMars/RoboMasのID・
     # 回転方向)----
@@ -2016,23 +2510,39 @@ class CommandGuiApp(QWidget):
         # (WORK_POINTS/SHOOT_POINTSのx,y)でボタン位置を決めることで、実際の
         # フィールド配置(奥からワーク4列・機体・シューティングボックス4列の順)と
         # 対応する見た目にする。
+        # 「自動シーケンスで実行」ON時は、workボタンで回収シーケンス・shootボタンで
+        # 投入シーケンスを開始する(_on_field_point参照)。OFF(既定)なら従来通り
+        # 即時移動のみ行う(2026-09-03新規)。
+        self.seq_auto_checkbox = QCheckBox(
+            '自動シーケンスで実行(ワーク=回収・シューティングボックス=投入。'
+            '設定は下の「ピック/投入 自動シーケンス」パネル)')
+        seq_row = QHBoxLayout()
+        seq_row.addWidget(self.seq_auto_checkbox)
+        seq_row.addStretch(1)
+        layout.addLayout(seq_row)
+
         box = QGroupBox('ワーク・シューティングボックス (クリックで移動、実フィールド配置)')
         grid = QGridLayout(box)
-        work_points = [p for row in WORK_POINTS for p in row]
-        shoot_points = SHOOT_POINTS['L'] + SHOOT_POINTS['R']
+        work_points = [(*p, 'pick') for row in WORK_POINTS for p in row]
+        shoot_points = [(*p, 'shoot') for p in SHOOT_POINTS['L'] + SHOOT_POINTS['R']]
         n_work_rows = len({round(p[2], 6) for p in work_points})
         self._build_button_grid(grid, work_points + shoot_points, header_row=1,
                                  gap_after_rank=n_work_rows - 1, gap_label='(機体)')
         # QVBoxLayoutへ直接addWidgetすると幅いっぱいに引き伸ばされてしまう
         # (グリッド内容は中身ぴったりのまま、右側だけ間延びした余白ができる)ため、
         # 横方向はQHBoxLayout+末尾stretchで中身ぴったりの幅に留める。
+        # ピック/投入自動シーケンスパネルは、このワーク・シューティングボックス
+        # パネルのすぐ隣に置く(2026-09-03、ユーザー指定。以前は統合操作タブの
+        # 左列下部にあり、work/shootボタンから視線が離れていた)。
         row = QHBoxLayout()
         row.addWidget(box)
+        self._build_sequence_settings_panel(row)
         row.addStretch(1)
         layout.addLayout(row)
 
     def _build_button_grid(self, grid, points, header_row=0, gap_after_rank=None, gap_label=''):
-        """points: (label, x, y, z)のリスト。実座標を見た目通りに配置する
+        """points: (label, x, y, z, kind)のリスト('pick'=ワーク/'shoot'=シューティング
+        ボックス、_on_field_point参照)。実座標を見た目通りに配置する
         (X昇順=左->右の列、Y降順=奥(ワーク方向)が上->手前が下の行)。
         gap_after_rankを指定すると、Y順位でその順位を超えた行を1行分下にずらし、
         間にgap_labelを挟む(ワーク行とシューティングボックス行の間に機体分の
@@ -2052,8 +2562,8 @@ class CommandGuiApp(QWidget):
         # 詰めたpadding(QSS参照。4px*2+border2px)分の余白から幅を決める。
         # 固定48pxだと桁数が増えたラベルが見切れていた。
         metrics = QFontMetrics(QPushButton().font())
-        btn_width = max(metrics.horizontalAdvance(label) for label, _, _, _ in points) + 14
-        for label, x, y, z in points:
+        btn_width = max(metrics.horizontalAdvance(label) for label, _, _, _, _ in points) + 14
+        for label, x, y, z, kind in points:
             col = xs.index(round(x, 6))
             rank = ys.index(round(y, 6))
             if gap_after_rank is not None and rank > gap_after_rank:
@@ -2061,7 +2571,8 @@ class CommandGuiApp(QWidget):
             btn = QPushButton(label)
             btn.setProperty('variant', 'grid')
             btn.setFixedWidth(btn_width)
-            btn.clicked.connect(lambda _checked=False, x=x, y=y, z=z: self._on_field_point(x, y, z))
+            btn.clicked.connect(
+                lambda _checked=False, x=x, y=y, z=z, kind=kind: self._on_field_point(x, y, z, kind))
             grid.addWidget(btn, rank + header_row, col)
 
         has_gap = gap_after_rank is not None
@@ -2074,8 +2585,14 @@ class CommandGuiApp(QWidget):
         total_rows = len(ys) + (1 if has_gap else 0)
         grid.addWidget(QLabel('↑ Y+ (ワーク側) ／ Y- (機体側) ↓'), header_row + total_rows, 0, 1, ncols)
 
-    def _on_field_point(self, x, y, z):
-        self._send_xyz(x, y, z)
+    def _on_field_point(self, x, y, z, kind):
+        if self.seq_auto_checkbox.isChecked():
+            if kind == 'pick':
+                self._start_pick_sequence(x, y, z)
+            else:
+                self._start_shoot_sequence(x, y, z)
+        else:
+            self._send_xyz(x, y, z)
 
     # ---------- realtime state / trajectory params ----------
     def _spin_ros(self):
@@ -2084,6 +2601,7 @@ class CommandGuiApp(QWidget):
         # 同じメインスレッド上で完結する)。
         rclpy.spin_once(self.node, timeout_sec=0)
         self._refresh_current_state()
+        self._advance_sequence()
 
     def _refresh_current_state(self):
         if not self.node.has_current_state():
@@ -2220,7 +2738,7 @@ class CommandGuiApp(QWidget):
         # 更新される前(読込リクエストを送っただけの段階)に古い関節数のまま
         # 適用してしまい「4要素必要」等で失敗する問題を防ぐ(2026-09-02修正)。
         self._traj_names_known = True
-        missing = [n for n in JOINT_NAMES if n not in names]
+        missing = [n for n in TRAJ_PANEL_JOINT_NAMES if n not in names]
         self._traj_loaded_extra = {}
         if vel and len(vel) == len(names):
             for name, v in zip(names, vel):
@@ -2249,11 +2767,15 @@ class CommandGuiApp(QWidget):
 
     def _collect_traj_values(self):
         """軌道生成パラメータをGUI入力欄から取得する(self._traj_joint_names順)。
-        「読込」未実行でもGUI固定のJOINT_NAMESを対象に動作する(__init__参照)。
-        tip_theta_joint等、GUIに編集欄が無い関節(JOINT_NAMES対象外)がノード側の
-        joint_namesに含まれる場合は、_traj_loaded_extraに保持した読込時の値を
-        そのまま使い、その関節の設定値を変更せず送り直す(real_all_axes_test.
-        launch.py参照)。"""
+        「読込」未実行でもGUI固定のTRAJ_PANEL_JOINT_NAMES(root_theta/z/r/tip_theta)を
+        対象に動作する(__init__参照)。万一これ以外の関節がノード側のjoint_names
+        に含まれる場合は、_traj_loaded_extraに保持した読込時の値をそのまま使い、
+        その関節の設定値を変更せず送り直す(real_all_axes_test.launch.py参照。
+        2026-09-03、tip_theta_jointは編集欄を持つようになったためこの経路を
+        通らなくなった。回収シーケンスがroot_theta_jointと同時にtip_theta_jointも
+        指令するようになり、trajectory_follower_nodeの同時到達スケーリングにより
+        tip_theta_jointの低いmax_velocity/max_accelerationがroot_theta_jointの
+        実効速度まで引きずり下げる問題が起きたため、GUIから調整できるようにした)。"""
         names = self._traj_joint_names
         vel = [
             get_float(self.traj_vel_edits[name]) if name in self.traj_vel_edits
@@ -2575,7 +3097,7 @@ class CommandGuiApp(QWidget):
 
     def _on_load_joy_speed(self):
         ok = self.node.request_node_params(
-            JOY_NODE_NAME, ['theta_speed', 'z_speed', 'r_speed'],
+            JOY_NODE_NAME, list(self.joy_speed_edits.keys()),
             self._apply_loaded_joy_speed,
             lambda reason: _set_status(self.joy_speed_status_label, f'読込失敗: {reason}', 'error'))
         _set_status(self.joy_speed_status_label,
@@ -2584,7 +3106,7 @@ class CommandGuiApp(QWidget):
         return ok
 
     def _apply_loaded_joy_speed(self, values):
-        for name in ('theta_speed', 'z_speed', 'r_speed'):
+        for name in self.joy_speed_edits:
             if name in values:
                 set_float(self.joy_speed_edits[name], round(values[name], 4))
         # 「読込」はノードの現在値をGUIに表示するだけに留め、gains.jsonへは
@@ -2835,6 +3357,11 @@ class CommandGuiApp(QWidget):
         for name, edit in self.joy_speed_edits.items():
             if name in joy:
                 set_float(edit, joy[name])
+
+        sequence = self._saved_gains.get('sequence', {})
+        for name, edit in self.sequence_edits.items():
+            if name in sequence:
+                set_float(edit, sequence[name])
 
     def closeEvent(self, event):
         """実機セットアップパネルで起動したros2 launch子プロセスが残っている場合、
