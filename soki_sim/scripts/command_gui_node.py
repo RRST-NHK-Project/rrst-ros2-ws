@@ -62,7 +62,9 @@ import rclpy
 from rcl_interfaces.msg import Parameter, ParameterType, ParameterValue
 from rcl_interfaces.srv import GetParameters, SetParameters
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile
 from sensor_msgs.msg import JointState
+from std_msgs.msg import Bool
 from std_srvs.srv import Trigger
 
 from PyQt5.QtCore import Qt, QPointF, QTimer
@@ -756,6 +758,13 @@ class CommandGuiNode(Node):
         self._pick_confirm_handler = None
         self.create_service(Trigger, 'pick_sequence_confirm', self._on_pick_sequence_confirm_srv)
 
+        # ハンドのポンプON/OFF状態(hand_node、2026-09-03再追加)。「ピック/投入
+        # 自動シーケンス」パネルにもポンプ操作ボタン・状態表示を出すために購読する
+        # (joy_teleop_nodeの同トピック購読部と同じ理由・QoS)。
+        self._pump_on_state = None
+        pump_state_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self.create_subscription(Bool, 'hand_pump_state', self._on_pump_state, pump_state_qos)
+
         # trajectory_follower_node/joy_teleop_nodeいずれのros2パラメータも同じ
         # get_parameters/set_parametersサービス経由でGUIから読込・変更できるよう、
         # 対象ノード名ごとにクライアントの組を保持する。
@@ -778,6 +787,13 @@ class CommandGuiNode(Node):
 
     def has_current_state(self):
         return self._current_received
+
+    def _on_pump_state(self, msg):
+        self._pump_on_state = msg.data
+
+    def get_pump_on_state(self):
+        """ポンプの現在ON/OFF状態(hand_pump_state購読)。まだ受信していなければNone。"""
+        return self._pump_on_state
 
     def set_pick_confirm_handler(self, handler):
         """CommandGuiApp._on_pick_confirm_requested(引数無し、bool返却)を登録する。"""
@@ -1733,6 +1749,25 @@ class CommandGuiApp(QWidget):
         btn_row.addWidget(abort_btn)
         layout.addLayout(btn_row)
 
+        # ポンプON/OFFはハンドパネルと重複するが、シーケンス操作中にタブを
+        # 切り替えずに吸着のON/OFFができるよう、ここにも同じ操作を置く
+        # (2026-09-03、ユーザー指定: 「ポンプのオンオフボタンをピック投入
+        # シーケンスの欄にも配置。ポンプのステータスも見れるように」)。
+        pump_row = QHBoxLayout()
+        seq_pump_on_btn = QPushButton('ポンプON(吸着)')
+        seq_pump_on_btn.setProperty('variant', 'primary')
+        seq_pump_on_btn.clicked.connect(lambda: self._on_hand_trigger('/hand_pump_on'))
+        pump_row.addWidget(seq_pump_on_btn)
+        seq_pump_off_btn = QPushButton('ポンプOFF')
+        seq_pump_off_btn.clicked.connect(lambda: self._on_hand_trigger('/hand_pump_off'))
+        pump_row.addWidget(seq_pump_off_btn)
+        layout.addLayout(pump_row)
+
+        self.sequence_pump_status_label = QLabel()
+        self.sequence_pump_status_label.setWordWrap(True)
+        _set_status(self.sequence_pump_status_label, 'ポンプ: 不明', 'muted')
+        layout.addWidget(self.sequence_pump_status_label)
+
         grid = QGridLayout()
         self.sequence_edits = {}
         for i, (key, label) in enumerate((
@@ -1779,14 +1814,28 @@ class CommandGuiApp(QWidget):
         theta回転以降は手先θ(tip_theta_joint)も同時に制御し、吸着パッド3個の
         展開軸がワークの行と平行になるよう自動で打ち消す(2026-09-03、ユーザー
         指摘: 「ハンドは3つ一気に回収するので手先θはワークの行と平行になるように
-        動く必要がある」)。"""
-        if not self._guard_sequence_start():
+        動く必要がある」)。
+        既に回収シーケンス実行中(回収実行待ち含む)に再度workボタンが押された
+        場合は、中断を要求せず自動的に新しいワークへやり直す(2026-09-03、
+        ユーザー指摘: 「ワークに移動し回収実行待ちの時に再度ワークの位置が
+        送信された場合は自動的にワーク移動からやり直すように」)。この場合は
+        直前のワークから近距離の移動とみなし、R軸を旋回軸まで戻す退避を省略して
+        直接回転+伸縮する(ユーザー指摘: 「ワークからワークに移動する際はR軸を
+        戻さなくていい。近距離なので」)。"""
+        restarting_from_work = self._seq_active and self._seq_kind == '回収'
+        if self._seq_active and not restarting_from_work:
+            QMessageBox.information(self, 'シーケンス実行中', '実行中のシーケンスを中断してから開始してください')
+            return
+        if not self.node.has_current_state():
+            QMessageBox.information(self, '未取得', 'まだ現在位置を受信していません')
             return
         try:
             settings = self._collect_sequence_values()
         except ValueError:
             QMessageBox.critical(self, '入力エラー', 'シーケンス設定パネルの数値を確認してください')
             return
+        if restarting_from_work:
+            self._abort_sequence('回収シーケンスを別のワークへやり直します')
 
         pos = self.node.get_current_positions()
         theta0, r0 = pos['root_theta_joint'], pos['r_joint']
@@ -1803,11 +1852,19 @@ class CommandGuiApp(QWidget):
         # theta回転を始めるレグ(パッドが目的の行へ向く前)から適用する。
         tip_theta_pick = -target_theta
 
+        if restarting_from_work:
+            # ワークtoワークの近距離移動: R退避を省略し、回転とR伸縮を1レグで行う。
+            approach_legs = [('move', target_theta, safe_zj, target_r, tip_theta_pick)]
+        else:
+            approach_legs = [
+                ('move', theta0, safe_zj, r_retract),         # Rを旋回軸近くへ退避
+                ('move', target_theta, safe_zj, r_retract, tip_theta_pick),  # theta回転(手先θも同時に打ち消し)
+                ('move', target_theta, safe_zj, target_r, tip_theta_pick),   # Rを目標半径まで伸長
+            ]
+
         steps = [
             ('move', theta0, safe_zj, r0),               # 現在地のまま安全高度へ
-            ('move', theta0, safe_zj, r_retract),         # Rを旋回軸近くへ退避
-            ('move', target_theta, safe_zj, r_retract, tip_theta_pick),  # theta回転(手先θも同時に打ち消し)
-            ('move', target_theta, safe_zj, target_r, tip_theta_pick),   # Rを目標半径まで伸長
+            *approach_legs,
             ('call', '/hand_spread_pads'),
             ('move', target_theta, approach_zj, target_r, tip_theta_pick),  # ワーク手前まで自動降下
             ('wait_pick_confirm',),                       # 人間の「回収実行」指示待ち
@@ -2569,7 +2626,14 @@ class CommandGuiApp(QWidget):
             if gap_after_rank is not None and rank > gap_after_rank:
                 rank += 1
             btn = QPushButton(label)
-            btn.setProperty('variant', 'grid')
+            # 3個ずつ回収する運用では、行内の列2・列5を狙うと両端1列ずつ含めて
+            # ちょうど3個(列1-3・列4-6)を吸着パッドでカバーできる(2026-09-03、
+            # ユーザー指定: 「3つずつとる想定でX-2,X-5のワークボタンは色を
+            # 変えておいて」)。該当するワークボタンだけ目立つ色にして、押すべき
+            # ボタンが一目でわかるようにする。
+            col_label = label.rsplit('-', 1)[-1]
+            variant = 'grid-highlight' if (kind == 'pick' and col_label in ('2', '5')) else 'grid'
+            btn.setProperty('variant', variant)
             btn.setFixedWidth(btn_width)
             btn.clicked.connect(
                 lambda _checked=False, x=x, y=y, z=z, kind=kind: self._on_field_point(x, y, z, kind))
@@ -2601,7 +2665,17 @@ class CommandGuiApp(QWidget):
         # 同じメインスレッド上で完結する)。
         rclpy.spin_once(self.node, timeout_sec=0)
         self._refresh_current_state()
+        self._refresh_sequence_pump_status()
         self._advance_sequence()
+
+    def _refresh_sequence_pump_status(self):
+        state = self.node.get_pump_on_state()
+        if state is None:
+            _set_status(self.sequence_pump_status_label, 'ポンプ: 不明(hand_node未起動?)', 'muted')
+        elif state:
+            _set_status(self.sequence_pump_status_label, 'ポンプ: ON(吸着中)', 'success')
+        else:
+            _set_status(self.sequence_pump_status_label, 'ポンプ: OFF', 'muted')
 
     def _refresh_current_state(self):
         if not self.node.has_current_state():
