@@ -164,19 +164,6 @@ ALL_AXES_LAUNCH_CMD = [
     'use_joy:=true', 'use_viz:=true', 'launch_gui:=false',
 ]
 
-# 統合操作タブ「実機セットアップ」の手順チェックリスト(上のボタン列と対応する
-# 実行順序を表す)。各項目は対応するstatus_labelがsuccess役割(色)になったかを
-# _refresh_setup_procedure_checksで判定して自動的にチェックする(手動での
-# チェック操作はしない)。「周囲確認」はGUIから判定できない物理確認のため、
-# チェックボックスにはせず固定の注意書きとして別途表示する(_build_setup_procedure_panel参照)。
-SETUP_PROCEDURE_STEPS = [
-    ('nodes', '「全ノード起動」を実行し、4ノードとも起動中になる'),
-    ('gains', '「全ゲイン読込」で現在値を確認してから「全ゲイン適用」を実行する'),
-    ('machine_origin', '機体を原点センサ位置相当へ物理的に合わせてから\n「機体原点オフセット適用」を実行する'),
-    ('root_theta', 'root_theta_jointを原点センサ位置へ合わせてから\n「root_theta原点設定」を実行する'),
-    ('homing', '「ホーミング開始」を実行する\n(既に原点センサ位置相当なら「スキップ」でも可)'),
-]
-
 # 機体原点オフセット(soki_sim.urdf.xacroのmachine_origin_x/y/z_joint、base_linkの
 # 子であるprismaticジョイント)。trajectory_follower_nodeの管理対象外(滑らか追従は
 # 不要な較正値)のため、motor_mixer_nodeと同様/mixed_joint_statesへ直接publishする。
@@ -464,13 +451,6 @@ def _set_status(label: QLabel, text: str, role: str = 'muted'):
     変更に相当)。"""
     label.setText(text)
     label.setStyleSheet(f'color: {_ROLE_COLORS[role]};')
-
-
-def _is_status_success(label: QLabel) -> bool:
-    """_set_statusで設定された色からrole='success'かどうかを判定する(実機
-    セットアップのチェックリスト自動チェック用。メッセージ文言はサービスの
-    応答次第で一定しないため、文字列一致ではなく_set_statusが設定した色で判定する)。"""
-    return label.styleSheet() == f'color: {_ROLE_COLORS["success"]};'
 
 
 _ZENKAKU_SIGN_TRANSLATION = str.maketrans({'－': '-', '−': '-', '．': '.'})
@@ -876,12 +856,32 @@ class CommandGuiApp(QWidget):
         self._spin_timer.timeout.connect(self._spin_ros)
         self._spin_timer.start(50)
 
-        # trajectory_follower_nodeがGUIより後に立ち上がることもあるため、
-        # サービスが使えるようになるまで一定間隔でリトライし、使えた時点で
-        # 一度だけ自動読込する(_try_auto_load_traj_params参照)。
-        self._traj_auto_load_timer = QTimer(self)
-        self._traj_auto_load_timer.timeout.connect(self._try_auto_load_traj_params)
-        self._traj_auto_load_timer.start(500)
+        # trajectory_follower_node/joy_teleop_nodeがGUIより後に立ち上がることも
+        # あるため、各サービスが使えるようになるまで一定間隔でリトライし、使えた
+        # 時点でそれぞれ一度だけ自動読込・自動適用する(_try_auto_setup_gains参照)。
+        # 「読込」は表示の同期のみ(joint_names等、実際のノード構成を知るため)。
+        # 「適用」はgains.json(起動時にGUIへ復元済みの値、_restore_saved_gains参照)を
+        # 実機へ自動でSetParametersする。手動で「適用」を押さない限りゲインが
+        # 反映されずrobomas(z/r)が動かない、という問題(2026-09-02報告)への対処。
+        # 手動の「適用」ボタンと違い確認ダイアログは出さない(起動のたびに人手を
+        # 挟むと運用上煩雑なため)。
+        self._traj_auto_loaded = False
+        self._mit_auto_loaded = False
+        self._robomas_auto_loaded = False
+        self._joy_auto_loaded = False
+        # _traj_auto_loaded/_mit_auto_loadedは読込「リクエスト送信済み」を表すだけ
+        # (request_node_paramsは非同期のため)。実際に_traj_joint_names/
+        # _mit_joint_namesが応答で更新されたかは以下の別フラグで判定する
+        # (_apply_loaded_traj_params/_apply_loaded_mit_gains参照)。
+        self._traj_names_known = False
+        self._mit_names_known = False
+        self._traj_auto_applied = False
+        self._mit_auto_applied = False
+        self._robomas_auto_applied = False
+        self._joy_auto_applied = False
+        self._auto_load_timer = QTimer(self)
+        self._auto_load_timer.timeout.connect(self._try_auto_setup_gains)
+        self._auto_load_timer.start(500)
 
         # 統合操作タブの機体ステータスパネル(ノード起動状況・適用ゲイン・校正状態・
         # 実機セットアップの全ノード起動プロセス)を1秒間隔でポーリング更新する。
@@ -1048,7 +1048,7 @@ class CommandGuiApp(QWidget):
             top_funcs=[self._build_field_buttons],
             left_funcs=[self._build_machine_status_panel, self._build_current_state_panel,
                         self._build_mode_panel],
-            right_funcs=[self._build_setup_checklist_panel, self._build_setup_procedure_panel])
+            right_funcs=[self._build_setup_checklist_panel])
 
     def _build_gain_tab(self, parent):
         self._build_panel_tab(
@@ -1277,8 +1277,6 @@ class CommandGuiApp(QWidget):
             else:
                 _set_status(self.launch_status_label, f'終了しました(code={code})', 'error')
 
-        self._refresh_setup_procedure_checks(active)
-
     def _build_setup_checklist_panel(self, column):
         # 試合開始前に毎回行う一連の操作(全ノード起動・全ゲイン適用・原点校正)を
         # 統合操作タブから離れずに実行できるようにする実行ボタン群。各ボタンは
@@ -1288,10 +1286,16 @@ class CommandGuiApp(QWidget):
         box = QGroupBox('実機セットアップ')
         layout = QVBoxLayout(box)
 
+        warn = QLabel()
+        warn.setWordWrap(True)
+        _set_status(warn, '(事前確認) 緊急停止ボタンを押すこと', 'error')
+        layout.addWidget(warn)
+
         desc = QLabel()
         desc.setWordWrap(True)
         _set_status(desc, '上から順に実行する想定(ノード起動→ゲイン適用→原点校正)。\n'
-                          '各操作の詳細な値編集はゲイン調整・原点校正タブで行う。', 'muted')
+                          '各操作の詳細な値編集はゲイン調整・原点校正タブで行う。\n'
+                          '進捗は左の機体ステータスパネル(適用ゲイン・校正状態)で確認できる。', 'muted')
         layout.addWidget(desc)
 
         launch_row = QHBoxLayout()
@@ -1376,55 +1380,6 @@ class CommandGuiApp(QWidget):
             return
         self._launch_process.send_signal(signal.SIGINT)
         _set_status(self.launch_status_label, '停止処理中...', 'muted')
-
-    def _build_setup_procedure_panel(self, column):
-        # 実機セットアップパネルのボタン列に対応する手順をチェックリスト表示する。
-        # 各項目は対応するstatus_labelがsuccess役割になったら
-        # _refresh_setup_procedure_checksが自動でチェックを入れる(クリックしても
-        # 状態は変わらないよう無効化しておく、_is_status_success参照)。
-        # 一部軸だけのテスト構成(real_root_theta_test.launch.py等)では自動条件が
-        # 成立しない項目が出るため、項目ごとに「スキップ」ボタン(チェック可能)で
-        # 手動チェック済み扱いにできる。自動条件が別途成立した場合はスキップの
-        # 有無に関わらずチェックされる(_refresh_setup_procedure_checks参照)。
-        # 「緊急停止ボタンを押すこと」はGUIから判定できない物理確認のため、
-        # チェックボックスにはせず固定の注意書きとして表示する。
-        box = QGroupBox('セットアップ手順')
-        layout = QVBoxLayout(box)
-
-        warn = QLabel()
-        warn.setWordWrap(True)
-        _set_status(warn, '(事前確認) 緊急停止ボタンを押すこと', 'error')
-        layout.addWidget(warn)
-
-        self._setup_procedure_checks = {}
-        self._setup_procedure_skip_buttons = {}
-        for key, step in SETUP_PROCEDURE_STEPS:
-            row = QHBoxLayout()
-            check = QCheckBox(step)
-            check.setEnabled(False)
-            row.addWidget(check, 1)
-            skip_btn = QPushButton('スキップ')
-            skip_btn.setCheckable(True)
-            skip_btn.toggled.connect(
-                lambda checked, b=skip_btn: b.setText('スキップ済み' if checked else 'スキップ'))
-            row.addWidget(skip_btn)
-            layout.addLayout(row)
-            self._setup_procedure_checks[key] = check
-            self._setup_procedure_skip_buttons[key] = skip_btn
-
-        column.addWidget(box)
-
-    def _refresh_setup_procedure_checks(self, active):
-        checks = {
-            'nodes': all(name in active for name in STATUS_NODE_NAMES),
-            'gains': _is_status_success(self.apply_all_status_label),
-            'machine_origin': _is_status_success(self.machine_origin_status_label),
-            'root_theta': _is_status_success(self.origin_status_label),
-            'homing': _is_status_success(self.homing_status_label),
-        }
-        for key, done in checks.items():
-            skipped = self._setup_procedure_skip_buttons[key].isChecked()
-            self._setup_procedure_checks[key].setChecked(done or skipped)
 
     def _build_current_state_panel(self, column):
         box = QGroupBox('現在状態 (リアルタイム)')
@@ -1961,15 +1916,100 @@ class CommandGuiApp(QWidget):
                     'muted' if ok else 'error')
         return ok
 
-    def _try_auto_load_traj_params(self):
-        # real_all_axes_test.launch.py等、tip_theta_jointを含む4関節構成では、
-        # 「読込」未実行のままGUI固定の3関節(JOINT_NAMES)で「適用」すると
-        # trajectory_follower_node側で「4要素必要」と拒否されてしまう
-        # (_collect_traj_values/__init__のコメント参照)。起動直後にサービスが
-        # 使えるようになり次第自動で一度「読込」し、実際のjoint_names構成を
-        # GUI側に反映しておくことでこれを防ぐ。
-        if self._on_load_traj_params():
-            self._traj_auto_load_timer.stop()
+    def _try_auto_setup_gains(self):
+        # 軌道生成・MIT・robomas・joy速度それぞれについて、対象ノードのサービスが
+        # 使えるようになり次第、自動で一度だけ「読込」→「適用」する(以後は明示的に
+        # ボタンを押すまで再取得・再送信しない。編集中の値を上書きし続けない
+        # ようにするため、カテゴリごとに一度成功したら止める)。
+        # 「読込」はjoint_names等ノードの実際の構成を知るための表示同期のみ
+        # (trajectory_follower_nodeの軌道生成読込には元々、real_all_axes_test.
+        # launch.py等tip_theta_jointを含む4関節構成で「読込」未実行のままGUI固定の
+        # 3関節(JOINT_NAMES)で「適用」すると「4要素必要」と拒否される問題を防ぐ
+        # 意味もあった。_collect_traj_values/__init__のコメント参照)。
+        # 「適用」はgains.json(_saved_gains、起動時にGUIへ復元済み)の値を実機へ
+        # SetParametersする。手動で「適用」を押さない限りゲインが反映されず
+        # robomas(z/r)が動かない、という問題(2026-09-02報告)への対処。
+        if not self._traj_auto_loaded and self._on_load_traj_params():
+            self._traj_auto_loaded = True
+        if not self._mit_auto_loaded and self._on_load_mit_gains():
+            self._mit_auto_loaded = True
+        if not self._robomas_auto_loaded and self._on_load_robomas_gains():
+            self._robomas_auto_loaded = True
+        if not self._joy_auto_loaded and self._on_load_joy_speed():
+            self._joy_auto_loaded = True
+
+        # 軌道生成・MITは配列の並び順・要素数がjoint_names次第のため、読込の
+        # 「応答」が届いてから適用する(_traj_names_known/_mit_names_known参照。
+        # 読込の「リクエスト送信済み」フラグ_traj_auto_loaded/_mit_auto_loadedは
+        # 非同期の応答到着を待たないため、これで判定すると_traj_joint_names等が
+        # まだ古い(GUI既定の)関節数のまま適用してしまい「4要素必要」等で
+        # 失敗する。2026-09-02報告・修正)。robomas・joy速度はスカラー
+        # パラメータのみで並び順の懸念がないため、読込を待たずに直接適用できる。
+        if self._traj_names_known and not self._traj_auto_applied and self._auto_apply_saved_traj():
+            self._traj_auto_applied = True
+        if self._mit_names_known and not self._mit_auto_applied and self._auto_apply_saved_mit():
+            self._mit_auto_applied = True
+        if not self._robomas_auto_applied and self._auto_apply_saved_robomas():
+            self._robomas_auto_applied = True
+        if not self._joy_auto_applied and self._auto_apply_saved_joy():
+            self._joy_auto_applied = True
+
+        if all((self._traj_auto_loaded, self._mit_auto_loaded,
+                self._robomas_auto_loaded, self._joy_auto_loaded,
+                self._traj_auto_applied, self._mit_auto_applied,
+                self._robomas_auto_applied, self._joy_auto_applied)):
+            self._auto_load_timer.stop()
+
+    def _auto_apply_saved_traj(self):
+        """gains.jsonのtrajectory値を、読込で学習した_traj_joint_names順の配列に
+        組み立てて自動適用する。未保存の関節がある場合はfalseを返し、次回tick
+        (通常は_apply_loaded_traj_paramsが表示を更新した直後)に再試行する。"""
+        saved = self._saved_gains.get('trajectory')
+        if not saved:
+            return True
+        names = self._traj_joint_names
+        vel_map = saved.get('max_velocity', {})
+        accel_map = saved.get('max_acceleration', {})
+        if not all(n in vel_map for n in names) or not all(n in accel_map for n in names):
+            return False
+        payload = {
+            'max_velocity': [vel_map[n] for n in names],
+            'max_acceleration': [accel_map[n] for n in names],
+        }
+        _set_status(self.traj_status_label, '自動適用中(gains.json)...', 'muted')
+        return self.node.set_node_params(TRAJ_NODE_NAME, payload, self._apply_traj_set_result)
+
+    def _auto_apply_saved_mit(self):
+        saved = self._saved_gains.get('mit_gain')
+        names = self._mit_joint_names
+        if not saved or not names:
+            return True
+        kp_map = saved.get('cubemars_kp', {})
+        kd_map = saved.get('cubemars_kd', {})
+        tff_map = saved.get('cubemars_torque_ff', {})
+        if not all(n in kp_map for n in names) or not all(n in kd_map for n in names):
+            return False
+        payload = {
+            'cubemars_kp': [kp_map[n] for n in names],
+            'cubemars_kd': [kd_map[n] for n in names],
+            'cubemars_torque_ff': [tff_map.get(n, 0.0) for n in names],
+        }
+        _set_status(self.mit_gain_status_label, '自動適用中(gains.json)...', 'muted')
+        return self.node.set_node_params(TRAJ_NODE_NAME, payload, self._apply_mit_gain_set_result)
+
+    def _auto_apply_saved_robomas(self):
+        saved = self._saved_gains.get('robomas_gain')
+        if not saved:
+            return True
+        _set_status(self.robomas_gain_status_label, '自動適用中(gains.json)...', 'muted')
+        return self.node.set_node_params(TRAJ_NODE_NAME, saved, self._apply_robomas_gain_set_result)
+
+    def _auto_apply_saved_joy(self):
+        saved = self._saved_gains.get('joy_speed')
+        if not saved:
+            return True
+        _set_status(self.joy_speed_status_label, '自動適用中(gains.json)...', 'muted')
+        return self.node.set_node_params(JOY_NODE_NAME, saved, self._apply_joy_speed_set_result)
 
     def _apply_loaded_traj_params(self, values):
         vel = values.get('max_velocity')
@@ -1977,6 +2017,12 @@ class CommandGuiApp(QWidget):
         mode = values.get('control_mode')
         names = values.get('joint_names') or JOINT_NAMES
         self._traj_joint_names = list(names)
+        # request_node_paramsは非同期(応答はrclpy.spin_once経由でこのコールバックが
+        # 呼ばれて初めて届く)。_try_auto_setup_gainsはこのフラグを見てから
+        # _auto_apply_saved_trajを呼ぶことで、_traj_joint_namesが実際の構成に
+        # 更新される前(読込リクエストを送っただけの段階)に古い関節数のまま
+        # 適用してしまい「4要素必要」等で失敗する問題を防ぐ(2026-09-02修正)。
+        self._traj_names_known = True
         missing = [n for n in JOINT_NAMES if n not in names]
         self._traj_loaded_extra = {}
         if vel and len(vel) == len(names):
@@ -1994,8 +2040,11 @@ class CommandGuiApp(QWidget):
         if mode:
             self._set_mode_silent(mode)
             _set_status(self.mode_status_label, f'現在のモード: {mode}', 'info')
-        if vel and accel and len(vel) == len(names) and len(accel) == len(names):
-            self._persist_traj_values({'max_velocity': vel, 'max_acceleration': accel})
+        # 「読込」はノードの現在値をGUIに表示するだけに留め、gains.jsonへは
+        # 「適用」時のみ永続化する(読込のたびに永続化すると、起動直後の
+        # 自動読込(_try_auto_load_traj_params)やセットアップ手順での読込操作で
+        # launchファイルの初期値がGUI保持の調整済み値を上書きしてしまう
+        # バグになるため、2026-09-02に修正)。
         status = '読込完了'
         if missing:
             status += f' (未起動構成: {", ".join(missing)}は表示更新されません)'
@@ -2060,6 +2109,8 @@ class CommandGuiApp(QWidget):
         tff = values.get('cubemars_torque_ff')
         names = values.get('cubemars_joint_names') or []
         self._mit_joint_names = list(names)
+        # _traj_names_knownと同じ理由(_apply_loaded_traj_paramsのコメント参照)。
+        self._mit_names_known = True
         if kp and len(kp) == len(names):
             for name, v in zip(names, kp):
                 if name in self.mit_kp_edits:
@@ -2072,14 +2123,14 @@ class CommandGuiApp(QWidget):
             for name, v in zip(names, tff):
                 if name in self.mit_torque_edits:
                     set_float(self.mit_torque_edits[name], round(v, 4))
+        # 「読込」はノードの現在値をGUIに表示するだけに留め、gains.jsonへは
+        # 「適用」時のみ永続化する(_apply_loaded_traj_paramsのコメント参照)。
         status = '読込完了'
         not_configured = [n for n in CUBEMARS_JOINT_NAMES if n not in names]
         if not_configured:
             status += f' (実機出力対象外: {", ".join(not_configured)})'
         if not names:
             status = '読込完了 (実機出力対象の関節が設定されていません)'
-        else:
-            self._persist_mit_values(self._collect_mit_values())
         _set_status(self.mit_gain_status_label, status, 'info')
 
     def _collect_mit_values(self):
@@ -2199,13 +2250,14 @@ class CommandGuiApp(QWidget):
             set_float(self.robomas_kd_edit, round(values['robomas_kd'], 6))
         if 'robomas_current_ff' in values:
             set_float(self.robomas_current_ff_edit, round(values['robomas_current_ff'], 6))
+        # 「読込」はノードの現在値をGUIに表示するだけに留め、gains.jsonへは
+        # 「適用」時のみ永続化する(_apply_loaded_traj_paramsのコメント参照)。
         device_id = values.get('robomas_device_id', 0)
         status = '読込完了'
         if not device_id:
             status += ' (実機出力無効: robomas_device_id未設定)'
         else:
             status += f' (device_id={device_id})'
-        self._persist_gains('robomas_gain', self._collect_robomas_values())
         _set_status(self.robomas_gain_status_label, status, 'info')
 
     def _collect_robomas_values(self):
@@ -2338,7 +2390,8 @@ class CommandGuiApp(QWidget):
         for name in ('theta_speed', 'z_speed', 'r_speed'):
             if name in values:
                 set_float(self.joy_speed_edits[name], round(values[name], 4))
-        self._persist_gains('joy_speed', self._collect_joy_speed_values())
+        # 「読込」はノードの現在値をGUIに表示するだけに留め、gains.jsonへは
+        # 「適用」時のみ永続化する(_apply_loaded_traj_paramsのコメント参照)。
         _set_status(self.joy_speed_status_label, '読込完了', 'info')
 
     def _collect_joy_speed_values(self):
