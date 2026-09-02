@@ -165,17 +165,16 @@ ALL_AXES_LAUNCH_CMD = [
 ]
 
 # 統合操作タブ「実機セットアップ」の手順チェックリスト(上のボタン列と対応する
-# 実行順序を表す)。ボタンで自動化できない物理確認(周囲確認・原点センサ位置への
-# 位置合わせ等)も含むため、実行結果に連動させず手動でチェックするだけの
-# チェックボックスにしている。
+# 実行順序を表す)。各項目は対応するstatus_labelがsuccess役割(色)になったかを
+# _refresh_setup_procedure_checksで判定して自動的にチェックする(手動での
+# チェック操作はしない)。「周囲確認」はGUIから判定できない物理確認のため、
+# チェックボックスにはせず固定の注意書きとして別途表示する(_build_setup_procedure_panel参照)。
 SETUP_PROCEDURE_STEPS = [
-    '周囲に人・障害物がないか確認する',
-    '「全ノード起動」を実行し、上の「ノード起動状況」で\n4ノードとも起動中になったことを確認する',
-    '「全ゲイン読込」で現在値を確認してから「全ゲイン適用」を実行する',
-    '機体を原点センサ位置相当へ物理的に合わせてから\n「機体原点オフセット適用」を実行する',
-    'root_theta_jointを原点センサ位置へ合わせてから\n「root_theta原点設定」を実行する',
-    '「ホーミング開始」を実行し、z/rホーミング完了を確認する\n(既に原点センサ位置相当なら「スキップ」でも可)',
-    '動作モード(自動/手動/併用)を確認する',
+    ('nodes', '「全ノード起動」を実行し、4ノードとも起動中になる'),
+    ('gains', '「全ゲイン読込」で現在値を確認してから「全ゲイン適用」を実行する'),
+    ('machine_origin', '機体を原点センサ位置相当へ物理的に合わせてから\n「機体原点オフセット適用」を実行する'),
+    ('root_theta', 'root_theta_jointを原点センサ位置へ合わせてから\n「root_theta原点設定」を実行する'),
+    ('homing', '「ホーミング開始」を実行する\n(既に原点センサ位置相当なら「スキップ」でも可)'),
 ]
 
 # 機体原点オフセット(soki_sim.urdf.xacroのmachine_origin_x/y/z_joint、base_linkの
@@ -465,6 +464,13 @@ def _set_status(label: QLabel, text: str, role: str = 'muted'):
     変更に相当)。"""
     label.setText(text)
     label.setStyleSheet(f'color: {_ROLE_COLORS[role]};')
+
+
+def _is_status_success(label: QLabel) -> bool:
+    """_set_statusで設定された色からrole='success'かどうかを判定する(実機
+    セットアップのチェックリスト自動チェック用。メッセージ文言はサービスの
+    応答次第で一定しないため、文字列一致ではなく_set_statusが設定した色で判定する)。"""
+    return label.styleSheet() == f'color: {_ROLE_COLORS["success"]};'
 
 
 _ZENKAKU_SIGN_TRANSLATION = str.maketrans({'－': '-', '−': '-', '．': '.'})
@@ -1271,6 +1277,8 @@ class CommandGuiApp(QWidget):
             else:
                 _set_status(self.launch_status_label, f'終了しました(code={code})', 'error')
 
+        self._refresh_setup_procedure_checks(active)
+
     def _build_setup_checklist_panel(self, column):
         # 試合開始前に毎回行う一連の操作(全ノード起動・全ゲイン適用・原点校正)を
         # 統合操作タブから離れずに実行できるようにする実行ボタン群。各ボタンは
@@ -1370,28 +1378,53 @@ class CommandGuiApp(QWidget):
         _set_status(self.launch_status_label, '停止処理中...', 'muted')
 
     def _build_setup_procedure_panel(self, column):
-        # 実機セットアップパネルのボタンだけでは自動化できない物理確認(周囲確認・
-        # 原点センサ位置への位置合わせ等)も含めた手順をチェックリスト表示する。
-        # 実行結果とは連動しない、操作者向けの手動チェック用(試合前に毎回
-        # リセットして使う想定)。
+        # 実機セットアップパネルのボタン列に対応する手順をチェックリスト表示する。
+        # 各項目は対応するstatus_labelがsuccess役割になったら
+        # _refresh_setup_procedure_checksが自動でチェックを入れる(クリックしても
+        # 状態は変わらないよう無効化しておく、_is_status_success参照)。
+        # 一部軸だけのテスト構成(real_root_theta_test.launch.py等)では自動条件が
+        # 成立しない項目が出るため、項目ごとに「スキップ」ボタン(チェック可能)で
+        # 手動チェック済み扱いにできる。自動条件が別途成立した場合はスキップの
+        # 有無に関わらずチェックされる(_refresh_setup_procedure_checks参照)。
+        # 「緊急停止ボタンを押すこと」はGUIから判定できない物理確認のため、
+        # チェックボックスにはせず固定の注意書きとして表示する。
         box = QGroupBox('セットアップ手順')
         layout = QVBoxLayout(box)
 
-        self._setup_procedure_checks = []
-        for step in SETUP_PROCEDURE_STEPS:
-            check = QCheckBox(step)
-            layout.addWidget(check)
-            self._setup_procedure_checks.append(check)
+        warn = QLabel()
+        warn.setWordWrap(True)
+        _set_status(warn, '(事前確認) 緊急停止ボタンを押すこと', 'error')
+        layout.addWidget(warn)
 
-        reset_btn = QPushButton('チェックをリセット')
-        reset_btn.clicked.connect(self._on_reset_setup_procedure)
-        layout.addWidget(reset_btn)
+        self._setup_procedure_checks = {}
+        self._setup_procedure_skip_buttons = {}
+        for key, step in SETUP_PROCEDURE_STEPS:
+            row = QHBoxLayout()
+            check = QCheckBox(step)
+            check.setEnabled(False)
+            row.addWidget(check, 1)
+            skip_btn = QPushButton('スキップ')
+            skip_btn.setCheckable(True)
+            skip_btn.toggled.connect(
+                lambda checked, b=skip_btn: b.setText('スキップ済み' if checked else 'スキップ'))
+            row.addWidget(skip_btn)
+            layout.addLayout(row)
+            self._setup_procedure_checks[key] = check
+            self._setup_procedure_skip_buttons[key] = skip_btn
 
         column.addWidget(box)
 
-    def _on_reset_setup_procedure(self):
-        for check in self._setup_procedure_checks:
-            check.setChecked(False)
+    def _refresh_setup_procedure_checks(self, active):
+        checks = {
+            'nodes': all(name in active for name in STATUS_NODE_NAMES),
+            'gains': _is_status_success(self.apply_all_status_label),
+            'machine_origin': _is_status_success(self.machine_origin_status_label),
+            'root_theta': _is_status_success(self.origin_status_label),
+            'homing': _is_status_success(self.homing_status_label),
+        }
+        for key, done in checks.items():
+            skipped = self._setup_procedure_skip_buttons[key].isChecked()
+            self._setup_procedure_checks[key].setChecked(done or skipped)
 
     def _build_current_state_panel(self, column):
         box = QGroupBox('現在状態 (リアルタイム)')
