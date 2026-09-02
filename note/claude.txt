@@ -2,6 +2,15 @@
 
 ##シミュレーション (soki_sim)
 円柱座標型4自由度アーム。RVizでの見た目確認用(物理演算なし)。
+sim起動直後(何も指令していない状態)のroot_theta_jointの既定値は-90deg
+(フィールドに平行、ハンドがX+側=右側)。以前は0deg(フィールドに垂直=前方Y+
+向き)だったが、ユーザー指定で変更した(2026-09-03)。display.launch.pyの
+joint_state_publisher(_gui)のzerosパラメータ、trajectory_follower_node.pyの
+INITIAL_ROOT_THETA_RAD(self.pos_/target_初期値)、joy_teleop_node.pyの同名定数
+(self.target_theta_初期値)の3箇所が連動しており、変更する場合は3箇所とも
+揃えること(揃っていないと最初の指令送信時に急なジャンプが起きる)。実機側
+(real_all_axes_test.launch.py等)は対象外(CubeMars構成時は最初の目標受信前に
+実機帰還値で上書きされるため、この既定値は事実上sim専用)。
   root_theta_joint : 旋回      continuous, z軸
   z_joint          : 昇降      prismatic, 0.0~0.432m
   r_joint          : 伸縮      prismatic, -0.622~0.622m (アーム長1.244m、実機寸法に合わせ済み)

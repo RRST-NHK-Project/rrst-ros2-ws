@@ -1,3 +1,4 @@
+import math
 import os
 
 from ament_index_python.packages import get_package_share_directory
@@ -7,6 +8,19 @@ from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
+
+
+# sim起動直後(何も目標を送っていない状態)のroot_theta_jointの見た目。0だと
+# 「前方=Y+」でフィールドに垂直(=正面を向く)になるが、フィールドに平行(かつ
+# ハンドがX+側=右側)にしたいとのユーザー指定により-90degにする(2026-09-03)。
+# joint_state_publisher(_gui)は、対象関節がsource_list(mixed_joint_states)から
+# まだ一度もpublishされていない間はこのzeros値をそのまま表示し続ける
+# (trajectory_follower_nodeは最初の/joint_targets受信までmixed_joint_statesへ
+# 何もpublishしないため、GUIやjoyで実際に動かすまでこの値が表示され続ける)。
+# trajectory_follower_node.py の self.pos_/self.target_ 初期値、joy_teleop_node.py
+# の self.target_theta_ 初期値もこれと一致させてあり、最初の指令送信時に前方の
+# 値へ急に飛ばないようにしている(3箇所とも要連動)。
+INITIAL_ROOT_THETA_RAD = -math.pi / 2.0
 
 
 def generate_launch_description():
@@ -43,7 +57,10 @@ def generate_launch_description():
         package='joint_state_publisher_gui',
         executable='joint_state_publisher_gui',
         name='joint_state_publisher_gui',
-        parameters=[{'source_list': ['mixed_joint_states']}],
+        parameters=[{
+            'source_list': ['mixed_joint_states'],
+            'zeros': {'root_theta_joint': INITIAL_ROOT_THETA_RAD},
+        }],
         condition=IfCondition(LaunchConfiguration('gui')),
     )
 
@@ -51,7 +68,10 @@ def generate_launch_description():
         package='joint_state_publisher',
         executable='joint_state_publisher',
         name='joint_state_publisher',
-        parameters=[{'source_list': ['mixed_joint_states']}],
+        parameters=[{
+            'source_list': ['mixed_joint_states'],
+            'zeros': {'root_theta_joint': INITIAL_ROOT_THETA_RAD},
+        }],
         condition=UnlessCondition(LaunchConfiguration('gui')),
     )
 

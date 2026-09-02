@@ -111,6 +111,14 @@ INT16_MIN, INT16_MAX = -32768, 32767
 
 VALID_CONTROL_MODES = ('auto', 'manual', 'both')
 
+# root_theta_jointの内部状態(self.pos_/target_)の起動直後の初期値。0だと
+# 「前方=Y+」でフィールドに垂直になるが、フィールドに平行(ハンドがX+側=右側)を
+# sim起動時の既定にしたいとのユーザー指定により-90degにする(2026-09-03、
+# soki_sim/launch/display.launch.pyのjoint_state_publisher zerosパラメータと
+# 一致させること。CubeMars構成時(実機)は最初の目標受信前に_on_cubemars_feedback
+# が実機の帰還値で上書きするため、この値は事実上sim専用)。
+INITIAL_ROOT_THETA_RAD = -math.pi / 2.0
+
 
 def clamp_int16(value: float) -> int:
     return max(INT16_MIN, min(INT16_MAX, int(round(value))))
@@ -244,8 +252,10 @@ class TrajectoryFollowerNode(Node):
         self.eff_max_vel_ = dict(self.max_vel_)
         self.eff_max_accel_ = dict(self.max_accel_)
         self.pos_ = {name: 0.0 for name in self.joint_names_}
+        if 'root_theta_joint' in self.pos_:
+            self.pos_['root_theta_joint'] = INITIAL_ROOT_THETA_RAD
         self.vel_ = {name: 0.0 for name in self.joint_names_}
-        self.target_ = {name: 0.0 for name in self.joint_names_}
+        self.target_ = dict(self.pos_)
         self.has_target_ = False
 
         self._setup_cubemars_outputs()

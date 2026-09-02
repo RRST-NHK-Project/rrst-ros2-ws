@@ -56,6 +56,8 @@ r/zが遅く感じたのはこのミスマッチが原因。launch/display.launc
 max_velocity/max_accelerationを引き上げ済み)。本ノード自体は追加の遅延を避ける
 ためupdate_rate_hzのデフォルトを50Hzにしている。
 """
+import math
+
 import rclpy
 from rcl_interfaces.msg import SetParametersResult
 from rclpy.node import Node
@@ -75,6 +77,11 @@ R_LOWER, R_UPPER = -ARM_LENGTH / 2.0, ARM_LENGTH / 2.0
 ROOT_THETA_REDUCTION = 112.0 / 24.0
 ROOT_THETA_LIMIT = 12.5 / ROOT_THETA_REDUCTION
 ROOT_THETA_LOWER, ROOT_THETA_UPPER = -ROOT_THETA_LIMIT, ROOT_THETA_LIMIT
+
+# trajectory_follower_node.py/display.launch.pyのINITIAL_ROOT_THETA_RAD/zerosと
+# 一致させること(sim起動直後、フィールドに平行・ハンドが右側になる向き、
+# 2026-09-03)。
+INITIAL_ROOT_THETA_RAD = -math.pi / 2.0
 
 
 def clamp(value, lower, upper):
@@ -135,10 +142,10 @@ class JoyTeleopNode(Node):
 
         # 現在の目標関節角度(スティック/十字キー入力をここへ積分していく)。
         # /mixed_joint_statesを受信するまでは、trajectory_follower_node起動直後の
-        # 実際の静止姿勢(全関節0.0)に合わせておく。ここを可動域の中央など実際と
-        # 異なる値にすると、/mixed_joint_states受信前に一部の軸だけ操作した場合でも
-        # 同じJointStateメッセージに含まれる他の軸がその適当な初期値へ動いてしまう。
-        self.target_theta_ = 0.0
+        # 実際の静止姿勢に合わせておく。ここを可動域の中央など実際と異なる値に
+        # すると、/mixed_joint_states受信前に一部の軸だけ操作した場合でも同じ
+        # JointStateメッセージに含まれる他の軸がその適当な初期値へ動いてしまう。
+        self.target_theta_ = INITIAL_ROOT_THETA_RAD
         self.target_z_ = 0.0
         self.target_r_ = 0.0
         self.target_tip_theta_ = 0.0
