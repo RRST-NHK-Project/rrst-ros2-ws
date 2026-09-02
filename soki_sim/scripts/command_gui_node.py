@@ -981,6 +981,15 @@ class CommandGuiApp(QWidget):
                           '全ゲインを、個別の「適用」なしでまとめて実機へ送信する。', 'muted')
         box_layout.addWidget(desc)
 
+        self.load_all_status_label = QLabel()
+        self.load_all_status_label.setWordWrap(True)
+        _set_status(self.load_all_status_label, '未読込', 'muted')
+        box_layout.addWidget(self.load_all_status_label)
+
+        load_all_btn = QPushButton('全ゲイン読み込み')
+        load_all_btn.clicked.connect(self._on_load_all_gains)
+        box_layout.addWidget(load_all_btn)
+
         self.apply_all_status_label = QLabel()
         self.apply_all_status_label.setWordWrap(True)
         _set_status(self.apply_all_status_label, '未送信', 'muted')
@@ -992,6 +1001,23 @@ class CommandGuiApp(QWidget):
         box_layout.addWidget(btn)
 
         layout.addWidget(box)
+
+    def _on_load_all_gains(self):
+        # 各パネル個別の「読込」を毎回押す代わりに、実機(trajectory_follower_node/
+        # joy_teleop_node)から軌道生成・MIT・robomas・joy速度の全ゲインをまとめて
+        # 読み込む。結果は各パネル自身のstatus_labelに反映される(非同期のため)。
+        results = {
+            'trajectory_follower_node(軌道生成)': self._on_load_traj_params(),
+            'trajectory_follower_node(MIT)': self._on_load_mit_gains(),
+            'trajectory_follower_node(robomas)': self._on_load_robomas_gains(),
+            'joy_teleop_node': self._on_load_joy_speed(),
+        }
+        failed = [label for label, ok in results.items() if not ok]
+        if failed:
+            _set_status(self.load_all_status_label,
+                        f'{"・".join(failed)}に接続できません(未起動?)', 'error')
+        else:
+            _set_status(self.load_all_status_label, '各パネルへ読込中...', 'muted')
 
     def _on_apply_all_gains(self):
         try:
@@ -1694,6 +1720,7 @@ class CommandGuiApp(QWidget):
         _set_status(self.mit_gain_status_label,
                     '読込中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
                     'muted' if ok else 'error')
+        return ok
 
     def _apply_loaded_mit_gains(self, values):
         kp = values.get('cubemars_kp')
@@ -1831,6 +1858,7 @@ class CommandGuiApp(QWidget):
         _set_status(self.robomas_gain_status_label,
                     '読込中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
                     'muted' if ok else 'error')
+        return ok
 
     def _apply_loaded_robomas_gains(self, values):
         if 'robomas_kp' in values:
@@ -1972,6 +2000,7 @@ class CommandGuiApp(QWidget):
         _set_status(self.joy_speed_status_label,
                     '読込中...' if ok else 'joy_teleop_nodeに接続できません(use_joy:=trueで起動?)',
                     'muted' if ok else 'error')
+        return ok
 
     def _apply_loaded_joy_speed(self, values):
         for name in ('theta_speed', 'z_speed', 'r_speed'):
