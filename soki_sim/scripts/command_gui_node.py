@@ -171,6 +171,13 @@ MACHINE_ORIGIN_JOINT_NAMES = ['machine_origin_x_joint', 'machine_origin_y_joint'
 # soki_sim.urdf.xacroのmachine_origin_offset_limitと一致させること
 MACHINE_ORIGIN_OFFSET_LIMIT = 1.0
 
+# ハンド取付オフセット(soki_sim.urdf.xacroのhand_offset_x/y/z_joint、tip_linkと
+# hand_pitch_linkの間のprismaticジョイント)。machine_origin_*と同じ理由・方式で、
+# trajectory_follower_nodeの管理対象外のため/mixed_joint_statesへ直接publishする。
+HAND_OFFSET_JOINT_NAMES = ['hand_offset_x_joint', 'hand_offset_y_joint', 'hand_offset_z_joint']
+# soki_sim.urdf.xacroのhand_offset_limitと一致させること
+HAND_OFFSET_LIMIT = 0.1
+
 # ---- real_joint_bridge.yaml配線設定(初期化用センサID・CubeMars/RoboMasのID・
 # 回転方向)----
 # これらはreal_joint_bridge_node/homing_nodeが起動時に一度だけ読み込む値で、
@@ -288,6 +295,10 @@ HAND_WIRING_FIELDS = [
     (None, [
         ('can_slots_per_node', 'ノードあたりスロット数', 'int'),
     ]),
+    ('サーボ可動範囲(共通)', [
+        ('servo_min_deg', '下限[deg]', 'int'),
+        ('servo_max_deg', '上限[deg]', 'int'),
+    ]),
     ('吸着パッド展開サーボ', [
         ('deploy_servo_device_id', 'ID', 'int'),
         ('deploy_servo_node_index', 'ノード', 'int'),
@@ -297,6 +308,9 @@ HAND_WIRING_FIELDS = [
         ('deploy_servo_retracted_deg', '収納角度[deg]', 'int'),
         ('deploy_servo_deployed_deg', '展開角度[deg]', 'int'),
     ]),
+    (None, [
+        ('deploy_servo_offset_deg', '角度オフセット[deg]', 'float'),
+    ]),
     ('ワークピッチ変更サーボ', [
         ('pitch_servo_device_id', 'ID', 'int'),
         ('pitch_servo_node_index', 'ノード', 'int'),
@@ -305,6 +319,9 @@ HAND_WIRING_FIELDS = [
     (None, [
         ('pitch_servo_hold_deg', '保持角度[deg]', 'int'),
         ('pitch_servo_insert_deg', '投入角度[deg]', 'int'),
+    ]),
+    (None, [
+        ('pitch_servo_offset_deg', '角度オフセット[deg]', 'float'),
     ]),
     ('ダイヤフラムポンプ(MD)', [
         ('pump_device_id', 'ID', 'int'),
@@ -644,7 +661,8 @@ class CommandGuiNode(Node):
         self.pub_ = self.create_publisher(JointState, 'joint_targets', 10)
         self.mixed_pub_ = self.create_publisher(JointState, 'mixed_joint_states', 10)
 
-        self._current_positions = {name: 0.0 for name in JOINT_NAMES + MACHINE_ORIGIN_JOINT_NAMES}
+        self._current_positions = {
+            name: 0.0 for name in JOINT_NAMES + MACHINE_ORIGIN_JOINT_NAMES + HAND_OFFSET_JOINT_NAMES}
         self._current_received = False
         self.create_subscription(JointState, 'mixed_joint_states', self._on_mixed_joint_state, 10)
 
@@ -693,6 +711,15 @@ class CommandGuiNode(Node):
         msg = JointState()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.name = list(MACHINE_ORIGIN_JOINT_NAMES)
+        msg.position = [x, y, z]
+        self.mixed_pub_.publish(msg)
+
+    def send_hand_offset(self, x, y, z):
+        """ハンド取付オフセット(hand_offset_x/y/z_joint)を/mixed_joint_statesへ
+        直接publishする(send_machine_originと同じ理由・方式)。"""
+        msg = JointState()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.name = list(HAND_OFFSET_JOINT_NAMES)
         msg.position = [x, y, z]
         self.mixed_pub_.publish(msg)
 
@@ -1098,8 +1125,8 @@ class CommandGuiApp(QWidget):
     def _build_calibration_tab(self, parent):
         self._build_panel_tab(
             parent,
-            left_funcs=[self._build_machine_origin_offset_panel, self._build_origin_panel,
-                        self._build_homing_panel])
+            left_funcs=[self._build_machine_origin_offset_panel, self._build_hand_offset_panel,
+                        self._build_origin_panel, self._build_homing_panel])
 
     def _build_wiring_tab(self, parent):
         self._build_panel_tab(
@@ -1458,11 +1485,14 @@ class CommandGuiApp(QWidget):
             b.blockSignals(False)
 
     def _build_hand_panel(self, column):
-        # ハンド(吸着パッド展開・ワークピッチ変更の2サーボ、ダイヤフラムポンプ)の
-        # 操作パネル。配線・角度・デューティの編集は配線設定タブの
-        # 「ハンド配線設定」で行い、ここでは4つのサービス(hand_node)を
+        # ハンド(吸着パッド展開/収集サーボ・ワークピッチサーボ・ダイヤフラム
+        # ポンプ)の操作パネル。配線・角度・デューティの編集は配線設定タブの
+        # 「ハンド配線設定」で行い、ここでは6つのサービス(hand_node)を
         # 呼ぶだけにする(定型位置移動ボタンと同様、確認ダイアログは付けない。
-        # 展開/収納・ピッチ切替は試合中に繰り返し使う通常操作のため)。
+        # 展開/収納・ポンプON/OFF・ピッチ切替は試合中に繰り返し使う通常操作の
+        # ため)。展開/収集サーボとポンプは独立している(2026-09-03、ユーザー
+        # 指摘で分離: 収納はワークを保持したまま中央へ集める動作のため、
+        # 収納時に自動でポンプを切ってはいけない)。
         box = QGroupBox('ハンド (hand_node)')
         layout = QVBoxLayout(box)
 
@@ -1472,14 +1502,23 @@ class CommandGuiApp(QWidget):
         layout.addWidget(self.hand_status_label)
 
         pad_row = QHBoxLayout()
-        deploy_btn = QPushButton('吸着パッド展開(吸着ON)')
-        deploy_btn.setProperty('variant', 'primary')
-        retract_btn = QPushButton('吸着パッド収納(吸着OFF)')
-        deploy_btn.clicked.connect(lambda: self._on_hand_trigger('/hand_deploy_pads'))
-        retract_btn.clicked.connect(lambda: self._on_hand_trigger('/hand_retract_pads'))
-        pad_row.addWidget(deploy_btn)
-        pad_row.addWidget(retract_btn)
+        spread_btn = QPushButton('吸着パッド展開')
+        gather_btn = QPushButton('吸着パッド収納')
+        spread_btn.clicked.connect(lambda: self._on_hand_trigger('/hand_spread_pads'))
+        gather_btn.clicked.connect(lambda: self._on_hand_trigger('/hand_gather_pads'))
+        pad_row.addWidget(spread_btn)
+        pad_row.addWidget(gather_btn)
         layout.addLayout(pad_row)
+
+        pump_row = QHBoxLayout()
+        pump_on_btn = QPushButton('ポンプON(吸着)')
+        pump_on_btn.setProperty('variant', 'primary')
+        pump_off_btn = QPushButton('ポンプOFF')
+        pump_on_btn.clicked.connect(lambda: self._on_hand_trigger('/hand_pump_on'))
+        pump_off_btn.clicked.connect(lambda: self._on_hand_trigger('/hand_pump_off'))
+        pump_row.addWidget(pump_on_btn)
+        pump_row.addWidget(pump_off_btn)
+        layout.addLayout(pump_row)
 
         pitch_row = QHBoxLayout()
         hold_btn = QPushButton('ピッチ: 保持姿勢')
@@ -1672,6 +1711,69 @@ class CommandGuiApp(QWidget):
         if any(abs(raw[name] - clamped[name]) > 1e-9 for name in MACHINE_ORIGIN_JOINT_NAMES):
             text += '\n(可動範囲外のためクランプされました)'
         _set_status(self.machine_origin_status_label, text, 'success')
+
+    def _build_hand_offset_panel(self, column):
+        box = QGroupBox('ハンド取付オフセット (soki_sim.urdf.xacro)')
+        layout = QVBoxLayout(box)
+
+        desc = QLabel()
+        desc.setWordWrap(True)
+        _set_status(desc, f'tip_link(手先)から実機のハンド取付位置までのズレ[m]。\n'
+                          f'(可動範囲: 各軸±{HAND_OFFSET_LIMIT:.2f}m)。', 'muted')
+        layout.addWidget(desc)
+
+        self.hand_offset_edits = {name: make_float_edit(0.0, width=70) for name in HAND_OFFSET_JOINT_NAMES}
+        entries = QHBoxLayout()
+        for label, name in (
+                ('X', 'hand_offset_x_joint'),
+                ('Y', 'hand_offset_y_joint'),
+                ('Z', 'hand_offset_z_joint')):
+            entries.addWidget(QLabel(label))
+            entries.addWidget(self.hand_offset_edits[name])
+        layout.addLayout(entries)
+
+        self.hand_offset_status_label = QLabel()
+        self.hand_offset_status_label.setWordWrap(True)
+        _set_status(self.hand_offset_status_label, '未送信', 'muted')
+        layout.addWidget(self.hand_offset_status_label)
+
+        btn_row = QHBoxLayout()
+        load_btn = QPushButton('現在値を反映')
+        apply_btn = QPushButton('適用')
+        apply_btn.setProperty('variant', 'primary')
+        load_btn.clicked.connect(self._on_load_hand_offset)
+        apply_btn.clicked.connect(self._on_apply_hand_offset)
+        btn_row.addWidget(load_btn)
+        btn_row.addWidget(apply_btn)
+        layout.addLayout(btn_row)
+
+        column.addWidget(box)
+
+    def _on_load_hand_offset(self):
+        if not self.node.has_current_state():
+            QMessageBox.information(self, '未取得', 'まだmixed_joint_statesを受信していません')
+            return
+        pos = self.node.get_current_positions()
+        for name, edit in self.hand_offset_edits.items():
+            set_float(edit, round(pos.get(name, 0.0), 4))
+        _set_status(self.hand_offset_status_label, '現在値を反映しました', 'info')
+
+    def _on_apply_hand_offset(self):
+        try:
+            raw = {name: get_float(self.hand_offset_edits[name]) for name in HAND_OFFSET_JOINT_NAMES}
+        except ValueError:
+            QMessageBox.critical(self, '入力エラー', 'X/Y/Zに数値を入力してください')
+            return
+        limit = HAND_OFFSET_LIMIT
+        clamped = {name: clamp(v, -limit, limit) for name, v in raw.items()}
+        for name, v in clamped.items():
+            set_float(self.hand_offset_edits[name], round(v, 4))
+        self.node.send_hand_offset(*(clamped[name] for name in HAND_OFFSET_JOINT_NAMES))
+        x, y, z = (clamped[name] for name in HAND_OFFSET_JOINT_NAMES)
+        text = f'送信しました (x={x:.3f}, y={y:.3f}, z={z:.3f})'
+        if any(abs(raw[name] - clamped[name]) > 1e-9 for name in HAND_OFFSET_JOINT_NAMES):
+            text += '\n(可動範囲外のためクランプされました)'
+        _set_status(self.hand_offset_status_label, text, 'success')
 
     def _build_origin_panel(self, column):
         box = QGroupBox('root_theta原点設定 (CubeMars本体、trajectory_follower_node)')

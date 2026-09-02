@@ -5,24 +5,37 @@ hand_node:
   ros__parameters:
     can_slots_per_node: 5
 
+    # SERVOnへ送る角度[deg]の許容範囲。実機のホビーサーボは負の角度等、
+    # 範囲外の値を受け付けない/暴走することがあるため、CAN送信直前に必ず
+    # この範囲へクランプする(RViz表示には影響しない、2026-09-03追加)。
+    servo_min_deg: 0
+    servo_max_deg: 270
+
     # ---- 吸着パッド展開サーボ (SERVOn、角度[deg]) ----
     # device_id=0は未配線・無効を意味する。実機配線が判明したら
     # note/can_mapping.txtに記入のうえここを書き換えること。
-    deploy_servo_device_id: 0
+    deploy_servo_device_id: 31
     deploy_servo_node_index: 0
     deploy_servo_local_index: 0   # SERVO1=0/SERVO2=1/SERVO3=2
     deploy_servo_retracted_deg: 0    # 要実測: 収納(搬送)姿勢の角度
     deploy_servo_deployed_deg: 90    # 要実測: 展開(吸着)姿勢の角度
+    # 実機のサーボ取付角度と論理角度(retracted_deg/deployed_deg)のズレを
+    # 補正するオフセット[deg]。CAN送信にのみ加算される(2026-09-03追加)。
+    deploy_servo_offset_deg: 0.0
 
     # ---- ワークピッチ変更サーボ (SERVOn、角度[deg]) ----
-    pitch_servo_device_id: 0
+    pitch_servo_device_id: 31
     pitch_servo_node_index: 0
     pitch_servo_local_index: 1   # SERVO1=0/SERVO2=1/SERVO3=2
-    pitch_servo_hold_deg: 0      # 要実測: ワーク保持(搬送)姿勢の角度
-    pitch_servo_insert_deg: 90   # 要実測: シューティングボックス投入姿勢の角度
+    pitch_servo_hold_deg: 90      # 要実測: ワーク保持(搬送)姿勢の角度
+    pitch_servo_insert_deg: 0   # 要実測: シューティングボックス投入姿勢の角度
+    # 実機のサーボ取付角度と論理角度(hold_deg/insert_deg)のズレを補正する
+    # オフセット[deg]。CAN送信にのみ加算される(RViz表示には影響しない、
+    # 2026-09-03追加)。
+    pitch_servo_offset_deg: -90.0
 
     # ---- ダイヤフラムポンプ (MDn、符号=方向・絶対値=PWMデューティ) ----
-    pump_device_id: 0
+    pump_device_id: 31
     pump_node_index: 0
     pump_local_index: 0   # MD1=0/MD2=1
     pump_duty_percent: 50.0

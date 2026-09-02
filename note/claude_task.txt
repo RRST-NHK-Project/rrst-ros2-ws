@@ -4,33 +4,99 @@ soki: 未着手の課題・制約メモ(claude.txtは現状把握用、こちら
 構成はnote/claude.txt「##ハンド」、配線テンプレートはnote/can_mapping.txt
 「## ハンド」参照。
 
-実装済み(2026-09-03):
+実装済み(2026-09-03、複数回の形状修正を経て確定):
   - 制御ノードhand_node(soki_sim/scripts/hand_node.py)を新規作成。
     real_joint_bridge_node/trajectory_follower_nodeとは独立(方針決定済み)。
-    Triggerサービス4つ(/hand_deploy_pads・/hand_retract_pads・
-    /hand_set_pitch_hold・/hand_set_pitch_insert)を提供。ダイヤフラムポンプは
-    吸着パッド展開/収納と連動してON(pump_duty_percent)/OFF(duty=0)する
-    方針で実装済み(方針決定済み)
+    Triggerサービス6つ(/hand_spread_pads・/hand_gather_pads・/hand_pump_on・
+    /hand_pump_off・/hand_set_pitch_hold・/hand_set_pitch_insert)を提供。
+    展開/収集サーボとポンプは独立したサービスに分離している(当初はdeploy=
+    展開+ポンプON、retract=収納+ポンプOFFと連動させていたが、収納は
+    「ワークを保持したまま中央へ集める」動作でありポンプを切ってはいけない、
+    とのユーザー指摘で分離。ポンプのON/OFFタイミングは呼び出し側が判断する)
   - パラメータファイルsoki_sim/config/hand.yaml(device_id等は全て既定0=
     未配線・無効。実機配線判明後に書き換えること)
   - command_gui_nodeへのGUI統合:
-    - 統合操作タブに「ハンド」操作パネル(展開/収納・ピッチ切替の4ボタン、
-      _build_hand_panel)を追加。定型位置移動ボタンと同様、確認ダイアログなし
+    - 統合操作タブに「ハンド」操作パネル(展開/収納・ポンプON/OFF・ピッチ切替の
+      6ボタン、_build_hand_panel)を追加。定型位置移動ボタンと同様、確認
+      ダイアログなし
     - 配線設定タブに「ハンド配線設定」パネル(_build_hand_wiring_panel、
       hand.yamlの読込/編集/保存)を追加。既存のyaml配線パネル機構
       (_build_yaml_wiring_panel)をyaml_filename引数で汎用化して流用
   - real_all_axes_test.launch.py(本番でそのまま使うlaunch)にhand_nodeを追加
     (config/hand.yamlを読み込む)
+  - URDF(soki_sim.urdf.xacro)にtip_link以降のハンド簡易形状を追加。
+    キネマティックチェーンはtip_link -> hand_pitch_link(ピッチサーボ) ->
+    hand_deploy_link(展開/収集サーボの取付ブラケット、固定) ->
+    suction_pad_1/2/3(吸着パッド、各々独立したprismatic関節)。
+    tip_link(赤い円筒)の関節原点(下端)に取り付き、下方向(-z)へ積み重なる
+    (2026-09-03、ユーザー指摘で修正: 当初tip_linkの兄弟としていたhand_pitch_
+    link/hand_deploy_linkを直列接続に変更し、ピッチ回転がパッド一式ごと
+    向きを変えるようにした。取付位置も上端から下端へ変更)。
+    吸着パッドはjoint値0=spread(同一行のワーク間隔0.200m、
+    command_gui_node.pyのWORK_COL_PITCHと一致)、joint値=上限値=gathered
+    (正三角形、一辺hand_gather_side=0.08m、要実測の仮値)を表す。中央パッド
+    (suction_pad_2)はtravel=0で動かず、spread時の位置がそのまま正三角形の
+    1頂点になる。動くのは両端2枚(suction_pad_1/3)のみ(2026-09-03訂正: 当初
+    3枚とも動く設計だったが、中央固定・両端可動の構成に修正)。
+    両端パッドの移動方向は左右(y)とフィールド側(z、手先直下方向)のみで、
+    前後(x、アームの伸縮方向と同軸)には動かさない(2026-09-03、3段階の
+    訂正を経て確定: (1)当初は水平面内(xy)のみの移動→フィールド側への
+    ズレが必要と指摘、(2)前後+x成分を追加→「機体中心から遠ざかる」と指摘、
+    (3)前後-x成分に反転→「今度は機体中心に向かう方向に動いてしまっている
+    (アームと同軸上には移動しないはず)」と指摘、最終的に前後(x)成分自体を
+    ゼロにして正三角形に必要な距離を全てz成分に割り当てる形に確定)。
+    hand_pad_side_axis_x=0、travel距離(0.174356)は一連の修正を通じて不変
+    (gx^2+gz^2=h^2で一定のため)
+  - hand_nodeの6サービスから、CAN送信(device_id=0なら未配線としてスキップ)とは
+    別に/mixed_joint_states(motor_mixer_node/trajectory_follower_nodeと同じ
+    集約トピック)へsuction_pad_1/2/3_joint・hand_pitch_jointの位置をpublish
+    するよう実装。実機配線の有無に関わらず常時publishするため、配線前でも
+    GUIの展開/収納・ピッチ切替ボタンでRVizの見た目が連動する
+  - 両端パッド(suction_pad_1/3)のリンクに、中央パッドへ繋がる接続棒の見た目
+    (細い円柱、pad_black)を一度追加したが、同日中に廃止した(2026-09-03)。
+    代わりに、hand_deploy_linkに固定の方向インジケータバー
+    (hand_indicator_link、オレンジ色、box 0.01x0.4x0.01、アームのx軸に
+    対して直角=y軸方向、展開(spread)時の3パッド間隔とちょうど同じ長さ
+    0.4m=hand_row_pitch*2)を追加した。パッドの集約/展開状態に関わらず
+    常にハンドの向きが一目で分かるようにするための固定参照物(2026-09-03)
+  - ハンド取付オフセット(hand_offset_x/y/z_joint)をtip_linkとhand_pitch_link
+    の間に追加。machine_origin_x/y/z_jointと全く同じ方式(prismatic、既定
+    範囲±0.1m=hand_offset_limit、command_gui_nodeの「ハンド取付オフセット」
+    パネル(_build_hand_offset_panel、原点校正タブ)から/mixed_joint_states
+    経由で即座に適用可能)。実機の組み付け誤差を起動中に調整する用途
+    (2026-09-03追加)
+  - ワークピッチ変更サーボの角度オフセット(pitch_servo_offset_deg、
+    hand.yaml)を追加。実機のサーボ取付角度と論理角度(hold=0deg等)のズレを
+    補正し、「ピッチ軸の原点の場所を変えたい」という要望に対応(2026-09-03
+    追加、GUIの「ハンド配線設定」パネルからも編集可能)。
+    サーボ角度[deg]の可動範囲クランプ(servo_min_deg/servo_max_deg、既定
+    0〜270deg、ros2can/device_profiles.pyのSERVO既定範囲と一致)も追加した。
+    実機ホビーサーボは負の角度を受け付けない/暴走することがあるため
+    (2026-09-03報告)。
+    さらに「sim(RViz)表示用の角度」と「実機CANへ送る角度」を分離した
+    (2026-09-03、ユーザー提案で修正): 当初はoffset加算後・クランプ後の値を
+    RViz表示にも使っていたため、クランプが起きるとRViz上の見た目まで
+    ユーザーの意図しない値になり「動作イメージとリンクしていた表示が崩れる」
+    問題があった。now: RViz表示は常にpitch_servo_hold_deg/insert_degそのまま
+    (オフセット・クランプの影響を受けない論理角度)、CAN送信のみ
+    +pitch_servo_offset_deg・クランプを適用する(hand_node.py _set_pitch参照)。
+    サービス応答メッセージにも「sim=Xdeg, 実機送信=Ydeg」の両方を表示する。
+    同じ機能(オフセットdeploy_servo_offset_deg・sim/CAN分離)を吸着パッド
+    展開/収集サーボにも追加した(2026-09-03、「収納・展開サーボにも同様の
+    機能を」との要望に対応。hand_node.py _set_deploy参照。sim表示は
+    spread/gathered状態のみでdeg値自体はそもそも使わない)
 
 未着手・未確定事項:
   - 実機配線(サーボ2個・ダイヤフラムポンプMDのdevice_id/node_index/
     local_index)をros2can GUIで確認し、can_mapping.txt・hand.yamlへ記入すること
-  - URDF(soki_sim.urdf.xacro)にtip_link以降のハンド機構(吸着パッド3個・
-    展開サーボ・ピッチサーボ)を追加するか、視覚のみで妥協するかを検討
+    (2026-09-03時点でhand.yamlに仮のID(313/31)が記入済み。実機と一致するか要確認)
   - サーボの角度範囲(収納⇔展開、保持⇔投入姿勢のそれぞれの角度、hand.yamlの
     *_deg系パラメータ)が未確定(実機で要調整)
   - hand_node自体の実機動作確認(topic_passthrough、SERVOn/SWnやENCn/MDnの
     ピン共有設定(MULTIn/ENCn_MD)が正しく切り替わっているか)が未実施
+  - URDFのハンド形状の寸法・取付位置・正三角形の一辺(hand_gather_side)の実測合わせ
+  - ポンプON/OFFの具体的な呼び出しタイミング(展開→吸着ON→収納→ピッチ投入→
+    ポンプOFFという想定でよいか)を実運用のシーケンスとして確定すること
 
 ## シューティングボックスへの移動時の衝突回避 (2026-08-27新規)
 soki_simのワンクリック移動ボタン(command_gui_node.py)やcommand_gui_nodeの目標送信は、
