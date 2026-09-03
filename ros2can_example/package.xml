@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>ros2can_example</name>
+  <version>0.0.0</version>
+  <description>
+    ros2can (xiao_esp32_s3_smd_serial_bridge, MODE_CAN_HOST) を外部ノードから
+    制御するC++サンプル集。serial_tx_[ID]/serial_rx_[ID] トピック経由での
+    指令送信・センサ受信の最小構成例を、既定プロファイルとMODE_CUBEMARS向けに
+    それぞれ収録する(common パッケージのパケットコントローラを使用)。
+  </description>
+  <maintainer email="tashikou1682@gmail.com">dev</maintainer>
+  <license>Apache-2.0</license>
+  <url type="repository">https://github.com/RRST-NHK-Project/ros2can</url>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>std_msgs</depend>
+  <depend>common</depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
