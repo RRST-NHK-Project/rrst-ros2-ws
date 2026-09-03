@@ -363,10 +363,6 @@ HAND_WIRING_FIELDS = [
     (None, [
         ('can_slots_per_node', 'ノードあたりスロット数', 'int'),
     ]),
-    ('サーボ可動範囲(共通)', [
-        ('servo_min_deg', '下限[deg]', 'int'),
-        ('servo_max_deg', '上限[deg]', 'int'),
-    ]),
     ('吸着パッド展開サーボ', [
         ('deploy_servo_device_id', 'ID', 'int'),
         ('deploy_servo_node_index', 'ノード', 'int'),
@@ -378,6 +374,14 @@ HAND_WIRING_FIELDS = [
     ]),
     (None, [
         ('deploy_servo_offset_deg', '角度オフセット[deg]', 'float'),
+    ]),
+    ('収納 実機送信角度 手動固定', [
+        ('deploy_servo_retracted_can_deg_override', '固定する', 'bool'),
+        ('deploy_servo_retracted_can_deg', '角度[deg]', 'float'),
+    ]),
+    ('展開 実機送信角度 手動固定', [
+        ('deploy_servo_deployed_can_deg_override', '固定する', 'bool'),
+        ('deploy_servo_deployed_can_deg', '角度[deg]', 'float'),
     ]),
     ('ワークピッチ変更サーボ', [
         ('pitch_servo_device_id', 'ID', 'int'),
@@ -391,6 +395,14 @@ HAND_WIRING_FIELDS = [
     (None, [
         ('pitch_servo_offset_deg', '角度オフセット[deg]', 'float'),
     ]),
+    ('保持 実機送信角度 手動固定', [
+        ('pitch_servo_hold_can_deg_override', '固定する', 'bool'),
+        ('pitch_servo_hold_can_deg', '角度[deg]', 'float'),
+    ]),
+    ('投入 実機送信角度 手動固定', [
+        ('pitch_servo_insert_can_deg_override', '固定する', 'bool'),
+        ('pitch_servo_insert_can_deg', '角度[deg]', 'float'),
+    ]),
     ('ダイヤフラムポンプ(MD)', [
         ('pump_device_id', 'ID', 'int'),
         ('pump_node_index', 'ノード', 'int'),
@@ -400,6 +412,24 @@ HAND_WIRING_FIELDS = [
         ('pump_duty_percent', 'デューティ[%]', 'float'),
         ('pump_md_pwm_max', 'PWM最大値', 'int'),
     ]),
+]
+
+# 収納/展開・保持/投入の各角度はsim表示用の論理値(角度制限なし)で、実機へは
+# 通常+オフセットを適用して送信するが、対応する*_can_deg_overrideがtrueの間は
+# *_can_degをそのまま送信する(hand_node.py _resolve_can_deg参照。いずれの経路も
+# クランプは行わない、2026-09-03、ユーザー指摘: 「オフセットをクランプしない。
+# 実機との相違があるため手動で固定角度を設定する」)。ハンド配線設定パネルに、
+# 実際に送信される角度をその場で確認できるプレビュー表示を追加する。
+# (角度キー, オフセットキー, オーバーライド有効キー, オーバーライド角度キー, 表示ラベル)の並び。
+HAND_SERVO_PREVIEW_SPECS = [
+    ('deploy_servo_retracted_deg', 'deploy_servo_offset_deg',
+     'deploy_servo_retracted_can_deg_override', 'deploy_servo_retracted_can_deg', '収納角度 実機送信[deg]'),
+    ('deploy_servo_deployed_deg', 'deploy_servo_offset_deg',
+     'deploy_servo_deployed_can_deg_override', 'deploy_servo_deployed_can_deg', '展開角度 実機送信[deg]'),
+    ('pitch_servo_hold_deg', 'pitch_servo_offset_deg',
+     'pitch_servo_hold_can_deg_override', 'pitch_servo_hold_can_deg', '保持角度 実機送信[deg]'),
+    ('pitch_servo_insert_deg', 'pitch_servo_offset_deg',
+     'pitch_servo_insert_can_deg_override', 'pitch_servo_insert_can_deg', '投入角度 実機送信[deg]'),
 ]
 
 
@@ -989,6 +1019,11 @@ class CommandGuiApp(QWidget):
         self._seq_leg_target = None
         self._seq_leg_start_time = None
         self._seq_delay_start_time = None
+        # 直近の回収対象(x, y, z)。吸着に失敗した場合など、シーケンス完了/中断後
+        # でも「回収実行」を再度押すだけで同じワークへやり直せるようにするため
+        # 記憶しておく(2026-09-03、ユーザー指摘: 「吸着できなかったときに回収
+        # 実行を再度行うことがある。現状だと回収実行が一回しかできない」)。
+        self._last_pick_target = None
 
         self.x_edit = make_float_edit(MAX_RADIUS / 2.0)
         self.y_edit = make_float_edit(0.0)
@@ -1575,11 +1610,37 @@ class CommandGuiApp(QWidget):
         if reply != QMessageBox.Yes:
             return
         try:
-            self._launch_process = subprocess.Popen(ALL_AXES_LAUNCH_CMD)
+            # start_new_session=True(setsid)でこの子プロセスを独立したプロセス
+            # グループのリーダーにする。ros2 launchはさらに複数のノードを自分の
+            # 子プロセスとして起動するため、後で停止する際はこのグループ全体へ
+            # まとめてシグナルを送る(_signal_launch_process_group参照。
+            # 2026-09-03、ユーザー報告: 「停止ボタンが機能しないことがある。
+            # 停止完了と表示されても裏で生きていたり、閉じるボタンでも裏で
+            # 生きていたりする」ことへの対処)。
+            self._launch_process = subprocess.Popen(ALL_AXES_LAUNCH_CMD, start_new_session=True)
         except OSError as exc:
             _set_status(self.launch_status_label, f'起動失敗: {exc}', 'error')
             return
         _set_status(self.launch_status_label, '起動処理中...', 'muted')
+
+    def _signal_launch_process_group(self, sig):
+        """self._launch_process(ros2 launch)とその配下の全ノードプロセスへ
+        まとめてシグナルを送る。send_signal()はPopenが直接追跡している1プロセス
+        (ros2 launch自身)にしか届かず、配下で起動された各ノードのプロセスまでは
+        必ずしも終了しきらないことがある(2026-09-03、ユーザー報告: 「停止
+        ボタン/閉じるボタンを押しても裏でノードが生き続け、ターミナルで
+        Ctrl+Cを押すまで終了しない」)。ターミナルでCtrl+Cを押した場合は
+        フォアグラウンドのプロセスグループ全体にSIGINTが届くため確実に
+        終了するのに対し、Popen.send_signal()は単一PIDにしか届かないことが
+        この差の原因と考えられる。_on_launch_all_nodesでstart_new_session=True
+        (setsid)で独立したプロセスグループにしてあるため、os.killpg()で
+        グループ全体(ros2 launch本体+配下の全ノード)へ確実に届かせる。"""
+        if self._launch_process is None:
+            return
+        try:
+            os.killpg(os.getpgid(self._launch_process.pid), sig)
+        except ProcessLookupError:
+            pass  # 既に終了済み
 
     def _on_stop_all_nodes(self):
         if self._launch_process is None or self._launch_process.poll() is not None:
@@ -1592,7 +1653,7 @@ class CommandGuiApp(QWidget):
             QMessageBox.Yes | QMessageBox.No)
         if reply != QMessageBox.Yes:
             return
-        self._launch_process.send_signal(signal.SIGINT)
+        self._signal_launch_process_group(signal.SIGINT)
         _set_status(self.launch_status_label, '停止処理中...', 'muted')
 
     def _build_current_state_panel(self, column):
@@ -1821,7 +1882,13 @@ class CommandGuiApp(QWidget):
         送信された場合は自動的にワーク移動からやり直すように」)。この場合は
         直前のワークから近距離の移動とみなし、R軸を旋回軸まで戻す退避を省略して
         直接回転+伸縮する(ユーザー指摘: 「ワークからワークに移動する際はR軸を
-        戻さなくていい。近距離なので」)。"""
+        戻さなくていい。近距離なので」)。
+        シーケンス完了/中断後で非アクティブな場合でも、この呼び出しは常に
+        self._last_pick_targetを更新する。これにより「回収実行」ボタン
+        (_on_pick_confirm_requested)は、シーケンスが完了した後でも同じワークへの
+        回収シーケンスを再度呼び出せる(吸着失敗時の再試行用、2026-09-03、
+        ユーザー指摘: 「吸着できなかったときに回収実行を再度行うことがある。
+        現状だと回収実行が一回しかできない」)。"""
         restarting_from_work = self._seq_active and self._seq_kind == '回収'
         if self._seq_active and not restarting_from_work:
             QMessageBox.information(self, 'シーケンス実行中', '実行中のシーケンスを中断してから開始してください')
@@ -1836,6 +1903,7 @@ class CommandGuiApp(QWidget):
             return
         if restarting_from_work:
             self._abort_sequence('回収シーケンスを別のワークへやり直します')
+        self._last_pick_target = (x, y, z)
 
         pos = self.node.get_current_positions()
         theta0, r0 = pos['root_theta_joint'], pos['r_joint']
@@ -2028,10 +2096,18 @@ class CommandGuiApp(QWidget):
     def _on_pick_confirm_requested(self):
         """GUIの「回収実行」ボタン、またはCommandGuiNodeの/pick_sequence_confirm
         サービス経由(PSコンの回収確認ボタン、joy_teleop_node)から呼ばれる。
-        現在wait_pick_confirmで一時停止中の場合のみ次のステップへ進め、Trueを返す。"""
+        wait_pick_confirmで一時停止中ならそのまま次のステップへ進める。
+        シーケンスが既に完了/中断していて直前の回収対象が分かっている場合は、
+        同じワークへの回収シーケンスを最初から再度呼び出す(2026-09-03、
+        ユーザー指摘: 「吸着できなかったときに回収実行を再度行うことがある。
+        現状だと回収実行が一回しかできない」。吸着失敗時、ボタンを押し直すだけで
+        再試行できるようにする)。"""
         if self._seq_active and self._seq_waiting_service == '(pick_confirm)':
             self._seq_waiting_service = None
             self._seq_index += 1
+            return True
+        if not self._seq_active and self._last_pick_target is not None:
+            self._start_pick_sequence(*self._last_pick_target)
             return True
         return False
 
@@ -2422,10 +2498,11 @@ class CommandGuiApp(QWidget):
                  'IDを0のままにするとその出力は無効(未配線)扱い。',
             description='hand_node起動時のみ反映。実行中には反映されません。',
             field_specs=HAND_WIRING_FIELDS,
-            yaml_filename='hand.yaml')
+            yaml_filename='hand.yaml',
+            preview_specs=HAND_SERVO_PREVIEW_SPECS)
 
     def _build_yaml_wiring_panel(self, column, attr_prefix, title, description, field_specs, note=None,
-                                  yaml_filename='real_joint_bridge.yaml'):
+                                  yaml_filename='real_joint_bridge.yaml', preview_specs=None):
         box = QGroupBox(title)
         layout = QVBoxLayout(box)
 
@@ -2467,6 +2544,9 @@ class CommandGuiApp(QWidget):
         layout.addLayout(grid)
         setattr(self, f'_{attr_prefix}_edits', edits)
 
+        if preview_specs:
+            self._build_wiring_preview(layout, edits, preview_specs)
+
         status_label = QLabel()
         status_label.setWordWrap(True)
         _set_status(status_label, '未読込', 'muted')
@@ -2484,6 +2564,47 @@ class CommandGuiApp(QWidget):
         layout.addLayout(btn_row)
 
         column.addWidget(box)
+
+    def _build_wiring_preview(self, layout, edits, preview_specs):
+        """preview_specs: (角度キー, オフセットキー, オーバーライド有効キー,
+        オーバーライド角度キー, ラベル)のリスト。オーバーライドが有効なら
+        その角度をそのまま、無効なら論理値[deg](sim表示用、無制限)+オフセットを
+        「実機に送信する角度」として表示する読み取り専用プレビュー(2026-09-03、
+        クランプは行わない。hand_node.py _resolve_can_deg参照)。editsの該当欄が
+        変わるたびに自動更新する(setText()もtextChangedを発火するため、yaml
+        読込時の一括反映でも追従する)。"""
+        grid = QGridLayout()
+        preview_labels = {}
+        for i, (deg_key, offset_key, override_key, override_deg_key, label) in enumerate(preview_specs):
+            grid.addWidget(QLabel(label), i, 0)
+            value_label = QLabel()
+            preview_labels[(deg_key, offset_key, override_key, override_deg_key)] = value_label
+            grid.addWidget(value_label, i, 1)
+        layout.addLayout(grid)
+
+        def _refresh(*_args):
+            for (deg_key, offset_key, override_key, override_deg_key), value_label in preview_labels.items():
+                try:
+                    if override_key in edits and edits[override_key].isChecked():
+                        can_deg = get_float(edits[override_deg_key])
+                        _set_status(value_label, f'{can_deg:.1f}deg (手動固定)', 'info')
+                        continue
+                    if deg_key not in edits:
+                        continue
+                    deg = get_int(edits[deg_key])
+                    offset = get_float(edits[offset_key]) if offset_key in edits else 0.0
+                except ValueError:
+                    _set_status(value_label, '(入力エラー)', 'error')
+                    continue
+                _set_status(value_label, f'{deg + offset:.1f}deg', 'info')
+
+        for deg_key, offset_key, override_key, override_deg_key, _label in preview_specs:
+            for key in (deg_key, offset_key, override_deg_key):
+                if key in edits:
+                    edits[key].textChanged.connect(_refresh)
+            if override_key in edits:
+                edits[override_key].stateChanged.connect(_refresh)
+        _refresh()
 
     def _on_load_yaml_wiring(self, attr_prefix, field_specs, yaml_filename='real_joint_bridge.yaml'):
         edits = getattr(self, f'_{attr_prefix}_edits')
@@ -3451,7 +3572,7 @@ class CommandGuiApp(QWidget):
                 event.ignore()
                 return
             if reply == QMessageBox.Yes:
-                self._launch_process.send_signal(signal.SIGINT)
+                self._signal_launch_process_group(signal.SIGINT)
         event.accept()
 
 

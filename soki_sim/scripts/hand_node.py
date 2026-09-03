@@ -49,6 +49,16 @@ note/can_mapping.txt「## ハンド」節と、soki_sim/config/hand.yamlのパ�
   /hand_set_pitch_hold   : ピッチサーボを保持姿勢へ
   /hand_set_pitch_insert : ピッチサーボを投入姿勢へ
 
+収納/展開・保持/投入の4状態それぞれについて、実機へ送るCAN角度を
+`*_can_deg_override`(bool)がTrueの間`*_can_deg`(float)に固定できる
+(2026-09-03新規、_resolve_can_deg参照)。Falseなら従来通り論理角度
+(*_deg)+オフセット(*_offset_deg)を使う。いずれの経路でもクランプは行わない
+(以前はservo_min_deg/servo_max_degへクランプしていたが、ユーザー指摘
+「オフセットをクランプしない。実機との相違があるため手動で固定角度を設定する」
+により撤廃し、代わりにこの手動オーバーライドを追加した。実機のホビーサーボが
+受け付けない/暴走する値を送らないよう、offset・オーバーライド値とも実機で
+安全な範囲に手動で追い込んで運用すること)。
+
 ポンプの現在ON/OFF状態は`hand_pump_state`(std_msgs/Bool)としてpublishする
 (2026-09-03追加)。GUIハンドパネルの「ポンプON/OFF」ボタンとjoy_teleop_nodeの
 PSコン丸ボタン(トグル)の両方から独立に操作できるようにするため、状態の真値は
@@ -101,15 +111,6 @@ class HandNode(Node):
         self.declare_parameter('can_slots_per_node', 5)
         self.slots_per_node_ = int(self.get_parameter('can_slots_per_node').value)
 
-        # SERVOn(角度[deg])に送る値の許容範囲。実機のホビーサーボは負の角度を
-        # 受け付けない/暴走することがあるため、deploy/pitch両サーボへ送信する
-        # 直前に必ずこの範囲へクランプする(2026-09-03追加。pitch_servo_offset_deg
-        # を導入した結果、hold_deg/insert_deg+offsetが負値になり実機で問題に
-        # なったための対処)。ros2can/ros2can/device_profiles.pyのSERVO既定範囲
-        # (0〜270deg)と合わせてある。
-        self.declare_parameter('servo_min_deg', 0)
-        self.declare_parameter('servo_max_deg', 270)
-
         # ---- 吸着パッド展開サーボ (SERVOn、角度[deg]) ----
         self.declare_parameter('deploy_servo_device_id', 0)  # 0=未配線・無効
         self.declare_parameter('deploy_servo_node_index', 0)
@@ -119,8 +120,19 @@ class HandNode(Node):
         # 実機のサーボ取付角度と論理角度(retracted_deg/deployed_deg)のズレを
         # 補正するオフセット。CAN送信にのみ加算する(RViz表示(spread/gathered
         # のパッド位置)には影響しない。pitch_servo_offset_degと同じ設計、
-        # 2026-09-03追加)。
+        # 2026-09-03追加)。クランプは行わない(2026-09-03、ユーザー指摘:
+        # 「オフセットをクランプしない」。実機のホビーサーボは負角度等を
+        # 受け付けない/暴走することがあるため、offset自体を実機で安全な範囲に
+        # 手動で追い込んで運用すること)。
         self.declare_parameter('deploy_servo_offset_deg', 0.0)
+        # 収納/展開それぞれについて、sim_deg+offsetの計算を使わず実機送信角度を
+        # 直接固定したい場合の手動オーバーライド(2026-09-03新規、ユーザー指摘:
+        # 「実機との相違があるため手動で固定角度を設定する」)。
+        # *_can_deg_overrideがTrueの間は*_can_degをそのままCAN送信する。
+        self.declare_parameter('deploy_servo_retracted_can_deg_override', False)
+        self.declare_parameter('deploy_servo_retracted_can_deg', 0.0)
+        self.declare_parameter('deploy_servo_deployed_can_deg_override', False)
+        self.declare_parameter('deploy_servo_deployed_can_deg', 0.0)
 
         # ---- ワークピッチ変更サーボ (SERVOn、角度[deg]) ----
         self.declare_parameter('pitch_servo_device_id', 0)
@@ -133,8 +145,15 @@ class HandNode(Node):
         # 修正: 当初はRViz表示にも加算していたが、クランプ発生時にRViz上の
         # 見た目まで意図しない値になり「動作イメージとリンクしていた表示が
         # 崩れる」問題があったため分離した。「ピッチ軸の原点の場所を
-        # 変えたい」との要望に対応)。
+        # 変えたい」との要望に対応)。クランプは行わない(deploy_servo_offset_deg
+        # と同じ理由、2026-09-03)。
         self.declare_parameter('pitch_servo_offset_deg', 0.0)
+        # 保持/投入それぞれの実機送信角度を直接固定する手動オーバーライド
+        # (deploy_servo_*_can_degと同じ設計、2026-09-03新規)。
+        self.declare_parameter('pitch_servo_hold_can_deg_override', False)
+        self.declare_parameter('pitch_servo_hold_can_deg', 0.0)
+        self.declare_parameter('pitch_servo_insert_can_deg_override', False)
+        self.declare_parameter('pitch_servo_insert_can_deg', 0.0)
 
         # ---- ダイヤフラムポンプ (MDn、符号=方向・絶対値=PWMデューティ) ----
         self.declare_parameter('pump_device_id', 0)
@@ -244,29 +263,28 @@ class HandNode(Node):
         self.device_publishers_[device_id].publish(msg)
         return True
 
-    def _clamp_servo_deg(self, deg):
-        """SERVOnへ送る角度[deg]をservo_min_deg〜servo_max_degへクランプする。
-        実機のホビーサーボは負の角度等、範囲外の値を受け付けない/暴走する
-        ことがあるため、CAN送信直前の値にのみ適用する(RViz表示には使わない。
-        2026-09-03追加)。クランプが発生した場合はログ警告を出す。"""
-        lo = int(self.get_parameter('servo_min_deg').value)
-        hi = int(self.get_parameter('servo_max_deg').value)
-        clamped = max(lo, min(hi, deg))
-        if clamped != deg:
-            self.get_logger().warning(
-                f'hand_node: 角度{deg}degはサーボ可動範囲[{lo},{hi}]外のため'
-                f'{clamped}degにクランプしました')
-        return clamped
+    def _resolve_can_deg(self, sim_deg, offset_deg, override_prefix):
+        """実機へ送るCAN角度[deg]を決定する。<override_prefix>_can_deg_overrideが
+        Trueなら<override_prefix>_can_degをそのまま使う(実機との相違を手動で
+        直接補正するため、2026-09-03新規、ユーザー指摘: 「実機との相違があるため
+        手動で固定角度を設定する」)。Falseなら従来通りsim_deg+offset_degを使う。
+        いずれもクランプは行わない(2026-09-03、ユーザー指摘: 「オフセットを
+        クランプしない」。実機のホビーサーボは負角度等を受け付けない/暴走する
+        ことがあるため、offset・オーバーライド値とも実機で安全な範囲に手動で
+        追い込んで運用すること)。"""
+        if bool(self.get_parameter(f'{override_prefix}_can_deg_override').value):
+            return round(float(self.get_parameter(f'{override_prefix}_can_deg').value))
+        return round(sim_deg + offset_deg)
 
     def _deploy_offset_deg(self):
         return float(self.get_parameter('deploy_servo_offset_deg').value)
 
-    def _set_deploy(self, sim_deg, gathered, response, label):
+    def _set_deploy(self, sim_deg, gathered, response, label, override_prefix):
         """RViz表示(gathered、sim_degの値自体は使わずspread/gathered状態のみ
-        反映)と、実際にCANへ送る角度(sim_deg + deploy_servo_offset_deg、
-        クランプ済み)を分けて扱う(_set_pitchと同じ設計、2026-09-03追加。
-        「収納・展開サーボにも同様の機能を」との要望に対応)。"""
-        can_deg = self._clamp_servo_deg(round(sim_deg + self._deploy_offset_deg()))
+        反映)と、実際にCANへ送る角度(_resolve_can_deg参照)を分けて扱う
+        (_set_pitchと同じ設計、2026-09-03追加。「収納・展開サーボにも同様の
+        機能を」との要望に対応)。"""
+        can_deg = self._resolve_can_deg(sim_deg, self._deploy_offset_deg(), override_prefix)
         response.success = self._send(self._deploy, can_deg)
         self._publish_pad_states(gathered=gathered)
         response.message = (
@@ -276,11 +294,11 @@ class HandNode(Node):
 
     def _on_spread_pads(self, request, response):
         sim_deg = int(self.get_parameter('deploy_servo_deployed_deg').value)
-        return self._set_deploy(sim_deg, False, response, '展開')
+        return self._set_deploy(sim_deg, False, response, '展開', 'deploy_servo_deployed')
 
     def _on_gather_pads(self, request, response):
         sim_deg = int(self.get_parameter('deploy_servo_retracted_deg').value)
-        return self._set_deploy(sim_deg, True, response, '収納')
+        return self._set_deploy(sim_deg, True, response, '収納', 'deploy_servo_retracted')
 
     def _publish_pump_state(self):
         msg = Bool()
@@ -312,15 +330,14 @@ class HandNode(Node):
     def _pitch_offset_deg(self):
         return float(self.get_parameter('pitch_servo_offset_deg').value)
 
-    def _set_pitch(self, sim_deg, response, label):
+    def _set_pitch(self, sim_deg, response, label, override_prefix):
         """RViz表示(sim_deg、pitch_servo_hold_deg/insert_degそのまま)と、
-        実際にCANへ送る角度(sim_deg + pitch_servo_offset_deg、servoの可動範囲へ
-        クランプ済み)を分けて扱う(2026-09-03修正: 当初はoffset加算後の値を
-        表示にも使っていたため、実機の可動範囲に合わせてクランプすると
-        RViz上の見た目まで意図しない値になり「動作イメージとリンクしていた
-        表示が崩れる」問題があった。sim表示は常にオフセット・クランプの
-        影響を受けない論理角度のままにする)。"""
-        can_deg = self._clamp_servo_deg(round(sim_deg + self._pitch_offset_deg()))
+        実際にCANへ送る角度(_resolve_can_deg参照)を分けて扱う(2026-09-03修正:
+        当初はoffset加算後の値を表示にも使っていたため、実機の可動範囲に
+        合わせてクランプすると RViz上の見た目まで意図しない値になり「動作
+        イメージとリンクしていた表示が崩れる」問題があった。sim表示は常に
+        オフセット・オーバーライドの影響を受けない論理角度のままにする)。"""
+        can_deg = self._resolve_can_deg(sim_deg, self._pitch_offset_deg(), override_prefix)
         response.success = self._send(self._pitch, can_deg)
         self._publish_joint_state(HAND_PITCH_JOINT, sim_deg)
         response.message = (
@@ -330,11 +347,11 @@ class HandNode(Node):
 
     def _on_set_pitch_hold(self, request, response):
         sim_deg = int(self.get_parameter('pitch_servo_hold_deg').value)
-        return self._set_pitch(sim_deg, response, '保持姿勢')
+        return self._set_pitch(sim_deg, response, '保持姿勢', 'pitch_servo_hold')
 
     def _on_set_pitch_insert(self, request, response):
         sim_deg = int(self.get_parameter('pitch_servo_insert_deg').value)
-        return self._set_pitch(sim_deg, response, '投入姿勢')
+        return self._set_pitch(sim_deg, response, '投入姿勢', 'pitch_servo_insert')
 
 
 def main(args=None):

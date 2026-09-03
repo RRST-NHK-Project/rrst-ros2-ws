@@ -1,5 +1,41 @@
 soki: 未着手の課題・制約メモ(claude.txtは現状把握用、こちらは今後対応が要る課題を並べる場所)
 
+## 「全ノード起動」停止ボタンが効かないことがある件 (2026-09-03発見・修正)
+command_gui_node.py統合操作タブの「実機セットアップ」パネルから`ros2 launch soki_sim
+real_all_axes_test.launch.py`をsubprocess.Popenで起動する機能(_on_launch_all_nodes)が
+あるが、「停止」ボタン(_on_stop_all_nodes)やGUIを閉じるとき(closeEvent)に
+Popen.send_signal(SIGINT)で止めようとしても、配下のノード群(real_joint_bridge_node/
+homing_node/hand_node/trajectory_follower_node/joy_node/joy_teleop_node/
+robot_state_publisher/joint_state_publisher/rviz2/ros2can等)が裏で生き残ることが
+あるとユーザーから報告があった(「停止ボタンが機能しないことがある。停止完了と
+表示されても裏で生きている。閉じるボタンでも裏で生きている。ターミナルでCtrl+Cを
+押すまで終了しない」)。
+  - 原因: Popen.send_signal()は指定した単一PID(Popenが直接追跡している
+    `ros2 launch`自身)にしかシグナルを送らない。ターミナルでCtrl+Cを押した場合は
+    フォアグラウンドのプロセスグループ全体にSIGINTが届くのに対し、
+    send_signal()はプロセスグループ全体には届かない。`ros2` CLIの起動方式
+    次第ではPopenが追跡しているPIDが実際の`ros2 launch`本体と一致しない
+    ケースもあり得るため、単一PID指定では確実性に欠ける。
+  - 対応: _on_launch_all_nodesでsubprocess.Popenにstart_new_session=Trueを
+    付け(setsid、独立したプロセスグループのリーダーにする)、停止時は
+    os.killpg(os.getpgid(pid), signal.SIGINT)でグループ全体へシグナルを送る
+    ように変更(_signal_launch_process_group、_on_stop_all_nodes/closeEvent
+    両方から呼ぶ)。
+  - 検証: offscreen QtでROS_DOMAIN_ID分離のうえ実際に`real_all_axes_test.
+    launch.py use_joy:=true use_viz:=true`を起動し、起動直後にプロセスグループ内へ
+    11プロセス(ros2can・real_joint_bridge_node・homing_node・hand_node・
+    trajectory_follower_node・joy_node・joy_teleop_node・robot_state_publisher・
+    joint_state_publisher・rviz2等)が存在すること、GUIの「停止」ロジックを
+    呼んだ後は同グループ内のプロセスが0個になることを確認済み(修正前の
+    send_signal方式との対比までは自動テストで再現していないが、修正後の
+    動作自体は確認済み)。
+  - 副次的な気づき: テスト中、ros2can(ros2can_gui)ノードがSIGINT後もspin_once
+    を呼び続けて`RCLError: failed to initialize wait set...`のトレースバックを
+    出し続け、ros2 launch側の既定10秒タイムアウト後にSIGKILLへ昇格して
+    ようやく終了した。ros2can側のシャットダウン処理(SIGINT受信後もspin_onceを
+    止めていない)に改善の余地がある可能性があるが、今回はcommand_gui_node.py側の
+    修正(プロセスグループ全体への確実なシグナル到達)が主眼のため深追いしていない。
+
 ## ハンド(エンドエフェクタ)実装 (2026-09-03新規着手)
 構成はnote/claude.txt「##ハンド」、配線テンプレートはnote/can_mapping.txt
 「## ハンド」参照。
@@ -85,6 +121,34 @@ soki: 未着手の課題・制約メモ(claude.txtは現状把握用、こちら
     展開/収集サーボにも追加した(2026-09-03、「収納・展開サーボにも同様の
     機能を」との要望に対応。hand_node.py _set_deploy参照。sim表示は
     spread/gathered状態のみでdeg値自体はそもそも使わない)
+  - 「ハンド配線設定」パネル(command_gui_node.py)に、上記オフセット適用後の
+    「実機送信角度」をその場で確認できるプレビュー表示を追加した(2026-09-03、
+    ユーザー指定: 「収納とピッチのサーボ角度について、GUIで設定できるのはいいが、
+    simは角度制限がなく、表示を正しくするためだけのオフセット、追加で実機に
+    送信するサーボ角度という項目を設けて」)。これまでこの計算結果はhand_node
+    呼び出し時のサービス応答メッセージ(「sim=Xdeg, 実機送信=Ydeg」)でしか
+    見えなかったが、実際にサーボを動かさなくてもGUI上の数値編集だけで確認できる
+    ようになった。実装は_build_yaml_wiring_panelに`preview_specs`引数を追加する
+    汎用的な形にし(_build_wiring_preview、editsのtextChanged/stateChanged購読で
+    自動更新)、HAND_SERVO_PREVIEW_SPECSとしてhand.yamlパネルにのみ渡している
+    (root_theta等の他の配線パネルには影響なし)。
+
+  - 上記のservo_min_deg/servo_max_degへのクランプは、導入直後にユーザー指摘
+    「オフセットをクランプしない。実機との相違があるため手動で固定角度を
+    設定する」により同日中に撤廃した(2026-09-03)。hand_node.pyの
+    _clamp_servo_deg・servo_min_deg/servo_max_degパラメータは完全に削除し、
+    代わりに収納/展開/保持/投入の4状態それぞれに手動オーバーライドを追加した
+    (`<state>_can_deg_override`(bool)がtrueの間`<state>_can_deg`(float)を
+    クランプなしでそのままCAN送信する。hand_node.py _resolve_can_deg参照。
+    falseなら従来通り論理角度+オフセットをクランプなしで送る)。GUIの
+    プレビューも追従し、オーバーライド有効時は「Xdeg (手動固定)」、無効時は
+    素の`角度+オフセット`の値をそのまま表示する(クランプ前後の区別は無くなった)。
+    hand.yamlにも8つの新規パラメータ(deploy_servo_retracted/deployed・
+    pitch_servo_hold/insertの各`_can_deg_override`/`_can_deg`)を追加し、
+    servo_min_deg/servo_max_degは削除した。実機のホビーサーボが負角度等を
+    受け付けない/暴走するリスクへの対策は、自動クランプではなく
+    オフセット・オーバーライド値自体を実機で安全な範囲に手動で追い込む運用に
+    委ねる方針になった(ユーザー判断)。
 
 未着手・未確定事項:
   - 実機配線(サーボ2個・ダイヤフラムポンプMDのdevice_id/node_index/
