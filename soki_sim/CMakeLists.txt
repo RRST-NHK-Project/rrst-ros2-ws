@@ -48,6 +48,12 @@ install(PROGRAMS
   RENAME homing_node
 )
 
+install(PROGRAMS
+  scripts/hand_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME hand_node
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)

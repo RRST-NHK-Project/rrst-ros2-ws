@@ -121,6 +121,35 @@ QPushButton[variant="grid"] {
     padding: 4px 6px;
 }
 
+/* 3個ずつ回収する運用で押すべきワーク列(列2・列5)を目立たせる
+   (grid variantと同じ詰めたpaddingを継承しつつ配色だけ変える、2026-09-03)。*/
+QPushButton[variant="grid-highlight"] {
+    padding: 4px 6px;
+    background-color: #f0ad4e;
+    border: 1px solid #d68f2e;
+    color: white;
+    font-weight: bold;
+}
+
+QPushButton[variant="grid-highlight"]:hover {
+    background-color: #f4bd6d;
+}
+
+QPushButton[variant="grid-highlight"]:pressed {
+    background-color: #d68f2e;
+}
+
+/* 矢印キー(D-pad)で選択中のワークを示すカーソル枠(2026-09-03追加)。
+   variant(grid/grid-highlight)の配色はそのまま、枠だけ重ねて表示する
+   (プロパティセレクタはAND条件のため、variantと独立して組み合わせられる)。 */
+QPushButton[selected="true"] {
+    border: 3px solid #2ecc71;
+}
+
+QPushButton[selected="true"]:hover {
+    border: 3px solid #38d97f;
+}
+
 QScrollArea {
     border: none;
 }

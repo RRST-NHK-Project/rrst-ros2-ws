@@ -1,5 +1,428 @@
 soki: 未着手の課題・制約メモ(claude.txtは現状把握用、こちらは今後対応が要る課題を並べる場所)
 
+## 「全ノード起動」停止ボタンが効かないことがある件 (2026-09-03発見・修正)
+command_gui_node.py統合操作タブの「実機セットアップ」パネルから`ros2 launch soki_sim
+real_all_axes_test.launch.py`をsubprocess.Popenで起動する機能(_on_launch_all_nodes)が
+あるが、「停止」ボタン(_on_stop_all_nodes)やGUIを閉じるとき(closeEvent)に
+Popen.send_signal(SIGINT)で止めようとしても、配下のノード群(real_joint_bridge_node/
+homing_node/hand_node/trajectory_follower_node/joy_node/joy_teleop_node/
+robot_state_publisher/joint_state_publisher/rviz2/ros2can等)が裏で生き残ることが
+あるとユーザーから報告があった(「停止ボタンが機能しないことがある。停止完了と
+表示されても裏で生きている。閉じるボタンでも裏で生きている。ターミナルでCtrl+Cを
+押すまで終了しない」)。
+  - 原因: Popen.send_signal()は指定した単一PID(Popenが直接追跡している
+    `ros2 launch`自身)にしかシグナルを送らない。ターミナルでCtrl+Cを押した場合は
+    フォアグラウンドのプロセスグループ全体にSIGINTが届くのに対し、
+    send_signal()はプロセスグループ全体には届かない。`ros2` CLIの起動方式
+    次第ではPopenが追跡しているPIDが実際の`ros2 launch`本体と一致しない
+    ケースもあり得るため、単一PID指定では確実性に欠ける。
+  - 対応: _on_launch_all_nodesでsubprocess.Popenにstart_new_session=Trueを
+    付け(setsid、独立したプロセスグループのリーダーにする)、停止時は
+    os.killpg(os.getpgid(pid), signal.SIGINT)でグループ全体へシグナルを送る
+    ように変更(_signal_launch_process_group、_on_stop_all_nodes/closeEvent
+    両方から呼ぶ)。
+  - 検証: offscreen QtでROS_DOMAIN_ID分離のうえ実際に`real_all_axes_test.
+    launch.py use_joy:=true use_viz:=true`を起動し、起動直後にプロセスグループ内へ
+    11プロセス(ros2can・real_joint_bridge_node・homing_node・hand_node・
+    trajectory_follower_node・joy_node・joy_teleop_node・robot_state_publisher・
+    joint_state_publisher・rviz2等)が存在すること、GUIの「停止」ロジックを
+    呼んだ後は同グループ内のプロセスが0個になることを確認済み(修正前の
+    send_signal方式との対比までは自動テストで再現していないが、修正後の
+    動作自体は確認済み)。
+  - 副次的な気づき: テスト中、ros2can(ros2can_gui)ノードがSIGINT後もspin_once
+    を呼び続けて`RCLError: failed to initialize wait set...`のトレースバックを
+    出し続け、ros2 launch側の既定10秒タイムアウト後にSIGKILLへ昇格して
+    ようやく終了した。ros2can側のシャットダウン処理(SIGINT受信後もspin_onceを
+    止めていない)に改善の余地がある可能性があるが、今回はcommand_gui_node.py側の
+    修正(プロセスグループ全体への確実なシグナル到達)が主眼のため深追いしていない。
+
+## ハンド(エンドエフェクタ)実装 (2026-09-03新規着手)
+構成はnote/claude.txt「##ハンド」、配線テンプレートはnote/can_mapping.txt
+「## ハンド」参照。
+
+実装済み(2026-09-03、複数回の形状修正を経て確定):
+  - 制御ノードhand_node(soki_sim/scripts/hand_node.py)を新規作成。
+    real_joint_bridge_node/trajectory_follower_nodeとは独立(方針決定済み)。
+    Triggerサービス6つ(/hand_spread_pads・/hand_gather_pads・/hand_pump_on・
+    /hand_pump_off・/hand_set_pitch_hold・/hand_set_pitch_insert)を提供。
+    展開/収集サーボとポンプは独立したサービスに分離している(当初はdeploy=
+    展開+ポンプON、retract=収納+ポンプOFFと連動させていたが、収納は
+    「ワークを保持したまま中央へ集める」動作でありポンプを切ってはいけない、
+    とのユーザー指摘で分離。ポンプのON/OFFタイミングは呼び出し側が判断する)
+  - パラメータファイルsoki_sim/config/hand.yaml(device_id等は全て既定0=
+    未配線・無効。実機配線判明後に書き換えること)
+  - command_gui_nodeへのGUI統合:
+    - 統合操作タブに「ハンド」操作パネル(展開/収納・ポンプON/OFF・ピッチ切替の
+      6ボタン、_build_hand_panel)を追加。定型位置移動ボタンと同様、確認
+      ダイアログなし
+    - 配線設定タブに「ハンド配線設定」パネル(_build_hand_wiring_panel、
+      hand.yamlの読込/編集/保存)を追加。既存のyaml配線パネル機構
+      (_build_yaml_wiring_panel)をyaml_filename引数で汎用化して流用
+  - real_all_axes_test.launch.py(本番でそのまま使うlaunch)にhand_nodeを追加
+    (config/hand.yamlを読み込む)
+  - URDF(soki_sim.urdf.xacro)にtip_link以降のハンド簡易形状を追加。
+    キネマティックチェーンはtip_link -> hand_pitch_link(ピッチサーボ) ->
+    hand_deploy_link(展開/収集サーボの取付ブラケット、固定) ->
+    suction_pad_1/2/3(吸着パッド、各々独立したprismatic関節)。
+    tip_link(赤い円筒)の関節原点(下端)に取り付き、下方向(-z)へ積み重なる
+    (2026-09-03、ユーザー指摘で修正: 当初tip_linkの兄弟としていたhand_pitch_
+    link/hand_deploy_linkを直列接続に変更し、ピッチ回転がパッド一式ごと
+    向きを変えるようにした。取付位置も上端から下端へ変更)。
+    吸着パッドはjoint値0=spread(同一行のワーク間隔0.200m、
+    command_gui_node.pyのWORK_COL_PITCHと一致)、joint値=上限値=gathered
+    (正三角形、一辺hand_gather_side=0.08m、要実測の仮値)を表す。中央パッド
+    (suction_pad_2)はtravel=0で動かず、spread時の位置がそのまま正三角形の
+    1頂点になる。動くのは両端2枚(suction_pad_1/3)のみ(2026-09-03訂正: 当初
+    3枚とも動く設計だったが、中央固定・両端可動の構成に修正)。
+    両端パッドの移動方向は左右(y)とフィールド側(z、手先直下方向)のみで、
+    前後(x、アームの伸縮方向と同軸)には動かさない(2026-09-03、3段階の
+    訂正を経て確定: (1)当初は水平面内(xy)のみの移動→フィールド側への
+    ズレが必要と指摘、(2)前後+x成分を追加→「機体中心から遠ざかる」と指摘、
+    (3)前後-x成分に反転→「今度は機体中心に向かう方向に動いてしまっている
+    (アームと同軸上には移動しないはず)」と指摘、最終的に前後(x)成分自体を
+    ゼロにして正三角形に必要な距離を全てz成分に割り当てる形に確定)。
+    hand_pad_side_axis_x=0、travel距離(0.174356)は一連の修正を通じて不変
+    (gx^2+gz^2=h^2で一定のため)
+  - hand_nodeの6サービスから、CAN送信(device_id=0なら未配線としてスキップ)とは
+    別に/mixed_joint_states(motor_mixer_node/trajectory_follower_nodeと同じ
+    集約トピック)へsuction_pad_1/2/3_joint・hand_pitch_jointの位置をpublish
+    するよう実装。実機配線の有無に関わらず常時publishするため、配線前でも
+    GUIの展開/収納・ピッチ切替ボタンでRVizの見た目が連動する
+  - 両端パッド(suction_pad_1/3)のリンクに、中央パッドへ繋がる接続棒の見た目
+    (細い円柱、pad_black)を一度追加したが、同日中に廃止した(2026-09-03)。
+    代わりに、hand_deploy_linkに固定の方向インジケータバー
+    (hand_indicator_link、オレンジ色、box 0.01x0.4x0.01、アームのx軸に
+    対して直角=y軸方向、展開(spread)時の3パッド間隔とちょうど同じ長さ
+    0.4m=hand_row_pitch*2)を追加した。パッドの集約/展開状態に関わらず
+    常にハンドの向きが一目で分かるようにするための固定参照物(2026-09-03)
+  - ハンド取付オフセット(hand_offset_x/y/z_joint)をtip_linkとhand_pitch_link
+    の間に追加。machine_origin_x/y/z_jointと全く同じ方式(prismatic、既定
+    範囲±0.1m=hand_offset_limit、command_gui_nodeの「ハンド取付オフセット」
+    パネル(_build_hand_offset_panel、原点校正タブ)から/mixed_joint_states
+    経由で即座に適用可能)。実機の組み付け誤差を起動中に調整する用途
+    (2026-09-03追加)
+  - ワークピッチ変更サーボの角度オフセット(pitch_servo_offset_deg、
+    hand.yaml)を追加。実機のサーボ取付角度と論理角度(hold=0deg等)のズレを
+    補正し、「ピッチ軸の原点の場所を変えたい」という要望に対応(2026-09-03
+    追加、GUIの「ハンド配線設定」パネルからも編集可能)。
+    サーボ角度[deg]の可動範囲クランプ(servo_min_deg/servo_max_deg、既定
+    0〜270deg、ros2can/device_profiles.pyのSERVO既定範囲と一致)も追加した。
+    実機ホビーサーボは負の角度を受け付けない/暴走することがあるため
+    (2026-09-03報告)。
+    さらに「sim(RViz)表示用の角度」と「実機CANへ送る角度」を分離した
+    (2026-09-03、ユーザー提案で修正): 当初はoffset加算後・クランプ後の値を
+    RViz表示にも使っていたため、クランプが起きるとRViz上の見た目まで
+    ユーザーの意図しない値になり「動作イメージとリンクしていた表示が崩れる」
+    問題があった。now: RViz表示は常にpitch_servo_hold_deg/insert_degそのまま
+    (オフセット・クランプの影響を受けない論理角度)、CAN送信のみ
+    +pitch_servo_offset_deg・クランプを適用する(hand_node.py _set_pitch参照)。
+    サービス応答メッセージにも「sim=Xdeg, 実機送信=Ydeg」の両方を表示する。
+    同じ機能(オフセットdeploy_servo_offset_deg・sim/CAN分離)を吸着パッド
+    展開/収集サーボにも追加した(2026-09-03、「収納・展開サーボにも同様の
+    機能を」との要望に対応。hand_node.py _set_deploy参照。sim表示は
+    spread/gathered状態のみでdeg値自体はそもそも使わない)
+  - 「ハンド配線設定」パネル(command_gui_node.py)に、上記オフセット適用後の
+    「実機送信角度」をその場で確認できるプレビュー表示を追加した(2026-09-03、
+    ユーザー指定: 「収納とピッチのサーボ角度について、GUIで設定できるのはいいが、
+    simは角度制限がなく、表示を正しくするためだけのオフセット、追加で実機に
+    送信するサーボ角度という項目を設けて」)。これまでこの計算結果はhand_node
+    呼び出し時のサービス応答メッセージ(「sim=Xdeg, 実機送信=Ydeg」)でしか
+    見えなかったが、実際にサーボを動かさなくてもGUI上の数値編集だけで確認できる
+    ようになった。実装は_build_yaml_wiring_panelに`preview_specs`引数を追加する
+    汎用的な形にし(_build_wiring_preview、editsのtextChanged/stateChanged購読で
+    自動更新)、HAND_SERVO_PREVIEW_SPECSとしてhand.yamlパネルにのみ渡している
+    (root_theta等の他の配線パネルには影響なし)。
+
+  - 上記のservo_min_deg/servo_max_degへのクランプは、導入直後にユーザー指摘
+    「オフセットをクランプしない。実機との相違があるため手動で固定角度を
+    設定する」により同日中に撤廃した(2026-09-03)。hand_node.pyの
+    _clamp_servo_deg・servo_min_deg/servo_max_degパラメータは完全に削除し、
+    代わりに収納/展開/保持/投入の4状態それぞれに手動オーバーライドを追加した
+    (`<state>_can_deg_override`(bool)がtrueの間`<state>_can_deg`(float)を
+    クランプなしでそのままCAN送信する。hand_node.py _resolve_can_deg参照。
+    falseなら従来通り論理角度+オフセットをクランプなしで送る)。GUIの
+    プレビューも追従し、オーバーライド有効時は「Xdeg (手動固定)」、無効時は
+    素の`角度+オフセット`の値をそのまま表示する(クランプ前後の区別は無くなった)。
+    hand.yamlにも8つの新規パラメータ(deploy_servo_retracted/deployed・
+    pitch_servo_hold/insertの各`_can_deg_override`/`_can_deg`)を追加し、
+    servo_min_deg/servo_max_degは削除した。実機のホビーサーボが負角度等を
+    受け付けない/暴走するリスクへの対策は、自動クランプではなく
+    オフセット・オーバーライド値自体を実機で安全な範囲に手動で追い込む運用に
+    委ねる方針になった(ユーザー判断)。
+
+未着手・未確定事項:
+  - 実機配線(サーボ2個・ダイヤフラムポンプMDのdevice_id/node_index/
+    local_index)をros2can GUIで確認し、can_mapping.txt・hand.yamlへ記入すること
+    (2026-09-03時点でhand.yamlに仮のID(313/31)が記入済み。実機と一致するか要確認)
+  - サーボの角度範囲(収納⇔展開、保持⇔投入姿勢のそれぞれの角度、hand.yamlの
+    *_deg系パラメータ)が未確定(実機で要調整)
+  - hand_node自体の実機動作確認(topic_passthrough、SERVOn/SWnやENCn/MDnの
+    ピン共有設定(MULTIn/ENCn_MD)が正しく切り替わっているか)が未実施
+  - URDFのハンド形状の寸法・取付位置・正三角形の一辺(hand_gather_side)の実測合わせ
+  - ポンプON/OFFの具体的な呼び出しタイミング(展開→吸着ON→収納→ピッチ投入→
+    ポンプOFFという想定でよいか)は、下記「ピック/投入 自動シーケンス」として
+    2026-09-03に実装した(RVizでの動作確認のみ、実機での妥当性検証はまだ)。
+
+## ピック/投入 自動シーケンス (command_gui_node、2026-09-03新規、同日中に運用フローを再設計)
+「移動はGUIで半自動化し、微調整・吸着ON・シュート実行(ポンプOFF)の判断は人間が行う」
+という運用イメージに沿って一連の操作を半自動化した。新規ノードは追加せず、
+command_gui_node.py(既存の50ms QTimerポーリングループ)にステップリスト方式の
+簡易状態機械を追加する形で実装(詳細はスクリプト内コメント参照)。
+offscreen Qt(QT_QPA_PLATFORM=offscreen)でtrajectory_follower_node/hand_nodeを
+実起動し、回収・投入シーケンスの状態遷移を自動テストで確認済み(2026-09-03、
+2回のテストでユーザーの実機セッションとROSグラフが混線する事故を起こしたため、
+以後はROS_DOMAIN_IDをテスト専用の値に分離してから実行している。note/claude.txt
+「実機セッションとの混線事故」参照)。
+
+現在の設計(2026-09-03、ユーザー指示で当初案から変更): 「移動とZをある程度下げる
+動作は自動、そこから先(ワークへの接触・シューティングボックスへの最終投入)は
+人間の明示的な指示」という2段階方式。
+  - GUI: 「ワーク・シューティングボックス」パネルに「自動シーケンスで実行」
+    チェックボックスを追加(既定OFF)。OFF時は従来通りwork/shootボタンが即時移動の
+    みを行う(挙動変更なし)。ONにすると、workボタンで回収シーケンス、shootボタンで
+    投入シーケンスを開始する。「ピック/投入 自動シーケンス」パネルは統合操作タブの
+    「ワーク・シューティングボックス」パネルの隣に配置(2026-09-03、ユーザー指定で
+    左列下部から移動)。状態表示・「回収実行」ボタン・「中断」ボタン・7つの
+    チューニング値(安全高度Z・R退避量・回収Zオフセット・回収アプローチ余裕・
+    投入アプローチ深さ・投入時手先θ・ポンプON後の待ち時間)の入力欄(gains.jsonへ
+    永続化、他のゲイン類と同じ_persist_gains機構を流用)がある。シーケンス開始時の
+    確認ダイアログは廃止済み(2026-09-03、ユーザー指定。ワンクリック移動・
+    ハンドパネルの各種ボタンと同様、確認なしで即座に開始する)。
+  - 根本θ回転前にRを退避させる(ユーザー指定: 腕を旋回軸に近づけてから回転すること
+    で機械的負荷を軽減)。範囲は本シーケンスのみに限定し、既存のワンクリック移動/
+    XYクリック/保存済みポイント送信の経路は変更していない(ユーザー判断)。
+  - 回収シーケンス: 安全高度退避→R退避→θ回転→R伸長→パッド展開→ワーク手前
+    (pickup_z_offset_m+pickup_approach_clearance_m、対象ワーク高さより一段高い
+    アプローチ高さ)まで自動降下→**ここで自動区間は一旦止まり、人間の「回収実行」
+    指示を待つ**(GUIの「回収実行」ボタン、またはPSコンの回収確認ボタン
+    (×ボタン想定、joy_teleop_nodeのpickup_confirm_buttonパラメータ)→
+    command_gui_nodeが新規に公開するTriggerサービス`/pick_sequence_confirm`経由)
+    →指示後、ワークに当たる高さ(pickup_z_offset_m)まで自動降下→ポンプON(自動、
+    pump_settle_sec秒待ってから)→安全高度へ上昇→パッド収納→完了。
+  - 投入シーケンス: 安全高度退避→R退避→θ回転→R伸長→ピッチ投入姿勢→
+    シューティングボックス手前(shoot_approach_depth_m、箱開口部上端からの
+    差し引き)まで自動降下して**そこで自動制御は終わり**。以降の細かい位置調整
+    (コントローラーのスティックジョグ)とポンプOFF(投入実行)は完全に手動操作
+    (2026-09-03、ユーザー指定で仕様変更: 当初はここでポンプOFF待ちにして
+    ピッチ保持姿勢への復帰・安全高度への再上昇まで自動化していたが、「シュートに
+    向かう、ある程度Zを下げて待機、細かい位置調整はコントローラーで行い
+    コントローラーで吸着をオフにして終了」との指示を受け、待機以降は一切
+    自動制御しない方式に変更。理由: 手動ジョグで実際の位置が事前計算値からズレた
+    状態のまま、シーケンス側が古い計算値へ自動で戻そうとすると危険なため)。
+  - GUI/PSコンどちらから操作されても状態がズレないように統一する設計は、投入側の
+    ポンプON/OFF(hand_node、hand_pump_state Bool、transient_local QoS)に続き、
+    回収側の「回収実行」指示にも同じ考え方を適用した(command_gui_node側が
+    /pick_sequence_confirmを公開し、GUIボタンとjoy_teleop_node両方から同じ
+    ハンドラ(CommandGuiApp._on_pick_confirm_requested)を呼ぶ)。
+  - ピッチ(hand_pitch_joint)の自動制御(2026-09-03新規、ユーザー指摘: 「ハンドは
+    回収待機状態で保持姿勢で吸着パッド展開、回収して上昇後にパッド収納、
+    投入姿勢に」)。回収シーケンスの先頭で/hand_set_pitch_hold(前回のシュートで
+    投入姿勢のまま残っていても、回収待機・パッド展開・接触・吸着まで一貫して
+    保持姿勢にしておく)、末尾のパッド収納後に/hand_set_pitch_insert(次の
+    シュートへの搬送に備える)を自動で呼ぶ。パッド収納とピッチ切替の間は
+    gather_settle_sec秒(既定0.5s)待ってから行う(ユーザー指摘: 「収納から
+    姿勢変更までの待機時間も必要。ほぼ同時はまずい」。パッドが物理的に
+    収納し切る前にピッチが回り始めると干渉する恐れがあるため)。
+  - ポンプが既にON(=ワーク保持中)のまま次のワークへ移動する場合の扱い
+    (2026-09-03、実装→撤回。一度試して元に戻したので経緯を残す)。ユーザー
+    指摘「ポンプオフを押さずに次のワークへ移動した際もピッチと展開収納は
+    動かないように」を受け、_start_pick_sequence開始時点でnode.get_pump_on_
+    state()がTrueなら/hand_set_pitch_hold・/hand_spread_pads・
+    /hand_gather_pads・/hand_set_pitch_insertの4つのcallステップを一切
+    ステップリストに含めない実装を入れたが、直後にユーザーから「これだと
+    回収実行おしてもハンドの向きが現状維持されたままになる」との指摘があり、
+    意図を確認したところ「ピッチを保持姿勢でパッド展開。ポンプのオンオフに
+    よる機体の動作制約がないようにしたい」という回答だったため、ポンプ状態に
+    よる分岐を完全に削除し、常に(ポンプがONでもOFFでも)全4サービスを呼ぶ
+    元の実装に戻した。offscreenテストで、ポンプがON状態のまま新しいワークへ
+    移動しても、ピッチ保持姿勢・パッド展開・パッド収納・ピッチ投入姿勢の
+    全てが通常通り(無条件に)呼ばれることを確認済み。教訓: 「ポンプの
+    オンオフでピッチ/パッドが動かないように」という要望は、必ずしも
+    「ポンプ状態でピッチ/パッド操作を条件分岐させる」という意味とは限らない
+    (このケースでは逆に「ポンプ状態に一切左右されず常に同じ動作をする」が
+    求められていた)。表面的な字面だけで実装方針を決めず、動作の目的
+    (今回は「ハンドが常に正しい姿勢になること」)を確認すること。
+  - 投入完了後の後片付け自動化(2026-09-03、同日中に実装→一部撤回→再実装して
+    確定。3段階のユーザー指摘を経た経緯を残す):
+    (1) 当初、指摘「シュート後は安全高度まで上がってからハンドを保持姿勢に
+    する」を受け、投入シーケンスの自動区間完了後、人間が手動ジョグ+
+    コントローラーのポンプOFFで投入を実行した直後(hand_pump_stateのON→OFFを
+    _spin_ros毎tickで監視)に「現在のtheta/rのままZだけ安全高度へ上昇→ピッチ
+    保持姿勢」という後片付けシーケンスを自動起動する実装を入れた。
+    (2) 指摘「ポンプがオフになってもシューティングボックスから出てないと
+    危険」(Zだけ上げてもR退避が無いと箱に引っかかる恐れがある)を受け、
+    続けて指摘「回収待機姿勢になるまでは現状維持が安全では?」があったため、
+    選択肢(a. ポンプOFF後の自動移動を廃止し現状維持にする、b. Z上昇→R退避の
+    2段階自動化を続ける)を確認したところ(a)が選ばれ、該当コードを一旦
+    全て削除した(ポンプOFF後は一切自動で動かない状態にした)。
+    (3) その直後、指摘「そうなんだけど現状維持は手先のピッチ軸と収納展開軸の
+    話だった」により、(a)の「現状維持」はピッチ・パッド展開/収納軸に限った
+    話であり、アーム(Z/R)は自動で箱の外まで退避させてよいと判明。最終的に
+    _check_post_shoot_cleanup/_start_post_shoot_cleanupを復活させたが、今度は
+    「Zだけ上げてピッチも戻す」ではなく「Zを上げてから(箱の壁をクリア)
+    続けてRを退避量まで引く(箱の外・旋回軸側へ)。ピッチ・パッド展開/収納には
+    一切触れない」という内容に変更して確定した(kind='投入後片付け'、
+    _start_pick_sequenceの安全な接近レグと同じZ→Rの順序)。offscreenテストで
+    ①投入完了でフラグが立つ、②ポンプON単独では発火しない、③ポンプOFFで
+    Z上昇→R退避が実行される、④ピッチはinsertのまま変化しない、ことを確認済み。
+    新しい回収/投入シーケンスが始まったらこのフラグは破棄する(古い後片付け
+    予約が後から誤発火しないように)。
+  - 手先θ(tip_theta_joint)の自動制御(2026-09-03新規、ユーザー指摘: 「ハンドは
+    3つ一気に回収するので手先θはワークの行と平行になるように動く必要がある。
+    シュート時はRと垂直になるように」)。吸着パッド3個の展開軸は、
+    tip_theta_joint=0の姿勢でr方向(アーム伸縮方向)に垂直(hand_indicator_link、
+    soki_sim.urdf.xacro参照)。root_theta_jointが機体を旋回させると手先ごと
+    同じ角度だけ回るため、パッド展開軸を常にワークの行(GUIのワールドX軸、
+    WORK_POINTSは同一行内でX方向に並ぶ)と平行に保つには、回収シーケンスの
+    θ回転レグ以降でtip_theta_joint = -root_theta_jointを同時に指令する
+    (command_gui_node.CommandGuiNode.send_targetにtip_theta引数を追加、
+    trajectory_follower_nodeの同時到達スケーリングでroot_theta/tip_thetaが
+    揃って動く)。投入シーケンスは逆に一切打ち消さずtip_theta_joint=一定値
+    (shoot_tip_theta_rad、既定0.0)を使う(root_thetaの値によらず幾何学的に
+    r方向に垂直となる。この具体的な値は実機未検証の暫定値、ユーザー指摘:
+    「シュート時の角度は暫定値である」)。
+  - hand_node呼び出し(spread/gather/pitch_insert)がdevice_id未配線で
+    response.success=Falseになっても(hand_node側の仕様、RViz表示は既に更新済み)
+    シーケンスは中断せず警告表示のみで続行する。hand_nodeサービス自体に接続できない
+    場合(未起動)はシーケンスを中断する。
+  - PSコンのボタン割り当て(joy_teleop_node、2026-09-03追加、実機で要確認):
+    ○(丸)ボタン(pump_toggle_button、既定1)=ポンプON/OFFトグル、×(バツ)ボタン
+    (pickup_confirm_button、既定0)=回収実行の指示。いずれも実際のLinuxドライバの
+    ボタン番号は`ros2 topic echo /joy`で確認が必要(仮定値のまま)。
+  - 回収実行待ち中の再送信で自動やり直し・R退避省略(2026-09-03、ユーザー指定:
+    「ワークに移動し回収実行待ちの時に再度ワークの位置が送信された場合は自動的に
+    ワーク移動からやり直すように。またワークからワークに移動する際はR軸を
+    戻さなくていい。近距離なので」)。回収シーケンス実行中(回収実行待ち含む)に
+    別のworkボタンが押された場合、_guard_sequence_startの「中断してから」という
+    拒否メッセージを出さず、_start_pick_sequence内で自動的に_abort_sequenceして
+    新しいワークへやり直す。この場合は直前のワークから近距離とみなし、
+    通常の「安全高度→R退避→θ回転→R伸長」(4レグ)のうちRを旋回軸まで戻す退避
+    レグを省略し、「安全高度へ(Rはそのまま)→θ回転とR伸縮を1レグで同時に」の
+    2レグに短縮する(通常の新規開始時はR退避を維持、対象は回収シーケンスの
+    再送信のみでシューティングボックス側の投入シーケンスには適用しない)。
+  - ワーク・シューティングボックスパネルのワークボタンのうち、列2・列5
+    (「1-2」「1-5」等)だけ色を変えた(2026-09-03、ユーザー指定:「3つずつとる
+    想定でX-2,X-5のワークボタンは色を変えておいて」)。吸着パッド3個は
+    中央パッドが狙った列、両端パッドがその隣接列(合計3列)を同時に吸着するため、
+    列2を狙うと列1-3、列5を狙うと列4-6がちょうど揃い、6列を2回の回収で
+    過不足なくカバーできる。新規QSS variant「grid-highlight」(style.qss、
+    オレンジ系)を追加し、_build_button_grid側でkind=='pick'かつラベルの
+    列番号が'2'/'5'の場合のみ適用する。
+  - 「ピック/投入 自動シーケンス」パネルにポンプON/OFFボタンと状態表示を追加
+    (2026-09-03、ユーザー指定: 「ポンプのオンオフボタンをピック投入シーケンスの
+    欄にも配置。ポンプのステータスも見れるように」)。ボタンはハンドパネルと同じ
+    _on_hand_triggerを呼ぶだけ(重複だがタブを切り替えずに操作できるようにする
+    ため)。状態表示は、CommandGuiNodeにhand_pump_state(std_msgs/Bool、
+    transient_local QoS)購読を再度追加し(joy_teleop_nodeの丸ボタン実装時に
+    一度追加したが、wait_pumpステップ廃止時に不要として削除していた。今回
+    GUI表示用途で復活)、_spin_ros毎tickで表示を更新する(_refresh_sequence_
+    pump_status)。
+
+## ピック/投入シーケンスの大幅簡略化 (2026-09-03、同日中に再々設計)
+上記「ピック/投入 自動シーケンス」導入からさらに同日中に、ユーザーから運用イメージの
+再定義があった: 「半自動化を大雑把にしよう。特にシューティングについては
+シューティングエリアに安全高度を維持したまま向かうだけでシュート自体は行わない。
+ワークへの移動を指示されたらハンドを保持姿勢、パッド展開、ポンプオンにして向かう。
+人の操作でワークを回収する。回収時のZ軸下降はそのまま残しておいて、次に
+シューティングエリアへの移動ボタン(これもPSコンのボタンに割当)でシューティング
+エリアへ移動人が位置を調整しポンプをオフする。Z軸の操作も人が行う」。要点は
+「移動(XY方向)は自動化するが、Z軸を伴う実際の接触・吸着・投入操作は人間に委ねる」
+という運用イメージへの回帰(自動化の粒度を大雑把にする)。
+  - 回収シーケンス(_start_pick_sequence): ピッチ保持姿勢・パッド展開・ポンプONの
+    3呼び出しを、シーケンスの一番最初(移動開始前)にまとめて行うよう変更(以前は
+    ポンプONだけ最終降下後、回収実行を押した後に自動で呼んでいた)。これにより
+    実際にワークへ接触した瞬間にすぐ吸着できる。Z軸の自動降下ロジック自体
+    (安全高度→アプローチ高さまで自動降下→「回収実行」待ち→最終降下→安全高度へ
+    上昇)はユーザー指定通り変更していない(「回収時のZ軸下降はそのまま残して
+    おいて」)。ポンプONを最終降下後まで遅延させるための待機(pump_settle_sec)は
+    不要になったため削除した(ポンプが移動開始時点からONになっており、接触までに
+    十分な時間があるため)。
+  - 投入シーケンス(_start_shoot_sequence): 大幅に簡略化し、安全高度を維持した
+    まま対象シューティングエリアのXYへ向かう4レグのmoveのみ(安全高度退避→R退避→
+    θ回転→R伸長)に縮小した。以前あったピッチ投入姿勢への自動切替、
+    shoot_approach_depth_mによる自動降下は完全に削除(呼び出し元は一切呼ばれない)。
+    以降のZ軸降下・位置の微調整・ピッチ切替・ポンプOFF(投入実行)は全て人間が
+    コントローラーで手動操作する(「Z軸の操作も人が行う」)。
+  - 上記に伴い、投入完了(ポンプOFF)後にアーム(Z→R)を自動で安全な位置へ戻していた
+    後片付け機構(_check_post_shoot_cleanup/_start_post_shoot_cleanup、
+    _awaiting_post_shoot_cleanup/_prev_pump_on_state)は丸ごと削除した。この機構は
+    「投入シーケンス自身が箱の中まで自動で降下する」設計を前提に、ポンプOFF後に
+    自動で箱の外へ退避させる目的だったが、今回の再設計でZ軸操作そのものが完全に
+    人間の手動操作になったため(投入シーケンスはもう箱の中まで降りない)、
+    ポンプOFF後だけ自動でZ/Rを動かすのは「Z軸の操作も人が行う」という新方針と
+    矛盾する。前提が崩れたため丸ごと削除した(復活させる場合は要件を再確認すること)。
+  - 新規「投入エリアへ移動」ボタン(GUI: 「ピック/投入 自動シーケンス」パネル、
+    _on_shoot_start_button_clicked/_on_shoot_start_requested)を追加。直前に
+    自動シーケンスで向かったシューティングエリア(self._last_shoot_target、
+    _last_pick_targetの投入版)へ、同じ簡略化された投入シーケンスを再度呼び出す
+    (ユーザー指定: 「シューティングエリアへの移動ボタン(これもPSコンのボタンに
+    割当)」)。PSコン対応として、CommandGuiNodeにTriggerサービス
+    /shoot_sequence_start(pick_sequence_confirmと同じ構造、set_shoot_start_handler
+    経由でCommandGuiApp._on_shoot_start_requestedへ委譲)を新設し、
+    joy_teleop_node.pyにshoot_start_button(既定2、△ボタン想定)パラメータと
+    _update_shoot_startメソッド(pump_toggle_button/pickup_confirm_buttonと同じ
+    立ち上がりエッジ検出パターン)を追加した。
+  - DEFAULT_SEQUENCE_SETTINGS/「ピック/投入 自動シーケンス」パネルから、不要に
+    なったshoot_approach_depth_m・pump_settle_secの2項目を削除した(gains.jsonの
+    'sequence'セクションに古い値が残っていても_restore_saved_gainsはself.
+    sequence_edits(現在の入力欄)に存在するキーしか復元しないため無害)。
+  - オフスクリーンQt+実ノード(trajectory_follower_node/hand_node、ROS_DOMAIN_ID
+    分離)で、回収シーケンスの3呼び出し前倒し・Z軸自動降下の維持、投入シーケンスの
+    4レグ移動のみ・ハンドサービス呼び出しゼロ・安全高度維持、/shoot_sequence_start
+    経由の再実行、を検証済み(2026-09-03)。
+
+## tip_theta_jointの軌道生成パラメータ・joy手動速度が編集不可だった件 (2026-09-03発覚・修正)
+ピック/投入シーケンス導入でtip_theta_jointを初めて能動的に駆動するようになったが、
+tip_theta_jointが遅い(かつ回収シーケンス中はroot_theta_jointまで連動して遅くなる)
+とユーザーから報告があった。原因はtrajectory_follower_node.target_callbackの
+同時到達スケーリング: 1つのJointStateメッセージ内の全関節をt_sync(最も時間が
+かかる関節の所要時間)に合わせるため、tip_theta_jointのmax_velocity/
+max_accelerationが低い(gains.jsonの初期値0.1rad/s・0.2rad/s²のまま、root_thetaの
+チューニング済み8.0/8.0よりずっと低かった)と、回収シーケンスが両関節を同時に
+指令する区間ではroot_theta_jointの実効速度までtip_theta_joint側に引きずり下げられて
+いた。さらに調べると、command_gui_nodeの「軌道生成パラメータ」パネル
+(_build_trajectory_panel)はJOINT_NAMES(root_theta/z/r)しかループしておらず、
+tip_theta_jointの編集欄がGUIに存在しなかった(そのため誰も値を上げられなかった)。
+同様に「手動操作(joy)速度」パネルにもtip_theta用の欄が無く、joy_teleop_node自体
+tip_theta_jointを手動ジョグする軸を一切持っていなかった(これまでtip_thetaは
+どこからも能動的に駆動されていなかったため、UIが用意されていなかった)。
+対応(2026-09-03):
+  - command_gui_node.py: TRAJ_PANEL_JOINT_NAMES(=JOINT_NAMES+['tip_theta_joint'])
+    を新設し、「軌道生成パラメータ」パネルをこれでループするよう変更。これにより
+    tip_theta_jointのmax_velocity/max_accelerationがGUIから編集・gains.jsonへ
+    永続化できるようになった(以前は_traj_loaded_extra経由で読込時の値を無変更で
+    送り直すだけだった)。
+  - joy_teleop_node.py: axis_tip_theta(既定3、右スティック左右)・
+    tip_theta_speed(既定1.0rad/s)パラメータを追加し、右スティックでtip_theta_joint
+    も手動ジョグできるようにした(z=右スティック上下と対にした)。
+  - command_gui_node.py: 「手動操作(joy)速度」パネルにtip_theta_speed欄を追加
+    (_on_load_joy_speed/_apply_loaded_joy_speedを特定3関節のハードコードから
+    self.joy_speed_edits全体を対象にする汎用実装へ変更)。
+  - 対応が必要だったのは値を上げること自体ではなく「上げる手段がGUIに無かった」
+    ことなので、コード変更はUIの追加のみ。実際の推奨速度値(root_thetaと揃える、
+    または安全マージンを取った値にするか)はユーザーが実機で判断・設定すること。
+
+未着手・未確定事項:
+  - 安全高度Z・R退避量・回収Zオフセット・回収アプローチ余裕・
+    投入時手先θ(shoot_tip_theta_rad)の実機での妥当な値の決定(現状は安全側の
+    既定値のみ、hand_gather_side等と同様に実測合わせが必要。投入アプローチ深さ・
+    ポンプON後の待ち時間は上記「ピック/投入シーケンスの大幅簡略化」で不要になり
+    削除済み)
+  - tip_theta_jointのmax_velocity/max_acceleration(gains.json、現状0.1rad/s・
+    0.2rad/s²の低速値のまま)を実機で妥当な値に上げること(上記「tip_theta_jointの
+    軌道生成パラメータ・joy手動速度が編集不可だった件」参照。GUIから編集可能には
+    なったが、値自体はまだ調整されていない)
+  - tip_theta_joint = -root_theta_jointという回収時の打ち消し式が、実機の
+    tip_theta回転方向(real_joint_bridge.yaml tip_theta_sign等)・ハンドの
+    実際の取付向きと符号が一致しているか実機で要検証(sim/kinematicモデル上の
+    想定のみで未確認)
+  - PSコンの実際のボタン番号(pump_toggle_button/pickup_confirm_button/
+    shoot_start_button)の実機確認
+  - 実機でのシーケンス動作確認(hand_node/trajectory_follower_nodeの実機出力込み)
+  - 下記「シューティングボックスへの移動時の衝突回避」の根本対応(経路上の障害物との
+    衝突判定)はまだ未実装。本シーケンスの安全高度退避はワーク/シューティングボックス
+    "上面"をクリアする簡易ウェイポイントに過ぎず、経路上の他の障害物までは考慮していない。
+
 ## シューティングボックスへの移動時の衝突回避 (2026-08-27新規)
 soki_simのワンクリック移動ボタン(command_gui_node.py)やcommand_gui_nodeの目標送信は、
 現在IK計算した目標角度へtrajectory_follower_nodeが各関節を独立に(同時到達するよう
@@ -14,6 +437,11 @@ soki_simのワンクリック移動ボタン(command_gui_node.py)やcommand_gui_
     通ってしまうケースが起こり得る。
   - 対応方針は未検討(実装まだ)。候補としては経由点(ウェイポイント)を挟む、
     Z方向に十分持ち上げてから水平移動する、等の単純な回避策から検討することになりそう。
+  - 上記「ピック/投入 自動シーケンス」(2026-09-03)で、安全高度まで上げてから
+    水平移動する簡易ウェイポイントを導入したが、これは新規シーケンス経由の移動のみに
+    限定され、ワンクリック移動ボタン(自動シーケンスOFF時)やXYクリック・保存済み
+    ポイント送信には適用されない。経路上の障害物そのものを判定する根本対応にも
+    なっていない(あくまで「フィールド/箱の上面をクリアする」という簡易策)。
 
 ## 実機とsimの関節角度校正(進行中、2026-08-27にreal_joint_bridge_node実装済み)
 減速比・CAN_ID/device_id割当は判明済み(note/hardware_mapping.txt、
@@ -24,19 +452,27 @@ soki_sim/config/real_joint_bridge.yamlのパラメータ変更のみで数値を
     実角度保持)。外部減速比は両方判明済み: root_theta=112/24(=14/3、2026-08-27変更)、
     tip_theta=ベルト+プーリ(モーター側20T/手先側28T=1.4倍)。
     原点センサは1箇所(初期較正用と思われる、要確認)。
-  - z_joint/r_joint: M2006+C610の差動機構だが、位置の真値はロボマス内蔵
-    エンコーダではなく外付けAMTエンコーダ(ENC1/ENC2、CAN_HOST配下ノードの
-    ローカルチャンネル)を使う設計。相対(インクリメンタル)方式のため電源投入毎に
-    基準を喪失。上限・下限それぞれに原点センサあり(合成後のz軸/r軸それぞれに1個、
-    motor1/motor2の個別軸ではない、確認済み)。毎起動ホーミングが必須。
+  - z_joint/r_joint: M2006+C610の差動機構。位置の真値はロボマス内蔵ロータ
+    エンコーダのCAN帰還(M{n} angle)を使う設計(2026-08-31方針転換。以前は
+    外付けAMTエンコーダ(ENC1/ENC2、CAN_HOST配下ノードのローカルチャンネル)を
+    使っていたが不使用に変更、note/hardware_mapping.txt参照)。相対
+    (インクリメンタル)方式のため電源投入毎に基準を喪失。上限・下限それぞれに
+    原点センサあり(合成後のz軸/r軸それぞれに1個、motor1/motor2の個別軸では
+    ない、確認済み)。毎起動ホーミングが必須。
   - ros2canの「エンコーダ原点セット」機能(zero_channel)はz/rの毎起動
-    ホーミングにのみ使う。tip_thetaはzero_channelのオフセットが非永続な
-    ことに依存せず、real_joint_bridge_node側で永続パラメータ
-    (tip_theta_offset_rad)による初回較正のみの方式にしている。root_thetaは
-    さらに一歩進めて2026-08-27にsoftwareオフセット方式自体を廃止し、CubeMars
-    本体へSet Origin CANコマンドを送って実機エンコーダの原点を直接較正する
+    ホーミングにのみ使う。root_thetaは2026-08-27にsoftwareオフセット方式を廃止し、
+    CubeMars本体へSet Origin CANコマンドを送って実機エンコーダの原点を直接較正する
     方式に変更済み(/set_root_theta_originサービス、詳細はnote/hardware_mapping.txt
-    「root_theta/tip_thetaの原点初期化」参照)。
+    「root_theta/tip_thetaの原点初期化」参照)。tip_thetaは従来
+    real_joint_bridge_node側の永続パラメータ(tip_theta_offset_rad)による
+    初回較正のみだったが、2026-09-03にroot_thetaと全く同じCubeMars Set Origin
+    方式(/set_tip_theta_originサービス、trajectory_follower_node._set_cubemars_origin
+    共通実装、command_gui_nodeの「原点校正」タブに「tip_theta原点設定」ボタン
+    追加)にも対応した(ユーザー指摘: 「root_theta原点設定と同様に手先θの原点合わせ
+    用も追加」)。tip_theta_offset_rad(real_joint_bridge_node側)は廃止しておらず、
+    2つの較正手段が併存している状態のため、実機投入前にどちらを正とするか整理が
+    必要(root_thetaは既にsoftwareオフセットを廃止済みなので、同様にtip_theta_
+    offset_radも廃止してSet Origin方式に一本化するのが自然だが未対応)。
 
   - z_joint/r_jointについても、ros2canのMODE_ROBOMASにMITモードが実装された
     ことを受け、2026-08-29にtrajectory_follower_node経由でのMIT位置制御出力を
@@ -62,8 +498,9 @@ soki_sim/config/real_joint_bridge.yamlのパラメータ変更のみで数値を
     (2026-08-27時点、RPM=3/POS=4の続き番号として採用したのみで未検証。
     note/hardware_mapping.txt参照)
   - root_thetaの初回較正の実施(原点センサ位置で/set_root_theta_originを呼ぶ)
-  - tip_thetaの初回較正の実施(原点センサ位置で_unwrapped値を読み、
-    tip_theta_offset_radをreal_joint_bridge.yamlに記入)
+  - tip_thetaの初回較正の実施。2026-09-03に/set_tip_theta_origin(root_thetaと
+    同じCubeMars Set Origin方式)を追加したため、こちらを使うか、従来の
+    tip_theta_offset_rad(real_joint_bridge.yaml)方式を使うか要整理(上記参照)
   - homing_node(z/r起動時ホーミング)は実装済み(2026-08-27、soki_sim/scripts/
     homing_node.py)だが、以下は仮定のまま実機未検証:
     - z軸/r軸原点センサのSWチャンネル配線(node_index/local_index、
@@ -73,3 +510,297 @@ soki_sim/config/real_joint_bridge.yamlのパラメータ変更のみで数値を
     実機での動作確認・調整が必要(低速30rpm・タイムアウト20秒から開始する設計)。
     start_homing/stop_homing(std_srvs/Trigger)サービスで手動起動・中断できる
     (安全のため自動起動はしない)。
+
+## PSコンのL4/R4・ポンプボタン再割当と、実行中の予約キュー追加 (2026-09-03)
+ユーザー指定でjoy_teleop_node.pyのボタン割当を変更: 「□(四角)でL4、○(丸)で
+R4、△(三角)でポンプトグル、×(バツ)で回収実行」(×のみ従来から変更なし)。
+  - joy_teleop_node.py: pump_toggle_button既定を1→2(△)、shoot_start_l4_button
+    既定を2→3(□)、shoot_start_r4_button既定を3→1(○)に変更(pickup_confirm_
+    buttonは0(×)のまま)。docstring・各_update_*メソッドのコメントも新割当に
+    合わせて修正。
+  - 追加でユーザー指摘: 「またシーケンス実行中に押されてもキューに追加し後で
+    実行」「キューに追加できる操作は1つ先まで」。従来は_guard_sequence_startが
+    _seq_active中のL4/R4リクエストを拒否するだけ(GUIならQMessageBox、PSコン
+    経由ならTriggerサービスのresponse.success=Falseで実質握りつぶし)だった。
+    command_gui_node.py CommandGuiAppに1件だけの予約スロット
+    self._seq_queued_shoot_label(初期None)を追加し、_on_shoot_start_requested
+    (label)で_seq_active中なら即座に開始せず予約するだけに変更(ステータス表示
+    「◯◯シーケンス完了後に{label}へ移動します(予約)」)。実行中の別のシーケンスが
+    _advance_sequenceの完了分岐(_seq_index >= len(_seq_steps))に到達した時点で
+    予約があれば自動的に_on_shoot_start_requestedを呼び直して開始する。1件しか
+    保持しないため、予約済みの状態で別のL4/R4ボタンが押された場合は新しい方で
+    上書きする(最新の指示を優先)。_abort_sequence(手動中断・タイムアウト)では
+    予約もあわせてクリアする(中断は「止めたい」という意図なので、そのまま次の
+    シーケンスへ続けるのは意図に反するため)。ポンプトグル(△)・回収実行(×)は
+    従来通りシーケンスの実行状態と独立に即座に実行するだけで、キューイングの
+    対象にはしていない(ポンプはシーケンス中でも常時操作可能、回収実行は
+    「一時停止中の回収シーケンスを進める」専用の別ロジックであり、新規シーケンス
+    開始の拒否とは性質が異なるため)。
+  - 上記「未着手・未確定事項」のPSコン実ボタン番号の実機確認は引き続き未対応
+    (今回の割当もLinuxドライバの一般的な仮定値のまま)。
+  - 続けてスティック割当も変更(2026-09-03、同日): 「左スティック上下でZ、
+    右スティック上下でR」。それまでz_jointは右スティック上下(axis_z、
+    既定4)、r_jointは十字キー上下(axis_r、既定7)だった。axis_zを4→1
+    (左スティック上下)、axis_rを7→4(右スティック上下)に変更(十字キーは
+    既定では未使用になった)。root_theta(左スティック左右、axis_theta=0)・
+    tip_theta(右スティック左右、axis_tip_theta=3)は変更なし。実軸番号は
+    実機で`ros2 topic echo /joy`要確認な点は他パラメータと同様。
+  - さらにOPTIONSボタンで手先θのroot_theta追従トグルを追加(2026-09-03、
+    同日、ユーザー指定: 「OPTIONSボタンで手先θを根本θに追従させるか
+    切り替えられるように」、続けて「デフォルトを自動シーケンスで実行に」)。
+    joy_teleop_node.pyにtip_theta_follow_theta_buttonパラメータ(既定9、
+    OPTIONSボタン想定、実機未確認)と_update_tip_theta_follow_toggleメソッド
+    (立ち上がりエッジでself._tip_theta_follow_theta_を反転するだけ、他の
+    ボタンと違いサービス呼び出しは無い)を追加。self._tip_theta_follow_theta_
+    は既定True(ON)。_timer_callbackのtip_theta_joint計算を、ONの間は
+    回収シーケンスと同じ追従式tip_theta_joint = -root_theta_jointを毎周期
+    指令する分岐を最優先にし(右スティック左右の手動ジョグ入力tip_theta_inは
+    無視)、OFFの間は従来通り右スティック左右で独立にジョグできる分岐へ
+    フォールバックする3分岐構成(follow / 手動ジョグ / 現在値へ同期)に変更。
+    ポンプトグル等と同じくenable_button(デッドマン)とは独立に扱う。
+  - 「ワーク・シューティングボックス」パネルの「自動シーケンスで実行」
+    チェックボックス(self.seq_auto_checkbox)も既定OFF→ON に変更
+    (2026-09-03、同日、ユーザー指定)。setChecked(True)を追加しただけで、
+    ON時の動作(workボタン=回収シーケンス・shootボタン=投入シーケンス開始、
+    _on_field_point参照)自体は変更なし。
+  - SHAREボタンでXY移動モードをトグル(2026-09-03、同日、ユーザー指定:
+    「続いてSHAREでX,Y移動モードに切り替え。現状は各関節の角度を人が調整
+    しているがこのモードではスティックでX,Y方向に手先を動かせる」)。
+    joy_teleop_node.pyにxy_move_toggle_button(既定8、SHAREボタン想定、実機
+    未確認)・axis_x/axis_y(既定はaxis_theta/axis_rと同じ0/4、同じ物理
+    スティックを流用)・invert_x/invert_y・xy_speed(既定0.2m/s)パラメータと
+    _update_xy_move_toggle(トグル状態self._xy_move_mode_を反転するだけ)を
+    追加。_timer_callbackのtheta/r計算を、xy_move_mode ON時はaxis_x/axis_yの
+    入力をcommand_gui_node.xyz_to_joint/joint_to_xyzと同じ極座標変換
+    (radius=r+ARM_LENGTH/2、x=-radius*sin(theta)、y=radius*cos(theta))で
+    ワールドXYへ変換→dx,dyを加算→逆変換(atan2(-x,y)、hypot(x,y)-ARM_LENGTH/2)
+    でtarget_theta_・target_r_を同時更新する分岐に、OFF時は従来のtheta_in/r_in
+    個別ジョグ分岐にする2分岐構成へ変更。ARM_LENGTH/ROOT_THETA_LOWER・UPPER/
+    R_LOWER・UPPERは元々joy_teleop_node.py側にも定義済みの定数を再利用。
+  - 続けて「手先θ追従はシューティングボックスへの自動移動時には自動で無効化」
+    (2026-09-03、同日、ユーザー指定)。投入(L4/R4)シーケンスはtip_thetaを固定値
+    (shoot_tip_theta_rad)へ制御するため、joy_teleop_nodeの手先θ追従(OPTIONS
+    トグル、既定ON)がONのまま残っていると、joy_teleop_node側が毎周期
+    tip_theta=-root_thetaで上書きして競合する。joy_teleop_node.pyにstd_srvs/
+    SetBoolサービス'set_tip_theta_follow_theta'(_on_set_tip_theta_follow_srv、
+    self._tip_theta_follow_theta_を直接書き換えるだけ)を追加し、command_gui_
+    node.py CommandGuiNodeにクライアント(_joy_tip_theta_follow_client_)と
+    ヘルパーset_joy_tip_theta_follow(enabled)(未接続なら黙って諦める、安全側)
+    を追加。CommandGuiApp._start_shoot_sequence(_guard_sequence_start通過後、
+    実際のmove step構築前)でself.node.set_joy_tip_theta_follow(False)を呼び、
+    投入シーケンス開始のたびに自動でOFFにする。回収(pick)シーケンスは元々
+    tip_theta=-root_thetaを自分でも指令しており追従式と一致するため対象外
+    (競合しない)。自動での再ON化はしていない(投入完了後もOFFのまま、
+    ユーザーが必要ならOPTIONSボタンで手動ON)。
+  - 続けて十字キー(D-pad)でGUI上のワーク選択・×ボタンで移動/回収実行の
+    2段階操作を追加(2026-09-03、同日、ユーザー指定:「矢印キーでGUI上で
+    目標ワークを選択し移動バツで移動、再度バツで回収実行」)。
+    - command_gui_node.py: CommandGuiNode.__init__にTriggerサービス4つ
+      (select_work_up/down/left/right、set_work_select_handler経由で
+      CommandGuiApp._on_work_select_requestedへ委譲)を追加。
+      CommandGuiApp側は_build_field_buttons内でワークボタン(kind=='pick')の
+      QPushButton参照をself._work_buttons[(round(x,6),round(y,6))]に保存
+      (_build_button_gridに新設したon_buttonコールバック引数経由、シューティング
+      ボックスボタンは対象外)。ワーク選択カーソルの座標系はself._work_grid
+      (rank,col)->(x,y,z)・self._work_grid_rc_by_xy(逆引き)として、
+      _build_button_grid内のxs/ys計算と同じ基準(X昇順=左->右、Y降順=奥->手前)
+      で独自に計算(シューティングボックス列を挟まないワーク4行6列のみの
+      ローカルな添字にするため、_build_button_gridの全点混合列番号は使わない)。
+      既定選択は(0,0)。_move_work_selection(d_rank,d_col)でclamp移動、
+      _highlight_selected_work(selected)でQPushButtonの'selected'プロパティを
+      setProperty+unpolish/polishして切替(resources/style.qssに
+      QPushButton[selected="true"]の緑枠ルールを追加、既存のvariant
+      grid/grid-highlightとはプロパティセレクタのAND条件で独立に重ねられる)。
+      マウスでのワーククリック(_on_field_point)でも選択カーソルを同じワークへ
+      同期させる(PSコン操作とマウス操作の状態が食い違わないように)。
+    - _on_pick_confirm_requested(×ボタン=pickup_confirm_button=pick_sequence_
+      confirmサービス、既存の「1回目=移動、待機中の2回目=回収実行」という
+      2段階構造は元からあった)を変更: 非アクティブ時に呼ばれた場合、従来は
+      self._last_pick_target(直前にシーケンス開始したワーク)のみを再送信する
+      仕様だったが、self._selected_work_xyz()(矢印キー選択中のワーク、無ければ
+      _last_pick_targetへフォールバック)を優先して_start_pick_sequenceを呼ぶ
+      よう変更。選択カーソルは常にどこかのワークを指しているため実質的に
+      「×ボタン1回目=選択中のワークへ移動、待機中の×2回目=回収実行」という
+      要求通りの動作になる。GUIの「回収実行」ボタンも同じ_on_pick_confirm_
+      requestedを使うため、同様に選択中ワークへ移動する動作へ揃った
+      (既存の吸着失敗時再試行=同じ選択のまま再度×を押す、で従来通り機能する)。
+    - joy_teleop_node.py: axis_select_col(既定6、十字キー左右)・
+      axis_select_row(既定7、十字キー上下、多くのLinuxドライバでaxes配列の
+      末尾2要素として出てくる想定、実機未確認)・invert_select_col/rowパラメータ
+      と_update_work_selectionメソッド(閾値0.5で「押されている」とみなし、
+      立ち上がりエッジで方向に応じたselect_work_*クライアントを呼ぶ。押し
+      っぱなしでの連続移動はしない)を追加。共通の_call_trigger(client,
+      description)ヘルパーも追加(既存の複数の_update_*内の「service_is_ready
+      なら呼ぶ、無ければwarning」という重複コードを流用可能にする目的だが、
+      既存メソッドは今回改修せず新規メソッドのみで使用)。
+    - オフスクリーンQt(実ノードは未起動、mixed_joint_stateを直接注入)で、
+      選択カーソルのclamp移動(グリッド端で止まる)・×相当の_on_pick_confirm_
+      requested呼び出しで選択中ワークへの回収シーケンスが開始されること
+      (_seq_active=True、_last_pick_targetが選択ワークの座標に一致)を確認済み
+      (2026-09-03)。実機のD-pad軸番号・値の符号は引き続き未検証。
+  - 実機/シミュレータで確認したところ左右が2箇所逆だったため修正(2026-09-03、
+    同日、ユーザー指摘:「左右が反転している」→「十字キーのワーク選択とXYモード
+    のXのどちらも」)。
+    - joy_teleop_node.py: XY移動モードのinvert_x既定をFalse→Trueに変更
+      (左スティック左右が世界座標Xと逆方向だったため)。
+    - 十字キー左右(ワーク選択)は「値の符号」ではなく「押した方向と呼ぶ
+      サービスの対応」自体が逆だったため、_update_work_selectionのcol_val>0時に
+      呼ぶクライアントをselect_work_left_client_⇔select_work_right_client_で
+      入れ替えて修正(invert_select_colパラメータ自体は既定Falseのまま。
+      実際に読者が確認する場合は、この対応関係が実機のドライバでも成立するか
+      要再確認)。
+  - 続けて「回収実行はバツ長押しに変更」(2026-09-03、同日、ユーザー指定)。
+    誤操作でワークに接触・吸着してしまうことを防ぐため、×ボタンの「移動」と
+    「回収実行(確定)」を短押し/長押しで分離。
+    - command_gui_node.py: 既存のpick_sequence_confirmサービスを「確定のみ」
+      (待機中でなければ何もしない)に限定し、新規にpick_sequence_moveサービス
+      (「選択中ワークへの移動のみ」、既にシーケンス実行中なら何もしない)を追加。
+      CommandGuiApp側は_try_confirm_pick/_try_move_to_selected_workの2つの
+      内部ヘルパーに分解し、_on_pick_confirm_only_requested(確定専用、
+      set_pick_confirm_handlerに登録、pick_sequence_confirm用)・
+      _on_pick_move_only_requested(移動専用、新設のset_pick_move_handlerに
+      登録、pick_sequence_move用)をそれぞれ用意。GUIマウスの「回収実行」
+      ボタンは長押し概念が無いため、従来通り両方を試す統合ハンドラ
+      _on_pick_confirm_requested(confirm→ダメならmove)のままクリック接続を
+      維持(マウス操作のUXは変更なし)。「ピック/投入 自動シーケンス」パネルの
+      説明文・待機中ステータス表示も「×長押し」と明記するよう更新。
+    - joy_teleop_node.py: pickup_confirm_hold_sec(既定0.8秒)パラメータを追加。
+      _update_pickup_confirmを全面改修: 立ち上がりエッジで即座にpick_sequence_
+      moveを呼び(_pickup_press_start_time_に押下開始時刻を記録)、押し続けて
+      pickup_confirm_hold_sec秒経過した時点で1回だけpick_sequence_confirmを
+      呼ぶ(_pickup_confirm_fired_this_press_で同一押下中の再発火を防止、
+      離すとリセット)。
+    - オフスクリーンQtで、_on_pick_move_only_requested(idle)→True・seq_active
+      になること、_on_pick_confirm_only_requested(待機前)→False(no-op)、
+      待機中(_seq_waiting_service='(pick_confirm)')に設定後は_on_pick_confirm_
+      only_requested→True・待機解除、実行中の_on_pick_move_only_requested→
+      False、をそれぞれ確認済み(2026-09-03)。
+  - 上記の実装直後、ユーザー報告で不具合発覚・修正(2026-09-03、同日):「矢印
+    でのワーク位置選択と移動後、回収実行をしないと移動ができない。誤って選択
+    しても移動できるように回収実行を押さなくてもワーク位置移動を再度指示できる
+    ように」。原因: _try_move_to_selected_work内の`if self._seq_active: return
+    False`が、_start_pick_sequence自身が元から持っていた「回収シーケンス実行中
+    (回収実行待ち含む)に再度workボタンが押された場合は自動的に新しいワークへ
+    やり直す」機能(restarting_from_work、2026-08-27頃?から存在。ワーク
+    ボタンのマウスクリックでは機能していた)を、×短押し/pick_sequence_move
+    経由の場合だけ手前でブロックしてしまっていた。修正: ガード条件を
+    `if self._seq_active and self._seq_kind != '回収': return False`に変更し、
+    回収シーケンス実行中(待機中含む)なら_start_pick_sequenceへ委譲してやり
+    直しを許可、投入(shoot)など回収以外がアクティブな場合のみブロックする
+    (_start_pick_sequence側のモーダルQMessageBoxはPSコン操作のみでは閉じ
+    にくいため、その場合だけは呼ばせない)。オフスクリーンQtで、move→
+    wait_pick_confirm相当の状態に設定→選択を変更して確認せずに再度move→
+    aborted&新ワークへ再開始(last_pick_targetが新選択の座標に更新、
+    _seq_waiting_serviceがNoneにリセット)されることを確認済み。
+  - 上記の直後、さらに方針を一段階徹底(2026-09-03、同日、ユーザー指摘:
+    「回収実行を押さなくてもシューティング位置へ移動できるように。ユーザーの
+    動きを制限したくない。状況判断はユーザーが行うため」)。それまで残っていた
+    「投入(shoot)など回収以外がアクティブな場合は_start_pick_sequence側の
+    モーダルダイアログがPSコン操作のみでは閉じられないため、そこだけは拒否する」
+    という制約自体を撤去し、実行中の他のシーケンスが何であっても即座に中断して
+    切り替える方針に統一した:
+    - _start_pick_sequence: 「_seq_active and 種類が回収以外ならQMessageBoxで
+      拒否」というguardを削除。_seq_active中は常に(種類を問わず)_abort_
+      sequence()してから続行するよう変更(restarting_from_workは「直前が回収
+      だったか」の判定用として残し、ワークtoワークの近距離移動最適化(R退避
+      省略)の分岐にのみ使う。投入から回収へ切り替わった場合はrestarting_from_
+      work=Falseになるため通常の全区間移動になる=安全側)。
+    - _start_shoot_sequence: 同様に_guard_sequence_start(_seq_active中は
+      QMessageBoxで拒否するだけの関数)の呼び出しをやめ、_seq_active中は
+      _abort_sequence()してから続行するよう変更。_guard_sequence_start関数
+      自体は他に呼び出し元が無くなったため削除。
+    - _on_shoot_start_requested: 「実行中は1件だけ予約し完了後に自動開始する」
+      キュー機構(_seq_queued_shoot_label、直前のセッションで追加したばかりの
+      機能)が丸ごと不要になったため削除(_advance_sequenceの完了処理・
+      _abort_sequence・CommandGuiApp.__init__の初期化からもすべて除去)。
+      _on_shoot_start_requestedは単純に_start_shoot_sequenceを呼ぶだけになった。
+    - _try_move_to_selected_work(×短押し/pick_sequence_move用): 上記により
+      _start_pick_sequence側がモーダルダイアログを出さなくなったため、
+      `self._seq_kind != '回収'`の場合だけ弾く制約も撤去。シーケンスの種類を
+      問わず常に_start_pick_sequenceへ委譲するようになった。
+    - オフスクリーンQtで、回収シーケンスを開始→回収実行待ち状態のまま(未確定)
+      shoot L4を要求→即座に投入シーケンスへ切り替わること(seq_kind='投入'、
+      waiting_serviceがNoneにリセット)、続けてその投入シーケンス実行中に
+      pick moveを要求→即座に回収シーケンスへ切り替わること(seq_kind='回収')、
+      の両方向を確認済み(2026-09-03)。
+  - 上記の直後、ユーザー報告で新たな不具合発覚・修正(2026-09-03、同日):
+    「バツ長押しで回収ができなくなった」。原因: joy_teleop_node._update_
+    pickup_confirmは×ボタンの立ち上がりエッジ(押した瞬間)で即座にpick_
+    sequence_moveを呼んでいた。長押しで回収実行確定するつもりで×を押すと、
+    その押した瞬間の移動呼び出しが先に発火し、command_gui_node._start_pick_
+    sequence側が(直前の「回収実行を押さなくても移動できるように」の変更で)
+    実行中でも常に即座に中断・やり直すようになっていたため、「回収実行待ち」
+    状態自体がそこで壊れてしまい、その後どれだけ長押しを続けてもpick_
+    sequence_confirmが確定すべき対象を失っていた(2つの直前の修正が組み合わさって
+    露呈した不具合)。
+    応急的にはjoy_teleop_node側で「移動をボタンを離した時点まで遅延させる」
+    (短押しと確定したときだけ移動を呼ぶ)よう修正して一旦解消したが、続けて
+    ユーザーから「回収ボタンをバツ長押しからPSボタンに変更」の指定があり、
+    根本的にボタンそのものを分離する方針に変更した:
+    - joy_teleop_node.py: pickup_confirm_hold_secパラメータ・長押し計測ロジック
+      (_pickup_press_start_time_/_pickup_confirm_fired_this_press_)を全て削除し、
+      ×ボタン(pickup_confirm_button)は単純な立ち上がりエッジ即時でpick_
+      sequence_moveを呼ぶだけの_update_pickup_moveに戻した。新規にpick_confirm_
+      button(既定10、PSボタン想定、実機未確認)パラメータと_update_pick_confirm_
+      buttonメソッド(同じく単純な立ち上がりエッジ即時でpick_sequence_confirmを
+      呼ぶだけ)を追加。2つのボタンは完全に独立したprev-pressed状態
+      (_prev_pickup_move_pressed_/_prev_pick_confirm_button_pressed_)を持つため、
+      互いに干渉しない。時間計測が不要になったため`import time`も削除した。
+    - command_gui_node.py: サービス自体(pick_sequence_move/pick_sequence_confirm)
+      とCommandGuiApp側のハンドラ構成(_try_move_to_selected_work/_try_confirm_
+      pick、_on_pick_move_only_requested/_on_pick_confirm_only_requested)は
+      変更不要(元々ボタン非依存の設計だったため)。GUI説明文・ステータス表示・
+      各種docstringの「×長押し」表記のみ「PSボタン」に置き換えた。
+    - オフスクリーンQtで、_on_pick_move_only_requested→True・seq_active、続けて
+      待機状態に設定後_on_pick_confirm_only_requested→True・待機解除、と
+      2つが独立して正しく動作することを確認済み。
+  - 続けてデフォルトの手動操作モードをXYモードに変更、スティック割当も再調整
+    (2026-09-03、同日、ユーザー指定:「デフォルトの手動操作モードをXYモードに。
+    XYは左ステック、Zは右スティック上下で」)。
+    - joy_teleop_node.py: self._xy_move_mode_の初期値をFalse→True(起動直後は
+      XYモード、SHAREボタンを押すと関節モード(root_theta/r直接ジョグ)へ切り替わる。
+      以前は逆で起動直後が関節モードだった)。
+    - axis_z(z_jointの手動ジョグ軸)を1(左スティック上下)→4(右スティック上下)に
+      変更(ユーザー指定:「Zは右スティック上下で」)。axis_zはXY/関節どちらの
+      モードでも常時有効(theta/rやX/Yと違いモード分岐の外にある)。
+    - axis_y(XYモードのYジョグ軸)を4(右スティック上下)→1(左スティック上下)に
+      変更(ユーザー指定:「XYは左スティック」。axis_x=0=左スティック左右と
+      合わせて左スティックだけでX,Y両方を操作できるようにする)。
+    - axis_r(関節モードのr_jointジョグ軸)を4(右スティック上下)→1(左スティック
+      上下)に変更。これは今回のユーザー指定に直接は無いが、axis_zが右スティック
+      上下(4)に移ったため、axis_rをそのまま4にしておくと関節モードで右スティック
+      上下を倒した際にr_jointとz_jointが同時に動いてしまう(z_jointがモード非依存
+      で常時axis_z=4を読むため)。競合を避けるため、axis_zが元々使っていた1
+      (左スティック上下)にaxis_rを付け替えた(結果的に関節モードは左スティック
+      左右=theta、左スティック上下=r、右スティック上下=zという配置になる)。
+    - オフスクリーンでノードを起動し、_xy_move_mode_=True、axis_x=0/axis_y=1/
+      axis_z=4/axis_r=1/axis_theta=0/axis_tip_theta=3であることをログ・属性値の
+      両方で確認済み。
+
+## 投入シーケンスが手先ピッチを投入姿勢へ揃えていなかった件 (2026-09-04発見・修正)
+ユーザー報告: 「手先ピッチが作動したりしなかったりする理由。シュート時は手先
+ピッチ投入姿勢でなくてはならない」。
+  - 原因: _start_shoot_sequence(投入シーケンス、L4/R4ボタン)のstepsには元々
+    手先ピッチ(hand pitch)を操作する呼び出しが一切無かった。ピッチが投入姿勢に
+    なるのは、_start_pick_sequence(回収シーケンス)が末尾で行う
+    ('call', '/hand_set_pitch_insert')(パッド収納後、次のシュートに備えて投入
+    姿勢へ切替、コメント「収納後は投入姿勢へ(シュートへの搬送に備える)」)が
+    完了した場合のみで、投入シーケンス自身はそれを前提に何もしていなかった。
+    2026-09-03の一連の変更(「回収実行を押さなくてもシューティング位置へ移動
+    できるように。ユーザーの動きを制限したくない」)により、回収シーケンスの
+    どの時点でも(冒頭のhand_set_pitch_hold直後、回収実行待ち中、等)即座に
+    投入シーケンスへ中断・切り替えられるようになった結果、回収シーケンスが
+    末尾のhand_set_pitch_insertまで到達しないまま中断されるケースが実運用上
+    頻発するようになり、「手先ピッチが作動したりしなかったりする」(=投入
+    シーケンスへ切り替えた時点の手先ピッチが保持姿勢のまま、あるいは不定)と
+    いう不具合として顕在化した。
+  - 対応: _start_shoot_sequenceのsteps先頭に('call', '/hand_set_pitch_insert')
+    を追加し、投入シーケンス自身が開始時に必ず投入姿勢へ揃えるように変更
+    (以前は「ピッチ投入姿勢への切替は自動区間に含めず人間が操作する」という
+    設計だったが、これは「回収シーケンスが必ず最後まで完走してから投入へ移る」
+    という前提があって初めて成立していたもので、その前提が崩れたため、投入
+    シーケンス自身が保証する方式に変更した。Z軸降下・ポンプOFF等、実際のシュート
+    操作自体は引き続き人間が行う、変更なし)。
+  - オフスクリーンQtで、_on_shoot_start_requested('L4')実行直後の
+    gui._seq_steps[0]が('call', '/hand_set_pitch_insert')になっていることを
+    確認済み(2026-09-04)。

@@ -13,19 +13,29 @@ tip_theta_jointは root_theta_joint とは別方式: タイミングベルト+�
   tip_theta_joint角度 = AK40-10エンコーダ角度 / 1.4 ( = * 5/7 )
 
 ## z_joint / r_joint (motor1/motor2差動、M2006+C610)
-位置の真値はC610/M2006内蔵ロータエンコーダのCAN帰還(ROBOMASのM{n} angle)ではなく、
-外付けAMTエンコーダ(ENC1/ENC2、CAN_HOST配下ノードのローカルチャンネル、
-note/can_mapping.txt参照)を使う。ロボマス(M2006)モーター軸 →
-プーリ(ピッチ円直径22.92mm、確認済み) → タイミングベルトで機構に接続。
+**方針変更(2026-08-31、ユーザー判断)**: 位置の真値はC610/M2006内蔵ロータ
+エンコーダのCAN帰還(ROBOMASのM{n} angle)を使う。以前は外付けAMTエンコーダ
+(ENC1/ENC2、CAN_HOST配下ノードのローカルチャンネル)を真値としていたが、
+ロボマス内蔵エンコーダに統一したため不使用になった(ENC1/ENC2自体の配線情報は
+note/can_mapping.txt「外付けAMTエンコーダ」に不使用の注記付きで残してある)。
+これにより「MIT位置フィードバックは内蔵エンコーダ、較正の真値は外付けENC」という
+2系統だった構成が、内蔵エンコーダ1本に統一された。
+ロボマス(M2006)モーター軸 → プーリ(ピッチ円直径22.92mm、確認済み) →
+タイミングベルトで機構に接続。
   pulley_radius = 22.92 / 2 = 11.46mm (ピッチ円直径なのでこれを直径として半分にする)
   motor1_joint/motor2_joint(線形変位、m) = motor_angle[rad] * pulley_radius[m]
-    motor_angle[rad] = ENCカウント値 / エンコーダ分解能(CPR、要確認) * 2π
+    motor_angle[rad] = M{n} angle帰還(0.1deg/LSB、cubemarsの帰還と同じ
+    スケール。robomas.cpp参照) をradへ変換したもの
 この線形変位に対して、既存の差動ミキシング(soki_sim/scripts/motor_mixer_node.py)が
 そのまま適用される:
   z = k*(m1+m2), r = k*(m1-m2), k = 0.5
 上下限の原点センサは合成後のz/r軸それぞれに付いている(motor1/motor2の
 個別軸ではない、確認済み)。相対エンコーダのため毎起動ホーミング必須
 (詳細はnote/claude_task.txt「実機とsimの関節角度校正」参照)。
+実装: soki_sim/scripts/real_joint_bridge_node.py、homing_node.py両方とも
+robomas_device_id(21)のserial_rx_*_unwrappedを購読してM{n} angleを読む方式に
+書き換え済み(2026-08-31)。CAN_HOST(device_id=101)はz/r原点センサ
+(SW1/SW2のリミットスイッチ)の読み取りにのみ、引き続きhoming_nodeが使う。
 
 ## ros2can CAN_ID・スロット割当 (note/can_mapping.txt記入済み、2026-08-27。
 ## デバイスIDは実機再確認により修正済み)
@@ -34,15 +44,12 @@ MODE_CUBEMARSデバイス (device_id=11):
   M2 (CAN_ID=102) → tip_theta_joint  (同上)
   M3/M4 → 未使用
 MODE_ROBOMASデバイス (device_id=21):
-  M1 (CAN_ID=0x201) → motor1_joint (速度指令用。位置の真値には使わない、上記参照)
+  M1 (CAN_ID=0x201) → motor1_joint (速度指令・位置の真値(M{n} angle帰還)の両方に使用)
   M2 (CAN_ID=0x202) → motor2_joint (同上)
   M3/M4 → 未使用
 CAN_HOSTデバイス (device_id=101、xiao_esp32_s3_smd_serial_bridge):
-  配下ノード(node_index、要確認)のENC1 → motor1_joint、ENC2 → motor2_joint
-  グローバルスロット = node_index*5 + {3:ENC1, 4:ENC2}
-
-CAN_HOSTのnode_index=1、外付けAMTエンコーダの分解能=2048CPRと判明済み
-(note/can_mapping.txt、real_joint_bridge.yamlに反映済み)。
+  z/r原点センサ(SW1/SW2)のみ使用。ENC1/ENC2は不使用(上記方針変更参照)。
+  グローバルスロット = node_index*5 + local_index
 
 ## root_theta/tip_thetaの原点初期化(θの「毎起動ホーミング」は不要な設計)
 z/rと違い、CubeMars AK40-10は絶対値エンコーダなので機構の原点自体は
@@ -162,9 +169,11 @@ z_joint/r_jointもtrajectory_follower_nodeからMIT指令を送れるように�
     0.1deg/LSBより粗い。範囲確保のため、robomas.cppのコメント参照)、帰還(angle)は
     0.1deg/LSB(cubemarsと同じ)。mit_kp=0.001(A/deg)/LSB、mit_kd=0.0001(A/rpm)/LSB、
     mit_current_ff=0.001A/LSB(config.hppのROBOMAS_MIT_*と一致させること)。
-  - 位置フィードバック基準はロボマス内蔵ロータエンコーダに割り切った
-    (root_theta/tip_thetaと同じ設計判断)。z/rの真値である外付けAMTエンコーダ
-    (ENC1/ENC2)との間のバックラッシュ差分は無視する。
+  - 位置フィードバック基準はロボマス内蔵ロータエンコーダ(root_theta/tip_thetaと
+    同じ設計判断)。2026-08-31の方針変更でreal_joint_bridge_node/homing_node側の
+    z/r真値も同じロボマス内蔵エンコーダに統一されたため、以前あった「MIT側は
+    内蔵エンコーダ、較正側は外付けENC1/ENC2」という基準のズレ(バックラッシュ差分)
+    は解消された。
 
 **homing_nodeとの排他制御**: homing_nodeは起動時ホーミング中、同じ
 robomas_device_idへ独立に速度指令をpublishするため、trajectory_follower_nodeの
@@ -187,3 +196,8 @@ SetParametersするようhoming_node._apply_offsets()を拡張した。値・符
 - homing_nodeが仮定しているz/r原点センサのSWチャンネル配線、センサ検出時の
   真のz/r値、モータ回転符号とz/r移動方向の対応(note/can_mapping.txt
   「z/r原点センサ(ホーミング用)」に記入欄あり、実機で要検証)
+- (2026-08-31追加) motor1_sign/motor2_sign(real_joint_bridge_node/homing_node
+  共通)は、以前は外付けENC1/ENC2カウント値の符号として較正されていた前提の値
+  (real_joint_bridge.yaml)をそのままロボマス内蔵エンコーダ帰還向けに転用している。
+  2つのエンコーダで回転方向の符号が同じとは限らないため、実機でmotor1/motor2を
+  それぞれ単体で少し回して符号が合っているか要再確認。

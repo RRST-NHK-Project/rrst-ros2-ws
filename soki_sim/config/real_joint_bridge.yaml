@@ -17,14 +17,12 @@ real_joint_bridge_node:
     # (trajectory_follower_nodeの/set_root_theta_originサービス、note/hardware_mapping.txt参照)。
     tip_theta_offset_rad: 0.0   # 要初回較正: 原点センサ位置での_unwrapped値から逆算して設定
 
-    # ---- CAN_HOST配下ノードのENC1/ENC2 (motor1_joint / motor2_joint) ----
-    can_host_device_id: 101
-    can_host_node_index: 1    # 確認済み(note/can_mapping.txt)
-    can_host_slots_per_node: 5
-    enc1_local_index: 3
-    enc2_local_index: 4
-    enc1_is_motor1: true      # 記入済み: ENC1=motor1_joint, ENC2=motor2_joint
-    motor_encoder_counts_per_rev: 2048.0  # 確認済み(note/can_mapping.txt)
+    # ---- ROBOMAS (motor1_joint / motor2_joint、内蔵ロータエンコーダのCAN帰還を
+    # 位置の真値として使う。2026-08-31方針転換で外付けAMTエンコーダ(ENC1/ENC2、
+    # CAN_HOST配下ノード)は不使用に変更した) ----
+    robomas_device_id: 21
+    robomas_motor1_index: 0   # M1 angle帰還スロット
+    robomas_motor2_index: 1   # M2 angle帰還スロット
     pulley_pitch_diameter_mm: 22.92        # 確認済み(ピッチ円直径)
     mix_k: 0.5
     motor1_sign: 1.0
@@ -42,34 +40,31 @@ real_joint_bridge_node:
     r_joint: r_joint
     output_topic: mixed_joint_states
 
-# homing_node のパラメータ。CAN_HOST/ENC/プーリー関連はreal_joint_bridge_nodeと
+# homing_node のパラメータ。ROBOMAS/プーリー関連はreal_joint_bridge_nodeと
 # 値を一致させること(重複管理、根拠はnote/hardware_mapping.txt参照)。
 homing_node:
   ros__parameters:
+    # z/r原点センサ(リミットスイッチ)のみCAN_HOSTを使う。motor1/motor2の位置は
+    # ROBOMAS内蔵エンコーダを使うためCAN_HOSTのENC1/ENC2は不使用
+    # (2026-08-31方針転換)。
     can_host_device_id: 101
-    can_host_node_index: 1
     can_host_slots_per_node: 5
-    enc1_local_index: 3
-    enc2_local_index: 4
-    enc1_is_motor1: true
-    motor_encoder_counts_per_rev: 2048.0
-    pulley_pitch_diameter_mm: 22.92
-    mix_k: 0.5
-    motor1_sign: 1.0
-    motor2_sign: 1.0
 
-    # 要確認(note/can_mapping.txt「z/r原点センサ(ホーミング用)」): z軸/r軸の
-    # 原点センサがCAN_HOSTのどのノード・どのSWチャンネルに配線されているか。
-    # 現状はENC1/ENC2と同じノード(node_index=1)のSW1/SW2という仮定。
-    z_limit_switch_node_index: 1
+    # 確認済み(note/can_mapping.txt「z/r原点センサ(ホーミング用)」): z軸=SW1、
+    # r軸=SW2、どちらも同じノード(node_index=0)に載っている。
+    z_limit_switch_node_index: 0
     z_limit_switch_local_index: 0   # SW1
-    r_limit_switch_node_index: 1
+    r_limit_switch_node_index: 0
     r_limit_switch_local_index: 1   # SW2
     switch_triggered_value: 1        # firmwareの!digitalRead()相当(要確認)
 
     robomas_device_id: 21
-    robomas_motor1_slot: 0   # M1 target_velocity
-    robomas_motor2_slot: 1   # M2 target_velocity
+    robomas_motor1_index: 0   # M1 target_velocity/angle
+    robomas_motor2_index: 1   # M2 target_velocity/angle
+    pulley_pitch_diameter_mm: 22.92
+    mix_k: 0.5
+    motor1_sign: 1.0
+    motor2_sign: 1.0
 
     # 要実機調整。低速・短めのタイムアウトから試すこと。
     homing_velocity_rpm: 30.0
@@ -85,3 +80,29 @@ homing_node:
 
     bridge_node_name: real_joint_bridge_node
     control_period_sec: 0.05
+
+# trajectory_follower_node の一部パラメータ。この節はz/rの上限・下限リミット
+# スイッチ(過走防止の安全停止用)専用で、joint_names/max_velocity等の他の
+# パラメータはlaunchファイル側(real_all_axes_test.launch.py等)から渡している。
+# device_id=0はそのスイッチ未配線・無効を意味する。上のhoming_node節の
+# z_limit_switch_*/r_limit_switch_*(原点較正用の下限側センサ)とは別物として
+# 個別に管理するが、通常は同じ配線を指すはず(note/can_mapping.txt
+# 「z/r上限リミットスイッチ」参照)。
+trajectory_follower_node:
+  ros__parameters:
+    limit_switch_can_host_slots_per_node: 5
+    limit_switch_triggered_value: 1        # firmwareの!digitalRead()相当(要確認)
+
+    # 要実測(note/can_mapping.txt「z/r上限リミットスイッチ」参照)。0=未配線・無効。
+    z_lower_limit_switch_device_id: 0
+    z_lower_limit_switch_node_index: 0
+    z_lower_limit_switch_local_index: 0
+    z_upper_limit_switch_device_id: 0
+    z_upper_limit_switch_node_index: 0
+    z_upper_limit_switch_local_index: 0
+    r_lower_limit_switch_device_id: 0
+    r_lower_limit_switch_node_index: 0
+    r_lower_limit_switch_local_index: 0
+    r_upper_limit_switch_device_id: 0
+    r_upper_limit_switch_node_index: 0
+    r_upper_limit_switch_local_index: 0

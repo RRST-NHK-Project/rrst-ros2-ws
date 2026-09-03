@@ -26,16 +26,18 @@ CAN_ID/スロット割当の実測値はnote/can_mapping.txtを参照。値が�
        yamlに保存され再起動しても消えない)で真の原点とのズレを補正する。
        較正手順: 関節を原点センサの位置(真の機械原点)へ物理的に合わせ、
        その瞬間の_unwrapped値でoffsetを逆算してyamlに書き込む。
-  serial_rx_{can_host_device_id}_unwrapped
-    -> 配下ノード(node_index)のENC1/ENC2(汎用AMTエンコーダ、外付け、カウント値)
-       から motor1_joint/motor2_joint(線形変位)を算出し、z_joint/r_jointへ合成。
-       相対エンコーダのため毎起動ホーミングが必須だが、これもros2canの
-       /zero_channel(ENC単体をゼロ化するだけで、z=k*(m1+m2)/r=k*(m1-m2)という
-       合成後の量を正しい基準に合わせる用途には向かない)には頼らず、
-       z_offset_m/r_offset_mパラメータ(homing_node担当、rcl_interfacesの
-       SetParametersサービスで実行時に設定される。yamlには保存しない
-       ランタイム専用値)で合成後の値を補正する。ホーミング未実施の間は
-       z_offset_m=r_offset_m=0.0のまま(起動直後の生値)。
+  serial_rx_{robomas_device_id}_unwrapped
+    -> ROBOMAS(C610/M2006)内蔵ロータエンコーダのCAN帰還(M{n} angle)から
+       motor1_joint/motor2_joint(線形変位)を算出し、z_joint/r_jointへ合成。
+       外付けAMTエンコーダ(ENC1/ENC2、CAN_HOST配下ノード)は2026-08-31の方針転換で
+       不使用になった(以前はこちらを位置の真値としていたが、ロボマス内蔵エンコーダに
+       統一。note/hardware_mapping.txt参照)。相対(インクリメンタル)エンコーダの
+       ため毎起動ホーミングが必須だが、これもros2canの/zero_channel(単体チャンネルを
+       ゼロ化するだけで、z=k*(m1+m2)/r=k*(m1-m2)という合成後の量を正しい基準に
+       合わせる用途には向かない)には頼らず、z_offset_m/r_offset_mパラメータ
+       (homing_node担当、rcl_interfacesのSetParametersサービスで実行時に設定
+       される。yamlには保存しないランタイム専用値)で合成後の値を補正する。
+       ホーミング未実施の間はz_offset_m=r_offset_m=0.0のまま(起動直後の生値)。
 """
 
 import math
@@ -44,6 +46,10 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Int32MultiArray
+
+# 帰還(angle)のスケール。trajectory_follower_node.pyのROBOMAS_FEEDBACK_POSITION_SCALE_DEG
+# と一致させること(cubemarsの帰還と同じ0.1deg/LSB、robomas.cpp参照)。
+ROBOMAS_FEEDBACK_POSITION_SCALE_DEG = 0.1
 
 
 class RealJointBridgeNode(Node):
@@ -66,15 +72,12 @@ class RealJointBridgeNode(Node):
         # ros2canの/zero_channelに頼らずここで永続的に持つ(較正手順はファイル冒頭コメント参照)。
         self.declare_parameter('tip_theta_offset_rad', 0.0)
 
-        # ---- CAN_HOST配下ノードのENC1/ENC2 (motor1_joint / motor2_joint) ----
-        self.declare_parameter('can_host_device_id', 101)
-        self.declare_parameter('can_host_node_index', 1)       # 確認済み(note/can_mapping.txt)
-        self.declare_parameter('can_host_slots_per_node', 5)
-        self.declare_parameter('enc1_local_index', 3)
-        self.declare_parameter('enc2_local_index', 4)
-        # ENC1/ENC2それぞれがmotor1側かmotor2側か(現状の記入: ENC1=motor1, ENC2=motor2)
-        self.declare_parameter('enc1_is_motor1', True)
-        self.declare_parameter('motor_encoder_counts_per_rev', 2048.0)  # 要確認(AMT DIP設定)
+        # ---- ROBOMAS (motor1_joint / motor2_joint、内蔵ロータエンコーダのCAN帰還を
+        # 位置の真値として使う。2026-08-31方針転換でENC1/ENC2(外付けAMTエンコーダ)
+        # は不使用に変更した) ----
+        self.declare_parameter('robomas_device_id', 21)
+        self.declare_parameter('robomas_motor1_index', 0)   # M1 angle帰還スロット
+        self.declare_parameter('robomas_motor2_index', 1)   # M2 angle帰還スロット
         self.declare_parameter('pulley_pitch_diameter_mm', 22.92)       # ピッチ円直径、確認済み
         self.declare_parameter('mix_k', 0.5)
         self.declare_parameter('motor1_sign', 1.0)
@@ -98,13 +101,9 @@ class RealJointBridgeNode(Node):
         self.tip_theta_sign_ = gp('tip_theta_sign').value
         self.tip_theta_offset_ = gp('tip_theta_offset_rad').value
 
-        self.can_host_device_id_ = gp('can_host_device_id').value
-        self.can_host_node_index_ = gp('can_host_node_index').value
-        self.can_host_slots_per_node_ = gp('can_host_slots_per_node').value
-        self.enc1_local_index_ = gp('enc1_local_index').value
-        self.enc2_local_index_ = gp('enc2_local_index').value
-        self.enc1_is_motor1_ = gp('enc1_is_motor1').value
-        self.motor_cpr_ = gp('motor_encoder_counts_per_rev').value
+        self.robomas_device_id_ = gp('robomas_device_id').value
+        self.robomas_motor1_index_ = gp('robomas_motor1_index').value
+        self.robomas_motor2_index_ = gp('robomas_motor2_index').value
         self.pulley_radius_m_ = (gp('pulley_pitch_diameter_mm').value / 2.0) / 1000.0
         self.mix_k_ = gp('mix_k').value
         self.motor1_sign_ = gp('motor1_sign').value
@@ -121,40 +120,36 @@ class RealJointBridgeNode(Node):
         self.r_name_ = gp('r_joint').value
         output_topic = gp('output_topic').value
 
-        base = self.can_host_node_index_ * self.can_host_slots_per_node_
-        self.enc1_slot_ = base + self.enc1_local_index_
-        self.enc2_slot_ = base + self.enc2_local_index_
-
         self.pub_ = self.create_publisher(JointState, output_topic, 10)
 
         self.cubemars_data_ = None
-        self.can_host_data_ = None
+        self.robomas_data_ = None
 
         self.create_subscription(
             Int32MultiArray, f'serial_rx_{self.cubemars_device_id_}_unwrapped',
             self._on_cubemars, 10)
         self.create_subscription(
-            Int32MultiArray, f'serial_rx_{self.can_host_device_id_}_unwrapped',
-            self._on_can_host, 10)
+            Int32MultiArray, f'serial_rx_{self.robomas_device_id_}_unwrapped',
+            self._on_robomas_feedback, 10)
 
         self.get_logger().info(
             f'real_joint_bridge_node started: '
             f'cubemars(device_id={self.cubemars_device_id_}) + '
-            f'can_host(device_id={self.can_host_device_id_}, '
-            f'node_index={self.can_host_node_index_}, '
-            f'ENC1=slot{self.enc1_slot_}, ENC2=slot{self.enc2_slot_}) '
+            f'robomas(device_id={self.robomas_device_id_}, '
+            f'motor1_index={self.robomas_motor1_index_}, '
+            f'motor2_index={self.robomas_motor2_index_}) '
             f'-> {output_topic}')
 
     def _on_cubemars(self, msg: Int32MultiArray):
         self.cubemars_data_ = msg.data
         self._publish_if_ready()
 
-    def _on_can_host(self, msg: Int32MultiArray):
-        self.can_host_data_ = msg.data
+    def _on_robomas_feedback(self, msg: Int32MultiArray):
+        self.robomas_data_ = msg.data
         self._publish_if_ready()
 
     def _publish_if_ready(self):
-        if self.cubemars_data_ is None or self.can_host_data_ is None:
+        if self.cubemars_data_ is None or self.robomas_data_ is None:
             return
 
         root_theta_raw = self.cubemars_data_[self.root_theta_index_]
@@ -166,18 +161,10 @@ class RealJointBridgeNode(Node):
         tip_theta = (self.tip_theta_sign_ * math.radians(tip_theta_deg)
                      / self.tip_theta_reduction_ + self.tip_theta_offset_)
 
-        enc1_count = self.can_host_data_[self.enc1_slot_]
-        enc2_count = self.can_host_data_[self.enc2_slot_]
-        enc1_rad = (enc1_count / self.motor_cpr_) * 2.0 * math.pi
-        enc2_rad = (enc2_count / self.motor_cpr_) * 2.0 * math.pi
-
-        if self.enc1_is_motor1_:
-            motor1_rad, motor2_rad = enc1_rad, enc2_rad
-        else:
-            motor1_rad, motor2_rad = enc2_rad, enc1_rad
-
-        motor1_joint = self.motor1_sign_ * motor1_rad * self.pulley_radius_m_
-        motor2_joint = self.motor2_sign_ * motor2_rad * self.pulley_radius_m_
+        m1_deg = self.robomas_data_[self.robomas_motor1_index_] * ROBOMAS_FEEDBACK_POSITION_SCALE_DEG
+        m2_deg = self.robomas_data_[self.robomas_motor2_index_] * ROBOMAS_FEEDBACK_POSITION_SCALE_DEG
+        motor1_joint = self.motor1_sign_ * math.radians(m1_deg) * self.pulley_radius_m_
+        motor2_joint = self.motor2_sign_ * math.radians(m2_deg) * self.pulley_radius_m_
 
         z = self.mix_k_ * (motor1_joint + motor2_joint) + self.get_parameter('z_offset_m').value
         r = self.mix_k_ * (motor1_joint - motor2_joint) + self.get_parameter('r_offset_m').value

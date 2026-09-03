@@ -218,6 +218,217 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
     <limit effort="${joint_effort}" velocity="${joint_velocity}"/>
   </joint>
 
+  <!-- ==================== ハンド(吸着ハンド、tip_linkに取り付く簡易形状) ====================
+       吸着パッド3個・展開/収集サーボ(deploy)・ワークピッチ変更サーボ(pitch)
+       (note/claude.txt「##ハンド」、note/can_mapping.txt「## ハンド」参照)。
+       実機のサーボ角度指令(ros2canのSERVOn、soki_sim/scripts/hand_node.py)とは
+       まだ連動しておらず、joint_state_publisher_guiのスライダーで動かせる
+       見た目確認用の簡易形状・関節のみ(2026-09-03追加)。寸法・取付位置ともに
+       仮値で、実測後に調整すること。
+
+       2026-09-03補足(ユーザー):
+       - 3つの吸着パッドは同一行のワーク3個を把持する配置(間隔はWORK_COL_PITCH=
+         0.200m、command_gui_node.pyと一致させる)からスタートし、deployサーボで
+         3つを中央へ集める。集めた状態は3パッド上面中心を結ぶと正三角形になる
+         (一辺の長さhand_gather_sideは未実測、仮値)。各パッドをそれぞれ独立した
+         prismatic関節(spread位置を原点、gathered位置方向を軸とする直線移動)で
+         表現することで、1つのサーボで3パッドが連動する機構を近似する
+         (実際のリンク機構そのものは再現していない)。
+       - ピッチサーボ(hand_pitch_joint)はワーク(=吸着パッド一式)の向きを
+         変える機構なので、吸着パッド一式(hand_deploy_link以下)を子孫に持つ
+         必要がある。tip_link直下の兄弟としていたのは誤りで、
+         tip_link -> hand_pitch_link -> hand_deploy_link -> 吸着パッドの順に
+         直列接続する(2026-09-03修正)。
+       - ハンド一式は手先(tip_link、赤い円筒)の下面に取り付くのが自然
+         (2026-09-03指摘)。tip_linkの視覚形状はz=0(自身の関節原点)を下端、
+         z=tip_heightを上端として上向きに伸びているため、ハンドはtip_linkの
+         関節原点(z=0)を基準に下方向(-z)へ積み重ねる。 -->
+  <xacro:property name="hand_deploy_size" value="0.05"/>
+  <xacro:property name="hand_pitch_size" value="0.04"/>
+  <xacro:property name="pad_radius" value="0.012"/>
+  <xacro:property name="pad_height" value="0.008"/>
+  <!-- 同一行のワーク間隔(command_gui_node.pyのWORK_COL_PITCHと一致させること)。
+       展開(spread)状態でのパッド間隔に使う。 -->
+  <xacro:property name="hand_row_pitch" value="0.200"/>
+  <!-- 集約(gathered)後の正三角形の一辺。要実測、現状は仮値。 -->
+  <xacro:property name="hand_gather_side" value="0.08"/>
+  <!-- 以下はhand_row_pitchから計算される、両端パッド(suction_pad_1/3)の
+       prismatic関節の移動方向(正規化ベクトル)・移動量(spread→gathered)。
+       中央パッド(suction_pad_2)は動かず、spread時の位置(原点)がそのまま
+       正三角形の1頂点になる(2026-09-03修正: 当初は3パッドとも動く設計
+       だったが、中央は動かさず両端だけが動く構成に訂正)。残る2頂点は
+       中央パッド(固定)からの距離がhand_gather_sideになるよう、
+       h=hand_gather_side*sqrt(3)/2を全てフィールド側(-z)成分に割り当てる
+       (前後(x、アームの伸縮方向と同軸)の成分は持たせない。2026-09-03、
+       2回の訂正を経て確定: 当初は水平面内(xy)のみの移動、次に前後(x)を
+       機体中心側へ寄せる案を試したがいずれも誤りで、前後方向には一切動かず
+       左右(y)と下方向(z)だけで正三角形を作るのが正しいとの指摘)。
+       (gx, ±hand_gather_side/2, gz) = (0, ±hand_gather_side/2, -h)の位置に
+       集まる(hand_gather_side=0.08を仮定した数値、変えた場合は再計算する
+       こと)。 -->
+  <xacro:property name="hand_pad_side_travel" value="0.174356"/>
+  <xacro:property name="hand_pad_side_axis_x" value="0"/>
+  <xacro:property name="hand_pad_side_axis_y" value="0.917663"/>
+  <xacro:property name="hand_pad_side_axis_z" value="-0.397360"/>
+  <xacro:property name="hand_servo_lower" value="0.0"/>
+  <xacro:property name="hand_servo_upper" value="${pi / 2}"/>
+  <!-- ハンドの向き(展開時にどちらを向いているか)を一目で分かるようにする
+       方向インジケータバー。アーム(r_joint、arm_link/tip_linkのローカルx軸)に
+       対して直角(=y軸方向)に、展開(spread)時の3パッドの並び(間隔
+       hand_row_pitch、y=-hand_row_pitch〜+hand_row_pitchの範囲)とちょうど
+       一致する長さで固定配置する(パッド同士を繋ぐ可動棒は廃止し、代わりに
+       この固定インジケータに置き換えた、2026-09-03)。 -->
+  <xacro:property name="hand_indicator_length" value="${hand_row_pitch * 2}"/>
+  <xacro:property name="hand_indicator_thickness" value="0.01"/>
+
+  <material name="hand_purple">
+    <color rgba="0.5 0.2 0.6 1.0"/>
+  </material>
+  <material name="pad_black">
+    <color rgba="0.1 0.1 0.1 1.0"/>
+  </material>
+  <material name="hand_indicator_orange">
+    <color rgba="1.0 0.5 0.0 1.0"/>
+  </material>
+
+  <!-- ==================== ハンド取付オフセット ====================
+       ハンド一式(hand_pitch_link以下)のtip_linkへの実際の取付位置は、実機の
+       組み付け誤差により設計値(tip_linkの関節原点)とズレる可能性がある。
+       機体原点オフセット(machine_origin_x/y/z_joint)と同じ方式で、
+       tip_linkとhand_pitch_linkの間にXYZオフセットのprismaticジョイントを
+       持たせる(2026-09-03追加)。joint_state_publisher_guiのスライダーで
+       RViz上で直接調整・確認でき、command_gui_nodeの「ハンド取付オフセット」
+       パネルからも/mixed_joint_states経由で即座に適用できる(machine_origin
+       と同様trajectory_follower_nodeを経由しない)。範囲は仮に
+       ±hand_offset_limit[m]としているので、実機とのズレの想定量に合わせて
+       調整すること。 -->
+  <xacro:property name="hand_offset_limit" value="0.1"/>
+
+  <link name="hand_offset_x_link"/>
+  <joint name="hand_offset_x_joint" type="prismatic">
+    <parent link="tip_link"/>
+    <child link="hand_offset_x_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="${-hand_offset_limit}" upper="${hand_offset_limit}"
+           effort="${joint_effort}" velocity="${joint_velocity}"/>
+  </joint>
+
+  <link name="hand_offset_y_link"/>
+  <joint name="hand_offset_y_joint" type="prismatic">
+    <parent link="hand_offset_x_link"/>
+    <child link="hand_offset_y_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="${-hand_offset_limit}" upper="${hand_offset_limit}"
+           effort="${joint_effort}" velocity="${joint_velocity}"/>
+  </joint>
+
+  <link name="hand_offset_link"/>
+  <joint name="hand_offset_z_joint" type="prismatic">
+    <parent link="hand_offset_y_link"/>
+    <child link="hand_offset_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="${-hand_offset_limit}" upper="${hand_offset_limit}"
+           effort="${joint_effort}" velocity="${joint_velocity}"/>
+  </joint>
+
+  <!-- ワークピッチ変更サーボ(pitch): 保持(0deg)/投入(90deg)相当。シューティング
+       ボックスへ縦向きに投入するため、吸着パッド一式(=保持したワーク)の
+       向きを変える。hand_offset_link(tip_linkの下面、関節原点、z=0を基準に
+       ハンド取付オフセットを適用した位置)に取り付く。 -->
+  <link name="hand_pitch_link">
+    <visual>
+      <origin xyz="0 0 ${-hand_pitch_size / 2}" rpy="0 0 0"/>
+      <geometry>
+        <box size="${hand_pitch_size} ${hand_pitch_size * 2} ${hand_pitch_size / 2}"/>
+      </geometry>
+      <material name="hand_purple"/>
+    </visual>
+  </link>
+
+  <joint name="hand_pitch_joint" type="revolute">
+    <parent link="hand_offset_link"/>
+    <child link="hand_pitch_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="${hand_servo_lower}" upper="${hand_servo_upper}"
+           effort="${joint_effort}" velocity="${joint_velocity}"/>
+  </joint>
+
+  <!-- ハンド本体(取付ブラケット相当、固定)。3つの吸着パッドはここから
+       spread(同一行のワーク間隔)⇔gathered(正三角形)へprismatic関節で動く。
+       hand_pitch_linkの下面に取り付くため、pitch回転と一緒にパッド一式も
+       向きが変わる。 -->
+  <link name="hand_deploy_link">
+    <visual>
+      <origin xyz="0 0 ${-hand_deploy_size / 2}" rpy="0 0 0"/>
+      <geometry>
+        <box size="${hand_deploy_size} ${hand_deploy_size} ${hand_deploy_size}"/>
+      </geometry>
+      <material name="hand_purple"/>
+    </visual>
+  </link>
+
+  <joint name="hand_deploy_mount_joint" type="fixed">
+    <parent link="hand_pitch_link"/>
+    <child link="hand_deploy_link"/>
+    <origin xyz="0 0 ${-hand_pitch_size}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ハンドの向きインジケータ(固定、見た目のみ)。アーム(x軸方向)に対して
+       直角(y軸方向)に、展開(spread)時の3パッドの並びとちょうど同じ長さの
+       バーを配置する。パッド同士を繋ぐ可動棒(2026-09-03に一度追加したが
+       同日廃止)の代わりに、ハンドの向きを一目で判別するための固定参照物と
+       して追加した(2026-09-03)。 -->
+  <link name="hand_indicator_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${hand_indicator_thickness} ${hand_indicator_length} ${hand_indicator_thickness}"/>
+      </geometry>
+      <material name="hand_indicator_orange"/>
+    </visual>
+  </link>
+
+  <joint name="hand_indicator_joint" type="fixed">
+    <parent link="hand_deploy_link"/>
+    <child link="hand_indicator_link"/>
+    <origin xyz="0 0 ${-hand_deploy_size}" rpy="0 0 0"/>
+  </joint>
+
+  <xacro:macro name="suction_pad" params="name origin_y axis_x axis_y axis_z travel">
+    <link name="${name}">
+      <visual>
+        <origin xyz="0 0 ${-pad_height / 2}" rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="${pad_radius}" length="${pad_height}"/>
+        </geometry>
+        <material name="pad_black"/>
+      </visual>
+    </link>
+    <joint name="${name}_joint" type="prismatic">
+      <parent link="hand_deploy_link"/>
+      <child link="${name}"/>
+      <origin xyz="0 ${origin_y} ${-hand_deploy_size}" rpy="0 0 0"/>
+      <axis xyz="${axis_x} ${axis_y} ${axis_z}"/>
+      <limit lower="0" upper="${travel}" effort="${joint_effort}" velocity="${joint_velocity}"/>
+    </joint>
+  </xacro:macro>
+  <!-- joint値0=spread(同一行のワーク間隔で並ぶ)、joint値=travel(上限)で
+       gathered(正三角形、フィールド側=-zへも近づく)になる。
+       suction_pad_2(中央)はtravel=0で動かず、spread時の位置がそのまま
+       正三角形の1頂点になる。 -->
+  <xacro:suction_pad name="suction_pad_1" origin_y="${-hand_row_pitch}"
+                      axis_x="${hand_pad_side_axis_x}" axis_y="${hand_pad_side_axis_y}"
+                      axis_z="${hand_pad_side_axis_z}" travel="${hand_pad_side_travel}"/>
+  <xacro:suction_pad name="suction_pad_2" origin_y="0" axis_x="1" axis_y="0"
+                      axis_z="0" travel="0"/>
+  <xacro:suction_pad name="suction_pad_3" origin_y="${hand_row_pitch}"
+                      axis_x="${hand_pad_side_axis_x}" axis_y="${-hand_pad_side_axis_y}"
+                      axis_z="${hand_pad_side_axis_z}" travel="${hand_pad_side_travel}"/>
+
   <!-- ==================== 機体原点 ====================
        base_link(旋回軸)は実機の基準点(機体原点、寸法採寸の基準)と必ずしも
        一致しないため、そのズレをXYZオフセットとして持たせたmachine_origin_link
@@ -230,7 +441,7 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
        直接調整・確認できる(display.launch.py参照)。範囲は仮に
        ±machine_origin_offset_limit[m]としているので、実機とのズレの想定量に
        合わせて調整すること。 -->
-  <xacro:property name="machine_origin_offset_limit" value="0.1"/>
+  <xacro:property name="machine_origin_offset_limit" value="1.0"/>
 
   <link name="machine_origin_x_link"/>
   <joint name="machine_origin_x_joint" type="prismatic">

@@ -2,6 +2,15 @@
 
 ##シミュレーション (soki_sim)
 円柱座標型4自由度アーム。RVizでの見た目確認用(物理演算なし)。
+sim起動直後(何も指令していない状態)のroot_theta_jointの既定値は-90deg
+(フィールドに平行、ハンドがX+側=右側)。以前は0deg(フィールドに垂直=前方Y+
+向き)だったが、ユーザー指定で変更した(2026-09-03)。display.launch.pyの
+joint_state_publisher(_gui)のzerosパラメータ、trajectory_follower_node.pyの
+INITIAL_ROOT_THETA_RAD(self.pos_/target_初期値)、joy_teleop_node.pyの同名定数
+(self.target_theta_初期値)の3箇所が連動しており、変更する場合は3箇所とも
+揃えること(揃っていないと最初の指令送信時に急なジャンプが起きる)。実機側
+(real_all_axes_test.launch.py等)は対象外(CubeMars構成時は最初の目標受信前に
+実機帰還値で上書きされるため、この既定値は事実上sim専用)。
   root_theta_joint : 旋回      continuous, z軸
   z_joint          : 昇降      prismatic, 0.0~0.432m
   r_joint          : 伸縮      prismatic, -0.622~0.622m (アーム長1.244m、実機寸法に合わせ済み)
@@ -20,6 +29,56 @@ motor_mixer_nodeが/joint_statesを監視し、motor1/2側とz/r側どちらが
 (joint_state_publisher(_gui)のsource_listで取り込む)。
 command_gui_node(2026-08-27新規作成)はX/Y/Zの目標値をGUI指定→逆運動学で
 theta/z/rに変換して/mixed_joint_statesへpublishする指令送信GUI。
+「ワーク・シューティングボックス」パネルの「自動シーケンスで実行」ON時は、
+work/shootボタンから回収/投入の半自動シーケンスを起動できる(2026-09-03新規、
+同日中に運用フローを再設計: 「移動とZをある程度下げる動作は自動、そこから先
+(ワークへの接触・シューティングボックスへの最終投入)は人間の明示的な指示
+(GUIボタンまたはPSコン)」という2段階方式。詳細はnote/claude_task.txt
+「## ピック/投入 自動シーケンス」参照)。
+
+##ハンド(エンドエフェクタ、2026-09-03新規、hand_node実装済み・実機配線は未確認)
+tip_link(tip_theta_jointの先、赤い円筒)の関節原点(下端)に取り付く吸着ハンド。
+キネマティックチェーン: tip_link -> hand_offset_x/y/z_link(ハンド取付オフセット、
+machine_origin_*と同じ方式のXYZ prismatic、既定範囲±0.1m。command_gui_nodeの
+「ハンド取付オフセット」パネルから/mixed_joint_states経由で調整可能、
+2026-09-03追加) -> hand_pitch_link(ピッチサーボ) ->
+hand_deploy_link(展開/収集サーボの取付ブラケット、固定) ->
+suction_pad_1/2/3(吸着パッド、各々独立関節)。構成:
+  - 手先θ回転: 既存のtip_theta_joint(CubeMars AK40-10)がハンド全体を回転させる
+  - 吸着パッド3個: 同一行のワーク3個(間隔0.200m=WORK_COL_PITCH)を同時に
+    吸着する展開(spread)位置と、吸着後に中央へ集める収納(gathered、3パッド
+    上面中心が正三角形、一辺0.08m仮値)位置の2状態。中央パッド(suction_pad_2)
+    は動かず、spread時の位置がそのまま正三角形の1頂点になる。動くのは
+    両端2枚(suction_pad_1/3)のみ(2026-09-03訂正)。両端パッドの収納動作は
+    左右(y、中央へ寄る)とフィールド側(z、pitch保持姿勢での手先直下方向)への
+    移動のみで、前後(x、アームの伸縮方向と同軸)には一切動かない
+    (2026-09-03、2回の訂正を経て確定: 水平面内のみ→前後+xへずれる→
+    前後-xへずれる、といずれも誤りで、前後方向の成分自体が不要だった)。
+    パッド同士を繋ぐ可動な接続棒は一度追加したが、パッド間接続は廃止し
+    (2026-09-03)、代わりにhand_deploy_linkに固定の方向インジケータバー
+    (hand_indicator_link、オレンジ色、アームに直角=y軸方向、展開時のパッド
+    間隔とちょうど同じ長さ0.4m)を追加した。パッドの集約/展開状態に関わらず
+    常にハンドの向きが分かるようにするための固定参照物
+  - 吸着パッド展開/収集サーボ x1: 展開⇔収納の2姿勢切替
+  - ワークピッチ変更サーボ x1: シューティングボックスへ縦向きに投入するため、
+    吸着パッド一式(=保持したワーク)の向き(ピッチ)を変える。パッド一式を
+    子孫に持つ(ピッチ回転でパッドごと向きが変わる)
+  - ダイヤフラムポンプ x1: 3つの吸着パッドの真空吸着源。ros2canのMD(モーター
+    ドライバ、PWM+DIR出力)チャンネル経由で50%デューティ固定で駆動する想定。
+    展開/収集サーボとは独立した別サービスで制御する(収納=ワーク保持したまま
+    集約する動作のため、収納時に自動でポンプを切ってはいけない、2026-09-03
+    ユーザー指摘で分離)
+
+実装方式の想定(ros2can/ros2can/device_profiles.py参照): xiao-esp32-s3_can2io
+のMODE_CAN_HOST配下「汎用IOノード」がSERVOx3/MDx2/SWx3/ENCx2チャンネルを
+持つ。SERVOnとSWnはピン共有(ファームウェアのMULTIn設定で0=スイッチ入力/
+1=サーボ出力を切替)、ENCnとMDnもピン共有(0=エンコーダ入力/1=MD出力)。
+2026-08-31の方針転換でz/r外付けAMTエンコーダ(ENC1/ENC2、node_index=1)は
+不使用になっているため、そのENC1(またはENC2)のピンをMD出力へ切り替えて
+ダイヤフラムポンプに使う、という再利用が候補になる(要実機配線確認)。
+サーボ2個は、z/r原点センサ(SW1/SW2、node_index=0)が使っていないSW3/SERVO3、
+または別ノードのSERVO1-3を使う想定。詳細な device_id/node_index/local_index
+はnote/can_mapping.txt「## ハンド」節に記入すること(未記入、実機確認待ち)。
 
 ##soki_simフィールド(ワーク配置環境)反映 (2026-08-27新規追加)
 実機のワーク配置環境をURDF(soki_sim.urdf.xacro)に静的モデルとして追加(衝突/慣性なし、視覚のみ)。
@@ -157,9 +216,10 @@ command_gui_node/trajectory_follower_nodeはsim/実機を区別せず同じ
     実測値はnote/can_mapping.txtにまとめてある。
   - root_theta/tip_theta(CubeMars AK40-10、絶対値エンコーダ)はMODE_CUBEMARS
     (device_id=11)のM{n} position帰還を使用。z/r(motor1/2差動、M2006+C610)は
-    ROBOMAS(device_id=21)のCAN帰還ではなく、CAN_HOST(device_id=101)配下ノードの
-    外付けAMTエンコーダ(ENC1/ENC2)を位置の真値として使う設計
-    (詳細はnote/claude_task.txt参照)。
+    ROBOMAS(device_id=21)内蔵ロータエンコーダのCAN帰還(M{n} angle)を位置の
+    真値として使う設計(2026-08-31方針転換。以前はCAN_HOST(device_id=101)配下
+    ノードの外付けAMTエンコーダ(ENC1/ENC2)を真値としていたが不使用に変更した。
+    詳細はnote/claude_task.txt、note/hardware_mapping.txt参照)。
   - z/r起動時ホーミングノード(homing_node)も実装済み(soki_sim/scripts/
     homing_node.py)。motor1/2を同方向/差動方向に低速駆動して原点センサを
     検出し、z_offset_m/r_offset_mをreal_joint_bridge_nodeへSetParametersで
@@ -167,6 +227,23 @@ command_gui_node/trajectory_follower_nodeはsim/実機を区別せず同じ
     のみ起動(自動起動なし)。センサ配線・回転符号・基準値は仮定のままなので
     実機検証が必要(note/can_mapping.txt「z/r原点センサ」参照)。
   - 未着手: 実機での疎通確認・homing_nodeの調整全般。
+
+## 実機セッションとの混線事故 (2026-09-03、Claudeの動作確認手順に関する教訓)
+ピック/投入自動シーケンスの動作確認のため、Claudeが`ros2 run soki_sim
+trajectory_follower_node`/`hand_node`をサブプロセスで実起動してテストしていたところ、
+ユーザーが同じマシン上の別ターミナル(pts/7)で既に実機用の構成(real_joint_bridge.yaml
+読込・実機のCAN device_id・ros2can_gui込み)を起動していたことが判明した。ROS 2は
+ノード名・トピック名が同じであればROS_DOMAIN_IDが同じ限りプロセスを跨いで混線する
+ため、Claudeのテスト用の関節目標がユーザーの実機用trajectory_follower_nodeにも
+届いていた可能性があり、さらにClaudeのGUIインスタンスが自動読込・自動適用する
+gains.json(git管理下)を、テスト用の簡易構成(tip_theta_joint無し)を基準に上書き
+保存してしまい、実際のチューニング値の一部を欠落させる事故が発生した(該当コミット
+前に発覚・git checkoutで復旧。実機は接続されていなかったため物理的な誤動作は
+無かったことをユーザーに確認済み)。
+教訓: soki_simのノードをサブプロセスで実起動して動作確認する際は、必ず
+`ROS_DOMAIN_ID`をテスト専用の値(実機セッションと異なる値)に設定してから行うこと。
+また、テスト前に`ps aux`で同名ノードが既に稼働していないか確認し、動作確認後は
+自分が起動したプロセスを確実に終了(process groupごとkillするなど)すること。
 
 ##未確認・要確認事項
 - soki_simのURDF寸法(base_height/lift_size_z/arm_length等)と実機寸法の対応
