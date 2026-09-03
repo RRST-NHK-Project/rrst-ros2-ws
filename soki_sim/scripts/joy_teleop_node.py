@@ -34,6 +34,24 @@ soki_sim: joyパッケージのjoy_node(/joy, sensor_msgs/Joy)を購読し、ス
                                          /pick_sequence_confirmサービスを呼んで
                                          続行させる(GUIの「回収実行」ボタンと同じ
                                          効果))
+  △(三角)ボタン   -> L4へ移動          (shoot_start_l4_button, デフォルト2。
+                                         PS4/PS5コントローラの一般的なLinux
+                                         ドライバ割り当てを仮定した値、実機で要確認。
+                                         2026-09-03追加、ユーザー指摘: 「シューティング
+                                         エリアはL4もしくはR4で、ボタンを2つおいて
+                                         おいて」。command_gui_nodeの/shoot_sequence_
+                                         start_l4サービスを呼び、シューティングエリア
+                                         L4へ、安全高度を維持したまま向かうだけの
+                                         投入シーケンスを実行させる(GUIの「L4へ移動」
+                                         ボタンと同じ効果))
+  □(四角)ボタン   -> R4へ移動          (shoot_start_r4_button, デフォルト3。
+                                         PS4/PS5コントローラの一般的なLinux
+                                         ドライバ割り当てを仮定した値、実機で要確認。
+                                         2026-09-03追加、上と同じ理由。
+                                         command_gui_nodeの/shoot_sequence_start_r4
+                                         サービスを呼び、シューティングエリアR4へ
+                                         同様に向かわせる(GUIの「R4へ移動」ボタンと
+                                         同じ効果))
 
 いずれもレート方式: 倒している間、target += 入力値*speed*dt で積分し続ける。
 入力が中立/デッドマン未押下の間は目標を/mixed_joint_statesの現在値に同期する
@@ -120,6 +138,9 @@ class JoyTeleopNode(Node):
         self.declare_parameter('pump_toggle_button', 1)
         # 回収実行の指示ボタン(2026-09-03追加)。-1ならボタン操作無効。
         self.declare_parameter('pickup_confirm_button', 0)
+        # L4/R4へ移動ボタン(2026-09-03追加)。-1ならボタン操作無効。
+        self.declare_parameter('shoot_start_l4_button', 2)
+        self.declare_parameter('shoot_start_r4_button', 3)
 
         self.axis_theta_ = int(self.get_parameter('axis_theta').value)
         self.axis_z_ = int(self.get_parameter('axis_z').value)
@@ -139,6 +160,8 @@ class JoyTeleopNode(Node):
         self.dt_ = 1.0 / update_rate_hz
         self.pump_toggle_button_ = int(self.get_parameter('pump_toggle_button').value)
         self.pickup_confirm_button_ = int(self.get_parameter('pickup_confirm_button').value)
+        self.shoot_start_l4_button_ = int(self.get_parameter('shoot_start_l4_button').value)
+        self.shoot_start_r4_button_ = int(self.get_parameter('shoot_start_r4_button').value)
 
         # 現在の目標関節角度(スティック/十字キー入力をここへ積分していく)。
         # /mixed_joint_statesを受信するまでは、trajectory_follower_node起動直後の
@@ -175,6 +198,14 @@ class JoyTeleopNode(Node):
         # 回収シーケンスが「ワーク手前で自動停止→回収実行待ち」のときに続行させる。
         self._prev_pickup_confirm_pressed_ = False
         self._pickup_confirm_client_ = self.create_client(Trigger, 'pick_sequence_confirm')
+
+        # L4/R4へ移動ボタン(△/□ボタン、2026-09-03追加)。command_gui_node側の
+        # /shoot_sequence_start_l4・_r4サービスを呼び、固定のシューティングエリア
+        # (L4/R4)へ向かわせる。
+        self._prev_shoot_start_l4_pressed_ = False
+        self._shoot_start_l4_client_ = self.create_client(Trigger, 'shoot_sequence_start_l4')
+        self._prev_shoot_start_r4_pressed_ = False
+        self._shoot_start_r4_client_ = self.create_client(Trigger, 'shoot_sequence_start_r4')
 
         # theta_speed/z_speed/r_speedは起動時にself.*_speed_へ取り込んだ後は
         # 参照されないため、command_gui_nodeの「手動操作(joy)速度」パネル等で
@@ -249,6 +280,42 @@ class JoyTeleopNode(Node):
                     'joy_teleop_node: command_gui_nodeの回収確認サービスに接続できません(GUI未起動?)')
         self._prev_pickup_confirm_pressed_ = pressed
 
+    def _update_shoot_start_l4(self, msg: Joy):
+        """△ボタンの立ち上がりエッジで、command_gui_nodeの
+        /shoot_sequence_start_l4(std_srvs/Trigger)を呼び、シューティングエリア
+        L4へ向かわせる(2026-09-03追加)。移動系のenable_button(デッドマン)とは
+        独立に扱う(ポンプトグルボタンと同じ理由)。"""
+        if self.shoot_start_l4_button_ < 0:
+            return
+        buttons = msg.buttons
+        pressed = (0 <= self.shoot_start_l4_button_ < len(buttons)
+                   and bool(buttons[self.shoot_start_l4_button_]))
+        if pressed and not self._prev_shoot_start_l4_pressed_:
+            if self._shoot_start_l4_client_.service_is_ready():
+                self._shoot_start_l4_client_.call_async(Trigger.Request())
+            else:
+                self.get_logger().warning(
+                    'joy_teleop_node: command_gui_nodeのL4移動サービスに接続できません(GUI未起動?)')
+        self._prev_shoot_start_l4_pressed_ = pressed
+
+    def _update_shoot_start_r4(self, msg: Joy):
+        """□ボタンの立ち上がりエッジで、command_gui_nodeの
+        /shoot_sequence_start_r4(std_srvs/Trigger)を呼び、シューティングエリア
+        R4へ向かわせる(2026-09-03追加)。移動系のenable_button(デッドマン)とは
+        独立に扱う(ポンプトグルボタンと同じ理由)。"""
+        if self.shoot_start_r4_button_ < 0:
+            return
+        buttons = msg.buttons
+        pressed = (0 <= self.shoot_start_r4_button_ < len(buttons)
+                   and bool(buttons[self.shoot_start_r4_button_]))
+        if pressed and not self._prev_shoot_start_r4_pressed_:
+            if self._shoot_start_r4_client_.service_is_ready():
+                self._shoot_start_r4_client_.call_async(Trigger.Request())
+            else:
+                self.get_logger().warning(
+                    'joy_teleop_node: command_gui_nodeのR4移動サービスに接続できません(GUI未起動?)')
+        self._prev_shoot_start_r4_pressed_ = pressed
+
     def _on_mixed_joint_state(self, msg: JointState):
         try:
             self._current_theta_ = msg.position[msg.name.index('root_theta_joint')]
@@ -281,6 +348,8 @@ class JoyTeleopNode(Node):
             return
         self._update_pump_toggle(msg)
         self._update_pickup_confirm(msg)
+        self._update_shoot_start_l4(msg)
+        self._update_shoot_start_r4(msg)
         enabled = self._is_enabled(msg)
 
         theta_in = apply_deadzone(self._axis(msg.axes, self.axis_theta_), self.deadzone_) * self.sign_theta_

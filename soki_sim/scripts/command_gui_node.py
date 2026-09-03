@@ -145,6 +145,10 @@ SHOOT_POINTS = {
     'L': [(f'L{i + 1}', -SHOOT_OFFSET_Y, SHOOT_CENTER_X + SHOOT_BOX_X[i], SHOOT_BOX_Z) for i in range(4)],
     'R': [(f'R{i + 1}', SHOOT_OFFSET_Y, SHOOT_CENTER_X + SHOOT_BOX_X[i], SHOOT_BOX_Z) for i in range(4)],
 }
+# 実運用で実際に使うシューティングエリアはL4/R4の2箇所のみ(2026-09-03、
+# ユーザー指摘: 「シューティングエリアはL4もしくはR4で、ボタンを2つおいておいて」)。
+# 「投入エリアへ移動」パネルの固定ボタン2つ(_on_shoot_start_requested)から使う。
+SHOOT_FIXED_TARGETS = {'L4': SHOOT_POINTS['L'][3], 'R4': SHOOT_POINTS['R'][3]}
 
 JOINT_NAMES = ['root_theta_joint', 'z_joint', 'r_joint']
 # MITゲインパネル(CubeMars)対象関節。JOINT_NAMESとは別物: root_theta/tip_thetaの
@@ -229,21 +233,14 @@ DEFAULT_SEQUENCE_SETTINGS = {
     # 指示を待つ(2026-09-03、ユーザー指摘: 「移動とZをある程度下げる動作は自動、
     # 次にPSコンまたはGUIのボタンで回収を指示、これでワークに当たる高さまで下げる」)。
     'pickup_approach_clearance_m': 0.15,
-    # 投入シーケンスの自動区間が止まる高さ(シューティングボックスのZ基準からの
-    # 差し引き)。ここで自動区間は終わり、以降の微調整(コントローラーでのジョグ)と
-    # 吸着OFF(投入実行)は完全に手動で行う(2026-09-03、ユーザー指摘: 「シュートに
-    # 向かう、ある程度Zを下げて待機、細かい位置調整はコントローラーで行い
-    # コントローラーで吸着をオフにして終了」。以前は自動でここまで降ろしてから
-    # ポンプOFF待ちにしていたが、この待機以降は一切自動制御しない方式に変更)。
-    'shoot_approach_depth_m': 0.0,
     # 投入時の手先θ(tip_theta_joint)目標[rad]。r方向(アーム伸縮方向)に垂直となる
     # 値だが、実機で未検証の暫定値(2026-09-03、ユーザー指摘)。
     'shoot_tip_theta_rad': 0.0,
-    # ポンプON(吸着)は回収シーケンスの「回収実行」後に自動的に呼ぶ(2026-09-03、
-    # ユーザー指摘: 「ポンプの始動は自動で始まっていい、オフのみコントローラーで」)。
-    # ONを呼んでから即座に上昇すると実際に吸着し切る前に持ち上げてしまう恐れが
-    # あるため、上昇前にこの秒数だけ待つ。
-    'pump_settle_sec': 0.4,
+    # パッド収納(/hand_gather_pads)からピッチ投入姿勢への切替(/hand_set_pitch_
+    # insert)までの待ち時間[s](2026-09-03、ユーザー指摘: 「収納から姿勢変更
+    # までの待機時間も必要。ほぼ同時はまずい」。パッドが物理的に収納し切る前に
+    # ピッチが回り始めると干渉する恐れがあるため)。
+    'gather_settle_sec': 0.5,
 }
 
 # ---- real_joint_bridge.yaml配線設定(初期化用センサID・CubeMars/RoboMasのID・
@@ -788,6 +785,21 @@ class CommandGuiNode(Node):
         self._pick_confirm_handler = None
         self.create_service(Trigger, 'pick_sequence_confirm', self._on_pick_sequence_confirm_srv)
 
+        # 「L4へ移動」「R4へ移動」ボタン(固定のシューティングエリアへ、安全高度を
+        # 維持したまま向かうだけの投入シーケンスを実行する)を、GUIボタンだけでなく
+        # PSコン(joy_teleop_node)の割当ボタンからも呼べるようにするTriggerサービス
+        # (2026-09-03、ユーザー指摘: 「シューティングエリアはL4もしくはR4で、
+        # ボタンを2つおいておいて」)。pick_sequence_confirmと同じ構造で、実際の
+        # 処理はset_shoot_start_handlerで登録されたコールバック
+        # (CommandGuiApp._on_shoot_start_requested、対象ラベル引数付き)に委譲する。
+        self._shoot_start_handler = None
+        self.create_service(
+            Trigger, 'shoot_sequence_start_l4',
+            functools.partial(self._on_shoot_sequence_start_srv, 'L4'))
+        self.create_service(
+            Trigger, 'shoot_sequence_start_r4',
+            functools.partial(self._on_shoot_sequence_start_srv, 'R4'))
+
         # ハンドのポンプON/OFF状態(hand_node、2026-09-03再追加)。「ピック/投入
         # 自動シーケンス」パネルにもポンプ操作ボタン・状態表示を出すために購読する
         # (joy_teleop_nodeの同トピック購読部と同じ理由・QoS)。
@@ -837,6 +849,19 @@ class CommandGuiNode(Node):
         response.success = self._pick_confirm_handler()
         response.message = (
             '回収を実行します' if response.success else '現在「回収実行」待ちの状態ではありません')
+        return response
+
+    def set_shoot_start_handler(self, handler):
+        """CommandGuiApp._on_shoot_start_requested(label: str、bool返却)を登録する。"""
+        self._shoot_start_handler = handler
+
+    def _on_shoot_sequence_start_srv(self, label, request, response):
+        if self._shoot_start_handler is None:
+            response.success = False
+            response.message = 'GUI未初期化です'
+            return response
+        response.success = self._shoot_start_handler(label)
+        response.message = f'{label}へ移動します' if response.success else f'{label}への移動に失敗しました'
         return response
 
     def get_active_node_names(self):
@@ -1077,6 +1102,10 @@ class CommandGuiApp(QWidget):
         # PSコン(joy_teleop_node)の回収確認ボタンから/pick_sequence_confirmサービス
         # 経由で呼ばれた際、GUIの「回収実行」ボタンと同じ処理を行わせる(2026-09-03)。
         self.node.set_pick_confirm_handler(self._on_pick_confirm_requested)
+        # PSコン(joy_teleop_node)の割当ボタンから/shoot_sequence_start_l4・_r4
+        # サービス経由で呼ばれた際、GUIの「L4へ移動」「R4へ移動」ボタンと同じ
+        # 処理を行わせる(2026-09-03)。
+        self.node.set_shoot_start_handler(self._on_shoot_start_requested)
 
         self.tabs.setCurrentWidget(overview_tab)
 
@@ -1787,11 +1816,14 @@ class CommandGuiApp(QWidget):
             desc,
             '「ワーク・シューティングボックス」パネルの「自動シーケンスで実行」を\n'
             'ONにしてボタンを押すと使える。\n'
-            '回収: ワーク手前(アプローチ高さ)までは自動、そこから先(接触・吸着ON)\n'
-            'は下の「回収実行」ボタンまたはPSコンの回収確認ボタンを押すまで進まない。\n'
-            '投入: シューティングボックス手前まで自動で近づいて待機し、そこから先の\n'
-            '細かい位置調整とポンプOFF(投入実行)はコントローラーで完全に手動操作する\n'
-            '(このシーケンスは自動で行わない)。', 'muted')
+            '回収: ハンドを保持姿勢・パッド展開・ポンプONにしてからワーク手前\n'
+            '(アプローチ高さ)まで自動で近づき、そこから先(実際の接触・回収)は\n'
+            '下の「回収実行」ボタンまたはPSコンの回収確認ボタンを押すまで進まない。\n'
+            '投入: シューティングエリア(L4/R4固定)の真上に安全高度を維持したまま\n'
+            '自動で近づくだけで、シュート自体(降下・位置調整・ポンプOFF)は行わない。\n'
+            '以降はZ軸の降下も含めて全てコントローラーで手動操作する。下の\n'
+            '「L4へ移動」「R4へ移動」ボタン(またはPSコンの割当ボタン)でいつでも\n'
+            'この移動だけをやり直せる。', 'muted')
         layout.addWidget(desc)
 
         self.sequence_status_label = QLabel()
@@ -1804,6 +1836,12 @@ class CommandGuiApp(QWidget):
         pick_confirm_btn.setProperty('variant', 'primary')
         pick_confirm_btn.clicked.connect(self._on_pick_confirm_button_clicked)
         btn_row.addWidget(pick_confirm_btn)
+        shoot_l4_btn = QPushButton('L4へ移動')
+        shoot_l4_btn.clicked.connect(lambda: self._on_shoot_start_requested('L4'))
+        btn_row.addWidget(shoot_l4_btn)
+        shoot_r4_btn = QPushButton('R4へ移動')
+        shoot_r4_btn.clicked.connect(lambda: self._on_shoot_start_requested('R4'))
+        btn_row.addWidget(shoot_r4_btn)
         abort_btn = QPushButton('中断')
         abort_btn.setProperty('variant', 'danger')
         abort_btn.clicked.connect(self._on_abort_sequence)
@@ -1836,9 +1874,8 @@ class CommandGuiApp(QWidget):
                 ('r_retract_m', 'R退避量[m]'),
                 ('pickup_z_offset_m', '回収Zオフセット[m]'),
                 ('pickup_approach_clearance_m', '回収アプローチ余裕[m]'),
-                ('shoot_approach_depth_m', '投入アプローチ深さ[m]'),
                 ('shoot_tip_theta_rad', '投入時手先θ[rad](暫定)'),
-                ('pump_settle_sec', 'ポンプON後の待ち時間[s]'))):
+                ('gather_settle_sec', '収納後の待ち時間[s]'))):
             grid.addWidget(QLabel(label), i, 0)
             edit = make_float_edit(DEFAULT_SEQUENCE_SETTINGS[key])
             self.sequence_edits[key] = edit
@@ -1864,14 +1901,21 @@ class CommandGuiApp(QWidget):
         _set_status(self.sequence_status_label, '設定を保存しました', 'success')
 
     def _start_pick_sequence(self, x, y, z):
-        """workボタン用: 安全高度退避→R退避→θ回転→R伸長→パッド展開→ワーク手前
+        """workボタン用: ピッチ保持姿勢・パッド展開・ポンプONを移動開始前に
+        まとめて行ってから、安全高度退避→R退避→θ回転→R伸長→ワーク手前
         (アプローチ高さ)まで自動降下→(人間の「回収実行」指示待ち。GUIの
         「回収実行」ボタンまたはPSコンの回収確認ボタン)→ワークに当たる高さまで
-        降下→ポンプON(自動)→上昇→パッド収納、という回収シーケンス。
-        「移動とZをある程度下げる動作は自動、そこから先(接触・吸着)は人間の
-        明示的な指示で実行する」というユーザー指定の運用に合わせている
-        (2026-09-03)。ポンプON自体は指示後に自動で行う(オフのみ人間が
-        コントローラーで判断する、という以前からの方針は投入側で維持)。
+        降下→上昇→パッド収納→ピッチ投入姿勢、という回収シーケンス
+        (2026-09-03、ユーザー指摘: 「半自動化を大雑把にしよう。ワークへの移動を
+        指示されたらハンドを保持姿勢、パッド展開、ポンプオンにして向かう。人の
+        操作でワークを回収する。回収時のZ軸下降はそのまま残しておいて」。以前は
+        ポンプONを最終降下の後(回収実行を押した後)に自動で呼んでいたが、
+        移動開始前に前倒しし、実際の接触・吸着(=回収そのもの)は人間の操作に
+        委ねる形にした。Z軸の自動降下(アプローチ高さまで→回収実行待ち→
+        最終降下)自体は変更せずそのまま維持している)。パッド収納とピッチ切替の
+        間はgather_settle_sec秒待ってから行う(ユーザー指摘: 「収納から姿勢変更
+        までの待機時間も必要。ほぼ同時はまずい」。パッドが物理的に収納し切る前に
+        ピッチが回り始めると干渉する恐れがあるため)。
         theta回転以降は手先θ(tip_theta_joint)も同時に制御し、吸着パッド3個の
         展開軸がワークの行と平行になるよう自動で打ち消す(2026-09-03、ユーザー
         指摘: 「ハンドは3つ一気に回収するので手先θはワークの行と平行になるように
@@ -1883,6 +1927,11 @@ class CommandGuiApp(QWidget):
         直前のワークから近距離の移動とみなし、R軸を旋回軸まで戻す退避を省略して
         直接回転+伸縮する(ユーザー指摘: 「ワークからワークに移動する際はR軸を
         戻さなくていい。近距離なので」)。
+        ピッチ保持姿勢・パッド展開・ポンプONの呼び出しはポンプの現在ON/OFF状態に
+        関わらず常に行う(2026-09-03、ユーザー指摘: 「ポンプのオンオフによる機体の
+        動作制約がないようにしたい」。一時、ポンプが既にONの間はこれらの呼び出しを
+        省略する実装を試したが、「回収実行を押してもハンドの向きが現状維持の
+        ままになる」という問題が生じたため撤回し、常に呼ぶ方式に戻した)。
         シーケンス完了/中断後で非アクティブな場合でも、この呼び出しは常に
         self._last_pick_targetを更新する。これにより「回収実行」ボタン
         (_on_pick_confirm_requested)は、シーケンスが完了した後でも同じワークへの
@@ -1931,30 +1980,36 @@ class CommandGuiApp(QWidget):
             ]
 
         steps = [
+            ('call', '/hand_set_pitch_hold'),             # 回収待機中は保持姿勢にしておく
+            ('call', '/hand_spread_pads'),                # 移動前にパッド展開
+            ('call', '/hand_pump_on'),                    # 移動前に吸着ON(接触したらすぐ吸着できるように)
             ('move', theta0, safe_zj, r0),               # 現在地のまま安全高度へ
             *approach_legs,
-            ('call', '/hand_spread_pads'),
             ('move', target_theta, approach_zj, target_r, tip_theta_pick),  # ワーク手前まで自動降下
-            ('wait_pick_confirm',),                       # 人間の「回収実行」指示待ち
+            ('wait_pick_confirm',),                       # 人間の「回収実行」指示待ち(=人の操作でワークを回収)
             ('move', target_theta, final_zj, target_r, tip_theta_pick),  # ワークに当たる高さまで降下
-            ('call', '/hand_pump_on'),                    # 吸着ON(自動)
-            ('delay', settings['pump_settle_sec']),       # 吸着が効くまで少し待つ
             ('move', target_theta, safe_zj, target_r, tip_theta_pick),  # 安全高度へ上昇
             ('call', '/hand_gather_pads'),
+            ('delay', settings['gather_settle_sec']),     # パッドが物理的に収納し切るまで少し待つ
+            ('call', '/hand_set_pitch_insert'),           # 収納後は投入姿勢へ(シュートへの搬送に備える)
         ]
         self._begin_sequence('回収', steps)
 
     def _start_shoot_sequence(self, x, y, z):
-        """shootボタン用: 安全高度退避→R退避→θ回転→R伸長→ピッチ投入姿勢→
-        ある程度Zを下げて待機、という投入シーケンス。ここで自動区間は終わりで、
-        以降の細かい位置調整とポンプOFF(投入実行)は完全に手動(コントローラーの
-        ジョグ・丸ボタン)で行う(2026-09-03、ユーザー指定: 「シュートに向かう、
-        ある程度Zを下げて待機、細かい位置調整はコントローラーで行い
-        コントローラーで吸着をオフにして終了」。以前は自動でポンプOFFを待って
-        ピッチを戻す所まで自動化していたが、待機以降は一切自動制御しない方式に
-        変更)。theta回転以降は手先θ(tip_theta_joint)もr方向に垂直な一定値
+        """shootボタン用: 安全高度を維持したままシューティングエリアのXYへ
+        向かうだけの投入シーケンス(2026-09-03、ユーザー指摘: 「半自動化を
+        大雑把にしよう。特にシューティングについてはシューティングエリアに
+        安全高度を維持したまま向かうだけでシュート自体は行わない」)。Z軸の
+        降下・ピッチ投入姿勢への切替・ポンプOFFはいずれも自動区間に含めず、
+        すべて人間がコントローラーで操作する(ユーザー指摘: 「シューティング
+        エリアへ移動人が位置を調整しポンプをオフする。Z軸の操作も人が行う」)。
+        theta回転以降は手先θ(tip_theta_joint)もr方向に垂直な一定値
         (shoot_tip_theta_rad)へ制御する(2026-09-03、ユーザー指摘: 「シュート時は
-        Rと垂直になるように」。この値自体は実機未検証の暫定値)。"""
+        Rと垂直になるように」。この値自体は実機未検証の暫定値)。
+        実運用ではx, y, zはSHOOT_FIXED_TARGETS(L4/R4)固定で、「L4へ移動」
+        「R4へ移動」ボタン(_on_shoot_start_requested、GUIボタンまたはPSコンの
+        割当ボタン)経由で呼ばれる想定(2026-09-03、ユーザー指摘: 「シューティング
+        エリアはL4もしくはR4で、ボタンを2つおいておいて」)。"""
         if not self._guard_sequence_start():
             return
         try:
@@ -1967,11 +2022,6 @@ class CommandGuiApp(QWidget):
         theta0, r0 = pos['root_theta_joint'], pos['r_joint']
         target_theta, target_r = _theta_r_from_xy(x, y)
         safe_zj = clamp(settings['safe_transit_z_m'] - Z_OFFSET, Z_LOWER, Z_UPPER)
-        # ユーザー指定通り「シューティングボックス底面からの距離」で定義する。
-        # SHOOT_POINTSのzは箱の開口部上端(SHOOT_BOX_HEIGHT)を指すため、そこから
-        # shoot_approach_depth_m分だけ差し引いて底面側へ寄せる(ここで自動区間は
-        # 終わり、最終的な投入深さの追い込みは手動ジョグで行う)。
-        approach_zj = clamp((z - settings['shoot_approach_depth_m']) - Z_OFFSET, Z_LOWER, Z_UPPER)
         r_retract = clamp(settings['r_retract_m'], R_LOWER, R_UPPER)
         # 投入時はr方向に垂直な姿勢(root_thetaの値によらず一定のtip_theta)にする
         # (SHOOT_TIP_THETA_RAD付近のコメント参照、ユーザー指摘:「シュート時はRと
@@ -1982,9 +2032,7 @@ class CommandGuiApp(QWidget):
             ('move', theta0, safe_zj, r0),
             ('move', theta0, safe_zj, r_retract),
             ('move', target_theta, safe_zj, r_retract, tip_theta_shoot),
-            ('move', target_theta, safe_zj, target_r, tip_theta_shoot),
-            ('call', '/hand_set_pitch_insert'),
-            ('move', target_theta, approach_zj, target_r, tip_theta_shoot),  # ある程度降下して待機
+            ('move', target_theta, safe_zj, target_r, tip_theta_shoot),  # 安全高度のままシューティングエリアのXYへ
         ]
         self._begin_sequence('投入', steps)
 
@@ -2058,8 +2106,8 @@ class CommandGuiApp(QWidget):
             self._abort_sequence(f'{self._seq_kind}: 移動タイムアウト(ステップ{self._seq_index + 1})')
 
     def _advance_delay_step(self, step):
-        """指定秒数だけ待って次のステップへ進む(現状はポンプON後の吸着settle待ちの
-        み用途、_start_pick_sequence参照)。"""
+        """指定秒数だけ待って次のステップへ進む(現状はパッド収納後のgather_
+        settle_sec待ちのみ用途、_start_pick_sequence参照)。"""
         _, seconds = step
         if self._seq_delay_start_time is None:
             self._seq_delay_start_time = time.monotonic()
@@ -2114,6 +2162,19 @@ class CommandGuiApp(QWidget):
     def _on_pick_confirm_button_clicked(self):
         if not self._on_pick_confirm_requested():
             _set_status(self.sequence_status_label, '現在「回収実行」待ちの状態ではありません', 'error')
+
+    def _on_shoot_start_requested(self, label):
+        """GUIの「L4へ移動」「R4へ移動」ボタン、またはCommandGuiNodeの
+        /shoot_sequence_start_l4・_r4サービス経由(PSコンの割当ボタン、
+        joy_teleop_node)から呼ばれる。SHOOT_FIXED_TARGETS[label]の固定
+        シューティングエリアへ、安全高度を維持したまま向かうだけの投入シーケンスを
+        実行する(2026-09-03、ユーザー指摘: 「シューティングエリアはL4もしくは
+        R4で、ボタンを2つおいておいて」。以前は直前にシーケンスで向かった対象を
+        覚えておいて再送信する方式だったが、実運用の対象がL4/R4の2箇所固定と
+        分かったため、対象を記憶せず直接その場で指定する方式に変更した)。"""
+        _, x, y, z = SHOOT_FIXED_TARGETS[label]
+        self._start_shoot_sequence(x, y, z)
+        return True
 
     def _abort_sequence(self, message):
         self._seq_active = False
