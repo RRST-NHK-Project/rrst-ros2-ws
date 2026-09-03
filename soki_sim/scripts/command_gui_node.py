@@ -65,7 +65,7 @@ from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Bool
-from std_srvs.srv import Trigger
+from std_srvs.srv import SetBool, Trigger
 
 from PyQt5.QtCore import Qt, QPointF, QTimer
 from PyQt5.QtGui import QColor, QDoubleValidator, QFontMetrics, QIcon, QIntValidator, QPainter, QPen, QPixmap
@@ -778,12 +778,28 @@ class CommandGuiNode(Node):
 
         # 回収シーケンスが「ワーク手前で自動停止→人間の回収実行指示待ち」の状態に
         # なっているとき、GUIの「回収実行」ボタンだけでなくPSコン(joy_teleop_node)
-        # の回収確認ボタンからも進めさせるためのTriggerサービス(2026-09-03追加)。
+        # のPSボタンからも進めさせるためのTriggerサービス(2026-09-03追加)。
         # シーケンス状態自体はCommandGuiApp側にあるため、実際の判定・進行処理は
         # set_pick_confirm_handlerで登録されたコールバック(CommandGuiApp._on_pick_
-        # confirm_requested)に委譲する。
+        # confirm_only_requested)に委譲する。2026-09-03、同日当初は「×長押しで
+        # 回収実行確定」としていたが、選択中ワークへの「移動」(×の短押し)と
+        # 同じボタンを共有していたため、移動が実行中シーケンスを即座に中断・
+        # やり直す仕様(下記参照)と衝突し、長押しのつもりで押した瞬間に移動が
+        # 先に発火して回収実行待ち状態を壊してしまう不具合が発生した。ユーザー
+        # 指定:「回収ボタンをバツ長押しからPSボタンに変更」により、確定は
+        # 専用のPSボタンへ分離した(誤操作でワークに接触・吸着してしまうことを
+        # 防ぐ安全策として、移動用の×ボタンとは意図的に別ボタンにしている)。
         self._pick_confirm_handler = None
         self.create_service(Trigger, 'pick_sequence_confirm', self._on_pick_sequence_confirm_srv)
+
+        # 選択中のワークへ回収シーケンスを開始するだけのTriggerサービス
+        # (2026-09-03追加、pick_sequence_confirmから「移動」部分を分離)。
+        # 待機中の確定は行わない(それはpick_sequence_confirmの役目)。実際の
+        # 処理はset_pick_move_handlerで登録されたコールバック(CommandGuiApp.
+        # _on_pick_move_only_requested)に委譲する。PSコン側では×ボタン
+        # (立ち上がりエッジ即時)から呼ばれる。
+        self._pick_move_handler = None
+        self.create_service(Trigger, 'pick_sequence_move', self._on_pick_sequence_move_srv)
 
         # 「L4へ移動」「R4へ移動」ボタン(固定のシューティングエリアへ、安全高度を
         # 維持したまま向かうだけの投入シーケンスを実行する)を、GUIボタンだけでなく
@@ -799,6 +815,19 @@ class CommandGuiNode(Node):
         self.create_service(
             Trigger, 'shoot_sequence_start_r4',
             functools.partial(self._on_shoot_sequence_start_srv, 'R4'))
+
+        # 矢印キー(D-pad)でGUI上の目標ワーク選択カーソルを移動するTriggerサービス
+        # 4つ(2026-09-03追加、ユーザー指定:「矢印キーでGUI上で目標ワークを選択し
+        # 移動バツで移動、再度バツで回収実行」)。実際の処理はset_work_select_
+        # handlerで登録されたコールバック(CommandGuiApp._on_work_select_requested、
+        # 方向文字列引数付き)に委譲する。選択自体の移動であり、シーケンスの開始は
+        # 行わない(開始は×ボタン=pick_sequence_confirm、_on_pick_confirm_requested
+        # 参照)。
+        self._work_select_handler = None
+        for direction in ('up', 'down', 'left', 'right'):
+            self.create_service(
+                Trigger, f'select_work_{direction}',
+                functools.partial(self._on_select_work_srv, direction))
 
         # ハンドのポンプON/OFF状態(hand_node、2026-09-03再追加)。「ピック/投入
         # 自動シーケンス」パネルにもポンプ操作ボタン・状態表示を出すために購読する
@@ -821,6 +850,14 @@ class CommandGuiNode(Node):
         # サービス名ごとに遅延生成してキャッシュする。
         self._trigger_clients = {}
 
+        # joy_teleop_nodeの手先θ追従トグル(OPTIONSボタン)をGUI側から明示的に
+        # ON/OFFするクライアント(std_srvs/SetBool、2026-09-03追加)。投入(L4/R4)
+        # シーケンス開始時にOFFへ切り替えるために使う(set_joy_tip_theta_follow・
+        # CommandGuiApp._start_shoot_sequence参照。ユーザー指定:「手先θ追従は
+        # シューティングボックスへの自動移動時には自動で無効化」)。
+        self._joy_tip_theta_follow_client_ = self.create_client(
+            SetBool, 'set_tip_theta_follow_theta')
+
     def _on_mixed_joint_state(self, msg):
         for name, pos in zip(msg.name, msg.position):
             if name in self._current_positions:
@@ -838,7 +875,8 @@ class CommandGuiNode(Node):
         return self._pump_on_state
 
     def set_pick_confirm_handler(self, handler):
-        """CommandGuiApp._on_pick_confirm_requested(引数無し、bool返却)を登録する。"""
+        """CommandGuiApp._on_pick_confirm_only_requested(引数無し、bool返却)を
+        登録する(2026-09-03、PSボタンでのみ呼ばれる確定専用ハンドラ)。"""
         self._pick_confirm_handler = handler
 
     def _on_pick_sequence_confirm_srv(self, request, response):
@@ -849,6 +887,21 @@ class CommandGuiNode(Node):
         response.success = self._pick_confirm_handler()
         response.message = (
             '回収を実行します' if response.success else '現在「回収実行」待ちの状態ではありません')
+        return response
+
+    def set_pick_move_handler(self, handler):
+        """CommandGuiApp._on_pick_move_only_requested(引数無し、bool返却)を
+        登録する(2026-09-03追加、×短押しで呼ばれる移動専用ハンドラ)。"""
+        self._pick_move_handler = handler
+
+    def _on_pick_sequence_move_srv(self, request, response):
+        if self._pick_move_handler is None:
+            response.success = False
+            response.message = 'GUI未初期化です'
+            return response
+        response.success = self._pick_move_handler()
+        response.message = (
+            '選択中のワークへ移動します' if response.success else '移動できません(選択ワーク未確定?)')
         return response
 
     def set_shoot_start_handler(self, handler):
@@ -863,6 +916,33 @@ class CommandGuiNode(Node):
         response.success = self._shoot_start_handler(label)
         response.message = f'{label}へ移動します' if response.success else f'{label}への移動に失敗しました'
         return response
+
+    def set_work_select_handler(self, handler):
+        """CommandGuiApp._on_work_select_requested(direction: 'up'/'down'/'left'/
+        'right'、戻り値無し)を登録する。"""
+        self._work_select_handler = handler
+
+    def _on_select_work_srv(self, direction, request, response):
+        if self._work_select_handler is None:
+            response.success = False
+            response.message = 'GUI未初期化です'
+            return response
+        self._work_select_handler(direction)
+        response.success = True
+        response.message = f'ワーク選択カーソルを{direction}へ移動しました'
+        return response
+
+    def set_joy_tip_theta_follow(self, enabled):
+        """joy_teleop_nodeの手先θ追従トグルをGUI側から明示的にON/OFFする
+        (std_srvs/SetBool、2026-09-03追加)。投入(L4/R4)シーケンス開始時にOFFへ
+        切り替えるために使う(CommandGuiApp._start_shoot_sequence参照)。
+        joy_teleop_node未起動時は黙って諦める(安全側、シーケンス自体は
+        続行してよいため呼び出し元をブロックしない)。"""
+        if not self._joy_tip_theta_follow_client_.service_is_ready():
+            return
+        req = SetBool.Request()
+        req.data = enabled
+        self._joy_tip_theta_follow_client_.call_async(req)
 
     def get_active_node_names(self):
         """現在ROSグラフに存在するノード名の集合を返す(機体ステータスパネルの
@@ -1099,13 +1179,21 @@ class CommandGuiApp(QWidget):
         self._build_calibration_tab(calibration_tab)
         self._build_wiring_tab(wiring_tab)
         self._restore_saved_gains()
-        # PSコン(joy_teleop_node)の回収確認ボタンから/pick_sequence_confirmサービス
-        # 経由で呼ばれた際、GUIの「回収実行」ボタンと同じ処理を行わせる(2026-09-03)。
-        self.node.set_pick_confirm_handler(self._on_pick_confirm_requested)
+        # PSコン(joy_teleop_node)から、PSボタン=/pick_sequence_confirm
+        # (確定のみ)・×ボタン=/pick_sequence_move(選択中ワークへの移動のみ)の
+        # 2つのサービス経由で呼ばれる(2026-09-03、ユーザー指定:「回収ボタンを
+        # バツ長押しからPSボタンに変更」。誤操作でワークに接触・吸着してしまう
+        # ことを防ぐため、確定操作は移動用の×ボタンとは別ボタンにしている)。
+        self.node.set_pick_confirm_handler(self._on_pick_confirm_only_requested)
+        self.node.set_pick_move_handler(self._on_pick_move_only_requested)
         # PSコン(joy_teleop_node)の割当ボタンから/shoot_sequence_start_l4・_r4
         # サービス経由で呼ばれた際、GUIの「L4へ移動」「R4へ移動」ボタンと同じ
         # 処理を行わせる(2026-09-03)。
         self.node.set_shoot_start_handler(self._on_shoot_start_requested)
+        # PSコン(joy_teleop_node)の十字キー(D-pad)から/select_work_up・_down・
+        # _left・_rightサービス経由で呼ばれた際、ワーク選択カーソルを動かす
+        # (2026-09-03、ユーザー指定:「矢印キーでGUI上で目標ワークを選択し移動」)。
+        self.node.set_work_select_handler(self._on_work_select_requested)
 
         self.tabs.setCurrentWidget(overview_tab)
 
@@ -1818,7 +1906,8 @@ class CommandGuiApp(QWidget):
             'ONにしてボタンを押すと使える。\n'
             '回収: ハンドを保持姿勢・パッド展開・ポンプONにしてからワーク手前\n'
             '(アプローチ高さ)まで自動で近づき、そこから先(実際の接触・回収)は\n'
-            '下の「回収実行」ボタンまたはPSコンの回収確認ボタンを押すまで進まない。\n'
+            '下の「回収実行」ボタンまたはPSコンのPSボタンを押すまで進まない\n'
+            '(×ボタンは選択中ワークへの移動のみ。矢印キーでワークを選択できる)。\n'
             '投入: シューティングエリア(L4/R4固定)の真上に安全高度を維持したまま\n'
             '自動で近づくだけで、シュート自体(降下・位置調整・ポンプOFF)は行わない。\n'
             '以降はZ軸の降下も含めて全てコントローラーで手動操作する。下の\n'
@@ -1937,11 +2026,16 @@ class CommandGuiApp(QWidget):
         (_on_pick_confirm_requested)は、シーケンスが完了した後でも同じワークへの
         回収シーケンスを再度呼び出せる(吸着失敗時の再試行用、2026-09-03、
         ユーザー指摘: 「吸着できなかったときに回収実行を再度行うことがある。
-        現状だと回収実行が一回しかできない」)。"""
+        現状だと回収実行が一回しかできない」)。
+        他のシーケンス(投入シーケンス含む)実行中でも、確認や中断操作なしに
+        即座にこちらへ切り替える(2026-09-03、ユーザー指摘:「回収実行を押さ
+        なくてもシューティング位置へ移動できるように。ユーザーの動きを制限
+        したくない。状況判断はユーザーが行うため」。以前は投入シーケンスなど
+        「回収」以外が実行中だとQMessageBoxで拒否していたが、状況判断は人間
+        (ユーザー)に委ね、システム側では止めない方針に変更した)。"""
         restarting_from_work = self._seq_active and self._seq_kind == '回収'
-        if self._seq_active and not restarting_from_work:
-            QMessageBox.information(self, 'シーケンス実行中', '実行中のシーケンスを中断してから開始してください')
-            return
+        if self._seq_active:
+            self._abort_sequence(f'{self._seq_kind}シーケンスを中断し、回収シーケンスへ切り替えます')
         if not self.node.has_current_state():
             QMessageBox.information(self, '未取得', 'まだ現在位置を受信していません')
             return
@@ -1950,8 +2044,6 @@ class CommandGuiApp(QWidget):
         except ValueError:
             QMessageBox.critical(self, '入力エラー', 'シーケンス設定パネルの数値を確認してください')
             return
-        if restarting_from_work:
-            self._abort_sequence('回収シーケンスを別のワークへやり直します')
         self._last_pick_target = (x, y, z)
 
         pos = self.node.get_current_positions()
@@ -2000,23 +2092,53 @@ class CommandGuiApp(QWidget):
         向かうだけの投入シーケンス(2026-09-03、ユーザー指摘: 「半自動化を
         大雑把にしよう。特にシューティングについてはシューティングエリアに
         安全高度を維持したまま向かうだけでシュート自体は行わない」)。Z軸の
-        降下・ピッチ投入姿勢への切替・ポンプOFFはいずれも自動区間に含めず、
-        すべて人間がコントローラーで操作する(ユーザー指摘: 「シューティング
-        エリアへ移動人が位置を調整しポンプをオフする。Z軸の操作も人が行う」)。
+        降下・ポンプOFFはいずれも自動区間に含めず、すべて人間がコントローラーで
+        操作する(ユーザー指摘: 「シューティングエリアへ移動人が位置を調整し
+        ポンプをオフする。Z軸の操作も人が行う」)。手先ピッチを投入姿勢へ
+        揃えることだけは例外で、シーケンス開始時に自動で行う(下記steps先頭の
+        hand_set_pitch_insert呼び出し、2026-09-04追加。当初は回収シーケンス末尾
+        での自動切替に任せて投入シーケンス側では何もしていなかったが、
+        「回収実行を押さなくてもシューティング位置へ移動できるように」により
+        回収シーケンスをいつでも中断できるようになった結果、保持姿勢のまま
+        シュートへ向かってしまうことがあり「手先ピッチが作動したりしなかったり
+        する」不具合として顕在化したため、投入シーケンス自身が保証するように
+        変更した。ユーザー指摘: 「シュート時は手先ピッチ投入姿勢でなくては
+        ならない」)。
         theta回転以降は手先θ(tip_theta_joint)もr方向に垂直な一定値
         (shoot_tip_theta_rad)へ制御する(2026-09-03、ユーザー指摘: 「シュート時は
         Rと垂直になるように」。この値自体は実機未検証の暫定値)。
         実運用ではx, y, zはSHOOT_FIXED_TARGETS(L4/R4)固定で、「L4へ移動」
         「R4へ移動」ボタン(_on_shoot_start_requested、GUIボタンまたはPSコンの
         割当ボタン)経由で呼ばれる想定(2026-09-03、ユーザー指摘: 「シューティング
-        エリアはL4もしくはR4で、ボタンを2つおいておいて」)。"""
-        if not self._guard_sequence_start():
+        エリアはL4もしくはR4で、ボタンを2つおいておいて」)。
+        他のシーケンス(回収シーケンス含む、回収実行待ちの状態でも)実行中でも、
+        確認や中断操作なしに即座にこちらへ切り替える(2026-09-03、ユーザー指摘:
+        「回収実行を押さなくてもシューティング位置へ移動できるように。ユーザー
+        の動きを制限したくない。状況判断はユーザーが行うため」。以前は
+        _guard_sequence_startでQMessageBoxにより拒否していたが、状況判断は
+        人間(ユーザー)に委ね、システム側では止めない方針に変更した。これに
+        伴い、実行中は開始できないことを前提とした「1件だけ予約して完了後に
+        自動開始する」キュー機構(_seq_queued_shoot_label、_on_shoot_start_
+        requested参照)も不要になり削除した)。"""
+        if self._seq_active:
+            self._abort_sequence(f'{self._seq_kind}シーケンスを中断し、投入シーケンスへ切り替えます')
+        if not self.node.has_current_state():
+            QMessageBox.information(self, '未取得', 'まだ現在位置を受信していません')
             return
         try:
             settings = self._collect_sequence_values()
         except ValueError:
             QMessageBox.critical(self, '入力エラー', 'シーケンス設定パネルの数値を確認してください')
             return
+
+        # 投入シーケンスは手先θを固定値(tip_theta_shoot、下記)へ制御するため、
+        # joy_teleop_node側の手先θroot_theta追従(OPTIONSボタン、既定ON)が
+        # ONのままだと毎周期-root_thetaへ上書きされて競合する。シーケンス開始時に
+        # 自動でOFFにする(2026-09-03、ユーザー指定:「手先θ追従はシューティング
+        # ボックスへの自動移動時には自動で無効化」。joy_teleop_node未起動時は
+        # set_joy_tip_theta_follow内で黙って無視されるだけで、本シーケンス自体は
+        # 続行する)。
+        self.node.set_joy_tip_theta_follow(False)
 
         pos = self.node.get_current_positions()
         theta0, r0 = pos['root_theta_joint'], pos['r_joint']
@@ -2029,21 +2151,27 @@ class CommandGuiApp(QWidget):
         tip_theta_shoot = settings['shoot_tip_theta_rad']
 
         steps = [
+            # シュート時は手先ピッチが投入姿勢でなければならない(2026-09-04、
+            # ユーザー指摘: 「手先ピッチが作動したりしなかったりする理由。
+            # シュート時は手先ピッチ投入姿勢でなくてはならない」)。以前はこの
+            # 呼び出しが無く、回収シーケンス末尾の(call, '/hand_set_pitch_insert')
+            # (パッド収納後に投入姿勢へ切り替える箇所)が完了した場合のみ結果的に
+            # 投入姿勢になっていた。2026-09-03の「回収実行を押さなくても
+            # シューティング位置へ移動できるように」「ユーザーの動きを制限したく
+            # ない」により、回収シーケンスを最後まで待たずいつでも即座に投入
+            # シーケンスへ中断・切り替えられるようになったため、回収シーケンスが
+            # 保持姿勢(hand_set_pitch_hold、シーケンス冒頭)のまま・あるいは
+            # ピッチ未設定のまま中断された状態で投入シーケンスが始まるケースが
+            # 増え、「手先ピッチが作動したりしなかったりする」不具合として顕在化
+            # した。原因は投入シーケンス自身がピッチ姿勢を一切指定していなかった
+            # ことなので、シーケンス開始時に必ず投入姿勢へ揃えるようにする。
+            ('call', '/hand_set_pitch_insert'),
             ('move', theta0, safe_zj, r0),
             ('move', theta0, safe_zj, r_retract),
             ('move', target_theta, safe_zj, r_retract, tip_theta_shoot),
             ('move', target_theta, safe_zj, target_r, tip_theta_shoot),  # 安全高度のままシューティングエリアのXYへ
         ]
         self._begin_sequence('投入', steps)
-
-    def _guard_sequence_start(self):
-        if self._seq_active:
-            QMessageBox.information(self, 'シーケンス実行中', '実行中のシーケンスを中断してから開始してください')
-            return False
-        if not self.node.has_current_state():
-            QMessageBox.information(self, '未取得', 'まだ現在位置を受信していません')
-            return False
-        return True
 
     def _begin_sequence(self, kind, steps):
         self._seq_kind = kind
@@ -2131,33 +2259,79 @@ class CommandGuiApp(QWidget):
 
     def _advance_wait_pick_confirm_step(self, step):
         """'wait_pick_confirm'ステップ: 人間が「回収実行」を指示する(GUIの
-        「回収実行」ボタン、またはPSコンの回収確認ボタン経由でcommand_gui_nodeの
-        /pick_sequence_confirmサービスを呼ぶ)まで一時停止する。実際の解除は
-        _on_pick_confirm_requestedで行う(ここでは表示のみ)。"""
+        「回収実行」ボタン、またはPSコンのPSボタン経由でcommand_gui_nodeの
+        /pick_sequence_confirmサービスを呼ぶ、2026-09-03、ユーザー指定:「回収
+        ボタンをバツ長押しからPSボタンに変更」)まで一時停止する。実際の解除は
+        _on_pick_confirm_only_requestedで行う(ここでは表示のみ)。"""
         if self._seq_waiting_service is None:
             self._seq_waiting_service = '(pick_confirm)'
             _set_status(
                 self.sequence_status_label,
                 f'{self._seq_kind}: 回収実行の指示待ち(GUIの「回収実行」ボタンまたは'
-                'PSコンで操作してください)', 'muted')
+                'PSコンのPSボタンで操作してください)', 'muted')
 
-    def _on_pick_confirm_requested(self):
-        """GUIの「回収実行」ボタン、またはCommandGuiNodeの/pick_sequence_confirm
-        サービス経由(PSコンの回収確認ボタン、joy_teleop_node)から呼ばれる。
-        wait_pick_confirmで一時停止中ならそのまま次のステップへ進める。
-        シーケンスが既に完了/中断していて直前の回収対象が分かっている場合は、
-        同じワークへの回収シーケンスを最初から再度呼び出す(2026-09-03、
-        ユーザー指摘: 「吸着できなかったときに回収実行を再度行うことがある。
-        現状だと回収実行が一回しかできない」。吸着失敗時、ボタンを押し直すだけで
-        再試行できるようにする)。"""
+    def _try_confirm_pick(self):
+        """wait_pick_confirmで一時停止中ならそのまま次のステップへ進める
+        (=回収実行を確定する)。それ以外は何もせずFalseを返す。"""
         if self._seq_active and self._seq_waiting_service == '(pick_confirm)':
             self._seq_waiting_service = None
             self._seq_index += 1
             return True
-        if not self._seq_active and self._last_pick_target is not None:
-            self._start_pick_sequence(*self._last_pick_target)
-            return True
         return False
+
+    def _try_move_to_selected_work(self):
+        """矢印キー(D-pad)で選択中のワークへの回収シーケンスを開始する
+        (2026-09-03、ユーザー指定:「矢印キーでGUI上で目標ワークを選択し
+        移動」)。選択カーソルは常にどこかのワークを指しているため(既定は
+        先頭のワーク、マウスでのワーククリックでも同期される、_build_field_
+        buttons/_on_field_point参照)基本的に常に成功するが、万一_work_grid未構築
+        (GUI初期化前)なら従来の_last_pick_target(吸着失敗時の再試行用、
+        2026-09-03、ユーザー指摘: 「吸着できなかったときに回収実行を再度行う
+        ことがある」)にフォールバックする。
+        他のシーケンス実行中(回収実行待ち・投入シーケンス中含む)でも、
+        _start_pick_sequence自身が確認や中断操作なしに即座に中断して切り替える
+        ため、ここでは一切ブロックしない(2026-09-03、ユーザー指摘: 「矢印での
+        ワーク位置選択と移動後、回収実行をしないと移動ができない。誤って選択
+        しても移動できるように回収実行を押さなくてもワーク位置移動を再度指示
+        できるように」、続けて「回収実行を押さなくてもシューティング位置へ移動
+        できるように。ユーザーの動きを制限したくない。状況判断はユーザーが
+        行うため」により、_start_pick_sequence側の「実行中は拒否する」guardを
+        撤去し常に即座に切り替わるよう変更済み。以前はここで
+        `self._seq_active and self._seq_kind != '回収'`のとき投入シーケンス側の
+        モーダルダイアログを避けるためにブロックしていたが、そのダイアログ自体
+        が無くなったため不要になった)。"""
+        target = self._selected_work_xyz()
+        if target is None:
+            target = self._last_pick_target
+        if target is None:
+            return False
+        self._start_pick_sequence(*target)
+        return True
+
+    def _on_pick_confirm_requested(self):
+        """GUIの「回収実行」ボタン(マウスクリック)から呼ばれる。待機中なら確定、
+        非アクティブなら選択中ワークへの移動を試みる、という統合動作(マウス
+        クリックには誤操作防止のボタン分離の必要が薄いため、従来通り1クリックで
+        両方の役割を兼ねる)。PSコン(joy_teleop_node)は2026-09-03、ユーザー
+        指定:「回収ボタンをバツ長押しからPSボタンに変更」により、この統合
+        ハンドラは使わず、×ボタン=_on_pick_move_only_requested
+        (pick_sequence_moveサービス)、PSボタン=_on_pick_confirm_only_requested
+        (pick_sequence_confirmサービス)に分離済み(誤操作でワークに接触・吸着
+        してしまうことを防ぐ安全策)。"""
+        return self._try_confirm_pick() or self._try_move_to_selected_work()
+
+    def _on_pick_confirm_only_requested(self):
+        """CommandGuiNode.set_pick_confirm_handler経由、PSコン×ボタンの長押しから
+        呼ばれる(2026-09-03追加)。確定のみ行い、移動は行わない
+        (_on_pick_move_only_requested参照)。"""
+        return self._try_confirm_pick()
+
+    def _on_pick_move_only_requested(self):
+        """CommandGuiNode.set_pick_move_handler経由、PSコン×ボタンの短押し
+        (立ち上がりエッジ即時)から呼ばれる(2026-09-03追加)。選択中ワークへの
+        移動のみ行い、待機中の確定は行わない(確定は長押しのみ、
+        _on_pick_confirm_only_requested参照)。"""
+        return self._try_move_to_selected_work()
 
     def _on_pick_confirm_button_clicked(self):
         if not self._on_pick_confirm_requested():
@@ -2171,7 +2345,13 @@ class CommandGuiApp(QWidget):
         実行する(2026-09-03、ユーザー指摘: 「シューティングエリアはL4もしくは
         R4で、ボタンを2つおいておいて」。以前は直前にシーケンスで向かった対象を
         覚えておいて再送信する方式だったが、実運用の対象がL4/R4の2箇所固定と
-        分かったため、対象を記憶せず直接その場で指定する方式に変更した)。"""
+        分かったため、対象を記憶せず直接その場で指定する方式に変更した)。
+        既に別のシーケンスが実行中でも、_start_shoot_sequence側が確認や中断
+        操作なしに即座に中断して切り替える(2026-09-03、ユーザー指摘:「回収実行
+        を押さなくてもシューティング位置へ移動できるように。ユーザーの動きを
+        制限したくない」。以前はここで1件だけ予約し完了後に自動開始する
+        キュー機構があったが、即座に切り替えられるようになったため不要になり
+        削除した)。"""
         _, x, y, z = SHOOT_FIXED_TARGETS[label]
         self._start_shoot_sequence(x, y, z)
         return True
@@ -2750,11 +2930,13 @@ class CommandGuiApp(QWidget):
         # フィールド配置(奥からワーク4列・機体・シューティングボックス4列の順)と
         # 対応する見た目にする。
         # 「自動シーケンスで実行」ON時は、workボタンで回収シーケンス・shootボタンで
-        # 投入シーケンスを開始する(_on_field_point参照)。OFF(既定)なら従来通り
-        # 即時移動のみ行う(2026-09-03新規)。
+        # 投入シーケンスを開始する(_on_field_point参照)。OFFなら従来通り即時移動
+        # のみ行う(2026-09-03新規、既定は当初OFFだったが、同日ユーザー指定で
+        # 既定ONに変更)。
         self.seq_auto_checkbox = QCheckBox(
             '自動シーケンスで実行(ワーク=回収・シューティングボックス=投入。'
             '設定は下の「ピック/投入 自動シーケンス」パネル)')
+        self.seq_auto_checkbox.setChecked(True)
         seq_row = QHBoxLayout()
         seq_row.addWidget(self.seq_auto_checkbox)
         seq_row.addStretch(1)
@@ -2765,8 +2947,38 @@ class CommandGuiApp(QWidget):
         work_points = [(*p, 'pick') for row in WORK_POINTS for p in row]
         shoot_points = [(*p, 'shoot') for p in SHOOT_POINTS['L'] + SHOOT_POINTS['R']]
         n_work_rows = len({round(p[2], 6) for p in work_points})
+        # 矢印キー(D-pad)でのワーク選択カーソル用に、ワークボタンのウィジェット
+        # 参照を(round(x,6), round(y,6))キーで覚えておく(2026-09-03追加、
+        # ユーザー指定:「矢印キーでGUI上で目標ワークを選択し移動バツで移動、
+        # 再度バツで回収実行」)。on_buttonコールバック経由で_build_button_grid
+        # から受け取る。
+        self._work_buttons = {}
+
+        def _register_button(label, x, y, z, kind, btn):
+            if kind == 'pick':
+                self._work_buttons[(round(x, 6), round(y, 6))] = btn
+
         self._build_button_grid(grid, work_points + shoot_points, header_row=1,
-                                 gap_after_rank=n_work_rows - 1, gap_label='(機体)')
+                                 gap_after_rank=n_work_rows - 1, gap_label='(機体)',
+                                 on_button=_register_button)
+
+        # ワーク選択カーソルの座標系(見た目通りのrank/col、シューティングボックス
+        # 列を挟まないワーク4行6列のみのローカルな添字)。_build_button_grid内の
+        # xs/ys計算と同じ基準(X昇順=左->右、Y降順=奥->手前)で独自に計算する。
+        work_xs = sorted({round(p[1], 6) for row in WORK_POINTS for p in row})
+        work_ys = sorted({round(p[2], 6) for row in WORK_POINTS for p in row}, reverse=True)
+        self._work_grid = {}         # (rank, col) -> (x, y, z)
+        self._work_grid_rc_by_xy = {}  # (round(x,6), round(y,6)) -> (rank, col)
+        for wrow in WORK_POINTS:
+            for _label, x, y, z in wrow:
+                rc = (work_ys.index(round(y, 6)), work_xs.index(round(x, 6)))
+                self._work_grid[rc] = (x, y, z)
+                self._work_grid_rc_by_xy[(round(x, 6), round(y, 6))] = rc
+        self._work_grid_rows = len(work_ys)
+        self._work_grid_cols = len(work_xs)
+        self._selected_work_rc = (0, 0)
+        self._highlight_selected_work(True)
+
         # QVBoxLayoutへ直接addWidgetすると幅いっぱいに引き伸ばされてしまう
         # (グリッド内容は中身ぴったりのまま、右側だけ間延びした余白ができる)ため、
         # 横方向はQHBoxLayout+末尾stretchで中身ぴったりの幅に留める。
@@ -2779,13 +2991,17 @@ class CommandGuiApp(QWidget):
         row.addStretch(1)
         layout.addLayout(row)
 
-    def _build_button_grid(self, grid, points, header_row=0, gap_after_rank=None, gap_label=''):
+    def _build_button_grid(self, grid, points, header_row=0, gap_after_rank=None, gap_label='',
+                            on_button=None):
         """points: (label, x, y, z, kind)のリスト('pick'=ワーク/'shoot'=シューティング
         ボックス、_on_field_point参照)。実座標を見た目通りに配置する
         (X昇順=左->右の列、Y降順=奥(ワーク方向)が上->手前が下の行)。
         gap_after_rankを指定すると、Y順位でその順位を超えた行を1行分下にずらし、
         間にgap_labelを挟む(ワーク行とシューティングボックス行の間に機体分の
-        空白を作るため)。"""
+        空白を作るため)。on_button(label, x, y, z, kind, btn)を指定すると、
+        作成した各QPushButtonを呼び出し元へ渡す(2026-09-03追加、ワーク選択
+        カーソルのハイライト用にウィジェット参照を回収するため、
+        _build_field_buttons参照)。"""
         grid.setHorizontalSpacing(4)
         xs = sorted({round(p[1], 6) for p in points})
         ys = sorted({round(p[2], 6) for p in points}, reverse=True)
@@ -2820,6 +3036,8 @@ class CommandGuiApp(QWidget):
             btn.clicked.connect(
                 lambda _checked=False, x=x, y=y, z=z, kind=kind: self._on_field_point(x, y, z, kind))
             grid.addWidget(btn, rank + header_row, col)
+            if on_button is not None:
+                on_button(label, x, y, z, kind, btn)
 
         has_gap = gap_after_rank is not None
         if has_gap and gap_label:
@@ -2832,6 +3050,15 @@ class CommandGuiApp(QWidget):
         grid.addWidget(QLabel('↑ Y+ (ワーク側) ／ Y- (機体側) ↓'), header_row + total_rows, 0, 1, ncols)
 
     def _on_field_point(self, x, y, z, kind):
+        # ワークボタンをマウスでクリックした場合も、矢印キー(D-pad)の選択
+        # カーソルを同じワークへ同期させる(2026-09-03追加。これによりPSコンの
+        # ×ボタンでの「移動」「回収実行」がマウス操作と矛盾しない)。
+        if kind == 'pick':
+            rc = self._work_grid_rc_by_xy.get((round(x, 6), round(y, 6)))
+            if rc is not None and rc != self._selected_work_rc:
+                self._highlight_selected_work(False)
+                self._selected_work_rc = rc
+                self._highlight_selected_work(True)
         if self.seq_auto_checkbox.isChecked():
             if kind == 'pick':
                 self._start_pick_sequence(x, y, z)
@@ -2839,6 +3066,50 @@ class CommandGuiApp(QWidget):
                 self._start_shoot_sequence(x, y, z)
         else:
             self._send_xyz(x, y, z)
+
+    def _highlight_selected_work(self, selected):
+        """現在のワーク選択カーソル(self._selected_work_rc)が指すボタンの
+        'selected'プロパティを更新し、QSSのQPushButton[selected="true"]
+        (style.qss)でハイライト枠を付け外しする(2026-09-03追加)。プロパティを
+        setProperty()するだけではQtがスタイルを再適用しないため、
+        unpolish/polishで強制的に反映させる。"""
+        target = self._work_grid.get(self._selected_work_rc)
+        if target is None:
+            return
+        x, y, _z = target
+        btn = self._work_buttons.get((round(x, 6), round(y, 6)))
+        if btn is None:
+            return
+        btn.setProperty('selected', selected)
+        btn.style().unpolish(btn)
+        btn.style().polish(btn)
+
+    def _move_work_selection(self, d_rank, d_col):
+        """矢印キー(D-pad)でワーク選択カーソルを1マス動かす(2026-09-03追加、
+        ユーザー指定:「矢印キーでGUI上で目標ワークを選択し移動」)。範囲外へは
+        動かず(clampするだけ)、末尾の列/行で押し続けても他の行/列へ回り込んだり
+        しない。"""
+        row, col = self._selected_work_rc
+        new_rc = (
+            int(clamp(row + d_rank, 0, self._work_grid_rows - 1)),
+            int(clamp(col + d_col, 0, self._work_grid_cols - 1)),
+        )
+        if new_rc == self._selected_work_rc:
+            return
+        self._highlight_selected_work(False)
+        self._selected_work_rc = new_rc
+        self._highlight_selected_work(True)
+
+    def _on_work_select_requested(self, direction):
+        """CommandGuiNode.set_work_select_handler経由(PSコンの十字キー、
+        joy_teleop_node)から呼ばれる(2026-09-03追加)。"""
+        d_rank, d_col = {'up': (-1, 0), 'down': (1, 0), 'left': (0, -1), 'right': (0, 1)}[direction]
+        self._move_work_selection(d_rank, d_col)
+
+    def _selected_work_xyz(self):
+        """現在のワーク選択カーソルが指すワークの(x, y, z)を返す(2026-09-03追加、
+        _on_pick_confirm_requested参照)。"""
+        return self._work_grid.get(self._selected_work_rc)
 
     # ---------- realtime state / trajectory params ----------
     def _spin_ros(self):

@@ -139,6 +139,17 @@ QPushButton[variant="grid-highlight"]:pressed {
     background-color: #d68f2e;
 }
 
+/* 矢印キー(D-pad)で選択中のワークを示すカーソル枠(2026-09-03追加)。
+   variant(grid/grid-highlight)の配色はそのまま、枠だけ重ねて表示する
+   (プロパティセレクタはAND条件のため、variantと独立して組み合わせられる)。 */
+QPushButton[selected="true"] {
+    border: 3px solid #2ecc71;
+}
+
+QPushButton[selected="true"]:hover {
+    border: 3px solid #38d97f;
+}
+
 QScrollArea {
     border: none;
 }

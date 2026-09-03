@@ -15,8 +15,9 @@
   },
   "joy_speed": {
     "theta_speed": 1.0,
-    "z_speed": 1.0,
-    "r_speed": 1.0
+    "z_speed": 0.2,
+    "r_speed": 0.2,
+    "tip_theta_speed": 1.0
   },
   "mit_gain": {
     "cubemars_kp": {
