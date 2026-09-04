@@ -68,7 +68,9 @@ from std_msgs.msg import Bool
 from std_srvs.srv import SetBool, Trigger
 
 from PyQt5.QtCore import Qt, QPointF, QTimer
-from PyQt5.QtGui import QColor, QDoubleValidator, QFontMetrics, QIcon, QIntValidator, QPainter, QPen, QPixmap
+from PyQt5.QtGui import (
+    QColor, QDoubleValidator, QFont, QFontMetrics, QIcon, QIntValidator, QPainter, QPen, QPixmap,
+)
 from PyQt5.QtWidgets import (
     QApplication, QButtonGroup, QCheckBox, QGridLayout, QGroupBox, QHBoxLayout,
     QInputDialog, QLabel, QLineEdit, QListWidget, QMessageBox, QPushButton,
@@ -1165,19 +1167,23 @@ class CommandGuiApp(QWidget):
         gain_tab = QWidget()
         calibration_tab = QWidget()
         wiring_tab = QWidget()
+        status_display_tab = QWidget()
         # 統合操作を既定表示にするだけでなく、タブの並びも一番左にする
-        # (先に追加した方が左側になる)。
+        # (先に追加した方が左側になる)。状態表示(拡大)はスマホでの画面共有
+        # 閲覧用(操作ボタンは置かず表示専用)のため末尾に追加するだけでよい。
         self.tabs.addTab(overview_tab, '統合操作')
         self.tabs.addTab(gain_tab, 'ゲイン調整')
         self.tabs.addTab(calibration_tab, '原点校正')
         self.tabs.addTab(wiring_tab, '配線設定')
         self.tabs.addTab(manual_tab, '座標指定操作')
+        self.tabs.addTab(status_display_tab, '状態表示(拡大)')
 
         self._build_move_tab(manual_tab)
         self._build_overview_tab(overview_tab)
         self._build_gain_tab(gain_tab)
         self._build_calibration_tab(calibration_tab)
         self._build_wiring_tab(wiring_tab)
+        self._build_status_display_tab(status_display_tab)
         self._restore_saved_gains()
         # PSコン(joy_teleop_node)から、PSボタン=/pick_sequence_confirm
         # (確定のみ)・×ボタン=/pick_sequence_move(選択中ワークへの移動のみ)の
@@ -1408,6 +1414,135 @@ class CommandGuiApp(QWidget):
             left_funcs=[self._build_machine_status_panel, self._build_current_state_panel,
                         self._build_mode_panel, self._build_hand_panel],
             right_funcs=[self._build_setup_checklist_panel])
+
+    # role色(_ROLE_COLORS)の文字色を、遠目にも分かる塗りつぶしカード(背景色+
+    # 文字色)に変換するテーブル(状態表示(拡大)タブ専用。統合操作タブ側は文字色
+    # だけの従来表示のまま変更しない)。
+    _STATUS_BLOCK_STYLES = {
+        _ROLE_COLORS['info']: ('#1a73e8', '#ffffff'),
+        _ROLE_COLORS['success']: ('#1e8e3e', '#ffffff'),
+        _ROLE_COLORS['error']: ('#d93025', '#ffffff'),
+        _ROLE_COLORS['muted']: ('#dfe3e6', '#3c4043'),
+    }
+    _ROLE_COLOR_RE = re.compile(r'color:\s*(#[0-9a-fA-F]{6})')
+
+    @staticmethod
+    def _make_big_label(point_size, bold=True):
+        """状態表示(拡大)タブ用の大きなQLabel(PC画面から離れた位置からでも
+        読める文字サイズにするため、統合操作タブの通常ラベルとは別にここで
+        フォントを指定する)。"""
+        label = QLabel()
+        label.setWordWrap(True)
+        font = QFont()
+        font.setPointSize(point_size)
+        font.setBold(bold)
+        label.setFont(font)
+        return label
+
+    def _build_status_display_tab(self, parent):
+        """PC画面から離れた位置(遠く)からでも読めることを想定した表示専用タブ。
+        操作ボタンは置かず、選択中ワークと試合中に確認したい主要ステータス
+        (動作モード・ポンプ・ピック/投入シーケンス状態・現在状態)を大きく表示
+        するだけにする(値の実体は統合操作タブ側のラベル・ワークボタンのまま、
+        二重管理を避けるため_refresh_status_display_tabで都度ミラーする)。
+        選択中ワークは、フィールド上の実際のワーク配置(_build_field_buttons/
+        _build_button_grid)と対応づけたグリッド(X昇順=左->右、Y降順=奥->手前)
+        で表示し、選択中セルだけを目立つ色で塗る(ボタンではなく表示専用の
+        QLabelにして誤操作を防ぐ)。"""
+        layout = QVBoxLayout(parent)
+
+        work_box = QGroupBox('選択中ワーク (フィールド配置)')
+        work_outer = QVBoxLayout(work_box)
+        axis_top = QLabel('← X- ・ X+ →')
+        axis_top.setAlignment(Qt.AlignCenter)
+        work_outer.addWidget(axis_top)
+
+        work_grid_layout = QGridLayout()
+        work_grid_layout.setSpacing(6)
+        self._status_work_cells = {}
+        for rc, (x, y, _z) in self._work_grid.items():
+            rank, col = rc
+            btn = self._work_buttons.get((round(x, 6), round(y, 6)))
+            label_text = btn.text() if btn is not None else '?'
+            cell = self._make_big_label(22)
+            cell.setAlignment(Qt.AlignCenter)
+            cell.setMinimumSize(110, 80)
+            cell.setText(label_text)
+            cell.setProperty('_col_label', label_text.rsplit('-', 1)[-1])
+            work_grid_layout.addWidget(cell, rank, col)
+            self._status_work_cells[rc] = cell
+        work_outer.addLayout(work_grid_layout)
+
+        axis_bottom = QLabel('↑ Y+ (ワーク側) ／ Y- (機体側) ↓')
+        axis_bottom.setAlignment(Qt.AlignCenter)
+        work_outer.addWidget(axis_bottom)
+        layout.addWidget(work_box)
+
+        mode_box = QGroupBox('動作モード')
+        mode_layout = QVBoxLayout(mode_box)
+        self.big_mode_label = self._make_big_label(40)
+        self.big_mode_label.setAlignment(Qt.AlignCenter)
+        mode_layout.addWidget(self.big_mode_label)
+        layout.addWidget(mode_box)
+
+        pump_box = QGroupBox('ポンプ')
+        pump_layout = QVBoxLayout(pump_box)
+        self.big_pump_label = self._make_big_label(40)
+        self.big_pump_label.setAlignment(Qt.AlignCenter)
+        pump_layout.addWidget(self.big_pump_label)
+        layout.addWidget(pump_box)
+
+        sequence_box = QGroupBox('ピック/投入シーケンス')
+        sequence_layout = QVBoxLayout(sequence_box)
+        self.big_sequence_label = self._make_big_label(28)
+        self.big_sequence_label.setAlignment(Qt.AlignCenter)
+        sequence_layout.addWidget(self.big_sequence_label)
+        layout.addWidget(sequence_box)
+
+        current_box = QGroupBox('現在状態')
+        current_layout = QVBoxLayout(current_box)
+        self.big_current_label = self._make_big_label(24, bold=False)
+        current_layout.addWidget(self.big_current_label)
+        layout.addWidget(current_box)
+
+        layout.addStretch(1)
+
+    def _style_status_work_cell(self, cell, col_label, selected):
+        if selected:
+            cell.setStyleSheet(
+                'background-color:#2ecc71; color:#0b3d24; border:4px solid #1e8449; '
+                'border-radius:8px;')
+        elif col_label in ('2', '5'):
+            # 元のワークボタン(_build_button_grid)と同じく、3個ずつ回収する
+            # 運用で押すべき列(列2・列5)をオレンジで目立たせる。
+            cell.setStyleSheet(
+                'background-color:#f0ad4e; color:white; border:1px solid #d68f2e; '
+                'border-radius:8px;')
+        else:
+            cell.setStyleSheet(
+                'background-color:#ecf0f1; color:#2c3e50; border:1px solid #bdc3c7; '
+                'border-radius:8px;')
+
+    def _apply_status_block_style(self, target_label, source_label):
+        """source_label(統合操作タブ側)の文字色から役割(info/success/error/
+        muted)を逆引きし、状態表示(拡大)タブでは文字色だけでなく背景も塗って
+        遠目にも分かるカード状にする。"""
+        match = self._ROLE_COLOR_RE.search(source_label.styleSheet())
+        color = match.group(1) if match else _ROLE_COLORS['muted']
+        bg, fg = self._STATUS_BLOCK_STYLES.get(color, self._STATUS_BLOCK_STYLES[_ROLE_COLORS['muted']])
+        target_label.setText(source_label.text())
+        target_label.setStyleSheet(f'background-color:{bg}; color:{fg}; border-radius:10px; padding:14px;')
+
+    def _refresh_status_display_tab(self):
+        for rc, cell in self._status_work_cells.items():
+            self._style_status_work_cell(cell, cell.property('_col_label'), rc == self._selected_work_rc)
+
+        self._apply_status_block_style(self.big_mode_label, self.mode_status_label)
+        self._apply_status_block_style(self.big_pump_label, self.sequence_pump_status_label)
+        self._apply_status_block_style(self.big_sequence_label, self.sequence_status_label)
+
+        self.big_current_label.setText(self.current_label.text())
+        self.big_current_label.setStyleSheet(self.current_label.styleSheet())
 
     def _build_gain_tab(self, parent):
         self._build_panel_tab(
@@ -3120,6 +3255,7 @@ class CommandGuiApp(QWidget):
         self._refresh_current_state()
         self._refresh_sequence_pump_status()
         self._advance_sequence()
+        self._refresh_status_display_tab()
 
     def _refresh_sequence_pump_status(self):
         state = self.node.get_pump_on_state()
