@@ -1,0 +1,969 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <world name="nhk27_field">
+    <physics name="1ms" type="ignore">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-contact-system" name="gz::sim::systems::Contact"/>
+
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+    <model name="ground_base">
+      <static>true</static>
+      <pose>0 0 -0.025 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>11.0 11.0 0.05</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>11.0 11.0 0.05</size></box></geometry>
+          <material>
+            <ambient>0.23 0.18 0.13 1.0</ambient>
+            <diffuse>0.23 0.18 0.13 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="ground_red">
+      <static>true</static>
+      <pose>0 -2.75 0.006 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>11.0 5.5 0.01</size></box></geometry>
+          <material>
+            <ambient>0.9411764705882353 0.8235294117647058 0.8235294117647058 1.0</ambient>
+            <diffuse>0.9411764705882353 0.8235294117647058 0.8235294117647058 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="ground_blue">
+      <static>true</static>
+      <pose>0 2.75 0.006 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>11.0 5.5 0.01</size></box></geometry>
+          <material>
+            <ambient>0.6666666666666666 0.8235294117647058 0.9019607843137255 1.0</ambient>
+            <diffuse>0.6666666666666666 0.8235294117647058 0.9019607843137255 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="field_boundary_north">
+      <static>true</static>
+      <pose>5.55 0 0.08 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.15 11.3 0.16</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.15 11.3 0.16</size></box></geometry>
+          <material>
+            <ambient>0.39215686274509803 0.24313725490196078 0.0 1.0</ambient>
+            <diffuse>0.39215686274509803 0.24313725490196078 0.0 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="field_boundary_south">
+      <static>true</static>
+      <pose>-5.55 0 0.08 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.15 11.3 0.16</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.15 11.3 0.16</size></box></geometry>
+          <material>
+            <ambient>0.39215686274509803 0.24313725490196078 0.0 1.0</ambient>
+            <diffuse>0.39215686274509803 0.24313725490196078 0.0 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="field_boundary_east">
+      <static>true</static>
+      <pose>0 5.55 0.08 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>11.3 0.15 0.16</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>11.3 0.15 0.16</size></box></geometry>
+          <material>
+            <ambient>0.39215686274509803 0.24313725490196078 0.0 1.0</ambient>
+            <diffuse>0.39215686274509803 0.24313725490196078 0.0 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="field_boundary_west">
+      <static>true</static>
+      <pose>0 -5.55 0.08 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>11.3 0.15 0.16</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>11.3 0.15 0.16</size></box></geometry>
+          <material>
+            <ambient>0.39215686274509803 0.24313725490196078 0.0 1.0</ambient>
+            <diffuse>0.39215686274509803 0.24313725490196078 0.0 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="level1_structure">
+      <static>true</static>
+      <pose>0 0 0.3 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>6.0 6.0 0.6</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>6.0 6.0 0.6</size></box></geometry>
+          <material>
+            <ambient>0.7450980392156863 0.7450980392156863 0.7450980392156863 1.0</ambient>
+            <diffuse>0.7450980392156863 0.7450980392156863 0.7450980392156863 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="level1_red">
+      <static>true</static>
+      <pose>0 -1.5 0.606 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>6.0 3.0 0.01</size></box></geometry>
+          <material>
+            <ambient>0.9215686274509803 0.7058823529411765 0.6274509803921569 1.0</ambient>
+            <diffuse>0.9215686274509803 0.7058823529411765 0.6274509803921569 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="level1_blue">
+      <static>true</static>
+      <pose>0 1.5 0.606 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>6.0 3.0 0.01</size></box></geometry>
+          <material>
+            <ambient>0.5882352941176471 0.8431372549019608 0.8627450980392157 1.0</ambient>
+            <diffuse>0.5882352941176471 0.8431372549019608 0.8627450980392157 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="level2_structure">
+      <static>true</static>
+      <pose>0 0 0.75 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>3.0 3.0 0.30000000000000004</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>3.0 3.0 0.30000000000000004</size></box></geometry>
+          <material>
+            <ambient>0.7450980392156863 0.7450980392156863 0.7450980392156863 1.0</ambient>
+            <diffuse>0.7450980392156863 0.7450980392156863 0.7450980392156863 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="central_pillar">
+      <static>true</static>
+      <pose>0 0 1.3 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><cylinder><radius>0.135</radius><length>0.8</length></cylinder></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><cylinder><radius>0.135</radius><length>0.8</length></cylinder></geometry>
+          <material>
+            <ambient>0.39215686274509803 0.24313725490196078 0.0 1.0</ambient>
+            <diffuse>0.39215686274509803 0.24313725490196078 0.0 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="mustika_pad">
+      <static>true</static>
+      <pose>3.5 0.0 0.014 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>1.0 1.0 0.01</size></box></geometry>
+          <material>
+            <ambient>0.9607843137254902 0.9411764705882353 0.7843137254901961 1.0</ambient>
+            <diffuse>0.9607843137254902 0.9411764705882353 0.7843137254901961 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="mustika_pillar">
+      <static>true</static>
+      <pose>3.5 0 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><cylinder><radius>0.135</radius><length>0.5</length></cylinder></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><cylinder><radius>0.135</radius><length>0.5</length></cylinder></geometry>
+          <material>
+            <ambient>0.39215686274509803 0.24313725490196078 0.0 1.0</ambient>
+            <diffuse>0.39215686274509803 0.24313725490196078 0.0 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="ramp_red">
+      <static>true</static>
+      <pose>1.25 -3.5 0.3 0.0 0.16977827396833844 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>3.5510561809129406 1.0 0.05</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>3.5510561809129406 1.0 0.05</size></box></geometry>
+          <material>
+            <ambient>0.7843137254901961 0.5882352941176471 0.5490196078431373 1.0</ambient>
+            <diffuse>0.7843137254901961 0.5882352941176471 0.5490196078431373 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="transfer_area_red">
+      <static>true</static>
+      <pose>-1.0 -3.5 0.3 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>1.0 1.0 0.6</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>1.0 1.0 0.6</size></box></geometry>
+          <material>
+            <ambient>0.9607843137254902 0.6666666666666666 0.23529411764705882 1.0</ambient>
+            <diffuse>0.9607843137254902 0.6666666666666666 0.23529411764705882 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="stairs_g2l1_red_step1">
+      <static>true</static>
+      <pose>-2.4 -3.5 0.075 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.3 1.0 0.15</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.3 1.0 0.15</size></box></geometry>
+          <material>
+            <ambient>0.9215686274509803 0.7058823529411765 0.6274509803921569 1.0</ambient>
+            <diffuse>0.9215686274509803 0.7058823529411765 0.6274509803921569 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="stairs_g2l1_red_step2">
+      <static>true</static>
+      <pose>-2.1 -3.5 0.15 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.3 1.0 0.3</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.3 1.0 0.3</size></box></geometry>
+          <material>
+            <ambient>0.9215686274509803 0.7058823529411765 0.6274509803921569 1.0</ambient>
+            <diffuse>0.9215686274509803 0.7058823529411765 0.6274509803921569 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="stairs_g2l1_red_step3">
+      <static>true</static>
+      <pose>-1.8 -3.5 0.22499999999999998 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.3 1.0 0.44999999999999996</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.3 1.0 0.44999999999999996</size></box></geometry>
+          <material>
+            <ambient>0.9215686274509803 0.7058823529411765 0.6274509803921569 1.0</ambient>
+            <diffuse>0.9215686274509803 0.7058823529411765 0.6274509803921569 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="stairs_g2l1_red_step4">
+      <static>true</static>
+      <pose>-1.5 -3.5 0.3 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.3 1.0 0.6</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.3 1.0 0.6</size></box></geometry>
+          <material>
+            <ambient>0.9215686274509803 0.7058823529411765 0.6274509803921569 1.0</ambient>
+            <diffuse>0.9215686274509803 0.7058823529411765 0.6274509803921569 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="ramp_blue">
+      <static>true</static>
+      <pose>1.25 3.5 0.3 0.0 0.16977827396833844 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>3.5510561809129406 1.0 0.05</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>3.5510561809129406 1.0 0.05</size></box></geometry>
+          <material>
+            <ambient>0.5098039215686274 0.7058823529411765 0.7843137254901961 1.0</ambient>
+            <diffuse>0.5098039215686274 0.7058823529411765 0.7843137254901961 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="transfer_area_blue">
+      <static>true</static>
+      <pose>-1.0 3.5 0.3 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>1.0 1.0 0.6</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>1.0 1.0 0.6</size></box></geometry>
+          <material>
+            <ambient>0.23529411764705882 0.6666666666666666 0.9607843137254902 1.0</ambient>
+            <diffuse>0.23529411764705882 0.6666666666666666 0.9607843137254902 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="stairs_g2l1_blue_step1">
+      <static>true</static>
+      <pose>-2.4 3.5 0.075 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.3 1.0 0.15</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.3 1.0 0.15</size></box></geometry>
+          <material>
+            <ambient>0.5882352941176471 0.8431372549019608 0.8627450980392157 1.0</ambient>
+            <diffuse>0.5882352941176471 0.8431372549019608 0.8627450980392157 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="stairs_g2l1_blue_step2">
+      <static>true</static>
+      <pose>-2.1 3.5 0.15 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.3 1.0 0.3</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.3 1.0 0.3</size></box></geometry>
+          <material>
+            <ambient>0.5882352941176471 0.8431372549019608 0.8627450980392157 1.0</ambient>
+            <diffuse>0.5882352941176471 0.8431372549019608 0.8627450980392157 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="stairs_g2l1_blue_step3">
+      <static>true</static>
+      <pose>-1.8 3.5 0.22499999999999998 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.3 1.0 0.44999999999999996</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.3 1.0 0.44999999999999996</size></box></geometry>
+          <material>
+            <ambient>0.5882352941176471 0.8431372549019608 0.8627450980392157 1.0</ambient>
+            <diffuse>0.5882352941176471 0.8431372549019608 0.8627450980392157 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="stairs_g2l1_blue_step4">
+      <static>true</static>
+      <pose>-1.5 3.5 0.3 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.3 1.0 0.6</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.3 1.0 0.6</size></box></geometry>
+          <material>
+            <ambient>0.5882352941176471 0.8431372549019608 0.8627450980392157 1.0</ambient>
+            <diffuse>0.5882352941176471 0.8431372549019608 0.8627450980392157 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="stairs_l1l2_red_step1">
+      <static>true</static>
+      <pose>0.0 -1.8 0.375 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>1.0 0.3 0.75</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>1.0 0.3 0.75</size></box></geometry>
+          <material>
+            <ambient>0.9215686274509803 0.7058823529411765 0.6274509803921569 1.0</ambient>
+            <diffuse>0.9215686274509803 0.7058823529411765 0.6274509803921569 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="stairs_l1l2_red_step2">
+      <static>true</static>
+      <pose>0.0 -1.5 0.44999999999999996 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>1.0 0.3 0.8999999999999999</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>1.0 0.3 0.8999999999999999</size></box></geometry>
+          <material>
+            <ambient>0.9215686274509803 0.7058823529411765 0.6274509803921569 1.0</ambient>
+            <diffuse>0.9215686274509803 0.7058823529411765 0.6274509803921569 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="stairs_l1l2_blue_step1">
+      <static>true</static>
+      <pose>0.0 1.8 0.375 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>1.0 0.3 0.75</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>1.0 0.3 0.75</size></box></geometry>
+          <material>
+            <ambient>0.5882352941176471 0.8431372549019608 0.8627450980392157 1.0</ambient>
+            <diffuse>0.5882352941176471 0.8431372549019608 0.8627450980392157 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="stairs_l1l2_blue_step2">
+      <static>true</static>
+      <pose>0.0 1.5 0.44999999999999996 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>1.0 0.3 0.8999999999999999</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>1.0 0.3 0.8999999999999999</size></box></geometry>
+          <material>
+            <ambient>0.5882352941176471 0.8431372549019608 0.8627450980392157 1.0</ambient>
+            <diffuse>0.5882352941176471 0.8431372549019608 0.8627450980392157 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="l1_barrier_north">
+      <static>true</static>
+      <pose>3.0 0.0 0.6749999999999999 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.06 6.12 0.15</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.06 6.12 0.15</size></box></geometry>
+          <material>
+            <ambient>0.7450980392156863 0.7450980392156863 0.7254901960784313 1.0</ambient>
+            <diffuse>0.7450980392156863 0.7450980392156863 0.7254901960784313 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="l1_barrier_south">
+      <static>true</static>
+      <pose>-3.0 0.0 0.6749999999999999 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.06 6.12 0.15</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.06 6.12 0.15</size></box></geometry>
+          <material>
+            <ambient>0.7450980392156863 0.7450980392156863 0.7254901960784313 1.0</ambient>
+            <diffuse>0.7450980392156863 0.7450980392156863 0.7254901960784313 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="l1_barrier_west_south">
+      <static>true</static>
+      <pose>-2.25 -3.0 0.6749999999999999 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>1.5 0.06 0.15</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>1.5 0.06 0.15</size></box></geometry>
+          <material>
+            <ambient>0.7450980392156863 0.7450980392156863 0.7254901960784313 1.0</ambient>
+            <diffuse>0.7450980392156863 0.7450980392156863 0.7254901960784313 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="l1_barrier_west_north">
+      <static>true</static>
+      <pose>1.25 -3.0 0.6749999999999999 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>3.5 0.06 0.15</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>3.5 0.06 0.15</size></box></geometry>
+          <material>
+            <ambient>0.7450980392156863 0.7450980392156863 0.7254901960784313 1.0</ambient>
+            <diffuse>0.7450980392156863 0.7450980392156863 0.7254901960784313 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="l1_barrier_east_south">
+      <static>true</static>
+      <pose>-2.25 3.0 0.6749999999999999 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>1.5 0.06 0.15</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>1.5 0.06 0.15</size></box></geometry>
+          <material>
+            <ambient>0.7450980392156863 0.7450980392156863 0.7254901960784313 1.0</ambient>
+            <diffuse>0.7450980392156863 0.7450980392156863 0.7254901960784313 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="l1_barrier_east_north">
+      <static>true</static>
+      <pose>1.25 3.0 0.6749999999999999 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>3.5 0.06 0.15</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>3.5 0.06 0.15</size></box></geometry>
+          <material>
+            <ambient>0.7450980392156863 0.7450980392156863 0.7254901960784313 1.0</ambient>
+            <diffuse>0.7450980392156863 0.7450980392156863 0.7254901960784313 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="l2_wall_north">
+      <static>true</static>
+      <pose>1.5 0.0 0.975 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.06 3.12 0.15</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.06 3.12 0.15</size></box></geometry>
+          <material>
+            <ambient>0.7450980392156863 0.7450980392156863 0.7254901960784313 1.0</ambient>
+            <diffuse>0.7450980392156863 0.7450980392156863 0.7254901960784313 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="l2_wall_south">
+      <static>true</static>
+      <pose>-1.5 0.0 0.975 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.06 3.12 0.15</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.06 3.12 0.15</size></box></geometry>
+          <material>
+            <ambient>0.7450980392156863 0.7450980392156863 0.7254901960784313 1.0</ambient>
+            <diffuse>0.7450980392156863 0.7450980392156863 0.7254901960784313 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="center_divider_ground_north">
+      <static>true</static>
+      <pose>4.75 0.0 0.15 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>1.5 0.06 0.3</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>1.5 0.06 0.3</size></box></geometry>
+          <material>
+            <ambient>0.39215686274509803 0.24313725490196078 0.0 1.0</ambient>
+            <diffuse>0.39215686274509803 0.24313725490196078 0.0 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="center_divider_ground_south1">
+      <static>true</static>
+      <pose>-3.3 0.0 0.15 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.5 0.06 0.3</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.5 0.06 0.3</size></box></geometry>
+          <material>
+            <ambient>0.39215686274509803 0.24313725490196078 0.0 1.0</ambient>
+            <diffuse>0.39215686274509803 0.24313725490196078 0.0 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="center_divider_ground_south2">
+      <static>true</static>
+      <pose>-5.3 0.0 0.15 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.4 0.06 0.3</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.4 0.06 0.3</size></box></geometry>
+          <material>
+            <ambient>0.39215686274509803 0.24313725490196078 0.0 1.0</ambient>
+            <diffuse>0.39215686274509803 0.24313725490196078 0.0 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="center_divider_l1_north">
+      <static>true</static>
+      <pose>1.75 0.0 0.7 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.5 0.06 0.2</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.5 0.06 0.2</size></box></geometry>
+          <material>
+            <ambient>0.39215686274509803 0.24313725490196078 0.0 1.0</ambient>
+            <diffuse>0.39215686274509803 0.24313725490196078 0.0 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="center_divider_l1_south">
+      <static>true</static>
+      <pose>-1.75 0.0 0.7 0.0 0.0 0.0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.5 0.06 0.2</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.5 0.06 0.2</size></box></geometry>
+          <material>
+            <ambient>0.39215686274509803 0.24313725490196078 0.0 1.0</ambient>
+            <diffuse>0.39215686274509803 0.24313725490196078 0.0 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="start_zone_red_a">
+      <static>true</static>
+      <pose>-5.15 -5.15 0.014 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.7 0.7 0.01</size></box></geometry>
+          <material>
+            <ambient>0.8745098039215686 0.13333333333333333 0.13333333333333333 1.0</ambient>
+            <diffuse>0.8745098039215686 0.13333333333333333 0.13333333333333333 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="start_zone_red_b">
+      <static>true</static>
+      <pose>-5.15 -4.35 0.014 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.7 0.7 0.01</size></box></geometry>
+          <material>
+            <ambient>0.8745098039215686 0.13333333333333333 0.13333333333333333 1.0</ambient>
+            <diffuse>0.8745098039215686 0.13333333333333333 0.13333333333333333 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="start_zone_blue_a">
+      <static>true</static>
+      <pose>-5.15 5.15 0.014 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.7 0.7 0.01</size></box></geometry>
+          <material>
+            <ambient>0.19607843137254902 0.0 1.0 1.0</ambient>
+            <diffuse>0.19607843137254902 0.0 1.0 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="start_zone_blue_b">
+      <static>true</static>
+      <pose>-5.15 4.35 0.014 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.7 0.7 0.01</size></box></geometry>
+          <material>
+            <ambient>0.19607843137254902 0.0 1.0 1.0</ambient>
+            <diffuse>0.19607843137254902 0.0 1.0 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="storage_red">
+      <static>true</static>
+      <pose>5.0 -4.5 0.014 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>1.0 2.0 0.01</size></box></geometry>
+          <material>
+            <ambient>0.9411764705882353 0.8235294117647058 0.8235294117647058 1.0</ambient>
+            <diffuse>0.9411764705882353 0.8235294117647058 0.8235294117647058 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="storage_blue">
+      <static>true</static>
+      <pose>5.0 4.5 0.014 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>1.0 2.0 0.01</size></box></geometry>
+          <material>
+            <ambient>0.6666666666666666 0.8235294117647058 0.9019607843137255 1.0</ambient>
+            <diffuse>0.6666666666666666 0.8235294117647058 0.9019607843137255 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="ground_shared_area">
+      <static>true</static>
+      <pose>-4.3 0.0 0.014 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>1.2 1.2 0.01</size></box></geometry>
+          <material>
+            <ambient>0.9607843137254902 0.9411764705882353 0.7843137254901961 1.0</ambient>
+            <diffuse>0.9607843137254902 0.9411764705882353 0.7843137254901961 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="l1_retry_zone_red">
+      <static>true</static>
+      <pose>2.65 -1.95 0.614 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.7 0.7 0.01</size></box></geometry>
+          <material>
+            <ambient>0.8745098039215686 0.13333333333333333 0.13333333333333333 1.0</ambient>
+            <diffuse>0.8745098039215686 0.13333333333333333 0.13333333333333333 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="l1_retry_zone_blue">
+      <static>true</static>
+      <pose>2.65 1.95 0.614 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.7 0.7 0.01</size></box></geometry>
+          <material>
+            <ambient>0.19607843137254902 0.0 1.0 1.0</ambient>
+            <diffuse>0.19607843137254902 0.0 1.0 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="building_spot_l1_red_north">
+      <static>true</static>
+      <pose>2.65 -2.65 0.614 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.5 0.5 0.01</size></box></geometry>
+          <material>
+            <ambient>0.1568627450980392 0.39215686274509803 0.19607843137254902 1.0</ambient>
+            <diffuse>0.1568627450980392 0.39215686274509803 0.19607843137254902 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="building_spot_l1_red_south">
+      <static>true</static>
+      <pose>-2.65 -2.6 0.614 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.5 0.5 0.01</size></box></geometry>
+          <material>
+            <ambient>0.1568627450980392 0.39215686274509803 0.19607843137254902 1.0</ambient>
+            <diffuse>0.1568627450980392 0.39215686274509803 0.19607843137254902 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="building_spot_l1_blue_north">
+      <static>true</static>
+      <pose>2.65 2.65 0.614 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.5 0.5 0.01</size></box></geometry>
+          <material>
+            <ambient>0.1568627450980392 0.39215686274509803 0.19607843137254902 1.0</ambient>
+            <diffuse>0.1568627450980392 0.39215686274509803 0.19607843137254902 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="building_spot_l1_blue_south">
+      <static>true</static>
+      <pose>-2.65 2.6 0.614 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.5 0.5 0.01</size></box></geometry>
+          <material>
+            <ambient>0.1568627450980392 0.39215686274509803 0.19607843137254902 1.0</ambient>
+            <diffuse>0.1568627450980392 0.39215686274509803 0.19607843137254902 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="l1_shared_pad_north">
+      <static>true</static>
+      <pose>2.5 0.0 0.614 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>1.0 1.0 0.01</size></box></geometry>
+          <material>
+            <ambient>0.9607843137254902 0.9411764705882353 0.7843137254901961 1.0</ambient>
+            <diffuse>0.9607843137254902 0.9411764705882353 0.7843137254901961 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="l1_shared_pad_south">
+      <static>true</static>
+      <pose>-2.5 0.0 0.614 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>1.0 1.0 0.01</size></box></geometry>
+          <material>
+            <ambient>0.9607843137254902 0.9411764705882353 0.7843137254901961 1.0</ambient>
+            <diffuse>0.9607843137254902 0.9411764705882353 0.7843137254901961 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="building_spot_l1_shared_north">
+      <static>true</static>
+      <pose>2.5 0.0 0.622 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.5 0.5 0.01</size></box></geometry>
+          <material>
+            <ambient>0.1568627450980392 0.39215686274509803 0.19607843137254902 1.0</ambient>
+            <diffuse>0.1568627450980392 0.39215686274509803 0.19607843137254902 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="building_spot_l1_shared_south">
+      <static>true</static>
+      <pose>-2.5 0.0 0.622 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.5 0.5 0.01</size></box></geometry>
+          <material>
+            <ambient>0.1568627450980392 0.39215686274509803 0.19607843137254902 1.0</ambient>
+            <diffuse>0.1568627450980392 0.39215686274509803 0.19607843137254902 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="building_spot_l2_sw">
+      <static>true</static>
+      <pose>-0.95 -0.95 0.914 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.5 0.5 0.01</size></box></geometry>
+          <material>
+            <ambient>0.1568627450980392 0.39215686274509803 0.19607843137254902 1.0</ambient>
+            <diffuse>0.1568627450980392 0.39215686274509803 0.19607843137254902 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="building_spot_l2_se">
+      <static>true</static>
+      <pose>-0.95 0.95 0.914 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.5 0.5 0.01</size></box></geometry>
+          <material>
+            <ambient>0.1568627450980392 0.39215686274509803 0.19607843137254902 1.0</ambient>
+            <diffuse>0.1568627450980392 0.39215686274509803 0.19607843137254902 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="building_spot_l2_nw">
+      <static>true</static>
+      <pose>0.95 -0.95 0.914 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.5 0.5 0.01</size></box></geometry>
+          <material>
+            <ambient>0.1568627450980392 0.39215686274509803 0.19607843137254902 1.0</ambient>
+            <diffuse>0.1568627450980392 0.39215686274509803 0.19607843137254902 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="building_spot_l2_ne">
+      <static>true</static>
+      <pose>0.95 0.95 0.914 0.0 0.0 0.0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>0.5 0.5 0.01</size></box></geometry>
+          <material>
+            <ambient>0.1568627450980392 0.39215686274509803 0.19607843137254902 1.0</ambient>
+            <diffuse>0.1568627450980392 0.39215686274509803 0.19607843137254902 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+  </world>
+</sdf>
+

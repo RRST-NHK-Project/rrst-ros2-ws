@@ -1,0 +1,102 @@
+#NHK学生ロボコン2027 / ABU Robocon 2027構成 (Claudeが現状把握している内容。2026-09-04時点、間違っていたら訂正してください)
+
+##競技概要
+ABU Asia-Pacific Robot Contest 2027 Solo, Indonesia「The Pursuit of Mustika Nusantara」
+(公式ルールブックPDF、ユーザーより2026-09-04提供、V1.0)。NHK学生ロボコンはこの
+ABU大会の日本代表選考会のため、基本的にこのルールがベースになる(国内予選特有の
+ローカルルールが別途出る可能性はあるが未確認)。
+
+2台編成、役割完全分離:
+  - Transporter Robot(TR): 手動操作可。Ground Area(地上)のみで活動、Transfer Areaへ
+    到達可能。Storage AreaからEarth Block(350mm立方、20個/チーム)、Ground Shared
+    Areaから共有のSky Block(200mm立方、赤/青両面、計12個)を集め、L1境界の
+    Transfer Areaまで運搬(最大3個同時搬送)。搬入するだけで5点/個(自動加点)。
+  - Builder Robot(BR): 完全自動のみ(手動介入禁止)。Transfer AreaでTRから受け取り
+    (最大2個)、L1/L2のBuilding SpotにEarth×2→Sky×1の順で積んでComplete Tower
+    (完成タワー)を作る。
+  - TR/BR間の無線通信は禁止(11.10)。受け渡しはTransfer Areaでの物理的な
+    タイミング合わせのみに頼る必要がある。
+
+得点構造:
+  Transfer(搬入するだけ)        5点/個
+  Earth Block 下段(L1/L2)       10/20点
+  Earth Block 中段(L1/L2)       20/40点
+  Sky Block 上段(L1/L2)         40/80点
+  Mustika奉納(Central Pillarへ)  250点(要Sanctuary Mandate達成)
+
+Sanctuary Mandate: 完全タワー2本以上(うち1本はL1 Shared AreaかL2 Shared Areaに)を
+建てて初めてMustika回収の資格が得られる(TR側の制約、4.5.1)。Sky Blockは天面の色で
+得点チームが決まり、後から相手がフリップして奪う(steal)ことも可能(3.5.6-3.5.8)。
+
+寸法(フィールド): Game Field 11000x11000mm。Ground Area(地上)、Level1(L1、地上+
+600mm、6000x6000mm、ランプ3500mm長 or 階段(300x1000x150mm/段)でアクセス)、
+Level2(L2、L1+300mm=地上+900mm、3000x3000mm、L1から階段でアクセス、全共有)。
+Storage Area 1000x2000mm/チーム、Start Zone 700x700mm x2/チーム(TR用・BR用)、
+Ground Shared Area 1200x1200mm(+Mustika Pillar周囲1000x1000mm共有)、Transfer
+Area 1000x1000mm、Building Spot 500x500mm、Mustika Pillar(高500mm・径270mm)、
+Central Pillar(高800mm・径270mm、L2上)。
+
+機体制約: 初期寸法700x700x700mm以内、展開時1000x1400x1200mm以内、各50kg以内、
+24V nominal/42V max、無線はWi-Fi/Zigbee/Bluetoothのみ、TR-BR間通信禁止、
+ドローン等の飛行機構禁止。
+
+##nhk27_fieldパッケージ(2026-09-04新規作成)
+移動シミュレーション(ランプ勾配・階段段差の走破性検証)が主目的のGazebo(gz-sim、
+Harmonic)環境。ROS2 Jazzy。ブロック・ムスティカ等のオブジェクト操作の物理演算は
+対象外(soki側のような把持・吸着シミュレーションはまだ扱っていない)。
+
+構成:
+  - worlds/nhk27_field.sdf: フィールド地形(地面11x11m、ランプ2本、階段3箇所
+    (Ground→L1赤/青、L1→L2赤/青2種)、L1/L2プラットフォーム、L1/L2周囲バリア、
+    センターディバイダ、Storage/Start Zone/Ground Shared Area/Transfer Area/
+    L1 Retry Zone/Building Spot等の色分けマーカー)。46モデル。
+  - urdf/placeholder_robot.urdf.xacro: 機体構想が未確定なため、差動2輪ボックス
+    シャーシ(700mm立方以内)の仮モデル。DiffDriveプラグイン(/cmd_vel購読、
+    /odom・/tf配信)。実機構想が固まり次第、本物のURDFに置き換える想定。
+  - launch/gz_sim.launch.py: ワールド起動+robot_state_publisher+機体スポーン
+    (赤側Start Zone付近)+ros_gz_bridge(cmd_vel/odom/tf/clock)。
+  - scripts/generate_field_world.py: フィールド寸法定数からSDFを生成するPython
+    ジェネレータ。座標定数を直せば再生成できる(下記「未確定事項」参照)。
+  - scripts/install_deps.sh: rosdep経由の依存インストール(ros_gz_sim/
+    ros_gz_bridge等、Gazebo Harmonic本体を含む)。soki_simと同じパターン。
+    sudoを付けずに実行すること(内部で必要時にsudoを呼ぶ)。
+
+座標系(generate_field_world.py内で使用): X=南(-,Start Zone側)/北(+,Storage・
+Mustika側)、Y=西(-,赤)/東(+,青)、Z=上。原点はフィールド中心=L1/L2の中心。
+
+フィールド配置(2026-09-04、ユーザー提供のThree.js製3D参照ページの座標を移植して
+確定。旧版のL1北端寄せ配置は誤りだったため全面修正済み):
+  - L1(6x6m)・L2(3x3m)はいずれもフィールド中央(X=0,Y=0)に配置。L1は西半分が赤
+    (Y<0)・東半分が青(Y>0)。L2はL1の中央に乗り、全面共有。
+  - ランプ(3500mm)・階段(Ground→L1、4段)・トランスファーエリア(1x1m、L1と同高)は
+    いずれもL1の西側(赤)/東側(青)の外側(Y=±3.5)にセットで配置され、南北方向に
+    展開する。両方ともトランスファーエリアの1つの開口部(L1境界のX:[-1.5,-0.5])
+    経由でL1へ合流する。
+  - 階段(L1→L2、2段)はL2の西端(赤)/東端(青)、X=0付近に配置され、東西方向に登る。
+  - ムスティカピラーはL1の北端中央(X=3.5,Y=0)、センターライン上の1x1共有パッドの
+    上にあり、両チームがアクセスできる。
+  - Start Zone(赤/青、TR用・BR用の2枠ずつ)はフィールド南端の自陣角(X=-5.15,
+    Y=±5.15と±4.35)。Storage Areaは北端の自陣角(X=5.0,Y=±4.5)。Ground Shared
+    Area(5x5グリッド)はセンターライン跨ぎでX=-4.3付近(Start Zoneより北・L1より南)。
+  - 出典: ユーザーがルールブックFigure 1-2を元に作成したThree.js製3D参照ページ
+    (2026-09-04にURLで共有)。ページ内のposition.set()座標をThree.js座標系
+    (X=東西,Y=高さ,Z=南北)からROS座標系(X=南北,Y=東西,Z=高さ)へ変換して移植した。
+    地形の絶対寸法(段数等)はルールブック本文の数値を優先し、参照ページと段数が
+    異なる箇所(L1階段が参照ページでは3段簡略化だったところ)は本文通り4段に
+    補正している。
+
+##未確定事項・既知の制約 (2026-09-04更新)
+  - フィールド上の各ゾーンの相対配置は、ユーザー提供の3D参照ページの座標を
+    移植したことで大幅に精度が向上した(上記「フィールド配置」参照)。ただし
+    この参照ページ自体もルールブックFigure 1-2を元にした非公式の解釈である
+    可能性があり、公式CAD/寸法図そのものではない点に注意。今後さらに正確な
+    情報が入手できたらgenerate_field_world.pyの座標定数を修正し再生成すること。
+  - Transfer Areaの正確な物理的位置(TRが「Ground Areaに触れたまま」到達できる
+    かどうかの解釈、3.4.5)は未確定。現状はL1南端の上(L1と同じ高さ)に配置して
+    いるが、ルール上はGround Area寄りの可能性もある。要検討。
+  - Gazebo本体(ros-jazzy-ros-gz-sim等)のインストールはユーザー環境で
+    scripts/install_deps.sh経由で実施中(2026-09-04時点で完了未確認)。
+  - ブロック(Earth/Sky)・Mustika(球体)のGazeboモデル、TR/BRの実際の機体構想
+    (ハンド形式、階段昇降機構等)はまだ着手していない。「機体の移動の
+    シミュレーションが主」というユーザー方針のため、まずは地形の走破性検証を
+    優先している。

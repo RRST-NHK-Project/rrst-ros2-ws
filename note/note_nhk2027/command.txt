@@ -1,0 +1,26 @@
+#依存関係インストール(初回のみ、Gazebo Harmonic本体含む。sudoを付けずに実行)
+src/nhk27_field/scripts/install_deps.sh
+
+#ビルド
+colcon build --packages-select nhk27_field --symlink-install
+
+#フィールドワールドSDFの再生成(座標定数を直した後)
+python3 src/nhk27_field/scripts/generate_field_world.py > src/nhk27_field/worlds/nhk27_field.sdf
+
+#プレースホルダー機体URDFの展開確認(xacroの構文チェック)
+xacro src/nhk27_field/urdf/placeholder_robot.urdf.xacro
+
+#Gazebo起動(フィールド+プレースホルダー機体スポーン+ros_gz_bridge)
+ros2 launch nhk27_field gz_sim.launch.py
+
+#走行テスト(cmd_velへ直接publish、前進)
+ros2 topic pub /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.3}}" -r 10
+
+#走行テスト(その場旋回)
+ros2 topic pub /cmd_vel geometry_msgs/msg/Twist "{angular: {z: 0.5}}" -r 10
+
+#キーボードteleop(teleop_twist_keyboardが入っていれば)
+ros2 run teleop_twist_keyboard teleop_twist_keyboard
+
+#オドメトリ確認
+ros2 topic echo /odom

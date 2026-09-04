@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>nhk27_field</name>
+  <version>0.0.0</version>
+  <description>
+    ABU Robocon 2027 "The Pursuit of Mustika Nusantara" (NHK学生ロボコン2027予選)
+    ルールブックの寸法に基づくGazeboフィールドワールドと、機体の移動性(ランプ勾配・
+    階段段差の走破性)を検証するためのプレースホルダー機体シミュレーション環境。
+    ブロック・ムスティカ等のオブジェクト操作の物理演算は対象外(移動シミュレーションが主)。
+  </description>
+  <maintainer email="tashikou1682@gmail.com">dev</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <exec_depend>ros_gz_sim</exec_depend>
+  <exec_depend>ros_gz_bridge</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>xacro</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

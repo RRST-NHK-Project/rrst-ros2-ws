@@ -1,0 +1,47 @@
+nhk2027: 未着手の課題・制約メモ(claude.txtは現状把握用、こちらは今後対応が要る課題を並べる場所)
+
+## ランプの傾斜方向が逆だった件 (2026-09-04発見・修正)
+ユーザーがGazeboで実際に起動して確認したところ、ランプ(ramp_red/ramp_blue)の
+高低が逆になっていた(generate_field_world.pyのramp()関数のpitch符号ミス)。
+  - 誤: pitch = -atan2(RISE,RUN) とし、北側(X=+3.0、ムスティカ寄り)を高い端、
+    南側(X=-0.5、トランスファーエリア寄り)を低い端にしていた。
+  - 正: 参照ページのPOS.rampBase(ThreeZ=2.95≒ROS_x=2.95、Y=0=地面)と
+    POS.rampTop(ThreeZ=-0.55≒ROS_x=-0.55、Y=0.6=L1高さ)を確認すると、
+    実際は南側(トランスファーエリア隣接、X≈-0.5)が高い端(L1と同高)、
+    北側(X≈3.0)が低い端(地面)だった。ランプはL1境界の開口部(トランスファー
+    エリア、X:[-1.5,-0.5])に接続する必要があるため、この向きが正しい。
+  - 修正: pitch = +atan2(RISE,RUN) に符号反転(scripts/generate_field_world.py
+    のramp()関数)。数値検証(box両端のワールド座標を三角関数で再計算)で
+    修正後は+X端(X=3.0)がZ=0、-X端(X=-0.5)がZ=0.6になることを確認済み。
+  - 教訓: SDFのpitch回転の符号は直感で決め打ちせず、参照データ(既知の2点の
+    座標)から逆算して検証すること。階段(stairs_along_x/stairs_along_y)は
+    同様の手順で見直したが、こちらは元々のロジックが正しかった(修正不要)。
+
+## Gazebo本体のインストール確認 (2026-09-04)
+nhk27_field/scripts/install_deps.sh経由でユーザー環境にros-jazzy-ros-gz-sim等を
+インストール中。完了後、以下を確認すること:
+  - `ros2 launch nhk27_field gz_sim.launch.py`でワールド+プレースホルダー機体が
+    起動すること
+  - `/cmd_vel`へTwistをpublishしてランプ(赤・青とも)を実際に登れること
+  - 階段(Ground→L1、L1→L2)は差動2輪では通常登れない想定(段差150mmは車輪径
+    100mmの仮モデルでは乗り越え困難)。ここでランプ経由ルートのみ機能確認できれば
+    十分で、階段はメカ設計側の課題として別途検討する。
+
+## フィールドゾーン配置の精度向上 (2026-09-04)
+generate_field_world.pyのゾーン相対配置はFigure 3からのbest-effort推定(claude.txt
+「未確定事項」参照)。ユーザー側で正確な寸法図(座標付きPDF/CAD等)が入手できたら、
+座標定数(L1_X_MIN、RAMP位置、Storage/Start Zone座標等)を実測値に合わせて修正し、
+generate_field_world.pyを再実行してworlds/nhk27_field.sdfを再生成すること。
+
+## Transfer Areaの物理的位置の解釈確認 (2026-09-04)
+ルール3.4.5「While touching the Ground Area, TR cannot place objects on the
+Transfer Area」の解釈次第でTransfer Areaの高さ(Ground同高 or L1同高)が変わる。
+現状はL1南端の上(L1と同じ高さ、Z=0.6)に仮配置しているが、要再検討。
+
+## 機体構想が固まり次第の対応 (未着手)
+  - urdf/placeholder_robot.urdf.xacroを実機構想(TR/BR別々になる見込み)の
+    URDFに置き換える
+  - ブロック(Earth 350mm/Sky 200mm立方)・Mustika(球体210mm)のGazeboモデルを
+    追加し、把持・積み上げの物理演算を検証する(現状は地形の移動シミュレーション
+    のみで、オブジェクト操作は未対応)
+  - 階段昇降機構(BR用、L1→L2到達に必須)の実現可能性検討

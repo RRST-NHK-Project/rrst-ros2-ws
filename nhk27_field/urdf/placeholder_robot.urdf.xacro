@@ -1,0 +1,152 @@
+<?xml version="1.0"?>
+<robot name="nhk27_placeholder" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <!--
+    機体構想が未確定な段階でのランプ勾配(約9.7度、600mm/3500mm)・階段段差
+    (150mm/段)の走破性を検証するための仮の差動2輪シャーシ。
+    初期寸法制約(700x700x700mm以内)に収まるボックス車体+2駆動輪+
+    前後キャスターの構成。実機構想が固まり次第、本物のURDFに置き換える。
+    base_linkは地面基準(spawn z=0で車輪接地面がちょうどz=0になる)。
+  -->
+  <xacro:property name="chassis_x" value="0.60"/>
+  <xacro:property name="chassis_y" value="0.60"/>
+  <xacro:property name="chassis_z" value="0.20"/>
+  <xacro:property name="chassis_mass" value="15.0"/>
+  <xacro:property name="chassis_clearance" value="0.05"/>  <!-- 車体下面と地面の隙間 -->
+  <xacro:property name="chassis_center_z" value="${chassis_clearance + chassis_z/2}"/>
+
+  <xacro:property name="wheel_radius" value="0.10"/>
+  <xacro:property name="wheel_width" value="0.05"/>
+  <xacro:property name="wheel_mass" value="1.0"/>
+  <xacro:property name="wheel_separation" value="0.55"/>
+  <xacro:property name="wheel_x_offset" value="0.0"/>
+  <xacro:property name="wheel_z_rel_chassis" value="${wheel_radius - chassis_center_z}"/>
+
+  <xacro:property name="caster_radius" value="0.05"/>
+  <xacro:property name="caster_z_rel_chassis" value="${caster_radius - chassis_center_z}"/>
+
+  <material name="body_gray">
+    <color rgba="0.3 0.3 0.3 1.0"/>
+  </material>
+  <material name="wheel_black">
+    <color rgba="0.05 0.05 0.05 1.0"/>
+  </material>
+
+  <link name="base_link"/>
+
+  <joint name="base_to_chassis" type="fixed">
+    <parent link="base_link"/>
+    <child link="chassis_link"/>
+    <origin xyz="0 0 ${chassis_center_z}" rpy="0 0 0"/>
+  </joint>
+
+  <link name="chassis_link">
+    <visual>
+      <geometry>
+        <box size="${chassis_x} ${chassis_y} ${chassis_z}"/>
+      </geometry>
+      <material name="body_gray"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="${chassis_x} ${chassis_y} ${chassis_z}"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="${chassis_mass}"/>
+      <inertia ixx="0.30" ixy="0" ixz="0" iyy="0.30" iyz="0" izz="0.50"/>
+    </inertial>
+  </link>
+
+  <xacro:macro name="wheel" params="prefix y_reflect">
+    <link name="${prefix}_wheel_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="1.5707963 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+        <material name="wheel_black"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="1.5707963 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="${wheel_mass}"/>
+        <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
+      </inertial>
+    </link>
+    <joint name="${prefix}_wheel_joint" type="continuous">
+      <parent link="chassis_link"/>
+      <child link="${prefix}_wheel_link"/>
+      <origin xyz="${wheel_x_offset} ${y_reflect * wheel_separation/2} ${wheel_z_rel_chassis}" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+    </joint>
+  </xacro:macro>
+  <xacro:wheel prefix="left" y_reflect="1"/>
+  <xacro:wheel prefix="right" y_reflect="-1"/>
+
+  <xacro:macro name="caster" params="prefix x_offset">
+    <link name="${prefix}_caster_link">
+      <visual>
+        <geometry>
+          <sphere radius="${caster_radius}"/>
+        </geometry>
+        <material name="wheel_black"/>
+      </visual>
+      <collision>
+        <geometry>
+          <sphere radius="${caster_radius}"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="0.3"/>
+        <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+      </inertial>
+    </link>
+    <joint name="${prefix}_caster_joint" type="fixed">
+      <parent link="chassis_link"/>
+      <child link="${prefix}_caster_link"/>
+      <origin xyz="${x_offset} 0 ${caster_z_rel_chassis}" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+  <xacro:caster prefix="front" x_offset="${chassis_x/2 - caster_radius}"/>
+  <xacro:caster prefix="rear" x_offset="${-(chassis_x/2 - caster_radius)}"/>
+
+  <gazebo>
+    <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
+      <left_joint>left_wheel_joint</left_joint>
+      <right_joint>right_wheel_joint</right_joint>
+      <wheel_separation>${wheel_separation}</wheel_separation>
+      <wheel_radius>${wheel_radius}</wheel_radius>
+      <max_linear_acceleration>2.0</max_linear_acceleration>
+      <topic>cmd_vel</topic>
+      <odom_topic>odom</odom_topic>
+      <tf_topic>tf</tf_topic>
+      <frame_id>odom</frame_id>
+      <child_frame_id>base_link</child_frame_id>
+    </plugin>
+    <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher"/>
+    <plugin filename="gz-sim-pose-publisher-system" name="gz::sim::systems::PosePublisher">
+      <publish_link_pose>true</publish_link_pose>
+      <use_pose_vector_msg>true</use_pose_vector_msg>
+      <static_publisher>true</static_publisher>
+      <static_update_frequency>10</static_update_frequency>
+    </plugin>
+  </gazebo>
+
+  <gazebo reference="chassis_link">
+    <material>Gazebo/Grey</material>
+  </gazebo>
+  <gazebo reference="left_wheel_link">
+    <material>Gazebo/Black</material>
+    <mu1>1.0</mu1>
+    <mu2>1.0</mu2>
+  </gazebo>
+  <gazebo reference="right_wheel_link">
+    <material>Gazebo/Black</material>
+    <mu1>1.0</mu1>
+    <mu2>1.0</mu2>
+  </gazebo>
+</robot>
