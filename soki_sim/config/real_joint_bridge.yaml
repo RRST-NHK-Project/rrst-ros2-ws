@@ -50,13 +50,13 @@ homing_node:
     can_host_device_id: 101
     can_host_slots_per_node: 5
 
-    # 確認済み(note/can_mapping.txt「z/r原点センサ(ホーミング用)」): z軸=SW1、
-    # r軸=SW2、どちらも同じノード(node_index=0)に載っている。
-    z_limit_switch_node_index: 0
-    z_limit_switch_local_index: 0   # SW1
-    r_limit_switch_node_index: 0
-    r_limit_switch_local_index: 1   # SW2
-    switch_triggered_value: 1        # firmwareの!digitalRead()相当(要確認)
+    # 実機確認済み(2026-09-05): z軸原点センサ=CAN_HOSTのスロット5、r軸原点センサ=
+    # スロット6(can_host_slots_per_node=5なので node_index=1, local_index=0/1)。
+    z_limit_switch_node_index: 1
+    z_limit_switch_local_index: 0   # slot 5 (z軸SW)
+    r_limit_switch_node_index: 1
+    r_limit_switch_local_index: 1   # slot 6 (r軸SW)
+    switch_triggered_value: 1        # firmwareの!digitalRead()相当(実機確認済み: 押すと1)
 
     robomas_device_id: 21
     robomas_motor1_index: 0   # M1 target_velocity/angle
