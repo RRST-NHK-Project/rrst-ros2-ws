@@ -26,7 +26,8 @@ def generate_launch_description():
     ROBOMAS/CubeMarsの内蔵エンコーダ帰還を真値として使う。z/rはRoboMas内蔵
     エンコーダに統一済み、2026-08-31方針転換。note/hardware_mapping.txt参照)、
     trajectory_follower_node(4軸とも実機出力あり)、homing_node(z/rの起動時
-    ホーミング。自動開始はしない、start_homing serviceで明示的に起動すること)、
+    ホーミング。自動開始はしない、start_homing_z/start_homing_r serviceで
+    軸ごとに明示的に起動すること)、
     hand_node(吸着ハンド。吸着パッド展開/収納・ワークピッチ変更のTriggerサービスを
     提供、config/hand.yaml参照。実機配線未確認のうちはdevice_id=0のまま何もしない)、
     command_gui_node。
@@ -53,8 +54,9 @@ def generate_launch_description():
     note/hardware_mapping.txt「z_joint/r_jointの実機出力(RoboMas MITモード)」
     参照)。z/rはホーミング未実施だと原点が未較正(生値)のままなので、起動後まず
     ros2can GUIでdevice_id=21(MODE_ROBOMAS)のtopic_passthroughをONにしてから
-    /start_homing(std_srvs/Trigger)を呼ぶこと(homing_node実行中はtrajectory_
-    follower_node側のロボマス出力が自動的に一時停止される、note/command.txt参照)。
+    /start_homing_z・/start_homing_r(いずれもstd_srvs/Trigger)を軸ごとに
+    呼ぶこと(homing_node実行中はtrajectory_follower_node側のロボマス出力が
+    自動的に一時停止される、note/command.txt参照)。
     """
     pkg_share = get_package_share_directory('soki_sim')
     xacro_file = os.path.join(pkg_share, 'urdf', 'soki_sim.urdf.xacro')

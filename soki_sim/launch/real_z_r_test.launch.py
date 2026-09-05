@@ -28,8 +28,8 @@ def generate_launch_description():
     root_theta/tip_thetaとも動かさない前提のためcubemars_root_theta_indexは
     yaml既定値のまま)、trajectory_follower_node(z/r実機出力あり、root_thetaは
     実機出力オフのままsoki_sim表示のみ)、homing_node(z/rの起動時ホーミング。
-    自動開始はしない、start_homing serviceで明示的に起動すること)、
-    command_gui_node。
+    自動開始はしない、start_homing_z/start_homing_r serviceで軸ごとに
+    明示的に起動すること)、command_gui_node。
     use_joy:=true でjoy_node/joy_teleop_nodeも起動する(control_modeは自動的に
     'both'になる)。enable_buttonでデッドマンスイッチを指定できる
     (real_root_theta_test.launch.py参照、デフォルト-1=常時有効)。
@@ -47,7 +47,8 @@ def generate_launch_description():
       2. motor1/motor2を手で少し回し、command_gui_nodeの「現在状態」表示の
          z_joint/r_jointが期待通りの符号で動くか確認(motor1_sign/motor2_sign)
       3. z/r原点センサ(SW1/SW2)の配線を確認しつつ、低速(既定30rpm)で
-         /start_homing を呼び、z/rが正しく較正されるか確認
+         /start_homing_z・/start_homing_r をそれぞれ呼び、z/rが正しく
+         較正されるか確認(軸ごとに独立して実行できる)
       4. command_gui_node/joyから低速でz/rを動かし、MIT指令(robomas_kp/kd)の
          挙動を確認しながら徐々にゲインを上げる
     """

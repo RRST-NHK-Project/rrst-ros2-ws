@@ -29,8 +29,8 @@ def generate_launch_description():
 
     起動するもの: ros2can GUI, real_joint_bridge_node(帰還確認),
     trajectory_follower_node(root_theta+z/r実機出力あり), homing_node
-    (z/rの起動時ホーミング。自動開始はしない、start_homing serviceで明示的に
-    起動すること)、command_gui_node。
+    (z/rの起動時ホーミング。自動開始はしない、start_homing_z/start_homing_r
+    serviceで軸ごとに明示的に起動すること)、command_gui_node。
     use_joy:=true でjoy_node/joy_teleop_nodeも起動する(control_modeは自動的に
     'both'になる)。enable_buttonでデッドマンスイッチを指定できる(デフォルト-1=
     常時有効。real_root_theta_test.launch.py参照、デッドマンスイッチなしでの
@@ -45,8 +45,9 @@ def generate_launch_description():
 
     z/rはホーミング未実施だと原点が未較正(生値)のままなので、起動後まず
     ros2can GUIでdevice_id=21(MODE_ROBOMAS)のtopic_passthroughをONにしてから
-    /start_homing(std_srvs/Trigger)を呼ぶこと(homing_node実行中はtrajectory_
-    follower_node側のロボマス出力が自動的に一時停止される、note/command.txt参照)。
+    /start_homing_z・/start_homing_r(いずれもstd_srvs/Trigger)を軸ごとに
+    呼ぶこと(homing_node実行中はtrajectory_follower_node側のロボマス出力が
+    自動的に一時停止される、note/command.txt参照)。
     """
     pkg_share = get_package_share_directory('soki_sim')
     xacro_file = os.path.join(pkg_share, 'urdf', 'soki_sim.urdf.xacro')

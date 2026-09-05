@@ -223,9 +223,11 @@ command_gui_node/trajectory_follower_nodeはsim/実機を区別せず同じ
   - z/r起動時ホーミングノード(homing_node)も実装済み(soki_sim/scripts/
     homing_node.py)。motor1/2を同方向/差動方向に低速駆動して原点センサを
     検出し、z_offset_m/r_offset_mをreal_joint_bridge_nodeへSetParametersで
-    反映する。安全のためstart_homing/stop_homing(Trigger)サービス呼び出しで
-    のみ起動(自動起動なし)。センサ配線・回転符号・基準値は仮定のままなので
-    実機検証が必要(note/can_mapping.txt「z/r原点センサ」参照)。
+    反映する。2026-09-05よりz軸/r軸は別サービス(start_homing_z/
+    start_homing_r)に分離し、軸ごとに独立して起動できる(stop_homingは共通)。
+    安全のためこれらのTriggerサービス呼び出しでのみ起動(自動起動なし)。
+    センサ配線・回転符号・基準値は仮定のままなので実機検証が必要
+    (note/can_mapping.txt「z/r原点センサ」参照)。
   - 未着手: 実機での疎通確認・homing_nodeの調整全般。
 
 ## 実機セッションとの混線事故 (2026-09-03、Claudeの動作確認手順に関する教訓)

@@ -38,7 +38,8 @@ def generate_launch_description():
     上限1.0A(ros2can/firmware/.../config.hppのROBOMAS_MAX_CURRENT_A)基準で
     デフォルト値を決めてある。詳細はnote/hardware_mapping.txt「z_joint/r_jointの
     実機出力(RoboMas MITモード)」参照)。ホーミング未実施のままだとz/rの原点は
-    未較正(生値)のままなので、先にhoming_nodeのstart_homingを実施すること。
+    未較正(生値)のままなので、先にhoming_nodeのstart_homing_z/start_homing_r
+    を実施すること。
     """
     pkg_share = get_package_share_directory('soki_sim')
     xacro_file = os.path.join(pkg_share, 'urdf', 'soki_sim.urdf.xacro')

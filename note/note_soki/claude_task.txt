@@ -508,8 +508,9 @@ soki_sim/config/real_joint_bridge.yamlのパラメータ変更のみで数値を
     - センサ検出時の真のz_joint/r_joint値(z_ref_value_m/r_ref_value_m)
     - モータ回転符号とz/r移動方向の対応(z_home_motor*_vel_sign等)
     実機での動作確認・調整が必要(低速30rpm・タイムアウト20秒から開始する設計)。
-    start_homing/stop_homing(std_srvs/Trigger)サービスで手動起動・中断できる
-    (安全のため自動起動はしない)。
+    2026-09-05よりz軸/r軸は別サービス(start_homing_z/start_homing_r、
+    std_srvs/Trigger)に分離し、軸ごとに独立して手動起動・中断できる
+    (stop_homingは共通。安全のため自動起動はしない)。
 
 ## PSコンのL4/R4・ポンプボタン再割当と、実行中の予約キュー追加 (2026-09-03)
 ユーザー指定でjoy_teleop_node.pyのボタン割当を変更: 「□(四角)でL4、○(丸)で

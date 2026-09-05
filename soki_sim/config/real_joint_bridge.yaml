@@ -70,12 +70,12 @@ homing_node:
     homing_velocity_rpm: 30.0
     homing_timeout_sec: 20.0
     # 要実機調整: どちらの符号で回すとz/rのどちら向きに動くか
-    z_home_motor1_vel_sign: -1.0
-    z_home_motor2_vel_sign: -1.0
+    z_home_motor1_vel_sign: 1.0
+    z_home_motor2_vel_sign: 1.0
     r_home_motor1_vel_sign: 1.0
     r_home_motor2_vel_sign: -1.0
     # 要実測: 原点センサトリガー位置での真のz/r値(z_joint/r_jointの単位、m)
-    z_ref_value_m: 0.0
+    z_ref_value_m: 0.33
     r_ref_value_m: 0.0
 
     bridge_node_name: real_joint_bridge_node

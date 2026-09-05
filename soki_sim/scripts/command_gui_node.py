@@ -1035,8 +1035,15 @@ class CommandGuiNode(Node):
         params = []
         for name, v in values.items():
             if isinstance(v, (list, tuple)):
-                pv = ParameterValue(type=ParameterType.PARAMETER_DOUBLE_ARRAY,
-                                     double_array_value=[float(x) for x in v])
+                # 空配列はdisabled_joints(文字列配列)の「全軸有効」を送る場合に
+                # 発生するため、要素の有無だけでは型を判別できない。全要素が
+                # strなら(空配列含め)文字列配列として扱う。
+                if all(isinstance(x, str) for x in v):
+                    pv = ParameterValue(type=ParameterType.PARAMETER_STRING_ARRAY,
+                                         string_array_value=list(v))
+                else:
+                    pv = ParameterValue(type=ParameterType.PARAMETER_DOUBLE_ARRAY,
+                                         double_array_value=[float(x) for x in v])
             elif isinstance(v, str):
                 pv = ParameterValue(type=ParameterType.PARAMETER_STRING, string_value=v)
             else:
@@ -1554,8 +1561,9 @@ class CommandGuiApp(QWidget):
     def _build_calibration_tab(self, parent):
         self._build_panel_tab(
             parent,
-            left_funcs=[self._build_machine_origin_offset_panel, self._build_hand_offset_panel,
-                        self._build_origin_panel, self._build_homing_panel])
+            left_funcs=[self._build_axis_enable_panel, self._build_machine_origin_offset_panel,
+                        self._build_hand_offset_panel, self._build_origin_panel,
+                        self._build_homing_panel])
 
     def _build_wiring_tab(self, parent):
         self._build_panel_tab(
@@ -1833,15 +1841,19 @@ class CommandGuiApp(QWidget):
         layout.addLayout(origin_row)
 
         homing_row = QHBoxLayout()
-        homing_start_btn = QPushButton('ホーミング開始')
-        homing_start_btn.setProperty('variant', 'primary')
+        homing_start_z_btn = QPushButton('z軸ホーミング開始')
+        homing_start_z_btn.setProperty('variant', 'primary')
+        homing_start_r_btn = QPushButton('r軸ホーミング開始')
+        homing_start_r_btn.setProperty('variant', 'primary')
         homing_stop_btn = QPushButton('中断')
         homing_skip_btn = QPushButton('スキップ')
         homing_skip_btn.setProperty('variant', 'danger')
-        homing_start_btn.clicked.connect(self._on_start_homing)
+        homing_start_z_btn.clicked.connect(self._on_start_homing_z)
+        homing_start_r_btn.clicked.connect(self._on_start_homing_r)
         homing_stop_btn.clicked.connect(self._on_stop_homing)
         homing_skip_btn.clicked.connect(self._on_skip_homing)
-        homing_row.addWidget(homing_start_btn)
+        homing_row.addWidget(homing_start_z_btn)
+        homing_row.addWidget(homing_start_r_btn)
         homing_row.addWidget(homing_stop_btn)
         homing_row.addWidget(homing_skip_btn)
         layout.addLayout(homing_row)
@@ -2745,6 +2757,64 @@ class CommandGuiApp(QWidget):
         if any(abs(raw[name] - clamped[name]) > 1e-9 for name in HAND_OFFSET_JOINT_NAMES):
             text += '\n(可動範囲外のためクランプされました)'
         _set_status(self.hand_offset_status_label, text, 'success')
+
+    def _build_axis_enable_panel(self, column):
+        # 組立中(まだ配線・組付けが終わっていない軸がある)や実機の不具合発生時に、
+        # その軸だけソフトウェア側で無視できるようにするパネル(2026-09-05追加)。
+        # チェックを外すとtrajectory_follower_nodeのdisabled_jointsパラメータに
+        # 追加され、以後その軸への目標追従を止めて現在位置で凍結する(他の軸は
+        # 通常通り動く)。モータへのMIT指令自体は現在位置保持として送り続けるため、
+        # 「軸を無視」であって「モータへの通電を止める」わけではない点に注意
+        # (z_joint/r_jointはロボマス差動のため、そもそも片方だけの通電停止はできない)。
+        box = QGroupBox('軸の有効/無効 (組立中・不具合時に軸を無視)')
+        layout = QVBoxLayout(box)
+
+        desc = QLabel()
+        desc.setWordWrap(True)
+        _set_status(desc, 'チェックを外すと、その軸への目標追従を止めて現在位置で\n'
+                          '保持する(他の軸は通常通り動作する。モータへの指令自体は\n'
+                          '現在位置保持として送り続ける)。', 'muted')
+        layout.addWidget(desc)
+
+        grid = QGridLayout()
+        self.axis_enable_checks = {}
+        for i, name in enumerate(TRAJ_PANEL_JOINT_NAMES):
+            cb = QCheckBox(name.removesuffix('_joint'))
+            cb.setChecked(True)
+            cb.toggled.connect(self._on_axis_enable_toggled)
+            self.axis_enable_checks[name] = cb
+            grid.addWidget(cb, i // 2, i % 2)
+        layout.addLayout(grid)
+
+        self.axis_enable_status_label = QLabel()
+        self.axis_enable_status_label.setWordWrap(True)
+        _set_status(self.axis_enable_status_label, '全軸有効', 'muted')
+        layout.addWidget(self.axis_enable_status_label)
+
+        column.addWidget(box)
+
+    def _on_axis_enable_toggled(self, _checked=None):
+        disabled = [name for name, cb in self.axis_enable_checks.items() if not cb.isChecked()]
+        ok = self.node.set_node_params(TRAJ_NODE_NAME, {'disabled_joints': disabled},
+                                        self._apply_axis_enable_result)
+        _set_status(self.axis_enable_status_label,
+                    '適用中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
+                    'muted' if ok else 'error')
+
+    def _apply_axis_enable_result(self, results):
+        if results is None:
+            _set_status(self.axis_enable_status_label, '適用に失敗しました(応答なし)', 'error')
+            return
+        if all(r.successful for r in results):
+            disabled = [name.removesuffix('_joint') for name, cb in self.axis_enable_checks.items()
+                        if not cb.isChecked()]
+            if disabled:
+                _set_status(self.axis_enable_status_label, f'無効化中: {", ".join(disabled)}', 'info')
+            else:
+                _set_status(self.axis_enable_status_label, '全軸有効', 'success')
+        else:
+            reasons = '; '.join(r.reason for r in results if not r.successful)
+            _set_status(self.axis_enable_status_label, f'適用失敗: {reasons}', 'error')
 
     def _build_origin_panel(self, column):
         box = QGroupBox('root_theta / tip_theta 原点設定 (CubeMars本体、trajectory_follower_node)')
@@ -3695,9 +3765,11 @@ class CommandGuiApp(QWidget):
 
         desc = QLabel()
         desc.setWordWrap(True)
-        _set_status(desc, '開始: motor1/motor2を低速駆動し原点センサまで動かす。\n'
+        _set_status(desc, '開始(z軸/r軸): motor1/motor2を低速駆動しその軸の\n'
+                          '原点センサまで動かす(z/rは独立に実行できるが、差動\n'
+                          '機構のためどちらの軸でもmotor1/motor2両方が回転する)。\n'
                           'スキップ: 機体を先に原点センサ位置相当へ手動で\n'
-                          '合わせてから使うこと(モータは駆動しない)。', 'muted')
+                          '合わせてから使うこと(モータは駆動せずz/r両方を反映)。', 'muted')
         layout.addWidget(desc)
 
         self.homing_status_label = QLabel()
@@ -3705,34 +3777,48 @@ class CommandGuiApp(QWidget):
         _set_status(self.homing_status_label, '未実行', 'muted')
         layout.addWidget(self.homing_status_label)
 
+        start_row = QHBoxLayout()
+        start_z_btn = QPushButton('z軸 開始')
+        start_z_btn.setProperty('variant', 'primary')
+        start_r_btn = QPushButton('r軸 開始')
+        start_r_btn.setProperty('variant', 'primary')
+        start_z_btn.clicked.connect(self._on_start_homing_z)
+        start_r_btn.clicked.connect(self._on_start_homing_r)
+        start_row.addWidget(start_z_btn)
+        start_row.addWidget(start_r_btn)
+        layout.addLayout(start_row)
+
         btn_row = QHBoxLayout()
-        start_btn = QPushButton('開始')
-        start_btn.setProperty('variant', 'primary')
         stop_btn = QPushButton('中断')
-        skip_btn = QPushButton('スキップ')
+        skip_btn = QPushButton('スキップ(z/r両方)')
         skip_btn.setProperty('variant', 'danger')
-        start_btn.clicked.connect(self._on_start_homing)
         stop_btn.clicked.connect(self._on_stop_homing)
         skip_btn.clicked.connect(self._on_skip_homing)
-        btn_row.addWidget(start_btn)
         btn_row.addWidget(stop_btn)
         btn_row.addWidget(skip_btn)
         layout.addLayout(btn_row)
 
         column.addWidget(box)
 
-    def _on_start_homing(self):
+    def _on_start_homing_axis(self, axis_label, service_name):
         reply = QMessageBox.question(
-            self, 'ホーミング開始の確認',
-            'motor1/motor2を低速駆動してz/r原点センサまで動かします。\n'
+            self, f'{axis_label}ホーミング開始の確認',
+            f'motor1/motor2を低速駆動して{axis_label}原点センサまで動かします\n'
+            f'(差動機構のためmotor1/motor2両方が回転します)。\n'
             '周囲に人・障害物がないか確認してください。',
             QMessageBox.Yes | QMessageBox.No)
         if reply != QMessageBox.Yes:
             return
-        _set_status(self.homing_status_label, '開始中...', 'muted')
-        ok = self.node.call_trigger_service('/start_homing', self._on_homing_service_done)
+        _set_status(self.homing_status_label, f'{axis_label}: 開始中...', 'muted')
+        ok = self.node.call_trigger_service(service_name, self._on_homing_service_done)
         if not ok:
             _set_status(self.homing_status_label, 'サービス未起動です(homing_node起動確認)', 'error')
+
+    def _on_start_homing_z(self):
+        self._on_start_homing_axis('z軸', '/start_homing_z')
+
+    def _on_start_homing_r(self):
+        self._on_start_homing_axis('r軸', '/start_homing_r')
 
     def _on_stop_homing(self):
         _set_status(self.homing_status_label, '中断中...', 'muted')

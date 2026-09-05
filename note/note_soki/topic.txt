@@ -69,9 +69,10 @@ soki関連トピック一覧(soki_sim + joy連携。全てsensor_msgs/JointState
   z軸/r軸の原点センサ検出まで低速駆動するための速度指令。通常運転時は
   trajectory_follower_nodeの/serial_tx_[cubemars_device_id]とは別device。
 
-/start_homing, /stop_homing (std_srvs/Trigger, サービス)
+/start_homing_z, /start_homing_r, /stop_homing (std_srvs/Trigger, サービス)
   提供: homing_node
-  ホーミング開始/中断(安全のため自動起動はせず、明示的にサービス呼び出しが必要)。
+  z軸/r軸ホーミング開始(2026-09-05より軸ごとに別サービス、独立に実行可能)・
+  中断(安全のため自動起動はせず、明示的にサービス呼び出しが必要)。
 
 /{real_joint_bridge_node,homing_node}/set_parameters, get_parameters
   (rcl_interfaces、サービス)

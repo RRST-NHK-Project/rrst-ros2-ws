@@ -19,9 +19,11 @@ ros2 launch soki_sim real_root_theta_test.launch.py use_joy:=true
 ros2 launch soki_sim real_root_theta_test.launch.py use_viz:=true
 ros2 launch soki_sim real_root_theta_test.launch.py motor_index:=0 kp:=10.0 kd:=1.0
 
-#エンコーダー管理ノード
+#エンコーダー管理ノード(z/rホーミングは2026-09-05よりz軸/r軸で別サービスに分離。
+#差動機構のためどちらの軸でもmotor1/motor2両方が回転する点は変わらない)
 ros2 run soki_sim homing_node --ros-args --params-file install/soki_sim/share/soki_sim/config/real_joint_bridge.yaml
-ros2 service call /start_homing std_srvs/srv/Trigger
+ros2 service call /start_homing_z std_srvs/srv/Trigger
+ros2 service call /start_homing_r std_srvs/srv/Trigger
 ros2 service call /stop_homing std_srvs/srv/Trigger
 
 #ホーミングのスキップ
@@ -33,12 +35,15 @@ ros2 launch soki_sim real_root_theta_test.launch.py use_robomas:=true robomas_kp
 
 #手先θ(tip_theta_joint)を除く全軸の実機動作確認
 ros2 launch soki_sim real_axes_test.launch.py
-ros2 service call /start_homing std_srvs/srv/Trigger
+ros2 service call /start_homing_z std_srvs/srv/Trigger
+ros2 service call /start_homing_r std_srvs/srv/Trigger
 
 #z_joint/r_joint単独の実機動作確認(2026-08-31方針転換のロボマス内蔵エンコーダ検証用)
 ros2 launch soki_sim real_z_r_test.launch.py
-ros2 service call /start_homing std_srvs/srv/Trigger
+ros2 service call /start_homing_z std_srvs/srv/Trigger
+ros2 service call /start_homing_r std_srvs/srv/Trigger
 
 #4軸(root_theta/tip_theta/z/r)全軸の実機動作確認。本番でそのまま使う想定
 ros2 launch soki_sim real_all_axes_test.launch.py use_joy:=true use_viz:=true
-ros2 service call /start_homing std_srvs/srv/Trigger
+ros2 service call /start_homing_z std_srvs/srv/Trigger
+ros2 service call /start_homing_r std_srvs/srv/Trigger

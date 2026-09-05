@@ -68,7 +68,7 @@ homing_node(z/rの起動時ホーミング)は本ノードと同じdevice(roboma
 これを避けるため、pause_robomas_output/resume_robomas_output(std_srvs/Trigger)
 サービスを設け、ホーミング中は本ノード側のrobomas出力を丸ごと止められるように
 した(root_theta原点設定の_origin_pending_と同様、外部ノードから能動的に
-出力を止めるパターン)。homing_node側がstart_homing時にpause、
+出力を止めるパターン)。homing_node側がstart_homing_z/start_homing_r時にpause、
 stop_homing/完了/タイムアウト失敗時にresumeを呼ぶ。
 
 z/r軸にはそれぞれ上限・下限のリミットスイッチがある(homing_nodeが原点較正に
@@ -177,6 +177,14 @@ class TrajectoryFollowerNode(Node):
         self.declare_parameter('output_topic', 'mixed_joint_states')
         # 'auto'=command_gui_nodeのみ受付, 'manual'=joy_teleop_nodeのみ受付, 'both'=両方受付
         self.declare_parameter('control_mode', 'auto')
+        # 組立中・不具合時に特定の軸を無視するためのランタイム設定(2026-09-05追加、
+        # command_gui_nodeの「軸の有効/無効」パネルから変更する)。ここに含まれる
+        # joint_namesはtarget_callbackで目標更新を無視し、現在位置で凍結される
+        # (モータへのMIT指令自体は現在位置保持として送り続ける。z_joint/r_jointは
+        # ロボマス差動のため、片方だけ無効化してももう片方は通常通り動く一方、
+        # 両モータへの指令自体は継続する点に注意)。空配列(デフォルト)ならどの
+        # 軸も無効化しない。yamlには保存しないランタイム専用値。
+        self.declare_parameter('disabled_joints', [], ParameterDescriptor(dynamic_typing=True))
 
         # 実機CubeMars(MITモード)への同時出力。対象関節ごとに device_id/motor_index/
         # kp/kd/torque_ffを同じ長さの配列で指定する(未設定=空配列ならsoki_sim表示のみ)。
@@ -245,6 +253,10 @@ class TrajectoryFollowerNode(Node):
         if self.control_mode_ not in VALID_CONTROL_MODES:
             raise ValueError(f'control_mode must be one of {VALID_CONTROL_MODES}')
 
+        self.disabled_joints_ = set(self.get_parameter('disabled_joints').value)
+        if any(name not in self.joint_names_ for name in self.disabled_joints_):
+            raise ValueError('disabled_joints entries must be in joint_names')
+
         self.max_vel_ = dict(zip(self.joint_names_, max_vel))
         self.max_accel_ = dict(zip(self.joint_names_, max_accel))
         # 同時到達スケーリング後の実効値。target_callbackで毎回更新される
@@ -285,7 +297,8 @@ class TrajectoryFollowerNode(Node):
             f'(joints={self.joint_names_}, rate={update_rate_hz}Hz, '
             f'control_mode={self.control_mode_}, cubemars_joints={list(self.cubemars_.keys())}, '
             f'robomas_enabled={self.robomas_ is not None}, '
-            f'limit_switches={sorted("_".join(k) for k in self._limit_switches_.keys())})')
+            f'limit_switches={sorted("_".join(k) for k in self._limit_switches_.keys())}, '
+            f'disabled_joints={sorted(self.disabled_joints_)})')
 
     def _setup_cubemars_outputs(self):
         names = list(self.get_parameter('cubemars_joint_names').value)
@@ -521,6 +534,10 @@ class TrajectoryFollowerNode(Node):
                 return SetParametersResult(
                     successful=False,
                     reason=f'control_mode must be one of {VALID_CONTROL_MODES}')
+            if p.name == 'disabled_joints' and any(name not in self.joint_names_ for name in p.value):
+                return SetParametersResult(
+                    successful=False,
+                    reason='disabled_joints entries must be in joint_names')
         for p in params:
             if p.name == 'max_velocity':
                 self.max_vel_ = dict(zip(self.joint_names_, p.value))
@@ -528,6 +545,14 @@ class TrajectoryFollowerNode(Node):
                 self.max_accel_ = dict(zip(self.joint_names_, p.value))
             elif p.name == 'control_mode':
                 self.control_mode_ = p.value
+            elif p.name == 'disabled_joints':
+                # 新たに無効化された軸は、以後target_callbackが目標更新を無視するだけ
+                # でなく、ここで即座にtarget_を現在位置へ固定して移動中なら滑らかに
+                # 停止させる(trap_stepがerror=0として台形プロファイルで減速する)。
+                new_disabled = set(p.value)
+                for name in new_disabled - self.disabled_joints_:
+                    self.target_[name] = self.pos_[name]
+                self.disabled_joints_ = new_disabled
             elif p.name in cubemars_array_params:
                 # cubemars_*系のKp/Kd/torque_ffは_setup_cubemars_outputs()実行時に
                 # self.cubemars_[name]へキャッシュされ、_publish_cubemars_commands()は
@@ -554,7 +579,8 @@ class TrajectoryFollowerNode(Node):
         if self.control_mode_ == 'manual' and source != 'manual':
             return
 
-        entries = [(name, pos) for name, pos in zip(msg.name, msg.position) if name in self.target_]
+        entries = [(name, pos) for name, pos in zip(msg.name, msg.position)
+                   if name in self.target_ and name not in self.disabled_joints_]
         if not entries:
             return
 
