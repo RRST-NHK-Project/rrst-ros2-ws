@@ -124,22 +124,30 @@ def clamp_int16(value: float) -> int:
     return max(INT16_MIN, min(INT16_MAX, int(round(value))))
 
 
-def trap_step(pos: float, vel: float, target: float, max_vel: float, max_accel: float, dt: float):
-    """加速度max_accel・速度max_velで制限した台形速度プロファイルで1ステップ進める。
+def trap_step(pos: float, vel: float, target: float, max_vel: float, max_accel: float,
+              max_decel: float, dt: float):
+    """加速度max_accel・減速度max_decel・速度max_velで制限した台形速度プロファイルで
+    1ステップ進める。
 
-    残り距離ちょうどでvel=0にできる速度(sqrt(2*max_accel*|error|)、等加速度運動の
+    残り距離ちょうどでvel=0にできる速度(sqrt(2*max_decel*|error|)、等加速度運動の
     公式 v^2=2ad から導出)を速度上限として使うことで、目標到達時にオーバーシュート
-    しないよう自動的に減速する。
+    しないよう自動的に減速する。加速・巡航にはmax_accelを、減速局面
+    (|desired_vel| < |vel|、目標に近づいた/目標が現在位置近くへ変わった場合を含む)
+    にはmax_decelを使う。同じ加速度で減速も行っていたため、ジョグ停止時の応答が
+    鈍かった問題への対策(2026-09-07、ユーザー指摘: 「手動操作のレスポンスが悪い、
+    停止時の」)。max_decel>=max_accelにすることで、動き出しはなめらかなまま
+    停止だけ素早くできる。
     """
     error = target - pos
-    if max_accel <= 0.0 or max_vel <= 0.0:
+    if max_accel <= 0.0 or max_vel <= 0.0 or max_decel <= 0.0:
         return target, 0.0
 
-    brake_vel = math.sqrt(max(0.0, 2.0 * max_accel * abs(error)))
+    brake_vel = math.sqrt(max(0.0, 2.0 * max_decel * abs(error)))
     vel_limit = min(max_vel, brake_vel)
     desired_vel = math.copysign(vel_limit, error) if error != 0.0 else 0.0
 
-    max_dv = max_accel * dt
+    accel_now = max_decel if abs(desired_vel) < abs(vel) else max_accel
+    max_dv = accel_now * dt
     dv = max(-max_dv, min(max_dv, desired_vel - vel))
     new_vel = vel + dv
     new_pos = pos + new_vel * dt
@@ -149,19 +157,24 @@ def trap_step(pos: float, vel: float, target: float, max_vel: float, max_accel: 
     return new_pos, new_vel
 
 
-def move_time(distance: float, max_vel: float, max_accel: float) -> float:
+def move_time(distance: float, max_vel: float, max_accel: float, max_decel: float) -> float:
     """distance移動するのにtrap_stepの台形プロファイルで要する時間(理論値)。
 
-    加速区間で最高速度max_velに到達できる距離(max_vel^2/max_accel)以上なら
-    台形(加速+等速+減速)、届かなければ三角形(加減速のみ)の所要時間になる。
+    加速度max_accel・減速度max_decelが非対称な場合の一般化(max_accel==max_decelの
+    ときは従来の対称な台形/三角形の式と一致する)。加速区間+減速区間の距離が
+    distance以上なら台形(加速+等速+減速)、届かなければ三角形(加減速のみ)の
+    所要時間になる。
     """
     d = abs(distance)
-    if d < 1e-9 or max_vel <= 0.0 or max_accel <= 0.0:
+    if d < 1e-9 or max_vel <= 0.0 or max_accel <= 0.0 or max_decel <= 0.0:
         return 0.0
-    accel_dist = max_vel * max_vel / max_accel
-    if d >= accel_dist:
-        return 2.0 * max_vel / max_accel + (d - accel_dist) / max_vel
-    return 2.0 * math.sqrt(d / max_accel)
+    accel_dist = max_vel * max_vel / (2.0 * max_accel)
+    decel_dist = max_vel * max_vel / (2.0 * max_decel)
+    if d >= accel_dist + decel_dist:
+        cruise_dist = d - accel_dist - decel_dist
+        return max_vel / max_accel + max_vel / max_decel + cruise_dist / max_vel
+    peak_vel = math.sqrt(2.0 * d * max_accel * max_decel / (max_accel + max_decel))
+    return peak_vel / max_accel + peak_vel / max_decel
 
 
 class TrajectoryFollowerNode(Node):
@@ -172,6 +185,11 @@ class TrajectoryFollowerNode(Node):
         self.declare_parameter('joint_names', ['root_theta_joint', 'z_joint', 'r_joint'])
         self.declare_parameter('max_velocity', [1.0, 0.05, 0.05])
         self.declare_parameter('max_acceleration', [2.0, 0.1, 0.1])
+        # 減速度(停止時の応答性)。既定はmax_accelerationの2倍(2026-09-07新規、
+        # ユーザー指摘: 「手動操作のレスポンスが悪い、停止時の」。動き出しは
+        # なめらかなまま停止だけ素早くするため、加速度より大きめにしておく)。
+        # joint_namesと同じ要素数が必要(trap_step/move_time参照)。
+        self.declare_parameter('max_deceleration', [4.0, 0.2, 0.2])
         self.declare_parameter('update_rate_hz', 50.0)
         self.declare_parameter('input_topic', 'joint_targets')
         self.declare_parameter('output_topic', 'mixed_joint_states')
@@ -246,8 +264,11 @@ class TrajectoryFollowerNode(Node):
         self.joint_names_ = list(self.get_parameter('joint_names').value)
         max_vel = list(self.get_parameter('max_velocity').value)
         max_accel = list(self.get_parameter('max_acceleration').value)
-        if len(max_vel) != len(self.joint_names_) or len(max_accel) != len(self.joint_names_):
-            raise ValueError('max_velocity/max_acceleration must have the same length as joint_names')
+        max_decel = list(self.get_parameter('max_deceleration').value)
+        if (len(max_vel) != len(self.joint_names_) or len(max_accel) != len(self.joint_names_)
+                or len(max_decel) != len(self.joint_names_)):
+            raise ValueError(
+                'max_velocity/max_acceleration/max_deceleration must have the same length as joint_names')
 
         self.control_mode_ = self.get_parameter('control_mode').value
         if self.control_mode_ not in VALID_CONTROL_MODES:
@@ -259,10 +280,12 @@ class TrajectoryFollowerNode(Node):
 
         self.max_vel_ = dict(zip(self.joint_names_, max_vel))
         self.max_accel_ = dict(zip(self.joint_names_, max_accel))
+        self.max_decel_ = dict(zip(self.joint_names_, max_decel))
         # 同時到達スケーリング後の実効値。target_callbackで毎回更新される
-        # (未受信時はmax_vel_/max_accel_と同じ=通常の単軸プロファイル)。
+        # (未受信時はmax_vel_/max_accel_/max_decel_と同じ=通常の単軸プロファイル)。
         self.eff_max_vel_ = dict(self.max_vel_)
         self.eff_max_accel_ = dict(self.max_accel_)
+        self.eff_max_decel_ = dict(self.max_decel_)
         self.pos_ = {name: 0.0 for name in self.joint_names_}
         if 'root_theta_joint' in self.pos_:
             self.pos_['root_theta_joint'] = INITIAL_ROOT_THETA_RAD
@@ -522,7 +545,7 @@ class TrajectoryFollowerNode(Node):
         cubemars_array_params = ('cubemars_kp', 'cubemars_kd', 'cubemars_torque_ff')
         robomas_scalar_params = ('robomas_kp', 'robomas_kd', 'robomas_current_ff')
         for p in params:
-            if p.name in ('max_velocity', 'max_acceleration') and len(p.value) != n:
+            if p.name in ('max_velocity', 'max_acceleration', 'max_deceleration') and len(p.value) != n:
                 return SetParametersResult(
                     successful=False,
                     reason=f'{p.name} must have {n} elements (one per joint_names entry)')
@@ -543,6 +566,8 @@ class TrajectoryFollowerNode(Node):
                 self.max_vel_ = dict(zip(self.joint_names_, p.value))
             elif p.name == 'max_acceleration':
                 self.max_accel_ = dict(zip(self.joint_names_, p.value))
+            elif p.name == 'max_deceleration':
+                self.max_decel_ = dict(zip(self.joint_names_, p.value))
             elif p.name == 'control_mode':
                 self.control_mode_ = p.value
             elif p.name == 'disabled_joints':
@@ -587,7 +612,8 @@ class TrajectoryFollowerNode(Node):
         # このメッセージに含まれる関節同士を同時到達させる: 各関節の(自分の
         # max_velocity/max_accelerationでの)所要時間のうち最大値に合わせて、
         # 他の関節は速度・加速度を時間軸方向にスケールダウンする。
-        times = {name: move_time(pos - self.pos_[name], self.max_vel_[name], self.max_accel_[name])
+        times = {name: move_time(pos - self.pos_[name], self.max_vel_[name], self.max_accel_[name],
+                                  self.max_decel_[name])
                  for name, pos in entries}
         t_sync = max(times.values())
 
@@ -596,6 +622,7 @@ class TrajectoryFollowerNode(Node):
             scale = (times[name] / t_sync) if t_sync > 1e-9 else 1.0
             self.eff_max_vel_[name] = self.max_vel_[name] * scale
             self.eff_max_accel_[name] = self.max_accel_[name] * (scale ** 2)
+            self.eff_max_decel_[name] = self.max_decel_[name] * (scale ** 2)
 
         self.has_target_ = True
 
@@ -650,7 +677,7 @@ class TrajectoryFollowerNode(Node):
                     target = pos
             self.pos_[name], self.vel_[name] = trap_step(
                 self.pos_[name], self.vel_[name], target,
-                self.eff_max_vel_[name], self.eff_max_accel_[name], self.dt_)
+                self.eff_max_vel_[name], self.eff_max_accel_[name], self.eff_max_decel_[name], self.dt_)
 
         out = JointState()
         out.header.stamp = self.get_clock().now().to_msg()

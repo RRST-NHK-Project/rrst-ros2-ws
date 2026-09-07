@@ -74,6 +74,10 @@ def generate_launch_description():
     root_theta_max_acceleration_arg = DeclareLaunchArgument(
         'root_theta_max_acceleration', default_value='0.2',
         description='root_thetaの最大加速度[rad/s^2]')
+    root_theta_max_deceleration_arg = DeclareLaunchArgument(
+        'root_theta_max_deceleration', default_value='0.4',
+        description='root_thetaの最大減速度[rad/s^2](既定はmax_accelerationの2倍。'
+                    '停止時の応答性向上、trajectory_follower_node.py参照)')
 
     # ---- z/r (RoboMas) ----
     robomas_kp_arg = DeclareLaunchArgument(
@@ -92,12 +96,20 @@ def generate_launch_description():
     z_max_acceleration_arg = DeclareLaunchArgument(
         'z_max_acceleration', default_value='0.1',
         description='z_jointの最大加速度[m/s^2]')
+    z_max_deceleration_arg = DeclareLaunchArgument(
+        'z_max_deceleration', default_value='0.2',
+        description='z_jointの最大減速度[m/s^2](既定はz_max_accelerationの2倍。'
+                    '停止時の応答性向上、trajectory_follower_node.py参照)')
     r_max_velocity_arg = DeclareLaunchArgument(
         'r_max_velocity', default_value='0.05',
         description='r_jointの最大速度[m/s](安全のため低めから)')
     r_max_acceleration_arg = DeclareLaunchArgument(
         'r_max_acceleration', default_value='0.1',
         description='r_jointの最大加速度[m/s^2]')
+    r_max_deceleration_arg = DeclareLaunchArgument(
+        'r_max_deceleration', default_value='0.2',
+        description='r_jointの最大減速度[m/s^2](既定はr_max_accelerationの2倍。'
+                    '停止時の応答性向上、trajectory_follower_node.py参照)')
 
     # ---- joy/viz ----
     use_joy_arg = DeclareLaunchArgument(
@@ -121,13 +133,16 @@ def generate_launch_description():
     kd = LaunchConfiguration('kd')
     root_theta_max_velocity = LaunchConfiguration('root_theta_max_velocity')
     root_theta_max_acceleration = LaunchConfiguration('root_theta_max_acceleration')
+    root_theta_max_deceleration = LaunchConfiguration('root_theta_max_deceleration')
     robomas_kp = LaunchConfiguration('robomas_kp')
     robomas_kd = LaunchConfiguration('robomas_kd')
     robomas_current_ff = LaunchConfiguration('robomas_current_ff')
     z_max_velocity = LaunchConfiguration('z_max_velocity')
     z_max_acceleration = LaunchConfiguration('z_max_acceleration')
+    z_max_deceleration = LaunchConfiguration('z_max_deceleration')
     r_max_velocity = LaunchConfiguration('r_max_velocity')
     r_max_acceleration = LaunchConfiguration('r_max_acceleration')
+    r_max_deceleration = LaunchConfiguration('r_max_deceleration')
     use_joy = LaunchConfiguration('use_joy')
     use_viz = LaunchConfiguration('use_viz')
     enable_button = LaunchConfiguration('enable_button')
@@ -179,10 +194,13 @@ def generate_launch_description():
         # 解決してから、通常のPythonリストとして渡すことで回避する。
         root_theta_vel = float(root_theta_max_velocity.perform(context))
         root_theta_accel = float(root_theta_max_acceleration.perform(context))
+        root_theta_decel = float(root_theta_max_deceleration.perform(context))
         z_vel = float(z_max_velocity.perform(context))
         z_accel = float(z_max_acceleration.perform(context))
+        z_decel = float(z_max_deceleration.perform(context))
         r_vel = float(r_max_velocity.perform(context))
         r_accel = float(r_max_acceleration.perform(context))
+        r_decel = float(r_max_deceleration.perform(context))
 
         return [Node(
             package='soki_sim',
@@ -193,6 +211,7 @@ def generate_launch_description():
                 'joint_names': ['root_theta_joint', 'z_joint', 'r_joint'],
                 'max_velocity': [root_theta_vel, z_vel, r_vel],
                 'max_acceleration': [root_theta_accel, z_accel, r_accel],
+                'max_deceleration': [root_theta_decel, z_decel, r_decel],
                 'update_rate_hz': 50.0,
                 'control_mode': control_mode,
                 # sim表示(mixed_joint_states)はreal_joint_bridge_nodeの実測値を
@@ -283,13 +302,16 @@ def generate_launch_description():
         kd_arg,
         root_theta_max_velocity_arg,
         root_theta_max_acceleration_arg,
+        root_theta_max_deceleration_arg,
         robomas_kp_arg,
         robomas_kd_arg,
         robomas_current_ff_arg,
         z_max_velocity_arg,
         z_max_acceleration_arg,
+        z_max_deceleration_arg,
         r_max_velocity_arg,
         r_max_acceleration_arg,
+        r_max_deceleration_arg,
         use_joy_arg,
         use_viz_arg,
         enable_button_arg,

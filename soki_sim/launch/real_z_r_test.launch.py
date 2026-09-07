@@ -73,12 +73,20 @@ def generate_launch_description():
     z_max_acceleration_arg = DeclareLaunchArgument(
         'z_max_acceleration', default_value='0.1',
         description='z_jointの最大加速度[m/s^2]')
+    z_max_deceleration_arg = DeclareLaunchArgument(
+        'z_max_deceleration', default_value='0.2',
+        description='z_jointの最大減速度[m/s^2](既定はz_max_accelerationの2倍。'
+                    '停止時の応答性向上、trajectory_follower_node.py参照)')
     r_max_velocity_arg = DeclareLaunchArgument(
         'r_max_velocity', default_value='0.05',
         description='r_jointの最大速度[m/s](安全のため低めから)')
     r_max_acceleration_arg = DeclareLaunchArgument(
         'r_max_acceleration', default_value='0.1',
         description='r_jointの最大加速度[m/s^2]')
+    r_max_deceleration_arg = DeclareLaunchArgument(
+        'r_max_deceleration', default_value='0.2',
+        description='r_jointの最大減速度[m/s^2](既定はr_max_accelerationの2倍。'
+                    '停止時の応答性向上、trajectory_follower_node.py参照)')
     use_joy_arg = DeclareLaunchArgument(
         'use_joy', default_value='false',
         description='trueならjoy_node/joy_teleop_nodeも起動し、'
@@ -98,8 +106,10 @@ def generate_launch_description():
     robomas_current_ff = LaunchConfiguration('robomas_current_ff')
     z_max_velocity = LaunchConfiguration('z_max_velocity')
     z_max_acceleration = LaunchConfiguration('z_max_acceleration')
+    z_max_deceleration = LaunchConfiguration('z_max_deceleration')
     r_max_velocity = LaunchConfiguration('r_max_velocity')
     r_max_acceleration = LaunchConfiguration('r_max_acceleration')
+    r_max_deceleration = LaunchConfiguration('r_max_deceleration')
     use_joy = LaunchConfiguration('use_joy')
     use_viz = LaunchConfiguration('use_viz')
     enable_button = LaunchConfiguration('enable_button')
@@ -161,6 +171,8 @@ def generate_launch_description():
                     [0.1, z_max_velocity, r_max_velocity], value_type=List[float]),
                 'max_acceleration': ParameterValue(
                     [0.2, z_max_acceleration, r_max_acceleration], value_type=List[float]),
+                'max_deceleration': ParameterValue(
+                    [0.4, z_max_deceleration, r_max_deceleration], value_type=List[float]),
                 'update_rate_hz': 50.0,
                 'control_mode': control_mode,
                 # sim表示(mixed_joint_states)はreal_joint_bridge_nodeの実測値を
@@ -238,8 +250,10 @@ def generate_launch_description():
         robomas_current_ff_arg,
         z_max_velocity_arg,
         z_max_acceleration_arg,
+        z_max_deceleration_arg,
         r_max_velocity_arg,
         r_max_acceleration_arg,
+        r_max_deceleration_arg,
         use_joy_arg,
         use_viz_arg,
         enable_button_arg,

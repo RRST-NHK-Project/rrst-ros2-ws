@@ -65,6 +65,10 @@ def generate_launch_description():
     max_acceleration_arg = DeclareLaunchArgument(
         'max_acceleration', default_value='0.2',
         description='root_thetaの最大加速度[rad/s^2]')
+    max_deceleration_arg = DeclareLaunchArgument(
+        'max_deceleration', default_value='0.4',
+        description='root_thetaの最大減速度[rad/s^2](既定はmax_accelerationの2倍。'
+                    '停止時の応答性向上、trajectory_follower_node.py参照)')
     use_joy_arg = DeclareLaunchArgument(
         'use_joy', default_value='false',
         description='trueならjoy_node/joy_teleop_nodeも起動し、'
@@ -100,6 +104,7 @@ def generate_launch_description():
     kd = LaunchConfiguration('kd')
     max_velocity = LaunchConfiguration('max_velocity')
     max_acceleration = LaunchConfiguration('max_acceleration')
+    max_deceleration = LaunchConfiguration('max_deceleration')
     use_joy = LaunchConfiguration('use_joy')
     use_viz = LaunchConfiguration('use_viz')
     enable_button = LaunchConfiguration('enable_button')
@@ -156,6 +161,7 @@ def generate_launch_description():
             'joint_names': ['root_theta_joint', 'z_joint', 'r_joint'],
             'max_velocity': ParameterValue([max_velocity, 0.05, 0.05], value_type=List[float]),
             'max_acceleration': ParameterValue([max_acceleration, 0.1, 0.1], value_type=List[float]),
+            'max_deceleration': ParameterValue([max_deceleration, 0.2, 0.2], value_type=List[float]),
             'update_rate_hz': 50.0,
             'control_mode': control_mode,
             # sim表示(mixed_joint_states)はreal_joint_bridge_nodeの実測値を
@@ -235,6 +241,7 @@ def generate_launch_description():
         kd_arg,
         max_velocity_arg,
         max_acceleration_arg,
+        max_deceleration_arg,
         use_joy_arg,
         use_viz_arg,
         enable_button_arg,

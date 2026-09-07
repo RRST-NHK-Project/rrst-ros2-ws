@@ -302,7 +302,7 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
        と同様trajectory_follower_nodeを経由しない)。範囲は仮に
        ±hand_offset_limit[m]としているので、実機とのズレの想定量に合わせて
        調整すること。 -->
-  <xacro:property name="hand_offset_limit" value="0.1"/>
+  <xacro:property name="hand_offset_limit" value="0.3"/>
 
   <link name="hand_offset_x_link"/>
   <joint name="hand_offset_x_joint" type="prismatic">

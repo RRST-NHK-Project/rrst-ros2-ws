@@ -179,13 +179,16 @@ STATUS_NODE_NAMES = [TRAJ_NODE_NAME, JOY_NODE_NAME, HOMING_NODE_NAME, REAL_JOINT
 # launch構成(note/command.txt「4軸(root_theta/tip_theta/z/r)全軸の実機動作確認。
 # 本番でそのまま使う想定」のコマンドと同じ)。real_all_axes_test.launch.pyは
 # command_gui_nodeも起動するが、既にこのGUIプロセス自身が動いているため
-# launch_gui:=falseでGUIの二重起動を防ぐ。
-ALL_AXES_LAUNCH_CMD = [
+# launch_gui:=falseでGUIの二重起動を防ぐ。use_viz/use_ros2canは「実機セットアップ」
+# パネルのチェックボックスから起動のたびに選べる(2026-09-07追加、ユーザー指摘:
+# 「全ノード起動ボタンで起動するrvizとros2canの起動を管理できるチェックボックスを
+# 追加」。別途起動済みのrviz/ros2canと二重起動になるのを避けたい場合に使う)。
+ALL_AXES_LAUNCH_BASE_CMD = [
     'ros2', 'launch', 'soki_sim', 'real_all_axes_test.launch.py',
-    'use_joy:=true', 'use_viz:=true', 'launch_gui:=false',
+    'use_joy:=true', 'launch_gui:=false',
 ]
 
-# ALL_AXES_LAUNCH_CMDが起動するノード名(real_all_axes_test.launch.py参照)。
+# ALL_AXES_LAUNCH_BASE_CMDが起動するノード名(real_all_axes_test.launch.py参照)。
 # self._launch_processはこのGUIプロセスのメモリ上の変数でしかないため、GUIを
 # 再起動すると前回「全ノード起動」したlaunchプロセスの存在を見失う
 # (start_new_session=Trueで独立させているため、GUI終了時にcloseEventで
@@ -209,8 +212,9 @@ MACHINE_ORIGIN_OFFSET_LIMIT = 1.0
 # hand_pitch_linkの間のprismaticジョイント)。machine_origin_*と同じ理由・方式で、
 # trajectory_follower_nodeの管理対象外のため/mixed_joint_statesへ直接publishする。
 HAND_OFFSET_JOINT_NAMES = ['hand_offset_x_joint', 'hand_offset_y_joint', 'hand_offset_z_joint']
-# soki_sim.urdf.xacroのhand_offset_limitと一致させること
-HAND_OFFSET_LIMIT = 0.1
+# soki_sim.urdf.xacroのhand_offset_limitと一致させること(2026-09-07、0.1では
+# 実機とのズレを補正しきれない場面があったため0.3へ拡大)。
+HAND_OFFSET_LIMIT = 0.3
 
 # ---- ピック/投入 自動シーケンス(2026-09-03新規) ----
 # 「移動のみGUIで自動化し、吸着ON/シュート実行(ポンプOFF)の判断は人間が行う」という
@@ -781,6 +785,110 @@ class XYPlaneWidget(QWidget):
             painter.setPen(Qt.NoPen)
             painter.setBrush(QColor('red'))
             painter.drawEllipse(QPointF(cx, cy), 5, 5)
+
+
+class FieldMinimapWidget(QWidget):
+    """フィールド(ワーク配置4行6列・シューティングボックスL/R各4)を実寸比率で
+    俯瞰する読み取り専用ミニマップ。統合操作タブの「現在状態」パネル用
+    (2026-09-07新規、ユーザー要望: 「統合操作画面に簡易的かつ視覚的に機体の
+    座標データが分かるような機能」)。XYPlaneWidgetは可動域circle+クリックで
+    目標設定する操作用ウィジェットでフィールド要素は描かないため、俯瞰専用に
+    別クラスとして分離した。WORK_POINTS/SHOOT_POINTS(_build_field_buttonsが
+    ワーク・シューティングボックスのボタン配置に使っているのと同じワールド座標、
+    X=右, Y=前方=ワーク方向)をそのまま使うので、フィールド寸法定数を更新すれば
+    自動的に追従する。"""
+
+    _PIXELS_PER_METER = 220
+    _MARGIN = 14
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        xs = [p[1] for row in WORK_POINTS for p in row] + \
+            [p[1] for p in SHOOT_POINTS['L'] + SHOOT_POINTS['R']] + [0.0]
+        ys = [p[2] for row in WORK_POINTS for p in row] + \
+            [p[2] for p in SHOOT_POINTS['L'] + SHOOT_POINTS['R']] + [0.0]
+        self._min_x, self._max_x = min(xs), max(xs)
+        self._min_y, self._max_y = min(ys), max(ys)
+        width = int(round((self._max_x - self._min_x) * self._PIXELS_PER_METER)) + 2 * self._MARGIN
+        height = int(round((self._max_y - self._min_y) * self._PIXELS_PER_METER)) + 2 * self._MARGIN
+        self.setFixedSize(width, height)
+        self.setStyleSheet('background-color: #f5f5f5; border: 1px solid #555;')
+        self._current = None
+
+    def set_current(self, x: float, y: float):
+        self._current = (x, y)
+        self.update()
+
+    def _to_widget(self, x, y):
+        px = (x - self._min_x) * self._PIXELS_PER_METER + self._MARGIN
+        # Y+(ワーク方向)を画面の上へ、機体側(Y小さい)を下へ表示する
+        # (XYPlaneWidgetのc - y*sと同じ上下反転の考え方)。
+        py = self.height() - ((y - self._min_y) * self._PIXELS_PER_METER + self._MARGIN)
+        return px, py
+
+    def paintEvent(self, _event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor('#9e9e9e'))
+        for row in WORK_POINTS:
+            for _label, x, y, _z in row:
+                px, py = self._to_widget(x, y)
+                painter.drawEllipse(QPointF(px, py), 3, 3)
+
+        for side in ('L', 'R'):
+            for label, x, y, _z in SHOOT_POINTS[side]:
+                px, py = self._to_widget(x, y)
+                # 実運用ではL4/R4のみ使う(SHOOT_FIXED_TARGETS参照)ので、
+                # それ以外より枠を太く・塗りつぶして目立たせる。
+                is_fixed = label in SHOOT_FIXED_TARGETS
+                painter.setPen(QPen(QColor('#e07b00'), 2 if is_fixed else 1))
+                painter.setBrush(QColor('#ffcc80') if is_fixed else Qt.NoBrush)
+                painter.drawRect(int(px) - 4, int(py) - 4, 8, 8)
+
+        ox, oy = self._to_widget(0.0, 0.0)
+        painter.setPen(QPen(QColor('#555555'), 1))
+        painter.setBrush(QColor('#cccccc'))
+        painter.drawEllipse(QPointF(ox, oy), 6, 6)
+
+        if self._current is not None:
+            cx, cy = self._to_widget(*self._current)
+            painter.setPen(QPen(QColor('#1a7a1a'), 2))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawEllipse(QPointF(cx, cy), 6, 6)
+
+
+class ZGaugeWidget(QWidget):
+    """z_joint由来のワールドZ高さを縦バーで示す読み取り専用ゲージ。統合操作タブの
+    「現在状態」パネル用(2026-09-07新規、FieldMinimapWidgetと同じ要望対応。
+    XY平面のミニマップだけでは高さが分からないため併設する)。可動範囲は
+    WORLD_Z_LOWER/WORLD_Z_UPPER(座標指定操作タブのZ編集欄と同じ範囲)。"""
+
+    def __init__(self, height=200, width=26, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(width, height)
+        self.setStyleSheet('background-color: #f5f5f5; border: 1px solid #555;')
+        self._z = None
+
+    def set_z(self, z: float):
+        self._z = z
+        self.update()
+
+    def paintEvent(self, _event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        if self._z is None:
+            return
+        span = WORLD_Z_UPPER - WORLD_Z_LOWER
+        ratio = clamp((self._z - WORLD_Z_LOWER) / span, 0.0, 1.0) if span > 0 else 0.0
+        fill_h = int(round(self.height() * ratio))
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor('#4a90d9'))
+        painter.drawRect(0, self.height() - fill_h, self.width(), fill_h)
+        painter.setPen(QColor('#333333'))
+        painter.drawText(2, self.height() - fill_h - 3 if fill_h < self.height() - 12 else 12,
+                          f'{self._z:.2f}')
 
 
 class CommandGuiNode(Node):
@@ -1873,6 +1981,22 @@ class CommandGuiApp(QWidget):
                           '進捗は左の機体ステータスパネル(適用ゲイン・校正状態)で確認できる。', 'muted')
         layout.addWidget(desc)
 
+        # rvizは別途起動済みの場合に二重起動を避けたいことがあるため、「全ノード
+        # 起動」のたびにON/OFFできるようにする。ros2canは常に起動する(実機接続の
+        # 前提として必須)が、GUI(PyQt5ウィンドウ)か--nogui(ターミナルダッシュ
+        # ボード)かは選べるようにする(2026-09-07追加、ユーザー指摘: 「全ノード
+        # 起動ボタンで起動するrvizとros2canの起動を管理できるチェックボックスを
+        # 追加」→「ros2canは起動するよもちろん。チェックボックスで選ぶのは
+        # ros2can --noguiか否かだけ」)。既定はrviz起動ON・ros2can GUI(従来通り)。
+        launch_options_row = QHBoxLayout()
+        self.launch_use_viz_checkbox = QCheckBox('rvizを起動する')
+        self.launch_use_viz_checkbox.setChecked(True)
+        self.launch_ros2can_gui_checkbox = QCheckBox('ros2canをGUIで起動する(オフで--nogui)')
+        self.launch_ros2can_gui_checkbox.setChecked(True)
+        launch_options_row.addWidget(self.launch_use_viz_checkbox)
+        launch_options_row.addWidget(self.launch_ros2can_gui_checkbox)
+        layout.addLayout(launch_options_row)
+
         launch_row = QHBoxLayout()
         launch_btn = QPushButton('全ノード起動')
         launch_btn.setProperty('variant', 'primary')  # よく使う操作のため目立つ色に(2026-09-03)
@@ -1935,6 +2059,10 @@ class CommandGuiApp(QWidget):
         if self._launch_process is not None and self._launch_process.poll() is None:
             QMessageBox.information(self, '起動済み', '既に起動中です(先に停止してください)')
             return
+        use_viz = 'true' if self.launch_use_viz_checkbox.isChecked() else 'false'
+        # チェックボックスは「GUIで起動する」なので、ros2can_nogui引数へは反転して渡す。
+        ros2can_nogui = 'false' if self.launch_ros2can_gui_checkbox.isChecked() else 'true'
+        cmd = ALL_AXES_LAUNCH_BASE_CMD + [f'use_viz:={use_viz}', f'ros2can_nogui:={ros2can_nogui}']
         try:
             # start_new_session=True(setsid)でこの子プロセスを独立したプロセス
             # グループのリーダーにする。ros2 launchはさらに複数のノードを自分の
@@ -1943,7 +2071,7 @@ class CommandGuiApp(QWidget):
             # 2026-09-03、ユーザー報告: 「停止ボタンが機能しないことがある。
             # 停止完了と表示されても裏で生きていたり、閉じるボタンでも裏で
             # 生きていたりする」ことへの対処)。
-            self._launch_process = subprocess.Popen(ALL_AXES_LAUNCH_CMD, start_new_session=True)
+            self._launch_process = subprocess.Popen(cmd, start_new_session=True)
         except OSError as exc:
             _set_status(self.launch_status_label, f'起動失敗: {exc}', 'error')
             return
@@ -1989,6 +2117,20 @@ class CommandGuiApp(QWidget):
         self.current_label.setWordWrap(True)
         _set_status(self.current_label, '(mixed_joint_states待ち)', 'success')
         layout.addWidget(self.current_label)
+
+        # フィールド俯瞰ミニマップ+Z軸バーゲージ(2026-09-07新規、ユーザー要望:
+        # 「統合操作画面に簡易的かつ視覚的に機体の座標データが分かるような機能」)。
+        # 数値(current_label)だけでは位置感を掴みにくいため、XY位置とZ高さを
+        # ひと目で見られるようにする。いずれも読み取り専用(_refresh_current_state
+        # から更新するのみ、クリック操作は無い)。
+        visual_row = QHBoxLayout()
+        self.field_minimap = FieldMinimapWidget()
+        visual_row.addWidget(self.field_minimap)
+        self.z_gauge = ZGaugeWidget(height=self.field_minimap.height())
+        visual_row.addWidget(self.z_gauge)
+        visual_row.addStretch(1)
+        layout.addLayout(visual_row)
+
         column.addWidget(box)
 
     def _build_mode_panel(self, column):
@@ -2585,24 +2727,32 @@ class CommandGuiApp(QWidget):
         grid = QGridLayout(box)
         grid.addWidget(QLabel('max_vel'), 0, 1)
         grid.addWidget(QLabel('max_accel'), 0, 2)
+        grid.addWidget(QLabel('max_decel'), 0, 3)
 
         self.traj_vel_edits = {}
         self.traj_accel_edits = {}
+        self.traj_decel_edits = {}
         for i, name in enumerate(TRAJ_PANEL_JOINT_NAMES):
             # 行ラベルは"_joint"を省いて表示(ボックス見出しで対象は自明なため、
             # 列幅を無駄に広げないようにする)。辞書キーは元のjoint名のまま。
             grid.addWidget(QLabel(name.removesuffix('_joint')), i + 1, 0)
             vel_edit = make_float_edit(0.0, width=70)
             accel_edit = make_float_edit(0.0, width=70)
+            # 減速度(max_decel、2026-09-07新規: 停止時の応答性向上のため
+            # 加速度と別値にできるようにした。trajectory_follower_node.py
+            # trap_step/move_time参照)。
+            decel_edit = make_float_edit(0.0, width=70)
             self.traj_vel_edits[name] = vel_edit
             self.traj_accel_edits[name] = accel_edit
+            self.traj_decel_edits[name] = decel_edit
             grid.addWidget(vel_edit, i + 1, 1)
             grid.addWidget(accel_edit, i + 1, 2)
+            grid.addWidget(decel_edit, i + 1, 3)
 
         self.traj_status_label = QLabel()
         self.traj_status_label.setWordWrap(True)
         _set_status(self.traj_status_label, '未読込', 'muted')
-        grid.addWidget(self.traj_status_label, len(TRAJ_PANEL_JOINT_NAMES) + 1, 0, 1, 3)
+        grid.addWidget(self.traj_status_label, len(TRAJ_PANEL_JOINT_NAMES) + 1, 0, 1, 4)
 
         btn_row = QHBoxLayout()
         load_btn = QPushButton('読込')
@@ -2612,7 +2762,7 @@ class CommandGuiApp(QWidget):
         apply_btn.clicked.connect(self._on_apply_traj_params)
         btn_row.addWidget(load_btn)
         btn_row.addWidget(apply_btn)
-        grid.addLayout(btn_row, len(TRAJ_PANEL_JOINT_NAMES) + 2, 0, 1, 3)
+        grid.addLayout(btn_row, len(TRAJ_PANEL_JOINT_NAMES) + 2, 0, 1, 4)
 
         column.addWidget(box)
 
@@ -3422,6 +3572,8 @@ class CommandGuiApp(QWidget):
             f'theta={math.degrees(theta):.1f}deg  z_joint={zj:.3f}  r_joint={r:.3f}\n'
             f'X={x:.3f}  Y={y:.3f}  Z={z:.3f}')
         self.xy_widget.set_current(x, y)
+        self.field_minimap.set_current(x, y)
+        self.z_gauge.set_z(z)
         if not self._target_synced_to_current_:
             set_float(self.x_edit, round(x, 3))
             set_float(self.y_edit, round(y, 3))
@@ -3435,7 +3587,8 @@ class CommandGuiApp(QWidget):
         # 配列は「そのノードの実際のjoint_names順」なので、GUI固定のJOINT_NAMESを
         # 前提にlen比較・zipすると、一致しない構成では表示が更新されず0のままに見える。
         ok = self.node.request_node_params(
-            TRAJ_NODE_NAME, ['max_velocity', 'max_acceleration', 'control_mode', 'joint_names'],
+            TRAJ_NODE_NAME,
+            ['max_velocity', 'max_acceleration', 'max_deceleration', 'control_mode', 'joint_names'],
             self._apply_loaded_traj_params,
             lambda reason: _set_status(self.traj_status_label, f'読込失敗: {reason}', 'error'))
         _set_status(self.traj_status_label,
@@ -3497,11 +3650,17 @@ class CommandGuiApp(QWidget):
         names = self._traj_joint_names
         vel_map = saved.get('max_velocity', {})
         accel_map = saved.get('max_acceleration', {})
+        # max_decelerationはこのGUIの2026-09-07追加より前に保存されたgains.jsonには
+        # 存在しない。無ければmax_accelerationの2倍(trap_step/move_timeの既定と
+        # 同じ考え方)を使う(古いgains.jsonでも「4要素必要」等で自動適用が失敗し
+        # 続けないようにするため)。
+        decel_map = saved.get('max_deceleration', {})
         if not all(n in vel_map for n in names) or not all(n in accel_map for n in names):
             return False
         payload = {
             'max_velocity': [vel_map[n] for n in names],
             'max_acceleration': [accel_map[n] for n in names],
+            'max_deceleration': [decel_map[n] if n in decel_map else accel_map[n] * 2.0 for n in names],
         }
         _set_status(self.traj_status_label, '自動適用中(gains.json)...', 'muted')
         return self.node.set_node_params(TRAJ_NODE_NAME, payload, self._apply_traj_set_result)
@@ -3541,6 +3700,7 @@ class CommandGuiApp(QWidget):
     def _apply_loaded_traj_params(self, values):
         vel = values.get('max_velocity')
         accel = values.get('max_acceleration')
+        decel = values.get('max_deceleration')
         mode = values.get('control_mode')
         names = values.get('joint_names') or JOINT_NAMES
         self._traj_joint_names = list(names)
@@ -3564,6 +3724,12 @@ class CommandGuiApp(QWidget):
                     set_float(self.traj_accel_edits[name], round(v, 4))
                 else:
                     self._traj_loaded_extra.setdefault(name, {})['max_acceleration'] = v
+        if decel and len(decel) == len(names):
+            for name, v in zip(names, decel):
+                if name in self.traj_decel_edits:
+                    set_float(self.traj_decel_edits[name], round(v, 4))
+                else:
+                    self._traj_loaded_extra.setdefault(name, {})['max_deceleration'] = v
         if mode:
             self._set_mode_silent(mode)
             _set_status(self.mode_status_label, f'現在のモード: {mode}', 'info')
@@ -3599,7 +3765,12 @@ class CommandGuiApp(QWidget):
             else self._traj_loaded_extra[name]['max_acceleration']
             for name in names
         ]
-        return {'max_velocity': vel, 'max_acceleration': accel}
+        decel = [
+            get_float(self.traj_decel_edits[name]) if name in self.traj_decel_edits
+            else self._traj_loaded_extra[name]['max_deceleration']
+            for name in names
+        ]
+        return {'max_velocity': vel, 'max_acceleration': accel, 'max_deceleration': decel}
 
     def _on_apply_traj_params(self):
         try:
@@ -4146,6 +4317,7 @@ class CommandGuiApp(QWidget):
         self._persist_gains('trajectory', {
             'max_velocity': dict(zip(names, traj['max_velocity'])),
             'max_acceleration': dict(zip(names, traj['max_acceleration'])),
+            'max_deceleration': dict(zip(names, traj['max_deceleration'])),
         })
 
     def _persist_mit_values(self, mit):
@@ -4161,7 +4333,8 @@ class CommandGuiApp(QWidget):
         入力欄の初期値へ反映する。ファイルが無い/壊れている場合は0.0のまま
         (make_float_editの初期値)とする。"""
         traj = self._saved_gains.get('trajectory', {})
-        for key, edits in (('max_velocity', self.traj_vel_edits), ('max_acceleration', self.traj_accel_edits)):
+        for key, edits in (('max_velocity', self.traj_vel_edits), ('max_acceleration', self.traj_accel_edits),
+                           ('max_deceleration', self.traj_decel_edits)):
             for name, v in traj.get(key, {}).items():
                 if name in edits:
                     set_float(edits[name], v)

@@ -98,6 +98,9 @@ def generate_launch_description():
             'joint_names': ['root_theta_joint', 'z_joint', 'r_joint'],
             'max_velocity': [1.0, 0.2, 0.2],
             'max_acceleration': [2.0, 0.4, 0.4],
+            # 減速度(max_accelerationの2倍、停止時の応答性向上。2026-09-07新規、
+            # trajectory_follower_node.pyのmax_deceleration参照)。
+            'max_deceleration': [4.0, 0.8, 0.8],
             'update_rate_hz': 50.0,
             # デフォルトは'both'(command_gui_node/joy_teleop_node併用)。
             # command_gui_nodeの「動作モード」パネルから'auto'/'manual'に切り替え可能

@@ -805,3 +805,27 @@ R4、△(三角)でポンプトグル、×(バツ)で回収実行」(×のみ従
   - オフスクリーンQtで、_on_shoot_start_requested('L4')実行直後の
     gui._seq_steps[0]が('call', '/hand_set_pitch_insert')になっていることを
     確認済み(2026-09-04)。
+
+
+## ハンド取付オフセット拡大・実機セットアップの起動チェックボックス追加 (2026-09-07、以下2件のユーザープロンプトに対応)
+
+- 「ハンド取り付けオフセットが0.1では足りない。0.3は取っておいて。他にも0.1で
+  クランプされているところがあれば0.3に拡大」への対応: hand_offset_limit
+  (soki_sim.urdf.xacro)・HAND_OFFSET_LIMIT(command_gui_node.py)を0.1→0.3へ
+  拡大(両方を一致させる規約、command_gui_node.py:212のコメント参照)。他に
+  0.1でクランプされている箇所は無かった(urdf.xacroのtip_height=0.1は手先の
+  物理寸法でクランプ値ではないため対象外。MACHINE_ORIGIN_OFFSET_LIMITは
+  既に1.0)。
+- 「soki_simのGUIの全ノード起動ボタンで起動するrvizとros2canの起動を管理
+  できるチェックボックスを追加」→ユーザー訂正「ros2canは起動するよもちろん。
+  チェックボックスで選ぶのはros2can --noguiか否かだけ」への対応: 「実機
+  セットアップ」パネルに「rvizを起動する」(既定ON)・「ros2canをGUIで起動する
+  (オフで--nogui)」(既定ON=GUI)チェックボックスを追加。ros2canは常に起動、
+  --noguiの有無だけを切り替える。real_all_axes_test.launch.pyにros2can_nogui
+  引数(既定false)を新設し、同名(ros2can_gui)の2つのNode定義をIfCondition/
+  UnlessConditionで排他的に切り替える方式にした(launch_ros.Nodeのarguments
+  は条件付きで一部だけ追加できないため)。command_gui_node.py側はALL_AXES_
+  LAUNCH_CMD(固定コマンド)をuse_viz抜きのALL_AXES_LAUNCH_BASE_CMDに変更し、
+  _on_launch_all_nodesでチェックボックスの状態からuse_viz:=/ros2can_nogui:=
+  (GUIチェックボックスは反転)を都度組み立てて追加するようにした。
+rvizの起動はデフォルトでオン、ros2canについてはデフォルトでオフ（--noguiで起動）

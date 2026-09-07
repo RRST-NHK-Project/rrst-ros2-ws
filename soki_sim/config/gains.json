@@ -2,15 +2,15 @@
   "trajectory": {
     "max_velocity": {
       "root_theta_joint": 1.0,
-      "tip_theta_joint": 8.0,
+      "tip_theta_joint": 1.0,
       "z_joint": 0.075,
       "r_joint": 0.075
     },
     "max_acceleration": {
-      "root_theta_joint": 1.0,
-      "tip_theta_joint": 8.0,
-      "z_joint": 0.075,
-      "r_joint": 0.075
+      "root_theta_joint": 2.0,
+      "tip_theta_joint": 2.0,
+      "z_joint": 0.15,
+      "r_joint": 0.15
     }
   },
   "joy_speed": {

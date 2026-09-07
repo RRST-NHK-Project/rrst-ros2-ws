@@ -3,7 +3,7 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
-from launch.conditions import IfCondition
+from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import Command, LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
@@ -96,12 +96,20 @@ def generate_launch_description():
     root_theta_max_acceleration_arg = DeclareLaunchArgument(
         'root_theta_max_acceleration', default_value='0.2',
         description='root_thetaの最大加速度[rad/s^2]')
+    root_theta_max_deceleration_arg = DeclareLaunchArgument(
+        'root_theta_max_deceleration', default_value='0.4',
+        description='root_thetaの最大減速度[rad/s^2](既定はmax_accelerationの2倍。'
+                    '停止時の応答性向上、trajectory_follower_node.py参照)')
     tip_theta_max_velocity_arg = DeclareLaunchArgument(
         'tip_theta_max_velocity', default_value='0.1',
         description='tip_thetaの最大速度[rad/s](安全のため低めから)')
     tip_theta_max_acceleration_arg = DeclareLaunchArgument(
         'tip_theta_max_acceleration', default_value='0.2',
         description='tip_thetaの最大加速度[rad/s^2]')
+    tip_theta_max_deceleration_arg = DeclareLaunchArgument(
+        'tip_theta_max_deceleration', default_value='0.4',
+        description='tip_thetaの最大減速度[rad/s^2](既定はmax_accelerationの2倍。'
+                    '停止時の応答性向上、trajectory_follower_node.py参照)')
 
     # ---- z/r (RoboMas) ----
     robomas_kp_arg = DeclareLaunchArgument(
@@ -120,12 +128,20 @@ def generate_launch_description():
     z_max_acceleration_arg = DeclareLaunchArgument(
         'z_max_acceleration', default_value='0.1',
         description='z_jointの最大加速度[m/s^2]')
+    z_max_deceleration_arg = DeclareLaunchArgument(
+        'z_max_deceleration', default_value='0.2',
+        description='z_jointの最大減速度[m/s^2](既定はz_max_accelerationの2倍。'
+                    '停止時の応答性向上、trajectory_follower_node.py参照)')
     r_max_velocity_arg = DeclareLaunchArgument(
         'r_max_velocity', default_value='0.05',
         description='r_jointの最大速度[m/s](安全のため低めから)')
     r_max_acceleration_arg = DeclareLaunchArgument(
         'r_max_acceleration', default_value='0.1',
         description='r_jointの最大加速度[m/s^2]')
+    r_max_deceleration_arg = DeclareLaunchArgument(
+        'r_max_deceleration', default_value='0.2',
+        description='r_jointの最大減速度[m/s^2](既定はr_max_accelerationの2倍。'
+                    '停止時の応答性向上、trajectory_follower_node.py参照)')
 
     # ---- joy/viz ----
     use_joy_arg = DeclareLaunchArgument(
@@ -141,6 +157,12 @@ def generate_launch_description():
     use_viz_arg = DeclareLaunchArgument(
         'use_viz', default_value='false',
         description='trueならrobot_state_publisher/joint_state_publisher/rviz2も起動する')
+    ros2can_nogui_arg = DeclareLaunchArgument(
+        'ros2can_nogui', default_value='false',
+        description='trueならros2canを--nogui(ターミナルダッシュボード、PyQt5ウィンドウ'
+                    'なし)で起動する。ros2can自体は常に起動する(command_gui_nodeの'
+                    '「実機セットアップ」パネルのチェックボックスで切替可能、2026-09-07'
+                    '追加、デフォルトfalseで従来通りGUI)')
     launch_gui_arg = DeclareLaunchArgument(
         'launch_gui', default_value='true',
         description='falseならcommand_gui_nodeを起動しない。command_gui_node自身が'
@@ -158,28 +180,45 @@ def generate_launch_description():
     tip_theta_kd = LaunchConfiguration('tip_theta_kd')
     root_theta_max_velocity = LaunchConfiguration('root_theta_max_velocity')
     root_theta_max_acceleration = LaunchConfiguration('root_theta_max_acceleration')
+    root_theta_max_deceleration = LaunchConfiguration('root_theta_max_deceleration')
     tip_theta_max_velocity = LaunchConfiguration('tip_theta_max_velocity')
     tip_theta_max_acceleration = LaunchConfiguration('tip_theta_max_acceleration')
+    tip_theta_max_deceleration = LaunchConfiguration('tip_theta_max_deceleration')
     robomas_kp = LaunchConfiguration('robomas_kp')
     robomas_kd = LaunchConfiguration('robomas_kd')
     robomas_current_ff = LaunchConfiguration('robomas_current_ff')
     z_max_velocity = LaunchConfiguration('z_max_velocity')
     z_max_acceleration = LaunchConfiguration('z_max_acceleration')
+    z_max_deceleration = LaunchConfiguration('z_max_deceleration')
     r_max_velocity = LaunchConfiguration('r_max_velocity')
     r_max_acceleration = LaunchConfiguration('r_max_acceleration')
+    r_max_deceleration = LaunchConfiguration('r_max_deceleration')
     use_joy = LaunchConfiguration('use_joy')
     use_viz = LaunchConfiguration('use_viz')
+    ros2can_nogui = LaunchConfiguration('ros2can_nogui')
     enable_button = LaunchConfiguration('enable_button')
     launch_gui = LaunchConfiguration('launch_gui')
 
     # use_joy:=trueならGUI/joy両方を受け付ける。falseならGUI専用のまま
     control_mode = PythonExpression(["'both' if '", use_joy, "' == 'true' else 'auto'"])
 
-    ros2can_node = Node(
+    # ros2canは常に起動する。--noguiの有無だけをros2can_noguiで切り替える
+    # (launch_ros.Nodeのargumentsは条件付きで一部だけ足すことができないため、
+    # 同名ノードをIfCondition/UnlessConditionで排他的に2つ用意する定番パターン)。
+    ros2can_gui_node = Node(
         package='ros2can',
         executable='ros2can',
         name='ros2can_gui',
         output='screen',
+        condition=UnlessCondition(ros2can_nogui),
+    )
+    ros2can_nogui_node = Node(
+        package='ros2can',
+        executable='ros2can',
+        name='ros2can_gui',
+        output='screen',
+        arguments=['--nogui'],
+        condition=IfCondition(ros2can_nogui),
     )
 
     real_joint_bridge_node = Node(
@@ -226,12 +265,16 @@ def generate_launch_description():
         # context評価時に素のfloatへ解決してから渡すことで回避する。
         root_theta_vel = float(root_theta_max_velocity.perform(context))
         root_theta_accel = float(root_theta_max_acceleration.perform(context))
+        root_theta_decel = float(root_theta_max_deceleration.perform(context))
         tip_theta_vel = float(tip_theta_max_velocity.perform(context))
         tip_theta_accel = float(tip_theta_max_acceleration.perform(context))
+        tip_theta_decel = float(tip_theta_max_deceleration.perform(context))
         z_vel = float(z_max_velocity.perform(context))
         z_accel = float(z_max_acceleration.perform(context))
+        z_decel = float(z_max_deceleration.perform(context))
         r_vel = float(r_max_velocity.perform(context))
         r_accel = float(r_max_acceleration.perform(context))
+        r_decel = float(r_max_deceleration.perform(context))
 
         device_id = int(cubemars_device_id.perform(context))
         root_index = int(root_theta_motor_index.perform(context))
@@ -259,6 +302,7 @@ def generate_launch_description():
                     'joint_names': ['root_theta_joint', 'tip_theta_joint', 'z_joint', 'r_joint'],
                     'max_velocity': [root_theta_vel, tip_theta_vel, z_vel, r_vel],
                     'max_acceleration': [root_theta_accel, tip_theta_accel, z_accel, r_accel],
+                    'max_deceleration': [root_theta_decel, tip_theta_decel, z_decel, r_decel],
                     'update_rate_hz': 50.0,
                     'control_mode': control_mode,
                     # sim表示(mixed_joint_states)はreal_joint_bridge_nodeの実測値を
@@ -350,20 +394,26 @@ def generate_launch_description():
         tip_theta_kd_arg,
         root_theta_max_velocity_arg,
         root_theta_max_acceleration_arg,
+        root_theta_max_deceleration_arg,
         tip_theta_max_velocity_arg,
         tip_theta_max_acceleration_arg,
+        tip_theta_max_deceleration_arg,
         robomas_kp_arg,
         robomas_kd_arg,
         robomas_current_ff_arg,
         z_max_velocity_arg,
         z_max_acceleration_arg,
+        z_max_deceleration_arg,
         r_max_velocity_arg,
         r_max_acceleration_arg,
+        r_max_deceleration_arg,
         use_joy_arg,
         use_viz_arg,
+        ros2can_nogui_arg,
         enable_button_arg,
         launch_gui_arg,
-        ros2can_node,
+        ros2can_gui_node,
+        ros2can_nogui_node,
         real_joint_bridge_node,
         homing_node,
         hand_node,
