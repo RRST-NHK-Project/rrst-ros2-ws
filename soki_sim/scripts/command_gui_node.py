@@ -185,6 +185,19 @@ ALL_AXES_LAUNCH_CMD = [
     'use_joy:=true', 'use_viz:=true', 'launch_gui:=false',
 ]
 
+# ALL_AXES_LAUNCH_CMDが起動するノード名(real_all_axes_test.launch.py参照)。
+# self._launch_processはこのGUIプロセスのメモリ上の変数でしかないため、GUIを
+# 再起動すると前回「全ノード起動」したlaunchプロセスの存在を見失う
+# (start_new_session=Trueで独立させているため、GUI終了時にcloseEventで
+# 「動かしたまま終了」を選ぶかGUIプロセス自体が異常終了すると道連れにならず
+# 生き残り続ける。2026-09-07、実際にこの状態のまま気づかず放置されるインシデントが
+# 発生したことへの対策)。GUI起動時に既にこれらのノードが動いていないかを
+# _check_existing_launch_nodesで確認する。
+ALL_AXES_LAUNCH_NODE_NAMES = {
+    'real_joint_bridge_node', 'homing_node', 'trajectory_follower_node',
+    'hand_node', 'joy_teleop_node',
+}
+
 # 機体原点オフセット(soki_sim.urdf.xacroのmachine_origin_x/y/z_joint、base_linkの
 # 子であるprismaticジョイント)。trajectory_follower_nodeの管理対象外(滑らか追従は
 # 不要な較正値)のため、motor_mixer_nodeと同様/mixed_joint_statesへ直接publishする。
@@ -1235,6 +1248,11 @@ class CommandGuiApp(QWidget):
         self._spin_timer = QTimer(self)
         self._spin_timer.timeout.connect(self._spin_ros)
         self._spin_timer.start(50)
+
+        # 起動時に、前回「全ノード起動」したlaunchプロセスが生き残っていないか
+        # 確認する(ALL_AXES_LAUNCH_NODE_NAMES定義部のコメント参照)。discoveryに
+        # 時間がかかるため、起動直後ではなく少し待ってから1回だけ確認する。
+        QTimer.singleShot(1500, self._check_existing_launch_nodes)
 
         # trajectory_follower_node/joy_teleop_nodeがGUIより後に立ち上がることも
         # あるため、各サービスが使えるようになるまで一定間隔でリトライし、使えた
@@ -4125,21 +4143,64 @@ class CommandGuiApp(QWidget):
             if name in sequence:
                 set_float(edit, sequence[name])
 
+    def _check_existing_launch_nodes(self):
+        """GUI起動時に、自分が把握していない(self._launch_process=Noneのままの)
+        実機ノード群が既に動いていないか確認する(ALL_AXES_LAUNCH_NODE_NAMES定義部の
+        コメント参照)。前回のGUIセッションでcloseEventの「動かしたまま終了」を
+        選んだか、GUIプロセス自体が異常終了してcloseEventが呼ばれなかった場合、
+        start_new_session=Trueで独立させたlaunchプロセスは生き残り続けるが、
+        self._launch_processはこのGUIプロセスのメモリ上の変数でしかないため
+        新しいGUIプロセスからはその存在が見えず、「停止」ボタンでも管理できない。
+        気づかず放置される事故を防ぐため、起動時に一度だけ警告する。"""
+        try:
+            running = set(self.node.get_node_names()) & ALL_AXES_LAUNCH_NODE_NAMES
+        except Exception:
+            return
+        if not running:
+            return
+        QMessageBox.warning(
+            self, '起動中の実機ノードを検知',
+            'このGUIが起動していないはずの実機ノードが既に動作中です:\n'
+            '  ' + ', '.join(sorted(running)) + '\n\n'
+            'おそらく前回のGUIセッションで「全ノード起動」したプロセスが、\n'
+            'GUI終了時に停止されずそのまま生き残っています\n'
+            '(self._launch_processはGUIプロセスごとに独立した変数のため、\n'
+            'このGUIの「停止」ボタンでは止められません)。\n\n'
+            '意図しない場合は、ターミナルで以下を確認し、該当プロセスを\n'
+            '終了させてください:\n'
+            '  ros2 node list\n'
+            '  pkill -INT -f real_all_axes_test.launch.py')
+
     def closeEvent(self, event):
         """実機セットアップパネルで起動したros2 launch子プロセスが残っている場合、
         GUI終了時に道連れで放置されないよう確認して停止する(通常のCtrl+Cと同様の
-        SIGINTで、ros2 launch側に配下ノードをまとめて終了させる)。"""
+        SIGINTで、ros2 launch側に配下ノードをまとめて終了させる)。
+
+        2026-09-07、ボタンをQMessageBox標準のYes/No/Cancelから明示的な日本語ラベルに
+        変更した。標準の「いいえ」は「ノードを停止せずGUIだけ閉じる」という重い意味を
+        持つのに、ラベルからそれが伝わらず誤って選びやすかった(実際にこの状態のまま
+        気づかず放置され、start_new_session=Trueで独立しているlaunchプロセスだけが
+        生き残り続けるインシデントが発生した)。デフォルトフォーカスも「停止して終了」
+        にし、誤ってEnterを押した場合も安全側に倒す。"""
         if self._launch_process is not None and self._launch_process.poll() is None:
-            reply = QMessageBox.question(
-                self, '終了確認',
-                '実機セットアップで起動したノード群がまだ動作中です。\n'
-                '停止してから終了しますか？',
-                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
-            if reply == QMessageBox.Cancel:
+            box = QMessageBox(self)
+            box.setWindowTitle('終了確認')
+            box.setText('実機セットアップで起動したノード群がまだ動作中です。')
+            stop_btn = box.addButton('停止して終了', QMessageBox.AcceptRole)
+            keep_btn = box.addButton('動かしたまま終了', QMessageBox.DestructiveRole)
+            cancel_btn = box.addButton('キャンセル', QMessageBox.RejectRole)
+            box.setDefaultButton(stop_btn)
+            box.exec_()
+            clicked = box.clickedButton()
+            if clicked is cancel_btn:
                 event.ignore()
                 return
-            if reply == QMessageBox.Yes:
+            if clicked is stop_btn:
                 self._signal_launch_process_group(signal.SIGINT)
+            elif clicked is keep_btn:
+                self.node.get_logger().warning(
+                    'command_gui_node: 実機ノード群を動かしたままGUIを終了します。'
+                    '次回GUI起動時に検知・警告されます。')
         event.accept()
 
 
