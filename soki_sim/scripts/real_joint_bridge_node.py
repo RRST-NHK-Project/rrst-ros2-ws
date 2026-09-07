@@ -38,6 +38,15 @@ CAN_ID/スロット割当の実測値はnote/can_mapping.txtを参照。値が�
        (homing_node担当、rcl_interfacesのSetParametersサービスで実行時に設定
        される。yamlには保存しないランタイム専用値)で合成後の値を補正する。
        ホーミング未実施の間はz_offset_m=r_offset_m=0.0のまま(起動直後の生値)。
+  fallback_topic (2026-09-07追加、パラメータで指定。空文字なら無効):
+    -> trajectory_follower_nodeの理想軌道(output_topicとは別トピックに分離
+       済み)。まだ実機帰還を一度も受信していない関節群(root_theta/tip_theta、
+       z/rの2グループ単位)についてのみ、そのままoutput_topicへ転送する
+       (_on_fallback参照)。実機未配線・一部軸のみ実機接続の構成でも、残りの
+       軸はsimの理想軌道で動き続けられるようにするためのフォールバックで、
+       一度でも実機帰還を受信したグループは以後この転送を無視する
+       (実測 -> 理想軌道への逆行はしない)。note/hardware_mapping.txt
+       「mixed_joint_statesの真値ソース」参照。
 """
 
 import math
@@ -89,6 +98,14 @@ class RealJointBridgeNode(Node):
         self.declare_parameter('z_joint', 'z_joint')
         self.declare_parameter('r_joint', 'r_joint')
         self.declare_parameter('output_topic', 'mixed_joint_states')
+        # trajectory_follower_nodeの理想軌道(output_topicとは別トピックに分離済み、
+        # note/hardware_mapping.txt「mixed_joint_statesの真値ソース」参照)を購読し、
+        # まだ実機帰還を一度も受信していない関節群についてのみそのまま転送する
+        # (2026-09-07追加)。空文字(デフォルト)なら転送しない。実機を配線前・
+        # 一部軸のみ実機接続の構成でもsim側の表示・GUI操作が固まらないようにする
+        # ためのフォールバックで、一度でも実機帰還を受信した関節群は以後この
+        # フォールバックを無視し実測値のみを使う(実測→理想軌道への逆行はしない)。
+        self.declare_parameter('fallback_topic', '')
 
         gp = self.get_parameter
         self.cubemars_device_id_ = gp('cubemars_device_id').value
@@ -119,8 +136,14 @@ class RealJointBridgeNode(Node):
         self.z_name_ = gp('z_joint').value
         self.r_name_ = gp('r_joint').value
         output_topic = gp('output_topic').value
+        fallback_topic = gp('fallback_topic').value
 
         self.pub_ = self.create_publisher(JointState, output_topic, 10)
+
+        # 実機帰還を一度でも受信したかどうか(cubemars=root_theta/tip_theta、
+        # robomas=z/rの2グループ単位。_on_fallback参照)。
+        self._cubemars_received_ = False
+        self._robomas_received_ = False
 
         self.create_subscription(
             Int32MultiArray, f'serial_rx_{self.cubemars_device_id_}_unwrapped',
@@ -128,6 +151,8 @@ class RealJointBridgeNode(Node):
         self.create_subscription(
             Int32MultiArray, f'serial_rx_{self.robomas_device_id_}_unwrapped',
             self._on_robomas_feedback, 10)
+        if fallback_topic:
+            self.create_subscription(JointState, fallback_topic, self._on_fallback, 10)
 
         self.get_logger().info(
             f'real_joint_bridge_node started: '
@@ -135,7 +160,8 @@ class RealJointBridgeNode(Node):
             f'robomas(device_id={self.robomas_device_id_}, '
             f'motor1_index={self.robomas_motor1_index_}, '
             f'motor2_index={self.robomas_motor2_index_}) '
-            f'-> {output_topic}')
+            f'-> {output_topic}'
+            + (f' (fallback: {fallback_topic})' if fallback_topic else ''))
 
     def _on_cubemars(self, msg: Int32MultiArray):
         # 以前はrobomas側の帰還も揃うまでpublishを待っていたが、これだとroot_theta/
@@ -146,6 +172,7 @@ class RealJointBridgeNode(Node):
         # tip_thetaだけをpublishしても安全(2026-09-07、ユーザー指摘: simは実機の
         # 実測値に追従して表示すべきで、trajectory_follower_nodeの理想軌道と
         # 競合させない設計にする一連の変更の一部)。
+        self._cubemars_received_ = True
         root_theta_raw = msg.data[self.root_theta_index_]
         tip_theta_raw = msg.data[self.tip_theta_index_]
         root_theta_deg = root_theta_raw * self.cubemars_scale_deg_
@@ -163,6 +190,7 @@ class RealJointBridgeNode(Node):
 
     def _on_robomas_feedback(self, msg: Int32MultiArray):
         # _on_cubemarsと同じ理由でcubemars側の帰還を待たずに独立してpublishする。
+        self._robomas_received_ = True
         m1_deg = msg.data[self.robomas_motor1_index_] * ROBOMAS_FEEDBACK_POSITION_SCALE_DEG
         m2_deg = msg.data[self.robomas_motor2_index_] * ROBOMAS_FEEDBACK_POSITION_SCALE_DEG
         motor1_joint = self.motor1_sign_ * math.radians(m1_deg) * self.pulley_radius_m_
@@ -175,6 +203,30 @@ class RealJointBridgeNode(Node):
         out.header.stamp = self.get_clock().now().to_msg()
         out.name = [self.z_name_, self.r_name_]
         out.position = [z, r]
+        self.pub_.publish(out)
+
+    def _on_fallback(self, msg: JointState):
+        """trajectory_follower_nodeの理想軌道(fallback_topic)のうち、まだ実機
+        帰還を一度も受信していない関節群だけをそのままoutput_topicへ転送する。
+        実機未配線・一部軸のみ実機接続の構成でも、残りの軸はsim(理想軌道)で
+        動き続けられるようにするためのフォールバック(2026-09-07追加)。一度でも
+        実機帰還を受信した関節群は、以後この転送を無視し実測値のみを使う
+        (実測 -> 理想軌道への逆行はしない)。"""
+        names = []
+        positions = []
+        for name, pos in zip(msg.name, msg.position):
+            if name in (self.root_theta_name_, self.tip_theta_name_) and self._cubemars_received_:
+                continue
+            if name in (self.z_name_, self.r_name_) and self._robomas_received_:
+                continue
+            names.append(name)
+            positions.append(pos)
+        if not names:
+            return
+        out = JointState()
+        out.header.stamp = self.get_clock().now().to_msg()
+        out.name = names
+        out.position = positions
         self.pub_.publish(out)
 
 

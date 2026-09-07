@@ -129,7 +129,14 @@ def generate_launch_description():
         output='screen',
         parameters=[
             real_joint_bridge_yaml,
-            {'cubemars_root_theta_index': motor_index},
+            {
+                'cubemars_root_theta_index': motor_index,
+                # trajectory_follower_node側のoutput_topic(下記)と一致させること。
+                # z/r(ROBOMAS未接続時)等、まだ実機帰還の無い軸はここから理想軌道を
+                # 転送してsim表示を動かし続ける(note/hardware_mapping.txt
+                # 「mixed_joint_statesの真値ソース」参照)。
+                'fallback_topic': 'trajectory_target_joint_states',
+            },
         ],
     )
 

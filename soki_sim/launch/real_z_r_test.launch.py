@@ -119,7 +119,16 @@ def generate_launch_description():
         executable='real_joint_bridge_node',
         name='real_joint_bridge_node',
         output='screen',
-        parameters=[real_joint_bridge_yaml],
+        parameters=[
+            real_joint_bridge_yaml,
+            {
+                # trajectory_follower_node側のoutput_topic(下記)と一致させること。
+                # root_theta(このlaunchでは実機出力なし)等、まだ実機帰還の無い軸は
+                # ここから理想軌道を転送してsim表示を動かし続ける
+                # (note/hardware_mapping.txt「mixed_joint_statesの真値ソース」参照)。
+                'fallback_topic': 'trajectory_target_joint_states',
+            },
+        ],
     )
 
     homing_node = Node(

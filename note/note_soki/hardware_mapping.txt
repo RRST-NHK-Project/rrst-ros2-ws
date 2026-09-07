@@ -219,12 +219,19 @@ simが実機の実測値に追従して表示すべき(逆に実機がsimの理�
     変更した(joint_state_publisherは受信メッセージに含まれる関節名だけを更新し
     他は保持するため、部分的なpublishでも問題ない)。
 
-**副作用**: 実機未接続の軸(例: real_root_theta_test.launch.pyでuse_robomas:=
-false時のz/r)は、GUI/RVizの現在値表示が初期値のまま更新されなくなる(以前は
-理想軌道値が代わりに表示されていたが、実機の実際の位置を反映しない紛らわしい
-表示だったため、意図的にこの挙動にした)。display.launch.py(sim単体、
-real_joint_bridge_node未起動)は影響を受けず、trajectory_follower_nodeが
-従来通りmixed_joint_statesへpublishする。
+**フォールバック(2026-09-07、同日追記)**: 上記だけだと実機を繋がない/一部軸
+しか実機接続していない構成でsim表示自体が固まってしまう(ユーザー指摘)。
+そのためreal_joint_bridge_nodeにfallback_topicパラメータを追加し、実機テスト用
+launch4本では'trajectory_target_joint_states'(trajectory_follower_nodeの
+理想軌道)を指定した。real_joint_bridge_nodeはこれを購読し、まだ実機帰還を
+一度も受信していない関節群(root_theta/tip_theta、z/rの2グループ単位)に
+ついてのみ、理想軌道の値をそのままmixed_joint_statesへ転送する
+(_on_fallback参照)。一度でも実機帰還を受信したグループは以後この転送を
+無視し実測値のみを使う(実測 -> 理想軌道への逆行はしない)。
+これにより、実機が繋がっていない/繋がっていない間は従来通りsimの理想軌道で
+動き、実機が繋がった軸から順に実測値表示へ切り替わる。display.launch.py
+(sim単体、real_joint_bridge_node未起動)は影響を受けず、trajectory_follower_
+nodeが従来通りmixed_joint_statesへ直接publishする。
 
 ## 未確認事項 (2026-08-27時点)
 - root_theta/tip_thetaの原点センサの物理位置(真の機械原点との対応)

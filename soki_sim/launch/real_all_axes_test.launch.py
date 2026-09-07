@@ -193,6 +193,11 @@ def generate_launch_description():
                 'cubemars_device_id': cubemars_device_id,
                 'cubemars_root_theta_index': root_theta_motor_index,
                 'cubemars_tip_theta_index': tip_theta_motor_index,
+                # trajectory_follower_node側のoutput_topic(下記)と一致させること。
+                # 起動直後、まだ実機帰還が届いていない軸はここから理想軌道を転送して
+                # sim表示を動かし続ける(note/hardware_mapping.txt
+                # 「mixed_joint_statesの真値ソース」参照)。
+                'fallback_topic': 'trajectory_target_joint_states',
             },
         ],
     )
