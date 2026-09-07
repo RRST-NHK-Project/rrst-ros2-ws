@@ -1138,6 +1138,14 @@ class CommandGuiApp(QWidget):
         # 記憶しておく(2026-09-03、ユーザー指摘: 「吸着できなかったときに回収
         # 実行を再度行うことがある。現状だと回収実行が一回しかできない」)。
         self._last_pick_target = None
+        # X/Y/Z編集欄は起動時点では固定デフォルト値(可動域中央付近)のままで
+        # 実機の現在位置とは無関係なため、電源投入直後にうっかり「送信」を押すと
+        # そのデフォルト値へ向けて急に動き出してしまう。電源off/on後もGUIを
+        # 起動し直すたびに再発するため、_refresh_current_stateで実機の現在位置を
+        # 最初に受信した時点で一度だけX/Y/Z欄を現在位置へ自動同期する
+        # (_on_copy_current_to_targetと同じ変換)。以後はユーザーの手動編集を
+        # 尊重し上書きしない。
+        self._target_synced_to_current_ = False
 
         self.x_edit = make_float_edit(MAX_RADIUS / 2.0)
         self.y_edit = make_float_edit(0.0)
@@ -3348,6 +3356,11 @@ class CommandGuiApp(QWidget):
             f'theta={math.degrees(theta):.1f}deg  z_joint={zj:.3f}  r_joint={r:.3f}\n'
             f'X={x:.3f}  Y={y:.3f}  Z={z:.3f}')
         self.xy_widget.set_current(x, y)
+        if not self._target_synced_to_current_:
+            set_float(self.x_edit, round(x, 3))
+            set_float(self.y_edit, round(y, 3))
+            set_float(self.z_edit, round(z, 3))
+            self._target_synced_to_current_ = True
 
     def _on_load_traj_params(self):
         # joint_namesも取得する: trajectory_follower_nodeは実行構成によって

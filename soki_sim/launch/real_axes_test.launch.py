@@ -188,6 +188,11 @@ def generate_launch_description():
                 'max_acceleration': [root_theta_accel, z_accel, r_accel],
                 'update_rate_hz': 50.0,
                 'control_mode': control_mode,
+                # sim表示(mixed_joint_states)はreal_joint_bridge_nodeの実測値を
+                # 真値として使う(2026-09-07方針変更、real_root_theta_test.launch.py
+                # 参照)。本ノードのpos_はMIT指令生成用の理想軌道でしかないため
+                # 出力先を分離した。
+                'output_topic': 'trajectory_target_joint_states',
                 # tip_theta_jointは初回較正が済むまで対象外(ファイル冒頭docstring参照)。
                 'cubemars_joint_names': ['root_theta_joint'],
                 # 単一要素配列は、bareなPythonリスト([x])で渡すとlaunch_rosに単一の

@@ -194,6 +194,38 @@ robomas_z_offset_m/robomas_r_offset_mという別パラメータ名でこちら�
 SetParametersするようhoming_node._apply_offsets()を拡張した。値・符号規約
 (z = mix_k*(m1+m2) + offset)はreal_joint_bridge_nodeと揃えてある。
 
+## mixed_joint_statesの真値ソース(2026-09-07方針変更)
+実機テスト用launch(real_root_theta_test/real_axes_test/real_z_r_test/
+real_all_axes_test.launch.py)では、trajectory_follower_nodeの内部軌道(pos_、
+MIT指令生成用の理想値、実機の追従が遅れても即座には反映されない)と
+real_joint_bridge_nodeの実測値(CAN帰還ベース)が、どちらも同じ
+mixed_joint_statesトピックへ別々にpublishしており、joint_state_publisher/GUI/
+RVizの表示がどちらが後に届いたか次第でブレる(simが実機より先行して見える)
+問題があった。
+
+**方針(ユーザー判断)**: simは実機が無い時のデバッグ用途であり、実機接続時は
+simが実機の実測値に追従して表示すべき(逆に実機がsimの理想軌道に追従させられる
+ように見えるのはおかしい)。そのため:
+  - 上記4つのlaunchでtrajectory_follower_nodeのoutput_topicを
+    'trajectory_target_joint_states'に分離し、mixed_joint_states(joint_state_
+    publisherのsource、command_gui_node/joy_teleop_nodeが現在値として購読する
+    トピック)にはpublishしないようにした。MIT指令自体はこれまで通りpos_を
+    元に生成する(この変更の影響を受けない)。
+  - real_joint_bridge_node.pyは、以前はCubeMars/ROBOMAS両方の帰還が揃うまで
+    mixed_joint_statesへのpublishを待っていたが、これだと部分実機構成
+    (例: real_root_theta_test.launch.pyでROBOMAS未接続)ではmixed_joint_states
+    自体が永久に出ずsim表示が固まる問題があった。CubeMars側/ROBOMAS側それぞれの
+    帰還が届いた時点で、その軸群だけを含むJointStateを独立にpublishするよう
+    変更した(joint_state_publisherは受信メッセージに含まれる関節名だけを更新し
+    他は保持するため、部分的なpublishでも問題ない)。
+
+**副作用**: 実機未接続の軸(例: real_root_theta_test.launch.pyでuse_robomas:=
+false時のz/r)は、GUI/RVizの現在値表示が初期値のまま更新されなくなる(以前は
+理想軌道値が代わりに表示されていたが、実機の実際の位置を反映しない紛らわしい
+表示だったため、意図的にこの挙動にした)。display.launch.py(sim単体、
+real_joint_bridge_node未起動)は影響を受けず、trajectory_follower_nodeが
+従来通りmixed_joint_statesへpublishする。
+
 ## 未確認事項 (2026-08-27時点)
 - root_theta/tip_thetaの原点センサの物理位置(真の機械原点との対応)
   → 上記較正手順を実施する際に確定させる

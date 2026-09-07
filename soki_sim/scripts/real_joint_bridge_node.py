@@ -122,9 +122,6 @@ class RealJointBridgeNode(Node):
 
         self.pub_ = self.create_publisher(JointState, output_topic, 10)
 
-        self.cubemars_data_ = None
-        self.robomas_data_ = None
-
         self.create_subscription(
             Int32MultiArray, f'serial_rx_{self.cubemars_device_id_}_unwrapped',
             self._on_cubemars, 10)
@@ -141,19 +138,16 @@ class RealJointBridgeNode(Node):
             f'-> {output_topic}')
 
     def _on_cubemars(self, msg: Int32MultiArray):
-        self.cubemars_data_ = msg.data
-        self._publish_if_ready()
-
-    def _on_robomas_feedback(self, msg: Int32MultiArray):
-        self.robomas_data_ = msg.data
-        self._publish_if_ready()
-
-    def _publish_if_ready(self):
-        if self.cubemars_data_ is None or self.robomas_data_ is None:
-            return
-
-        root_theta_raw = self.cubemars_data_[self.root_theta_index_]
-        tip_theta_raw = self.cubemars_data_[self.tip_theta_index_]
+        # 以前はrobomas側の帰還も揃うまでpublishを待っていたが、これだとroot_theta/
+        # tip_thetaのみの部分実機テスト(real_root_theta_test.launch.py等、ROBOMAS
+        # 未接続)ではmixed_joint_statesが永久に出ずsim表示が固まってしまっていた。
+        # joint_state_publisherは受信したJointStateに含まれる関節名だけを更新し
+        # 他は保持する仕様のため、CubeMars側だけが届いた時点でroot_theta/
+        # tip_thetaだけをpublishしても安全(2026-09-07、ユーザー指摘: simは実機の
+        # 実測値に追従して表示すべきで、trajectory_follower_nodeの理想軌道と
+        # 競合させない設計にする一連の変更の一部)。
+        root_theta_raw = msg.data[self.root_theta_index_]
+        tip_theta_raw = msg.data[self.tip_theta_index_]
         root_theta_deg = root_theta_raw * self.cubemars_scale_deg_
         tip_theta_deg = tip_theta_raw * self.cubemars_scale_deg_
         root_theta = (self.root_theta_sign_ * math.radians(root_theta_deg)
@@ -161,8 +155,16 @@ class RealJointBridgeNode(Node):
         tip_theta = (self.tip_theta_sign_ * math.radians(tip_theta_deg)
                      / self.tip_theta_reduction_ + self.tip_theta_offset_)
 
-        m1_deg = self.robomas_data_[self.robomas_motor1_index_] * ROBOMAS_FEEDBACK_POSITION_SCALE_DEG
-        m2_deg = self.robomas_data_[self.robomas_motor2_index_] * ROBOMAS_FEEDBACK_POSITION_SCALE_DEG
+        out = JointState()
+        out.header.stamp = self.get_clock().now().to_msg()
+        out.name = [self.root_theta_name_, self.tip_theta_name_]
+        out.position = [root_theta, tip_theta]
+        self.pub_.publish(out)
+
+    def _on_robomas_feedback(self, msg: Int32MultiArray):
+        # _on_cubemarsと同じ理由でcubemars側の帰還を待たずに独立してpublishする。
+        m1_deg = msg.data[self.robomas_motor1_index_] * ROBOMAS_FEEDBACK_POSITION_SCALE_DEG
+        m2_deg = msg.data[self.robomas_motor2_index_] * ROBOMAS_FEEDBACK_POSITION_SCALE_DEG
         motor1_joint = self.motor1_sign_ * math.radians(m1_deg) * self.pulley_radius_m_
         motor2_joint = self.motor2_sign_ * math.radians(m2_deg) * self.pulley_radius_m_
 
@@ -171,8 +173,8 @@ class RealJointBridgeNode(Node):
 
         out = JointState()
         out.header.stamp = self.get_clock().now().to_msg()
-        out.name = [self.root_theta_name_, self.tip_theta_name_, self.z_name_, self.r_name_]
-        out.position = [root_theta, tip_theta, z, r]
+        out.name = [self.z_name_, self.r_name_]
+        out.position = [z, r]
         self.pub_.publish(out)
 
 

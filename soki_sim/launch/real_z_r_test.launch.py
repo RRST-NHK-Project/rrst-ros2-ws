@@ -154,6 +154,11 @@ def generate_launch_description():
                     [0.2, z_max_acceleration, r_max_acceleration], value_type=List[float]),
                 'update_rate_hz': 50.0,
                 'control_mode': control_mode,
+                # sim表示(mixed_joint_states)はreal_joint_bridge_nodeの実測値を
+                # 真値として使う(2026-09-07方針変更、real_root_theta_test.launch.py
+                # 参照)。本ノードのpos_はMIT指令生成用の理想軌道でしかないため
+                # 出力先を分離した。
+                'output_topic': 'trajectory_target_joint_states',
                 # 空配列はlaunch_rosが要素型を推定できずエラーになるため
                 # (real_root_theta_test.launch.py等の単一要素配列と同じ理由)、
                 # ParameterValueでList[str]と明示する。

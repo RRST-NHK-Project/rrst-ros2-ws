@@ -256,6 +256,12 @@ def generate_launch_description():
                     'max_acceleration': [root_theta_accel, tip_theta_accel, z_accel, r_accel],
                     'update_rate_hz': 50.0,
                     'control_mode': control_mode,
+                    # sim表示(mixed_joint_states)はreal_joint_bridge_nodeの実測値を
+                    # 真値として使う(2026-09-07方針変更)。本ノードのpos_はMIT指令
+                    # 生成用の理想軌道でしかなく、実機の追従遅れ次第でmixed_joint_
+                    # statesに直接publishすると実測値と競合してsimが実機を置き去りに
+                    # したように見える問題があったため、出力先を分離した。
+                    'output_topic': 'trajectory_target_joint_states',
                     # 4軸ともCubeMars/RoboMasへのMIT実機出力を常時有効化する
                     # (本launchの目的そのものなのでトグルなし)。
                     'cubemars_joint_names': ['root_theta_joint', 'tip_theta_joint'],

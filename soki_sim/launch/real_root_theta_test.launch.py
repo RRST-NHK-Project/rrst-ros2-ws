@@ -151,6 +151,12 @@ def generate_launch_description():
             'max_acceleration': ParameterValue([max_acceleration, 0.1, 0.1], value_type=List[float]),
             'update_rate_hz': 50.0,
             'control_mode': control_mode,
+            # sim表示(mixed_joint_states)はreal_joint_bridge_nodeの実測値を
+            # 真値として使う(2026-09-07方針変更)。本ノードのpos_はMIT指令生成用の
+            # 理想軌道でしかなく、実機の追従遅れ次第でmixed_joint_statesに直接
+            # publishすると実測値と競合してsimが実機を置き去りにしたように見える
+            # 問題があったため、出力先を分離した。
+            'output_topic': 'trajectory_target_joint_states',
             'cubemars_joint_names': ['root_theta_joint'],
             'cubemars_device_ids': ParameterValue([[device_id]], value_type=List[int]),
             'cubemars_motor_indices': ParameterValue([[motor_index]], value_type=List[int]),
