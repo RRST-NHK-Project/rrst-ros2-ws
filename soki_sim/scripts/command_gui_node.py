@@ -1890,15 +1890,6 @@ class CommandGuiApp(QWidget):
         if self._launch_process is not None and self._launch_process.poll() is None:
             QMessageBox.information(self, '起動済み', '既に起動中です(先に停止してください)')
             return
-        reply = QMessageBox.question(
-            self, '全ノード起動の確認',
-            '{}\n\n'
-            '実機を駆動するノード群(real_joint_bridge_node/homing_node/\n'
-            'trajectory_follower_node等)を起動します。\n'
-            '周囲に人・障害物がないか確認してください。'.format(' '.join(ALL_AXES_LAUNCH_CMD)),
-            QMessageBox.Yes | QMessageBox.No)
-        if reply != QMessageBox.Yes:
-            return
         try:
             # start_new_session=True(setsid)でこの子プロセスを独立したプロセス
             # グループのリーダーにする。ros2 launchはさらに複数のノードを自分の
@@ -4173,34 +4164,16 @@ class CommandGuiApp(QWidget):
 
     def closeEvent(self, event):
         """実機セットアップパネルで起動したros2 launch子プロセスが残っている場合、
-        GUI終了時に道連れで放置されないよう確認して停止する(通常のCtrl+Cと同様の
-        SIGINTで、ros2 launch側に配下ノードをまとめて終了させる)。
+        GUI終了時に確認ダイアログなしで自動的に停止してから終了する(通常のCtrl+Cと
+        同様のSIGINTで、ros2 launch側に配下ノードをまとめて終了させる)。
 
-        2026-09-07、ボタンをQMessageBox標準のYes/No/Cancelから明示的な日本語ラベルに
-        変更した。標準の「いいえ」は「ノードを停止せずGUIだけ閉じる」という重い意味を
-        持つのに、ラベルからそれが伝わらず誤って選びやすかった(実際にこの状態のまま
-        気づかず放置され、start_new_session=Trueで独立しているlaunchプロセスだけが
-        生き残り続けるインシデントが発生した)。デフォルトフォーカスも「停止して終了」
-        にし、誤ってEnterを押した場合も安全側に倒す。"""
+        2026-09-07、ユーザー指定:「デフォで閉じるときもダイヤログなしですべて停止して」
+        により、以前あった「停止して終了/動かしたまま終了/キャンセル」の確認ダイアログを
+        廃止した(start_new_session=Trueで独立させているlaunchプロセスが、GUI終了時に
+        道連れにならず生き残り続けるインシデントが発生していたため、GUIを閉じたら
+        常に停止する、を既定かつ唯一の動作にした)。"""
         if self._launch_process is not None and self._launch_process.poll() is None:
-            box = QMessageBox(self)
-            box.setWindowTitle('終了確認')
-            box.setText('実機セットアップで起動したノード群がまだ動作中です。')
-            stop_btn = box.addButton('停止して終了', QMessageBox.AcceptRole)
-            keep_btn = box.addButton('動かしたまま終了', QMessageBox.DestructiveRole)
-            cancel_btn = box.addButton('キャンセル', QMessageBox.RejectRole)
-            box.setDefaultButton(stop_btn)
-            box.exec_()
-            clicked = box.clickedButton()
-            if clicked is cancel_btn:
-                event.ignore()
-                return
-            if clicked is stop_btn:
-                self._signal_launch_process_group(signal.SIGINT)
-            elif clicked is keep_btn:
-                self.node.get_logger().warning(
-                    'command_gui_node: 実機ノード群を動かしたままGUIを終了します。'
-                    '次回GUI起動時に検知・警告されます。')
+            self._signal_launch_process_group(signal.SIGINT)
         event.accept()
 
 
