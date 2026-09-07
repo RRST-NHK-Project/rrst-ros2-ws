@@ -424,6 +424,14 @@ HAND_WIRING_FIELDS = [
         ('pump_duty_percent', 'デューティ[%]', 'float'),
         ('pump_md_pwm_max', 'PWM最大値', 'int'),
     ]),
+    ('真空破壊リレー(MDのDIRピンを流用、ポンプON/OFFと連動)', [
+        ('vacuum_release_device_id', 'ID', 'int'),
+        ('vacuum_release_node_index', 'ノード', 'int'),
+        ('vacuum_release_local_index', 'MDスロット', 'int'),
+    ]),
+    (None, [
+        ('vacuum_release_duty_percent', 'デューティ[%](DIRのみ使用、量は無関係)', 'float'),
+    ]),
 ]
 
 # 収納/展開・保持/投入の各角度はsim表示用の論理値(角度制限なし)で、実機へは
@@ -1594,9 +1602,46 @@ class CommandGuiApp(QWidget):
     def _build_wiring_tab(self, parent):
         self._build_panel_tab(
             parent,
+            top_funcs=[self._build_wiring_bulk_load_panel],
             left_funcs=[self._build_robomas_wiring_panel, self._build_cubemars_wiring_panel,
                         self._build_hand_wiring_panel],
             right_funcs=[self._build_homing_wiring_panel, self._build_limit_switch_wiring_panel])
+
+    def _build_wiring_bulk_load_panel(self, layout):
+        # 各配線設定パネルは_build_yaml_wiring_panelで起動時に自動読込済みだが、
+        # GUI起動後にyamlファイルを外部エディタ等で書き換えた場合に、各パネル
+        # 個別の「読込」を毎回押さずまとめて再読込できるようにするボタン
+        # (_build_apply_all_panelの「全ゲイン読み込み」と同じ設計、2026-09-07新規)。
+        box = QGroupBox('一括読込')
+        box_layout = QVBoxLayout(box)
+
+        desc = QLabel()
+        desc.setWordWrap(True)
+        _set_status(desc, '下記5パネルすべてのyamlを一括で再読込する。\n'
+                          '各パネルは本タブを開いた時点で自動読込済み。', 'muted')
+        box_layout.addWidget(desc)
+
+        self.wiring_bulk_load_status_label = QLabel()
+        self.wiring_bulk_load_status_label.setWordWrap(True)
+        _set_status(self.wiring_bulk_load_status_label, '未読込', 'muted')
+        box_layout.addWidget(self.wiring_bulk_load_status_label)
+
+        btn = QPushButton('全配線設定 一括読込')
+        btn.clicked.connect(self._on_bulk_load_yaml_wiring)
+        box_layout.addWidget(btn)
+
+        layout.addWidget(box)
+
+    def _on_bulk_load_yaml_wiring(self):
+        failed = []
+        for attr_prefix, field_specs, yaml_filename, title in getattr(self, '_yaml_wiring_panels', []):
+            if not self._on_load_yaml_wiring(attr_prefix, field_specs, yaml_filename):
+                failed.append(title)
+        if failed:
+            _set_status(self.wiring_bulk_load_status_label,
+                        f'{"・".join(failed)}の読込に失敗しました', 'error')
+        else:
+            _set_status(self.wiring_bulk_load_status_label, '全パネルの読込完了', 'success')
 
     def _build_apply_all_panel(self, layout):
         # 各ゲインパネル個別の「適用」を毎回押す代わりに、GUIが保持している
@@ -2003,7 +2048,7 @@ class CommandGuiApp(QWidget):
         pump_row = QHBoxLayout()
         pump_on_btn = QPushButton('ポンプON(吸着)')
         pump_on_btn.setProperty('variant', 'primary')
-        pump_off_btn = QPushButton('ポンプOFF')
+        pump_off_btn = QPushButton('ポンプOFF(真空破壊)')
         pump_on_btn.clicked.connect(lambda: self._on_hand_trigger('/hand_pump_on'))
         pump_off_btn.clicked.connect(lambda: self._on_hand_trigger('/hand_pump_off'))
         pump_row.addWidget(pump_on_btn)
@@ -2110,7 +2155,7 @@ class CommandGuiApp(QWidget):
         seq_pump_on_btn.setProperty('variant', 'primary')
         seq_pump_on_btn.clicked.connect(lambda: self._on_hand_trigger('/hand_pump_on'))
         pump_row.addWidget(seq_pump_on_btn)
-        seq_pump_off_btn = QPushButton('ポンプOFF')
+        seq_pump_off_btn = QPushButton('ポンプOFF(真空破壊)')
         seq_pump_off_btn.clicked.connect(lambda: self._on_hand_trigger('/hand_pump_off'))
         pump_row.addWidget(seq_pump_off_btn)
         layout.addLayout(pump_row)
@@ -3028,6 +3073,15 @@ class CommandGuiApp(QWidget):
 
         column.addWidget(box)
 
+        # 一括読込パネル(_build_wiring_bulk_load_panel)向けの登録と、GUI起動時の
+        # 自動読込(2026-09-07新規、ユーザー指摘: 「配線設定をオートで読み込んで
+        # ほしい」)。従来は「未読込」のまま放置され、各パネルで毎回「読込」を
+        # 押す必要があった。
+        if not hasattr(self, '_yaml_wiring_panels'):
+            self._yaml_wiring_panels = []
+        self._yaml_wiring_panels.append((attr_prefix, field_specs, yaml_filename, title))
+        self._on_load_yaml_wiring(attr_prefix, field_specs, yaml_filename)
+
     def _build_wiring_preview(self, layout, edits, preview_specs):
         """preview_specs: (角度キー, オフセットキー, オーバーライド有効キー,
         オーバーライド角度キー, ラベル)のリスト。オーバーライドが有効なら
@@ -3070,18 +3124,20 @@ class CommandGuiApp(QWidget):
         _refresh()
 
     def _on_load_yaml_wiring(self, attr_prefix, field_specs, yaml_filename='real_joint_bridge.yaml'):
+        """成功したかどうかをbool で返す(_on_bulk_load_yaml_wiringの集計用、
+        _on_load_all_gainsの各ゲインローダーと同じ設計)。"""
         edits = getattr(self, f'_{attr_prefix}_edits')
         status_label = getattr(self, f'_{attr_prefix}_status_label')
         path = _resolve_config_yaml_path(yaml_filename)
         if path is None:
             _set_status(status_label, f'{yaml_filename}が見つかりません', 'error')
-            return
+            return False
         try:
             with open(path, 'r', encoding='utf-8') as f:
                 data = yaml.safe_load(f)
         except (OSError, yaml.YAMLError) as exc:
             _set_status(status_label, f'読込失敗: {exc}', 'error')
-            return
+            return False
         values = _flatten_yaml_node_params(data)
         missing = []
         for key, _label, kind in _iter_wiring_fields(field_specs):
@@ -3099,6 +3155,7 @@ class CommandGuiApp(QWidget):
         if missing:
             status += f'\n(yamlに無い項目: {", ".join(missing)})'
         _set_status(status_label, status, 'info')
+        return True
 
     def _on_save_yaml_wiring(self, attr_prefix, field_specs, title, yaml_filename='real_joint_bridge.yaml'):
         edits = getattr(self, f'_{attr_prefix}_edits')

@@ -67,18 +67,30 @@ suction_pad_1/2/3(吸着パッド、各々独立関節)。構成:
     ドライバ、PWM+DIR出力)チャンネル経由で50%デューティ固定で駆動する想定。
     展開/収集サーボとは独立した別サービスで制御する(収納=ワーク保持したまま
     集約する動作のため、収納時に自動でポンプを切ってはいけない、2026-09-03
-    ユーザー指摘で分離)
+    ユーザー指摘で分離)。2026-09-07ユーザー確認: CAN_HOST device_id=101の
+    MD1に接続されている(z/r原点センサSW1/SW2と同じCAN_HOSTボード。ただし
+    SW1/SW2はnode_index=1の別ノード(STM32 b-g431-esc1_can2io)、MD1/MD2は
+    node_index=0のホスト自身なので物理的には別ノード、混同注意)
+  - 真空破壊リレー x1 (2026-09-07新規): ワークを離す際に真空破壊が必要で、
+    そのリレーをMD2のDIRピンで代用する。DIRピンはduty量と無関係に符号だけで
+    HIGH/LOWが決まる(PWM出力自体はリレーに配線しないので無視される)ため、
+    デジタル信号として使える。独立サービスにはせず、ポンプON中はリレーOFF
+    (閉、真空保持)・ポンプOFF時はリレーON(開、真空破壊)と連動させる
+    (hand_node.py _on_pump_on/_on_pump_off/_set_vacuum_release参照)
 
-実装方式の想定(ros2can/ros2can/device_profiles.py参照): xiao-esp32-s3_can2io
-のMODE_CAN_HOST配下「汎用IOノード」がSERVOx3/MDx2/SWx3/ENCx2チャンネルを
-持つ。SERVOnとSWnはピン共有(ファームウェアのMULTIn設定で0=スイッチ入力/
-1=サーボ出力を切替)、ENCnとMDnもピン共有(0=エンコーダ入力/1=MD出力)。
-2026-08-31の方針転換でz/r外付けAMTエンコーダ(ENC1/ENC2、node_index=1)は
-不使用になっているため、そのENC1(またはENC2)のピンをMD出力へ切り替えて
-ダイヤフラムポンプに使う、という再利用が候補になる(要実機配線確認)。
-サーボ2個は、z/r原点センサ(SW1/SW2、node_index=0)が使っていないSW3/SERVO3、
-または別ノードのSERVO1-3を使う想定。詳細な device_id/node_index/local_index
-はnote/can_mapping.txt「## ハンド」節に記入すること(未記入、実機確認待ち)。
+実装方式(ros2can/ros2can/device_profiles.py参照): xiao-esp32-s3_can2ioの
+MODE_CAN_HOST配下「汎用IOノード」がSERVOx3/MDx2/SWx3/ENCx2チャンネルを持つ。
+SERVOnとSWnはピン共有(ファームウェアのMULTIn設定で0=スイッチ入力/1=サーボ
+出力を切替)、ENCnとMDnもピン共有(0=エンコーダ入力/1=MD出力)。ノード1台分
+(can_host_slots_per_node=5)のローカルスロット並びはlocal0-2=SERVO1-3、
+local3=MD1、local4=MD2(MD1/MD2はlocal_index 0/1ではない、2026-09-07訂正。
+can_mapping.txt「## ハンド」参照)。2026-08-31の方針転換でz/r外付けAMT
+エンコーダ(ENC1/ENC2)は不使用になっているため、両方ともMD出力へ転用済み
+(config.hpp ENC1_MD=1/ENC2_MD=1)。ENC1→MD1をポンプ、ENC2→MD2を真空破壊
+リレーに使う。サーボ2個は、z/r原点センサ(SW1/SW2、別ノード node_index=1)が
+使っていないSW3/SERVO3、または別ノードのSERVO1-3を使う想定(未確定)。
+詳細な device_id/node_index/local_indexはnote/can_mapping.txt「## ハンド」節
+参照(ポンプ/リレーは記入済み、サーボ2個は実機確認待ち)。
 
 ##soki_simフィールド(ワーク配置環境)反映 (2026-08-27新規追加)
 実機のワーク配置環境をURDF(soki_sim.urdf.xacro)に静的モデルとして追加(衝突/慣性なし、視覚のみ)。

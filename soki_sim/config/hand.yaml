@@ -42,9 +42,27 @@ hand_node:
     pitch_servo_insert_can_deg_override: true
     pitch_servo_insert_can_deg: 98.0
 
-    # ---- ダイヤフラムポンプ (MDn、符号=方向・絶対値=PWMデューティ) ----
-    pump_device_id: 31
-    pump_node_index: 0
-    pump_local_index: 0   # MD1=0/MD2=1
+    # ---- ダイヤフラムポンプ (CAN_HOST device_id=101のMD1、符号=方向・絶対値=PWM
+    # デューティ。汎用IOノード1台分は SERVO1-3=local0-2, MD1=local3, MD2=local4
+    # の並び(ros2can/ros2can/device_profiles.py _append_generic_io_node_channels
+    # 参照。ENC1/ENC2が不使用になった枠をMD出力へ転用しており、config.hppは
+    # ENC1_MD=1/ENC2_MD=1で両方とも既にMD出力モード)。2026-09-07、ユーザー確認:
+    # 「ダイヤフラムがCAN101のMD1に接続されているはず」 ----
+    pump_device_id: 101
+    pump_node_index: 0   # ホスト自身(xiao-esp32-s3_can2io)= node0
+    pump_local_index: 3   # MD1
     pump_duty_percent: 50.0
     pump_md_pwm_max: 255   # config.hppのMD_PWM_RESOLUTION(既定8bit)から算出
+
+    # ---- 真空破壊リレー (MD2のDIRピンをリレー駆動信号として流用、2026-09-07新規)
+    # ワークを離す際の真空破壊にリレーを使い、そのリレーをMD2の方向ピンで
+    # 代用する計画(ユーザー確認)。MD2のPWM出力自体は未配線で無視されるため、
+    # duty量は符号(DIR)を立てられればよい(ros2can/firmware/xiao-esp32-s3_can2io/
+    # src/pin_ctrl_task.cpp IO_MD_Output: digitalWrite(MD2D, md2>0 ? HIGH : LOW)は
+    # デューティ量と無関係に符号だけで決まる)。ポンプON中はリレーOFF(閉、真空保持)、
+    # ポンプOFF時はリレーON(開、真空破壊)という連動で駆動する
+    # (独立サービスにはせず_on_pump_on/_on_pump_offの中で一緒に送る)。 ----
+    vacuum_release_device_id: 101
+    vacuum_release_node_index: 0   # ホスト自身(xiao-esp32-s3_can2io)= node0、pumpと同じCAN_HOST
+    vacuum_release_local_index: 4   # MD2
+    vacuum_release_duty_percent: 50.0   # DIRピンのみ使うため量自体は無関係(符号だけ意味を持つ)

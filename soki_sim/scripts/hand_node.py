@@ -44,8 +44,10 @@ note/can_mapping.txt「## ハンド」節と、soki_sim/config/hand.yamlのパ�
 (homing_nodeと同様、自動起動はしない):
   /hand_spread_pads      : 吸着パッド展開角度へ(spread、ワーク回収姿勢)
   /hand_gather_pads      : 吸着パッド収納角度へ(gathered、正三角形に集約)
-  /hand_pump_on          : ポンプduty_percentへ(吸着ON)
-  /hand_pump_off         : ポンプduty=0へ(吸着OFF)
+  /hand_pump_on          : ポンプduty_percentへ(吸着ON)。真空破壊リレーはOFF(閉)
+  /hand_pump_off         : ポンプduty=0へ(吸着OFF)。真空破壊リレーをON(開)にして
+                           ワークを離す(2026-09-07新規、MD2のDIRピンをリレー駆動
+                           信号として流用。独立サービスは設けず連動のみ)
   /hand_set_pitch_hold   : ピッチサーボを保持姿勢へ
   /hand_set_pitch_insert : ピッチサーボを投入姿勢へ
 
@@ -155,22 +157,36 @@ class HandNode(Node):
         self.declare_parameter('pitch_servo_insert_can_deg_override', False)
         self.declare_parameter('pitch_servo_insert_can_deg', 0.0)
 
-        # ---- ダイヤフラムポンプ (MDn、符号=方向・絶対値=PWMデューティ) ----
+        # ---- ダイヤフラムポンプ (MDn、符号=方向・絶対値=PWMデューティ。SERVO1-3=
+        # local0-2なので、汎用IOノード1台分ではMD1=local3/MD2=local4になる) ----
         self.declare_parameter('pump_device_id', 0)
         self.declare_parameter('pump_node_index', 0)
-        self.declare_parameter('pump_local_index', 0)  # MD1=0/MD2=1
+        self.declare_parameter('pump_local_index', 3)  # MD1=3/MD2=4
         self.declare_parameter('pump_duty_percent', 50.0)
         # config.hppのMD_PWM_RESOLUTION(既定8bit)から算出される最大デューティ値。
         # ros2can/ros2can/device_profiles.pyのDEFAULT_MD_PWM_MAXと一致させること。
         self.declare_parameter('pump_md_pwm_max', 255)
 
+        # ---- 真空破壊リレー (MD2のDIRピンをリレー駆動信号として流用。2026-09-07
+        # 新規: ワークを離す際の真空破壊にリレーを使い、そのリレーをMDの方向ピンで
+        # 代用する。DIRピンは`digitalWrite(MDnD, raw>0 ? HIGH : LOW)`のようにduty量
+        # とは無関係に符号だけで決まる(ros2can/firmware/xiao-esp32-s3_can2io/src/
+        # pin_ctrl_task.cpp IO_MD_Output参照、PWM出力自体は未配線なので無視される)。
+        # 独立サービスにはせず、ポンプON中はリレーOFF(閉、真空保持)・ポンプOFF時は
+        # リレーON(開、真空破壊)という連動で_on_pump_on/_on_pump_offから駆動する) ----
+        self.declare_parameter('vacuum_release_device_id', 0)
+        self.declare_parameter('vacuum_release_node_index', 0)
+        self.declare_parameter('vacuum_release_local_index', 4)  # MD2
+        self.declare_parameter('vacuum_release_duty_percent', 50.0)
+
         self._deploy = self._make_channel_cfg('deploy_servo')
         self._pitch = self._make_channel_cfg('pitch_servo')
         self._pump = self._make_channel_cfg('pump')
+        self._vacuum_release = self._make_channel_cfg('vacuum_release')
 
         self.device_buffers_ = {}
         self.device_publishers_ = {}
-        for cfg in (self._deploy, self._pitch, self._pump):
+        for cfg in (self._deploy, self._pitch, self._pump, self._vacuum_release):
             self._ensure_publisher(cfg['device_id'])
 
         # RViz表示用(soki_sim.urdf.xacroのhand_deploy_joint/hand_pitch_joint、
@@ -211,7 +227,8 @@ class HandNode(Node):
             f'deploy_servo(device_id={self._deploy["device_id"]}), '
             f'pitch_servo(device_id={self._pitch["device_id"]}), '
             f'pump(device_id={self._pump["device_id"]}, '
-            f'duty={self.get_parameter("pump_duty_percent").value}%)')
+            f'duty={self.get_parameter("pump_duty_percent").value}%), '
+            f'vacuum_release(device_id={self._vacuum_release["device_id"]})')
 
     def _publish_joint_state(self, joint_name, deg):
         msg = JointState()
@@ -305,11 +322,25 @@ class HandNode(Node):
         msg.data = self._pump_on
         self.pump_state_pub_.publish(msg)
 
+    def _set_vacuum_release(self, on):
+        """真空破壊リレー(MD2 DIRピン流用)をON/OFFする。ポンプON/OFFと連動して
+        呼ばれる専用の内部ヘルパーで、独立したサービスは設けない(_on_pump_on/
+        _on_pump_off参照)。DIRピンは符号のみで決まるため、OFF時は0を送ればよい。"""
+        if not on:
+            self._send(self._vacuum_release, 0)
+            return
+        duty_percent = float(self.get_parameter('vacuum_release_duty_percent').value)
+        pwm_max = int(self.get_parameter('pump_md_pwm_max').value)
+        duty_raw = round(pwm_max * duty_percent / 100.0)
+        self._send(self._vacuum_release, duty_raw)
+
     def _on_pump_on(self, request, response):
         duty_percent = float(self.get_parameter('pump_duty_percent').value)
         pwm_max = int(self.get_parameter('pump_md_pwm_max').value)
         duty_raw = round(pwm_max * duty_percent / 100.0)
         response.success = self._send(self._pump, duty_raw)
+        # 真空破壊リレーはポンプONの間は閉じておく(真空保持)。
+        self._set_vacuum_release(False)
         # RViz表示用publish等と同様、CAN送信の成否(device_id未配線か)に関わらず
         # 論理状態は更新する(配線前でもjoy_teleop_node側のトグル判定が正しく動く
         # ようにするため)。
@@ -322,9 +353,11 @@ class HandNode(Node):
 
     def _on_pump_off(self, request, response):
         response.success = self._send(self._pump, 0)
+        # 真空破壊リレーをONにして真空を破壊する(ワークを離す)。
+        self._set_vacuum_release(True)
         self._pump_on = False
         self._publish_pump_state()
-        response.message = 'ポンプOFF' if response.success else 'ポンプOFF: device_id未設定のためCAN送信できませんでした'
+        response.message = 'ポンプOFF(真空破壊)' if response.success else 'ポンプOFF: device_id未設定のためCAN送信できませんでした'
         return response
 
     def _pitch_offset_deg(self):

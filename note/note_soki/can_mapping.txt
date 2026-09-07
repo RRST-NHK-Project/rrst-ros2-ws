@@ -133,12 +133,20 @@ r軸下限センサ(trajectory_follower_node側、通常は上のr軸原点セ�
   r_lower_limit_switch_node_index →
   r_lower_limit_switch_local_index →
 
-## ハンド (エンドエフェクタ、2026-09-03追加、記入待ち)
+## ハンド (エンドエフェクタ、2026-09-03追加、2026-09-07一部確定)
 tip_link(tip_theta_jointの先)に付く吸着ハンド。サーボ2個(吸着パッド展開・
-ワークピッチ変更)とダイヤフラムポンプ1個(吸着源、MD経由50%デューティ)で
-構成(note/claude.txt「##ハンド」参照)。いずれもxiao-esp32-s3_can2io
-MODE_CAN_HOST配下の汎用IOノード(SERVOx3/MDx2/SWx3/ENCx2、ピン共有あり。
-ros2can/ros2can/device_profiles.py参照)を使う想定。
+ワークピッチ変更)とダイヤフラムポンプ1個(吸着源、MD経由50%デューティ)、
+真空破壊リレー1個(2026-09-07追加、下記参照)で構成(note/claude.txt「##ハンド」
+参照)。いずれもxiao-esp32-s3_can2io MODE_CAN_HOST配下の汎用IOノード
+(SERVOx3/MDx2/SWx3/ENCx2、ピン共有あり。ros2can/ros2can/device_profiles.py
+参照)を使う想定。
+
+汎用IOノード1台分(can_host_slots_per_node=5)のローカルスロット並び
+(ros2can/ros2can/device_profiles.py _append_generic_io_node_channels、
+firmware frame_data.cpp参照): local0-2=SERVO1-3(SWnとピン共有)、
+local3=MD1(ENC1とピン共有)、local4=MD2(ENC2とピン共有)。
+**MD1/MD2はlocal_index 0/1ではなくlocal_index 3/4**(2026-09-07訂正:
+以前このメモ自身がMD1=0/MD2=1と誤記していた)。
 
 吸着パッド展開サーボ:
   device_id(このCAN_HOSTボードの番号) →
@@ -152,17 +160,34 @@ ros2can/ros2can/device_profiles.py参照)を使う想定。
   local_index(SERVO1=0/SERVO2=1/SERVO3=2) →
   角度範囲(保持時/シューティングボックス投入時、それぞれ何度か) →
 
-ダイヤフラムポンプ(MD、PWM+DIR出力、符号=方向・絶対値=デューティ。
+ダイヤフラムポンプ(MD1、PWM+DIR出力、符号=方向・絶対値=デューティ。
 DEFAULT_MD_PWM_MAX=255換算で50%運転 ≒ ±127):
-  device_id →
-  node_index →
-  local_index(MD1=0/MD2=1) →
-  ON/OFF方式(常時50%か、吸着したい時だけ50%にして他はduty=0か) →
+  device_id → 101 (2026-09-07ユーザー確認: 「ダイヤフラムがCAN101のMD1に
+    接続されているはず」。CAN_HOST device_id=101はhoming_nodeのz/r原点センサ
+    (SW1/SW2)と同じボード、note/hardware_mapping.txt「CAN_HOSTデバイス」参照)
+  node_index → 0 (ホスト自身=node0。z/r原点センサのSW1/SW2はnode_index=1の
+    別ノード(STM32 b-g431-esc1_can2io)なので混同注意)
+  local_index → 3 (MD1、上記スロット並び参照)
+  ON/OFF方式 → 常時50%固定(duty=0でOFF)。soki_sim/config/hand.yaml
+    pump_duty_percent参照
+
+真空破壊リレー(MD2、2026-09-07新規): ワークを離す際に真空破壊が必要で、
+そのためのリレーをMD2のDIRピンで代用する計画(ユーザー確認)。DIRピンは
+`digitalWrite(MD2D, raw>0 ? HIGH : LOW)`のようにduty量とは無関係に符号だけで
+決まる(firmware pin_ctrl_task.cpp IO_MD_Output参照、PWM出力自体はリレーに
+配線しないので無視される)。独立サービスにはせず、ポンプON中はリレーOFF
+(閉、真空保持)・ポンプOFF時はリレーON(開、真空破壊)と連動させる
+(hand_node.py _on_pump_on/_on_pump_off/_set_vacuum_release参照)。
+  device_id → 101 (ポンプと同じCAN_HOSTボード)
+  node_index → 0
+  local_index → 4 (MD2)
 
 備考: SERVOn/SWnはピン共有、ENCn/MDnもピン共有のため、既存のz/r原点センサ
-(SW1=node_index0/local0、SW2=node_index0/local1)や、不使用となったENC1/ENC2
-(node_index1、note/hardware_mapping.txt「z_joint/r_jointの実機出力」参照)と
-配線が衝突しないよう、上記記入時に確認すること。
+(SW1/SW2、node_index=1の別ノード)と物理配線が衝突しないよう要確認。
+ENC1/ENC2は不使用となったため両方MD出力へ転用済み(config.hpp
+ENC1_MD=1/ENC2_MD=1、note/hardware_mapping.txt「z_joint/r_jointの実機出力」
+参照)。上記device_id/node_index/local_indexは実機配線からの申告ベースで
+soki_sim/config/hand.yamlに反映済みだが、現物での最終確認はまだ。
 
 ## 備考・その他気づいた点
 (自由記入)
