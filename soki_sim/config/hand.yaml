@@ -10,7 +10,7 @@ hand_node:
     # note/can_mapping.txtに記入のうえここを書き換えること。
     deploy_servo_device_id: 31
     deploy_servo_node_index: 0
-    deploy_servo_local_index: 0   # SERVO1=0/SERVO2=1/SERVO3=2
+    deploy_servo_local_index: 1   # SERVO1=0/SERVO2=1/SERVO3=2
     deploy_servo_retracted_deg: 0    # 要実測: 収納(搬送)姿勢の角度
     deploy_servo_deployed_deg: 90    # 要実測: 展開(吸着)姿勢の角度
     # 実機のサーボ取付角度と論理角度(retracted_deg/deployed_deg)のズレを
@@ -28,7 +28,7 @@ hand_node:
     # ---- ワークピッチ変更サーボ (SERVOn、角度[deg]) ----
     pitch_servo_device_id: 31
     pitch_servo_node_index: 0
-    pitch_servo_local_index: 1   # SERVO1=0/SERVO2=1/SERVO3=2
+    pitch_servo_local_index: 0   # SERVO1=0/SERVO2=1/SERVO3=2
     pitch_servo_hold_deg: 0      # 要実測: ワーク保持(搬送)姿勢の角度
     pitch_servo_insert_deg: -90   # 要実測: シューティングボックス投入姿勢の角度
     # 実機のサーボ取付角度と論理角度(hold_deg/insert_deg)のズレを補正する
