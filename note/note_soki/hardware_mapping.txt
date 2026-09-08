@@ -533,3 +533,22 @@ rpmを下げても電流上限(ROBOMAS_MAX_CURRENT_A)自体は変わらないた
 (config.hppのM2006セクションのコメント参照、dt換算に注意)ファームウェア側の
 再チューニングが必要。次にこの症状に対応する際は、rpmを下げる案は既に試して
 効果が無かったことを踏まえ、最初からファームウェア側の再チューニングに進むこと。
+
+**最終対策(実装済み、2026-09-09)**: ユーザー指定「速度制御モードのときのみ
+1.0Aに制限」を受け、MITモードと速度モードで電流上限を分離した。
+config.hpp(M3508/M2006/GM6020各セクション)にROBOMAS_MAX_CURRENT_A(MITモード用)
+とは別にROBOMAS_MAX_CURRENT_VEL_A(速度モード用)を新設し、M2006は
+ROBOMAS_MAX_CURRENT_A=5.0f(動き出しトルク不足対策、そのまま維持)、
+ROBOMAS_MAX_CURRENT_VEL_A=1.0f(ホーミングが安定していた元の値へ復元)とした
+(M3508/GM6020はROBOMAS_MAX_CURRENT_VEL_Aを既存のROBOMAS_MAX_CURRENT_Aと同じ値
+にして挙動を変えていない)。robomas.cpp robomasTask()の速度モード分岐
+(else節、vel_out算出後のconstrainFloat)がROBOMAS_MAX_CURRENT_Aではなく
+ROBOMAS_MAX_CURRENT_VEL_Aを参照するよう変更した。これによりhoming_velocity_rpm
+は30rpmのまま(rpmを下げる暫定対策は不要になったため撤回)、MITモード側の
+動き出しトルク不足対策(5.0A)とホーミング(速度モード、1.0A、安定していた
+元の挙動)を両立できる。
+**要実機確認**: 実装後未検証。ホーミングのガクガクが収まるか、MITモード側の
+動き出しトルク不足改善が引き続き効いているか、両方確認すること。
+firmware/xiao-esp32-s3_can2io/・generated_firmware/soki_robomas_21/・
+soki_robomas_21_safe/の3箇所とも同期済み(config.hpp/robomas.cpp、デバイス
+固有設定(DEVICE_ID/MODE_ROBOMAS/ENC1_MD等)は各ディレクトリの値を保持)。
