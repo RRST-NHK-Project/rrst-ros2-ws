@@ -18,11 +18,16 @@ INITIAL_ROOT_THETA_RAD(self.pos_/target_初期値)、joy_teleop_node.pyの同名
 実機ではz_joint/r_jointはmotor1/motor2の2モータ差動機構で駆動
   z = k(m1+m2), r = k(m1-m2), k=0.5
 
-各関節の使用モーター
+各関節の使用モーター(2026-09-08方針変更: root_theta側のAK40-10が電源逆接続で
+焼損したため、無事だったtip_theta側のAK40-10をroot_thetaへ転用し、tip_theta側は
+新規にm2006+c610(z/rと同一device_id=21のM3)を導入した。詳細はnote/hardware_
+mapping.txt「root_theta_joint (旋回)」節の方針変更を参照)
   root_theta_joint : AK40-10 KV170 V3.0 with MIT mode
-  z_joint          : m2006 with c610 driver マイコンで速度制御、位置ループはROS側で回す      
-  r_joint          : m2006 with c610 driver マイコンで速度制御、位置ループはROS側で回す       
-  tip_theta_joint  : AK40-10 KV170 V3.0 with MIT mode
+  z_joint          : m2006 with c610 driver マイコンで速度制御、位置ループはROS側で回す
+  r_joint          : m2006 with c610 driver マイコンで速度制御、位置ループはROS側で回す
+  tip_theta_joint  : m2006 with c610 driver、MIT mode(単独直接駆動、z/rのような
+                      差動ミックス無し。原点センサ無しのため電源投入前に手で
+                      0degへ合わせておく前提)
 
 motor_mixer_nodeが/joint_statesを監視し、motor1/2側とz/r側どちらが
 動いたかを判定して双方向にミキシング計算し/mixed_joint_statesへpublish
@@ -44,7 +49,8 @@ machine_origin_*と同じ方式のXYZ prismatic、既定範囲±0.1m。command_g
 2026-09-03追加) -> hand_pitch_link(ピッチサーボ) ->
 hand_deploy_link(展開/収集サーボの取付ブラケット、固定) ->
 suction_pad_1/2/3(吸着パッド、各々独立関節)。構成:
-  - 手先θ回転: 既存のtip_theta_joint(CubeMars AK40-10)がハンド全体を回転させる
+  - 手先θ回転: 既存のtip_theta_joint(2026-09-08よりRoboMas M2006、上記参照)が
+    ハンド全体を回転させる
   - 吸着パッド3個: 同一行のワーク3個(間隔0.200m=WORK_COL_PITCH)を同時に
     吸着する展開(spread)位置と、吸着後に中央へ集める収納(gathered、3パッド
     上面中心が正三角形、一辺0.08m仮値)位置の2状態。中央パッド(suction_pad_2)
@@ -119,13 +125,15 @@ base_link原点、+X=奥行き(ワーク側)、Y=幅方向(ワーク群中心線
 ##実機モータ制御 (ros2can経由。soki本体はこちらを使用、serial_bridge/robomas.cppは不使用)
 soki 4関節はすべて `ros2can` パッケージ (xiao-esp32-s3_can2io ファームウェア) 配下。
 1マイコン=1モードで、以下2系統の独立デバイスに分かれている。
-  MODE_CUBEMARS (root_theta_joint / tip_theta_joint 用):
+  MODE_CUBEMARS (root_theta_joint 用。2026-09-08方針変更でtip_theta_jointは
+  下記MODE_ROBOMAS側(M3)へ移動、note/hardware_mapping.txt参照):
     CubeMars AKシリーズ(AK40-10)をServo(CAN)モード or Force Control(MIT)モードで
     直接駆動。アクチュエータ内蔵クローズドループに指令、ホスト側PIDなし。CAN 1Mbps固定。
     ファームウェア: ros2can/firmware/xiao-esp32-s3_can2io/src/cubemars.cpp/.hpp
-  MODE_ROBOMAS (z_joint / r_joint 用、motor1/motor2 = M2006 x2):
+  MODE_ROBOMAS (z_joint / r_joint / tip_theta_joint 用、motor1/motor2 = M2006 x2の
+  差動でz/r、M3 = M2006単独でtip_theta):
     C610ドライバでM2006を速度制御(マイコン側)、位置ループはROS側(motor_mixer_node
-    経由でz/rとの相互変換)。
+    経由でz/rとの相互変換)。tip_thetaはMITモードで単独直接駆動(ミックス無し)。
     ファームウェア: ros2can/firmware/xiao-esp32-s3_can2io/src/robomas.cpp/.hpp
     (serial_bridge/firmware/esp32_serial_bridge/src/robomas.cpp とは別物、混同注意)
 どちらもUSBシリアルで `ros2can` GUI/ノードとやり取りする(24 x int16スロット、
@@ -226,8 +234,9 @@ command_gui_node/trajectory_follower_nodeはsim/実機を区別せず同じ
     値が変わってもコード変更不要でyaml編集のみで反映できる。
   - 変換の内訳・根拠数値はnote/hardware_mapping.txt、CAN_ID/スロット割当の
     実測値はnote/can_mapping.txtにまとめてある。
-  - root_theta/tip_theta(CubeMars AK40-10、絶対値エンコーダ)はMODE_CUBEMARS
-    (device_id=11)のM{n} position帰還を使用。z/r(motor1/2差動、M2006+C610)は
+  - root_theta(CubeMars AK40-10、絶対値エンコーダ)はMODE_CUBEMARS
+    (device_id=11)のM{n} position帰還を使用。z/r(motor1/2差動)・tip_theta
+    (単独直接駆動、2026-09-08方針変更でCubeMarsから移行)は、いずれもM2006+C610の
     ROBOMAS(device_id=21)内蔵ロータエンコーダのCAN帰還(M{n} angle)を位置の
     真値として使う設計(2026-08-31方針転換。以前はCAN_HOST(device_id=101)配下
     ノードの外付けAMTエンコーダ(ENC1/ENC2)を真値としていたが不使用に変更した。

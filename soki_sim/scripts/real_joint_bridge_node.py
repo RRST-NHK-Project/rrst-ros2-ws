@@ -13,19 +13,16 @@ CAN_ID/スロット割当の実測値はnote/can_mapping.txtを参照。値が�
 
 購読トピック (ros2can/ros_backend.py が配信する Int32MultiArray, 24スロット):
   serial_rx_{cubemars_device_id}_unwrapped
-    -> M{n} position (0.1deg/LSB) から root_theta_joint / tip_theta_joint を算出。
+    -> M{n} position (0.1deg/LSB) から root_theta_joint を算出。
        _zeroedではなく_unwrapped(ラップアラウンド解決済みの生の絶対値)を購読する。
        root_theta_jointはCubeMars AK40-10本体へ「Set Origin」CANコマンド
        (control_mode=3、trajectory_follower_nodeの/set_root_theta_origin
        サービス経由、2026-08-27実装)を送ることで実機エンコーダ自体の原点を
        永続的に(フラッシュ保存、電源off/onを跨いでも)真の機械原点に合わせる方式
        にしたため、本ノード側でのオフセット補正(root_theta_offset_rad)は廃止した。
-       tip_theta_jointはCubeMars本体側にSet Origin機能を使っておらず、従来通り
-       ros2canの/zero_channel(オフセットがGUIプロセスのメモリ上限りで永続化
-       されない)には依存せず、本ノード側のパラメータ(tip_theta_offset_rad、
-       yamlに保存され再起動しても消えない)で真の原点とのズレを補正する。
-       較正手順: 関節を原点センサの位置(真の機械原点)へ物理的に合わせ、
-       その瞬間の_unwrapped値でoffsetを逆算してyamlに書き込む。
+       (2026-09-08方針変更: root_theta側AK40-10が電源逆接続で焼損したため、
+       無事だったtip_theta側のAK40-10をroot_thetaへ転用した。tip_theta_jointは
+       下記ROBOMAS側(M3)へ移行、CubeMars側からは削除)。
   serial_rx_{robomas_device_id}_unwrapped
     -> ROBOMAS(C610/M2006)内蔵ロータエンコーダのCAN帰還(M{n} angle)から
        motor1_joint/motor2_joint(線形変位)を算出し、z_joint/r_jointへ合成。
@@ -38,10 +35,16 @@ CAN_ID/スロット割当の実測値はnote/can_mapping.txtを参照。値が�
        (homing_node担当、rcl_interfacesのSetParametersサービスで実行時に設定
        される。yamlには保存しないランタイム専用値)で合成後の値を補正する。
        ホーミング未実施の間はz_offset_m=r_offset_m=0.0のまま(起動直後の生値)。
+       同じ帰還フレームのM3(motor3_joint相当)からtip_theta_jointも算出する
+       (2026-09-08新規。z/rのような差動ミックスではなく単独直接駆動)。tip_theta
+       には原点センサが無いため、電源投入前に機構原点(0deg)へ手で合わせておく
+       前提とし、M2006内蔵エンコーダの起動時リセット値(=0)をそのまま原点として
+       扱う(ホーミング処理は無し。微調整用にtip_theta_offset_radのみ残す)。
   fallback_topic (2026-09-07追加、パラメータで指定。空文字なら無効):
     -> trajectory_follower_nodeの理想軌道(output_topicとは別トピックに分離
-       済み)。まだ実機帰還を一度も受信していない関節群(root_theta/tip_theta、
-       z/rの2グループ単位)についてのみ、そのままoutput_topicへ転送する
+       済み)。まだ実機帰還を一度も受信していない関節群(root_theta、
+       tip_theta/z/rの2グループ単位。2026-09-08方針変更でtip_thetaはROBOMAS側
+       グループに移動)についてのみ、そのままoutput_topicへ転送する
        (_on_fallback参照)。実機未配線・一部軸のみ実機接続の構成でも、残りの
        軸はsimの理想軌道で動き続けられるようにするためのフォールバックで、
        一度でも実機帰還を受信したグループは以後この転送を無視する
@@ -66,20 +69,13 @@ class RealJointBridgeNode(Node):
     def __init__(self):
         super().__init__('real_joint_bridge_node')
 
-        # ---- CubeMars (root_theta_joint / tip_theta_joint) ----
+        # ---- CubeMars (root_theta_jointのみ。2026-09-08方針変更でtip_theta_joint
+        # はROBOMAS側(M3)へ移行、ファイル冒頭コメント参照) ----
         self.declare_parameter('cubemars_device_id', 11)
         self.declare_parameter('cubemars_root_theta_index', 0)   # M1
-        self.declare_parameter('cubemars_tip_theta_index', 1)    # M2
         self.declare_parameter('cubemars_position_scale_deg', 0.1)  # LSB -> deg
         self.declare_parameter('root_theta_reduction', 112.0 / 24.0)  # 112/24
-        self.declare_parameter('tip_theta_reduction', 1.4)          # 28T/20T
         self.declare_parameter('root_theta_sign', 1.0)
-        self.declare_parameter('tip_theta_sign', 1.0)
-        # tip_thetaのみ対象(root_thetaはCubeMars本体のSet Originコマンドで原点を
-        # 永続化するため、本ノード側のオフセット補正は廃止した。ファイル冒頭コメント参照)。
-        # 実機組み立て後の初回較正のみで決める、真の機械原点とのズレ補正値。
-        # ros2canの/zero_channelに頼らずここで永続的に持つ(較正手順はファイル冒頭コメント参照)。
-        self.declare_parameter('tip_theta_offset_rad', 0.0)
 
         # ---- ROBOMAS (motor1_joint / motor2_joint、内蔵ロータエンコーダのCAN帰還を
         # 位置の真値として使う。2026-08-31方針転換でENC1/ENC2(外付けAMTエンコーダ)
@@ -91,6 +87,16 @@ class RealJointBridgeNode(Node):
         self.declare_parameter('mix_k', 0.5)
         self.declare_parameter('motor1_sign', 1.0)
         self.declare_parameter('motor2_sign', 1.0)
+
+        # ---- ROBOMAS M3 (tip_theta_joint、2026-09-08新規。z/rと違いミックス無しの
+        # 単独直接駆動。原点センサが無いため、電源投入前に機構原点(0deg)へ手で
+        # 合わせておく前提で、M2006内蔵エンコーダの起動時リセット値(=0)をそのまま
+        # 原点として扱う(ホーミング処理は無し)) ----
+        self.declare_parameter('robomas_tip_theta_index', 2)   # M3 angle帰還スロット
+        self.declare_parameter('tip_theta_reduction', 1.4)     # 28T/20T
+        self.declare_parameter('tip_theta_sign', 1.0)
+        # 通常0(手動ゼロ合わせ前提)。実機の微小な位置ズレ補正が必要な場合のみ設定。
+        self.declare_parameter('tip_theta_offset_rad', 0.0)
 
         # ---- 出力joint名・トピック ----
         self.declare_parameter('root_theta_joint', 'root_theta_joint')
@@ -110,13 +116,9 @@ class RealJointBridgeNode(Node):
         gp = self.get_parameter
         self.cubemars_device_id_ = gp('cubemars_device_id').value
         self.root_theta_index_ = gp('cubemars_root_theta_index').value
-        self.tip_theta_index_ = gp('cubemars_tip_theta_index').value
         self.cubemars_scale_deg_ = gp('cubemars_position_scale_deg').value
         self.root_theta_reduction_ = gp('root_theta_reduction').value
-        self.tip_theta_reduction_ = gp('tip_theta_reduction').value
         self.root_theta_sign_ = gp('root_theta_sign').value
-        self.tip_theta_sign_ = gp('tip_theta_sign').value
-        self.tip_theta_offset_ = gp('tip_theta_offset_rad').value
 
         self.robomas_device_id_ = gp('robomas_device_id').value
         self.robomas_motor1_index_ = gp('robomas_motor1_index').value
@@ -125,6 +127,11 @@ class RealJointBridgeNode(Node):
         self.mix_k_ = gp('mix_k').value
         self.motor1_sign_ = gp('motor1_sign').value
         self.motor2_sign_ = gp('motor2_sign').value
+
+        self.robomas_tip_theta_index_ = gp('robomas_tip_theta_index').value
+        self.tip_theta_reduction_ = gp('tip_theta_reduction').value
+        self.tip_theta_sign_ = gp('tip_theta_sign').value
+        self.tip_theta_offset_ = gp('tip_theta_offset_rad').value
 
         # homing_nodeがSetParametersで実行時に更新するランタイム専用オフセット
         # (yamlへの保存値は起動直後の初期値=0.0でよい)。
@@ -159,33 +166,30 @@ class RealJointBridgeNode(Node):
             f'cubemars(device_id={self.cubemars_device_id_}) + '
             f'robomas(device_id={self.robomas_device_id_}, '
             f'motor1_index={self.robomas_motor1_index_}, '
-            f'motor2_index={self.robomas_motor2_index_}) '
+            f'motor2_index={self.robomas_motor2_index_}, '
+            f'tip_theta_index={self.robomas_tip_theta_index_}) '
             f'-> {output_topic}'
             + (f' (fallback: {fallback_topic})' if fallback_topic else ''))
 
     def _on_cubemars(self, msg: Int32MultiArray):
-        # 以前はrobomas側の帰還も揃うまでpublishを待っていたが、これだとroot_theta/
-        # tip_thetaのみの部分実機テスト(real_root_theta_test.launch.py等、ROBOMAS
-        # 未接続)ではmixed_joint_statesが永久に出ずsim表示が固まってしまっていた。
+        # 以前はrobomas側の帰還も揃うまでpublishを待っていたが、これだとroot_theta
+        # のみの部分実機テスト(real_root_theta_test.launch.py等、ROBOMAS未接続)
+        # ではmixed_joint_statesが永久に出ずsim表示が固まってしまっていた。
         # joint_state_publisherは受信したJointStateに含まれる関節名だけを更新し
-        # 他は保持する仕様のため、CubeMars側だけが届いた時点でroot_theta/
-        # tip_thetaだけをpublishしても安全(2026-09-07、ユーザー指摘: simは実機の
-        # 実測値に追従して表示すべきで、trajectory_follower_nodeの理想軌道と
-        # 競合させない設計にする一連の変更の一部)。
+        # 他は保持する仕様のため、CubeMars側だけが届いた時点でroot_thetaだけを
+        # publishしても安全(2026-09-07、ユーザー指摘: simは実機の実測値に追従して
+        # 表示すべきで、trajectory_follower_nodeの理想軌道と競合させない設計にする
+        # 一連の変更の一部)。
         self._cubemars_received_ = True
         root_theta_raw = msg.data[self.root_theta_index_]
-        tip_theta_raw = msg.data[self.tip_theta_index_]
         root_theta_deg = root_theta_raw * self.cubemars_scale_deg_
-        tip_theta_deg = tip_theta_raw * self.cubemars_scale_deg_
         root_theta = (self.root_theta_sign_ * math.radians(root_theta_deg)
                       / self.root_theta_reduction_)
-        tip_theta = (self.tip_theta_sign_ * math.radians(tip_theta_deg)
-                     / self.tip_theta_reduction_ + self.tip_theta_offset_)
 
         out = JointState()
         out.header.stamp = self.get_clock().now().to_msg()
-        out.name = [self.root_theta_name_, self.tip_theta_name_]
-        out.position = [root_theta, tip_theta]
+        out.name = [self.root_theta_name_]
+        out.position = [root_theta]
         self.pub_.publish(out)
 
     def _on_robomas_feedback(self, msg: Int32MultiArray):
@@ -199,10 +203,17 @@ class RealJointBridgeNode(Node):
         z = self.mix_k_ * (motor1_joint + motor2_joint) + self.get_parameter('z_offset_m').value
         r = self.mix_k_ * (motor1_joint - motor2_joint) + self.get_parameter('r_offset_m').value
 
+        # tip_theta(M3)はz/rのような差動ミックスではなく単独直接駆動(2026-09-08新規、
+        # ファイル冒頭コメント参照)。原点センサが無いため、電源投入前の手動ゼロ合わせ
+        # +起動時リセットされるM2006内蔵エンコーダの値をそのまま原点として使う。
+        tip_theta_deg = msg.data[self.robomas_tip_theta_index_] * ROBOMAS_FEEDBACK_POSITION_SCALE_DEG
+        tip_theta = (self.tip_theta_sign_ * math.radians(tip_theta_deg)
+                     / self.tip_theta_reduction_ + self.tip_theta_offset_)
+
         out = JointState()
         out.header.stamp = self.get_clock().now().to_msg()
-        out.name = [self.z_name_, self.r_name_]
-        out.position = [z, r]
+        out.name = [self.z_name_, self.r_name_, self.tip_theta_name_]
+        out.position = [z, r, tip_theta]
         self.pub_.publish(out)
 
     def _on_fallback(self, msg: JointState):
@@ -215,9 +226,9 @@ class RealJointBridgeNode(Node):
         names = []
         positions = []
         for name, pos in zip(msg.name, msg.position):
-            if name in (self.root_theta_name_, self.tip_theta_name_) and self._cubemars_received_:
+            if name == self.root_theta_name_ and self._cubemars_received_:
                 continue
-            if name in (self.z_name_, self.r_name_) and self._robomas_received_:
+            if name in (self.z_name_, self.r_name_, self.tip_theta_name_) and self._robomas_received_:
                 continue
             names.append(name)
             positions.append(pos)

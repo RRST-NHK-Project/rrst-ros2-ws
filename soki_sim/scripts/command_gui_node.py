@@ -153,9 +153,11 @@ SHOOT_POINTS = {
 SHOOT_FIXED_TARGETS = {'L4': SHOOT_POINTS['L'][3], 'R4': SHOOT_POINTS['R'][3]}
 
 JOINT_NAMES = ['root_theta_joint', 'z_joint', 'r_joint']
-# MITゲインパネル(CubeMars)対象関節。JOINT_NAMESとは別物: root_theta/tip_thetaの
-# 2つがCubeMars駆動(z/rはロボマス駆動、note/hardware_mapping.txt参照)。
-CUBEMARS_JOINT_NAMES = ['root_theta_joint', 'tip_theta_joint']
+# MITゲインパネル(CubeMars)対象関節。JOINT_NAMESとは別物: root_thetaのみが
+# CubeMars駆動(z/r/tip_thetaはロボマス駆動、note/hardware_mapping.txt参照。
+# tip_thetaは2026-09-08方針変更でCubeMars AK40-10からロボマスM2006(M3)へ移行、
+# ロボマスMITゲインパネル(_build_robomas_gain_panel)側で扱う)。
+CUBEMARS_JOINT_NAMES = ['root_theta_joint']
 # 軌道生成パラメータパネル(max_velocity/max_acceleration)の対象関節。JOINT_NAMES
 # (座標指定操作パネルが編集欄を持つ関節)にtip_theta_jointを加えたもの。
 # ピック/投入シーケンス(2026-09-03新規)がroot_theta_jointと同時にtip_theta_joint
@@ -303,21 +305,21 @@ ROBOMAS_WIRING_FIELDS = [
         ('robomas_device_id', 'ID', 'int'),
         ('robomas_motor1_index', 'motor1スロット', 'int'),
         ('robomas_motor2_index', 'motor2スロット', 'int'),
+        ('robomas_tip_theta_index', 'tip_thetaスロット(M3)', 'int'),
     ]),
     (None, [
         ('motor1_sign', 'motor1回転方向(±1)', 'float'),
         ('motor2_sign', 'motor2回転方向(±1)', 'float'),
+        ('tip_theta_sign', 'tip_theta回転方向(±1)', 'float'),
     ]),
 ]
 CUBEMARS_WIRING_FIELDS = [
     (None, [
         ('cubemars_device_id', 'ID', 'int'),
         ('cubemars_root_theta_index', 'root_thetaスロット', 'int'),
-        ('cubemars_tip_theta_index', 'tip_thetaスロット', 'int'),
     ]),
     (None, [
         ('root_theta_sign', 'root_theta回転方向(±1)', 'float'),
-        ('tip_theta_sign', 'tip_theta回転方向(±1)', 'float'),
     ]),
 ]
 HOMING_WIRING_FIELDS = [
@@ -2137,7 +2139,7 @@ class CommandGuiApp(QWidget):
         self.calibration_summary_labels = {}
         for i, (key, title) in enumerate((
                 ('machine_origin', '機体原点オフセット'), ('root_theta', 'root_theta原点'),
-                ('tip_theta', 'tip_theta原点'), ('homing', 'z/rホーミング'))):
+                ('homing', 'z/rホーミング'))):
             calib_grid.addWidget(QLabel(title), i, 0)
             label = QLabel()
             label.setWordWrap(True)
@@ -2167,7 +2169,6 @@ class CommandGuiApp(QWidget):
         for key, source_label in (
                 ('machine_origin', self.machine_origin_status_label),
                 ('root_theta', self.origin_status_label),
-                ('tip_theta', self.tip_theta_origin_status_label),
                 ('homing', self.homing_status_label)):
             target = self.calibration_summary_labels[key]
             target.setText(source_label.text())
@@ -2247,14 +2248,10 @@ class CommandGuiApp(QWidget):
         machine_origin_btn = QPushButton('機体原点オフセット適用')
         root_theta_btn = QPushButton('root_theta原点設定')
         root_theta_btn.setProperty('variant', 'danger')
-        tip_theta_btn = QPushButton('tip_theta原点設定')
-        tip_theta_btn.setProperty('variant', 'danger')
         machine_origin_btn.clicked.connect(self._on_apply_machine_origin)
         root_theta_btn.clicked.connect(self._on_set_root_theta_origin)
-        tip_theta_btn.clicked.connect(self._on_set_tip_theta_origin)
         origin_row.addWidget(machine_origin_btn)
         origin_row.addWidget(root_theta_btn)
-        origin_row.addWidget(tip_theta_btn)
         layout.addLayout(origin_row)
 
         homing_row = QHBoxLayout()
@@ -3311,7 +3308,11 @@ class CommandGuiApp(QWidget):
             _set_status(self.axis_enable_status_label, f'適用失敗: {reasons}', 'error')
 
     def _build_origin_panel(self, column):
-        box = QGroupBox('root_theta / tip_theta 原点設定 (CubeMars本体、trajectory_follower_node)')
+        # 2026-09-08方針変更: tip_theta_jointはROBOMAS(M2006)側へ移行し、Set Origin
+        # 機構自体を持たない(原点センサも無く、電源投入前の手動ゼロ合わせ+起動時
+        # リセットされる内蔵エンコーダの値をそのまま原点として使う)ため、
+        # ここはroot_theta(CubeMars AK40-10)のみを対象とする。
+        box = QGroupBox('root_theta 原点設定 (CubeMars本体、trajectory_follower_node)')
         layout = QVBoxLayout(box)
 
         warn = QLabel()
@@ -3329,19 +3330,6 @@ class CommandGuiApp(QWidget):
         root_theta_origin_btn.setProperty('variant', 'danger')
         root_theta_origin_btn.clicked.connect(self._on_set_root_theta_origin)
         layout.addWidget(root_theta_origin_btn)
-
-        # tip_theta_joint原点設定(2026-09-03新規、root_thetaと全く同じ仕組み
-        # (trajectory_follower_node._set_cubemars_origin)をtip_theta_jointにも
-        # 使えるようにした/set_tip_theta_originサービスへ対応)。
-        self.tip_theta_origin_status_label = QLabel()
-        self.tip_theta_origin_status_label.setWordWrap(True)
-        _set_status(self.tip_theta_origin_status_label, '未実行', 'muted')
-        layout.addWidget(self.tip_theta_origin_status_label)
-
-        tip_theta_origin_btn = QPushButton('/set_tip_theta_origin 呼び出し')
-        tip_theta_origin_btn.setProperty('variant', 'danger')
-        tip_theta_origin_btn.clicked.connect(self._on_set_tip_theta_origin)
-        layout.addWidget(tip_theta_origin_btn)
 
         column.addWidget(box)
 
@@ -3364,25 +3352,6 @@ class CommandGuiApp(QWidget):
     def _on_set_root_theta_origin_done(self, success, message):
         _set_status(self.origin_status_label, message, 'success' if success else 'error')
 
-    def _on_set_tip_theta_origin(self):
-        reply = QMessageBox.question(
-            self, '手先θ原点設定の確認',
-            'tip_theta_jointをCubeMars本体(AK40-10)のフラッシュへ\n'
-            '永久原点として書き込みます。\n\n'
-            '関節は今、原点センサの位置(真の機械原点)にありますか？\n'
-            '間違った位置で実行すると、以後のすべての角度がずれます。',
-            QMessageBox.Yes | QMessageBox.No)
-        if reply != QMessageBox.Yes:
-            return
-        _set_status(self.tip_theta_origin_status_label, '呼び出し中...', 'muted')
-        ok = self.node.call_trigger_service(
-            '/set_tip_theta_origin', self._on_set_tip_theta_origin_done)
-        if not ok:
-            _set_status(self.tip_theta_origin_status_label, 'サービス未起動です', 'error')
-
-    def _on_set_tip_theta_origin_done(self, success, message):
-        _set_status(self.tip_theta_origin_status_label, message, 'success' if success else 'error')
-
     # ---------- real_joint_bridge.yaml配線設定(センサID・CubeMars/RoboMasのID・
     # 回転方向)----
     # Kp/Kd等と違い、この節のパラメータはreal_joint_bridge_node/homing_nodeが
@@ -3396,7 +3365,10 @@ class CommandGuiApp(QWidget):
             title='RoboMas ID・回転方向 (real_joint_bridge.yaml)',
             note='motor1/motor2は、z_joint(昇降)・r_joint(伸縮)を差動駆動する\n'
                  '2基のRoboMas(M2006+C610)モータ(z=mix_k*(m1+m2)、r=mix_k*(m1-m2))。\n'
-                 '内蔵ロータエンコーダのCAN帰還を位置の真値として使う。',
+                 '内蔵ロータエンコーダのCAN帰還を位置の真値として使う。\n'
+                 'tip_theta(M3)は同じ機種を単独直接駆動(ミックス無し)に使う\n'
+                 '(2026-09-08新規、旧CubeMars AK40-10からの移行。原点センサが\n'
+                 '無いため、電源投入前に機構原点(0deg)へ手で合わせておくこと)。',
             description='real_joint_bridge_node/homing_node共通。次回ノード起動から\n'
                         '反映されます(実行中には反映されません)。',
             field_specs=ROBOMAS_WIRING_FIELDS)
@@ -4188,6 +4160,22 @@ class CommandGuiApp(QWidget):
             grid.addWidget(edit, i, 1)
         layout.addLayout(grid)
 
+        # tip_theta(M3、2026-09-08新規)はz/r(motor1/motor2)と動特性が異なるため
+        # 別ゲインを持つ。同じdeviceに同居するため読込/適用ボタンは共通のまま、
+        # 入力欄だけ分ける。
+        layout.addWidget(QLabel('tip_theta(M3)'))
+        tip_grid = QGridLayout()
+        self.robomas_tip_theta_kp_edit = make_float_edit(0.0, width=70)
+        self.robomas_tip_theta_kd_edit = make_float_edit(0.0, width=70)
+        self.robomas_tip_theta_current_ff_edit = make_float_edit(0.0, width=70)
+        for i, (label, edit) in enumerate((
+                ('Kp [A/deg]', self.robomas_tip_theta_kp_edit),
+                ('Kd [A/rpm]', self.robomas_tip_theta_kd_edit),
+                ('current_ff [A]', self.robomas_tip_theta_current_ff_edit))):
+            tip_grid.addWidget(QLabel(label), i, 0)
+            tip_grid.addWidget(edit, i, 1)
+        layout.addLayout(tip_grid)
+
         self.robomas_gain_status_label = QLabel()
         self.robomas_gain_status_label.setWordWrap(True)
         _set_status(self.robomas_gain_status_label, '未読込', 'muted')
@@ -4219,7 +4207,10 @@ class CommandGuiApp(QWidget):
 
     def _on_load_robomas_gains(self):
         ok = self.node.request_node_params(
-            TRAJ_NODE_NAME, ['robomas_kp', 'robomas_kd', 'robomas_current_ff', 'robomas_device_id'],
+            TRAJ_NODE_NAME,
+            ['robomas_kp', 'robomas_kd', 'robomas_current_ff',
+             'robomas_tip_theta_kp', 'robomas_tip_theta_kd', 'robomas_tip_theta_current_ff',
+             'robomas_device_id'],
             self._apply_loaded_robomas_gains,
             lambda reason: _set_status(self.robomas_gain_status_label, f'読込失敗: {reason}', 'error'))
         _set_status(self.robomas_gain_status_label,
@@ -4234,6 +4225,13 @@ class CommandGuiApp(QWidget):
             set_float(self.robomas_kd_edit, round(values['robomas_kd'], 6))
         if 'robomas_current_ff' in values:
             set_float(self.robomas_current_ff_edit, round(values['robomas_current_ff'], 6))
+        if 'robomas_tip_theta_kp' in values:
+            set_float(self.robomas_tip_theta_kp_edit, round(values['robomas_tip_theta_kp'], 6))
+        if 'robomas_tip_theta_kd' in values:
+            set_float(self.robomas_tip_theta_kd_edit, round(values['robomas_tip_theta_kd'], 6))
+        if 'robomas_tip_theta_current_ff' in values:
+            set_float(self.robomas_tip_theta_current_ff_edit,
+                      round(values['robomas_tip_theta_current_ff'], 6))
         # 「読込」はノードの現在値をGUIに表示するだけに留め、gains.jsonへは
         # 「適用」時のみ永続化する(_apply_loaded_traj_paramsのコメント参照)。
         device_id = values.get('robomas_device_id', 0)
@@ -4249,6 +4247,9 @@ class CommandGuiApp(QWidget):
             'robomas_kp': get_float(self.robomas_kp_edit),
             'robomas_kd': get_float(self.robomas_kd_edit),
             'robomas_current_ff': get_float(self.robomas_current_ff_edit),
+            'robomas_tip_theta_kp': get_float(self.robomas_tip_theta_kp_edit),
+            'robomas_tip_theta_kd': get_float(self.robomas_tip_theta_kd_edit),
+            'robomas_tip_theta_current_ff': get_float(self.robomas_tip_theta_current_ff_edit),
         }
 
     def _on_apply_robomas_gains(self):
@@ -4259,7 +4260,7 @@ class CommandGuiApp(QWidget):
             return
         reply = QMessageBox.question(
             self, 'MITゲイン適用の確認',
-            'motor1/motor2(z/r)のMITゲインを実機へ即座に反映します。\n'
+            'motor1/motor2(z/r)・tip_theta(M3)のMITゲインを実機へ即座に反映します。\n'
             'Kpを大きくするほど保持力・応答性が上がりますが、\n'
             '実機にかかる力も大きくなります。よろしいですか？',
             QMessageBox.Yes | QMessageBox.No)

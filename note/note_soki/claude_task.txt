@@ -448,10 +448,13 @@ soki_simのワンクリック移動ボタン(command_gui_node.py)やcommand_gui_
 note/can_mapping.txt)。変換ノード(real_joint_bridge_node)も実装済みで
 soki_sim/config/real_joint_bridge.yamlのパラメータ変更のみで数値を反映できる
 (詳細はnote/claude.txt「実機とsimの関節角度校正」参照)。要点は以下:
-  - root_theta/tip_theta: CubeMars AK40-10、絶対値エンコーダ(電源再投入後も
-    実角度保持)。外部減速比は両方判明済み: root_theta=112/24(=14/3、2026-08-27変更)、
-    tip_theta=ベルト+プーリ(モーター側20T/手先側28T=1.4倍)。
-    原点センサは1箇所(初期較正用と思われる、要確認)。
+  - root_theta: CubeMars AK40-10、絶対値エンコーダ(電源再投入後も実角度保持)。
+    外部減速比=112/24(=14/3、2026-08-27変更)。原点センサは1箇所
+    (初期較正用と思われる、要確認)。
+  - tip_theta: 2026-09-08方針変更でRoboMas M2006(M3、相対エンコーダ)による
+    単独直接駆動へ移行(root_theta側AK40-10焼損に伴う機材転用、下記参照)。
+    外部減速比はベルト+プーリ(モーター側20T/手先側28T=1.4倍、変更無し)。
+    原点センサ無し、電源投入前に手で0degへ合わせる運用。
   - z_joint/r_joint: M2006+C610の差動機構。位置の真値はロボマス内蔵ロータ
     エンコーダのCAN帰還(M{n} angle)を使う設計(2026-08-31方針転換。以前は
     外付けAMTエンコーダ(ENC1/ENC2、CAN_HOST配下ノードのローカルチャンネル)を
@@ -473,6 +476,17 @@ soki_sim/config/real_joint_bridge.yamlのパラメータ変更のみで数値を
     2つの較正手段が併存している状態のため、実機投入前にどちらを正とするか整理が
     必要(root_thetaは既にsoftwareオフセットを廃止済みなので、同様にtip_theta_
     offset_radも廃止してSet Origin方式に一本化するのが自然だが未対応)。
+
+  **2026-09-08方針変更で上記のtip_theta併存問題は別の形で解消**: root_theta側の
+  AK40-10が電源逆接続で焼損したため、無事だったtip_theta側のAK40-10をroot_theta
+  へ転用し、tip_theta側は新規にRoboMas M2006+C610(z/rと同一device_id=21のM3)へ
+  移行した。これによりtip_thetaはCubeMars Set Origin方式(/set_tip_theta_origin、
+  command_gui_nodeのボタンごと削除済み)を使わなくなり、z/rのような差動ミックス
+  でもない単独直接駆動として、原点センサ無し・電源投入前の手動ゼロ合わせ
+  (M2006内蔵エンコーダの起動時リセット値=0を原点とする)という第三の方式に
+  一本化された。tip_theta_offset_rad自体は微調整用として存置。
+  詳細はnote/hardware_mapping.txt「root_theta_joint (旋回)」節、
+  note/can_mapping.txtのMODE_ROBOMAS M3割当を参照。
 
   - z_joint/r_jointについても、ros2canのMODE_ROBOMASにMITモードが実装された
     ことを受け、2026-08-29にtrajectory_follower_node経由でのMIT位置制御出力を
@@ -498,9 +512,10 @@ soki_sim/config/real_joint_bridge.yamlのパラメータ変更のみで数値を
     (2026-08-27時点、RPM=3/POS=4の続き番号として採用したのみで未検証。
     note/hardware_mapping.txt参照)
   - root_thetaの初回較正の実施(原点センサ位置で/set_root_theta_originを呼ぶ)
-  - tip_thetaの初回較正の実施。2026-09-03に/set_tip_theta_origin(root_thetaと
-    同じCubeMars Set Origin方式)を追加したため、こちらを使うか、従来の
-    tip_theta_offset_rad(real_joint_bridge.yaml)方式を使うか要整理(上記参照)
+  - tip_thetaは2026-09-08方針変更でRoboMas M2006(M3)側の単独直接駆動へ移行
+    (上記参照)。/set_tip_theta_originはCubeMars専用機構のため廃止済み。
+    残タスク: 実機組立後、電源投入前に機構原点(0deg)へ手で合わせる運用の徹底
+    (較正コマンド不要、tip_theta_offset_radは微調整用のみ)
   - homing_node(z/r起動時ホーミング)は実装済み(2026-08-27、soki_sim/scripts/
     homing_node.py)だが、以下は仮定のまま実機未検証:
     - z軸/r軸原点センサのSWチャンネル配線(node_index/local_index、

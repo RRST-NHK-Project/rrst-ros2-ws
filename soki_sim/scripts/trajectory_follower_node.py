@@ -35,15 +35,18 @@ self.pos_/self.vel_(関節角度)に cubemars_reduction を掛けて変換して
 帰還値でself.pos_を追従させ、起動直後の内部状態(0.0)と実機の実際の角度との
 ズレによる意図しない位置ジャンプを防ぐ(_on_cubemars_feedback参照)。
 
-root_theta_joint/tip_theta_jointについては、/set_root_theta_origin・
-/set_tip_theta_origin(いずれもstd_srvs/Trigger)サービスでCubeMars本体(AK40-10)へ
-Set Origin(永久原点、フラッシュ保存)CANコマンドを送信できる(root_thetaは
-2026-08-27追加、tip_thetaは2026-09-03追加。同じ仕組みを共有する(_set_cubemars_origin
-参照)。control_mode=3、ros2can/firmware側の対応実装はcubemars.cpp参照)。
-呼び出すと数周期(ORIGIN_HOLD_CYCLES)だけ通常のMIT指令を止めてSET_ORIGINモードを
-送る。これにより実機エンコーダ自体の原点が電源off/onを跨いで保持されるため、
-real_joint_bridge_node側のroot_theta_offset_radによるソフトウェア補正は廃止した
-(note/hardware_mapping.txt参照)。
+root_theta_jointについては、/set_root_theta_origin(std_srvs/Trigger)サービスで
+CubeMars本体(AK40-10)へSet Origin(永久原点、フラッシュ保存)CANコマンドを送信できる
+(2026-08-27追加。_set_cubemars_origin参照。control_mode=3、ros2can/firmware側の
+対応実装はcubemars.cpp参照)。呼び出すと数周期(ORIGIN_HOLD_CYCLES)だけ通常のMIT
+指令を止めてSET_ORIGINモードを送る。これにより実機エンコーダ自体の原点が電源
+off/onを跨いで保持されるため、real_joint_bridge_node側のroot_theta_offset_radに
+よるソフトウェア補正は廃止した(note/hardware_mapping.txt参照)。
+(tip_theta_jointは2026-09-03に同じSet Origin機構をCubeMars側で使っていたが、
+2026-09-08方針変更でROBOMAS(M2006、下記z/rと同じdevice)側の単独直接駆動軸へ
+移行した。M2006にSet Origin機構は無く、原点センサも無いため、電源投入前に
+機構原点(0deg)へ手で合わせておき、内蔵エンコーダの起動時リセット値をそのまま
+原点として使う)。
 
 /joint_targetsの送信元は自動(command_gui_node)とjoy_teleop_node(手動操作)の
 2系統があり、control_modeパラメータ('auto'/'manual'/'both')でどちらを受け付ける
@@ -55,13 +58,18 @@ real_joint_bridge_node側のroot_theta_offset_radによるソフトウェア補�
 z_joint/r_jointについても、実機のロボマス(M2006+C610、motor1/motor2の差動機構、
 note/hardware_mapping.txt参照)へMIT(位置PD制御)モードで同時に指令できる
 (2026-08-29追加、ros2canのMODE_ROBOMASにMITモードが実装されたことを受けて
-root_theta/tip_theta(CubeMars MIT)と対称的に追加)。robomas_device_id等の
-パラメータで有効化する(未設定=device_id0のデフォルトのままなら実機出力無効)。
-z/r(joint角度)はそれぞれ独立に台形プロファイルされた後、motor_mixer_nodeと
-同じ式(m1=(z+r)/(2*mix_k), m2=(z-r)/(2*mix_k))でmotor1/motor2側(アクチュエータ軸)
-へ変換してから送信する。位置フィードバックはCubeMars側と異なりロボマス内蔵の
+root_theta(CubeMars MIT)と対称的に追加)。robomas_device_id等のパラメータで
+有効化する(未設定=device_id0のデフォルトのままなら実機出力無効)。z/r(joint角度)
+はそれぞれ独立に台形プロファイルされた後、motor_mixer_nodeと同じ式
+(m1=(z+r)/(2*mix_k), m2=(z-r)/(2*mix_k))でmotor1/motor2側(アクチュエータ軸)へ
+変換してから送信する。位置フィードバックはCubeMars側と異なりロボマス内蔵の
 ロータエンコーダを基準に割り切る(z/rの真値である外付けAMTエンコーダとの
 バックラッシュ差分は無視する設計判断、note/hardware_mapping.txt参照)。
+
+同じdevice(robomas_device_id)のM3(motor_index=2)にtip_theta_jointを直接駆動で
+同居させる(2026-09-08新規、robomas_tip_theta_index等のパラメータで有効化)。
+z/rのような差動ミックスは行わず、cubemars_joint_names側のroot_thetaと同様
+joint_deg = actuator_deg / tip_theta_reduction の単純な変換のみ。
 
 homing_node(z/rの起動時ホーミング)は本ノードと同じdevice(robomas_device_id)へ
 独立に速度指令をpublishするため、ホーミング中に本ノードのMIT指令と衝突する。
@@ -246,6 +254,21 @@ class TrajectoryFollowerNode(Node):
         self.declare_parameter('robomas_z_offset_m', 0.0)
         self.declare_parameter('robomas_r_offset_m', 0.0)
 
+        # ROBOMAS M3 (tip_theta_joint、2026-09-08新規)。z/rのような差動ミックスでは
+        # なく単独直接駆動(joint_deg = actuator_deg / tip_theta_reduction)。
+        # robomas_tip_theta_index未設定(既定-1)ならtip_theta側の実機出力は無効
+        # (root_theta_reduction等と同じ「未設定なら出力無効」パターン)。原点センサが
+        # 無いため、電源投入前に機構原点(0deg)へ手で合わせておく前提で、M2006内蔵
+        # エンコーダの起動時リセット値(=0)をそのまま原点として扱う(ホーミング無し)。
+        self.declare_parameter('robomas_tip_theta_index', -1)   # M3
+        self.declare_parameter('robomas_tip_theta_joint', 'tip_theta_joint')
+        self.declare_parameter('tip_theta_reduction', 1.4)      # 28T/20T
+        self.declare_parameter('tip_theta_sign', 1.0)
+        self.declare_parameter('tip_theta_offset_rad', 0.0)     # 通常0(手動ゼロ合わせ前提)
+        self.declare_parameter('robomas_tip_theta_kp', 0.0)
+        self.declare_parameter('robomas_tip_theta_kd', 0.0)
+        self.declare_parameter('robomas_tip_theta_current_ff', 0.0)
+
         # z/r軸それぞれの上限・下限リミットスイッチ(CAN_HOST経由、過走防止の
         # 安全停止用、2026-08-31追加)。homing_nodeが原点較正に使う原点センサ
         # (通常は下限側)とは別に、本ノードは4個(z上限/z下限/r上限/r下限)を
@@ -298,7 +321,6 @@ class TrajectoryFollowerNode(Node):
         self._setup_robomas_outputs()
         self._setup_limit_switches()
         self.create_service(Trigger, 'set_root_theta_origin', self._on_set_root_theta_origin)
-        self.create_service(Trigger, 'set_tip_theta_origin', self._on_set_tip_theta_origin)
 
         # ---- ソフト緊急停止 (2026-09-08追加、CAN_HOST(device_id=101)実機の赤色状態
         # 表示灯の「点滅(速)」に対応。engage_estop中はtimer_callbackが早い段階で
@@ -438,6 +460,22 @@ class TrajectoryFollowerNode(Node):
             'motor1_sign': float(self.get_parameter('robomas_motor1_sign').value),
             'motor2_sign': float(self.get_parameter('robomas_motor2_sign').value),
         }
+        tip_theta_index = int(self.get_parameter('robomas_tip_theta_index').value)
+        if tip_theta_index >= 0:
+            tip_theta_name = self.get_parameter('robomas_tip_theta_joint').value
+            if tip_theta_name not in self.joint_names_:
+                raise ValueError('robomas_tip_theta_joint must be in joint_names')
+            self.robomas_['tip_theta'] = {
+                'motor_index': tip_theta_index,
+                'joint': tip_theta_name,
+                'reduction': float(self.get_parameter('tip_theta_reduction').value),
+                'sign': float(self.get_parameter('tip_theta_sign').value),
+                'offset': float(self.get_parameter('tip_theta_offset_rad').value),
+                'kp': float(self.get_parameter('robomas_tip_theta_kp').value),
+                'kd': float(self.get_parameter('robomas_tip_theta_kd').value),
+                'current_ff': float(self.get_parameter('robomas_tip_theta_current_ff').value),
+            }
+
         self.robomas_pub_ = self.create_publisher(
             Int16MultiArray, f'serial_tx_{device_id}', 10)
         self.create_subscription(
@@ -535,6 +573,17 @@ class TrajectoryFollowerNode(Node):
             self.vel_[name] = 0.0
             self.target_[name] = val
 
+        # tip_theta(M3)はz/rの差動ミックスとは独立した単独直接駆動
+        # (_publish_robomas_commandsのtip_theta側と対称、2026-09-08新規)。
+        tip_cfg = cfg.get('tip_theta')
+        if tip_cfg is not None:
+            tip_deg = msg.data[tip_cfg['motor_index']] * ROBOMAS_FEEDBACK_POSITION_SCALE_DEG
+            tip_theta = (tip_cfg['sign'] * math.radians(tip_deg) / tip_cfg['reduction']
+                         + tip_cfg['offset'])
+            self.pos_[tip_cfg['joint']] = tip_theta
+            self.vel_[tip_cfg['joint']] = 0.0
+            self.target_[tip_cfg['joint']] = tip_theta
+
     def _on_pause_robomas_output(self, request, response):
         """homing_node等、robomas_device_idへ独立に指令を送る外部ノードのための
         一時停止スイッチ。呼び出している間は_publish_robomas_commands()が
@@ -601,6 +650,8 @@ class TrajectoryFollowerNode(Node):
         m = len(self.cubemars_)
         cubemars_array_params = ('cubemars_kp', 'cubemars_kd', 'cubemars_torque_ff')
         robomas_scalar_params = ('robomas_kp', 'robomas_kd', 'robomas_current_ff')
+        robomas_tip_theta_params = ('robomas_tip_theta_kp', 'robomas_tip_theta_kd',
+                                     'robomas_tip_theta_current_ff')
         for p in params:
             if p.name in ('max_velocity', 'max_acceleration', 'max_deceleration') and len(p.value) != n:
                 return SetParametersResult(
@@ -650,6 +701,13 @@ class TrajectoryFollowerNode(Node):
                 key = {'robomas_kp': 'kp', 'robomas_kd': 'kd',
                        'robomas_current_ff': 'current_ff'}[p.name]
                 self.robomas_[key] = float(p.value)
+            elif (p.name in robomas_tip_theta_params and self.robomas_ is not None
+                  and 'tip_theta' in self.robomas_):
+                # tip_theta(M3)はz/rと別ゲインを持つため、robomas_scalar_paramsとは
+                # 別にself.robomas_['tip_theta']側のキャッシュを更新する。
+                key = {'robomas_tip_theta_kp': 'kp', 'robomas_tip_theta_kd': 'kd',
+                       'robomas_tip_theta_current_ff': 'current_ff'}[p.name]
+                self.robomas_['tip_theta'][key] = float(p.value)
         return SetParametersResult(successful=True)
 
     def target_callback(self, msg: JointState):
@@ -685,9 +743,11 @@ class TrajectoryFollowerNode(Node):
 
     def _set_cubemars_origin(self, name, response):
         """nameのCubeMars本体(AK40-10)へSet Origin(永久原点、フラッシュ保存)
-        コマンドを送るようリクエストする。root_theta_joint/tip_theta_jointどちらも
-        同じ仕組み(_on_set_root_theta_origin/_on_set_tip_theta_origin参照)。
+        コマンドを送るようリクエストする(_on_set_root_theta_origin参照)。
         呼び出し前に関節を原点センサの位置(真の機械原点)へ物理的に合わせておくこと。
+        (2026-09-08方針変更: tip_theta_jointはROBOMAS(M2006)側へ移行し、Set Origin
+        機能自体を持たないため対象外になった。原点センサも無く、電源投入前の手動
+        ゼロ合わせ+起動時リセットされる内蔵エンコーダの値をそのまま原点として使う)
         """
         cfg = self.cubemars_.get(name)
         if cfg is None:
@@ -706,9 +766,6 @@ class TrajectoryFollowerNode(Node):
         # real_joint_bridge_node側のroot_theta_offset_radは廃止済みのため、
         # この操作が実機の唯一の原点設定手段になる(_set_cubemars_origin参照)。
         return self._set_cubemars_origin('root_theta_joint', response)
-
-    def _on_set_tip_theta_origin(self, request, response):
-        return self._set_cubemars_origin('tip_theta_joint', response)
 
     def timer_callback(self):
         if not self.has_target_:
@@ -819,6 +876,22 @@ class TrajectoryFollowerNode(Node):
         buf[16 + i2] = clamp_int16(cfg['kd'] * 10000.0)
         buf[20 + i1] = clamp_int16(cfg['current_ff'] * 1000.0)  # mit_current_ff: 0.001A/LSB
         buf[20 + i2] = clamp_int16(cfg['current_ff'] * 1000.0)
+
+        # tip_theta(M3)はz/rの差動ミックスとは独立した単独直接駆動
+        # (_publish_cubemars_commandsのroot_theta単軸パターンと同型、2026-09-08新規)。
+        tip_cfg = cfg.get('tip_theta')
+        if tip_cfg is not None:
+            i3 = tip_cfg['motor_index']
+            tip_pos = self.pos_[tip_cfg['joint']]
+            tip_vel = self.vel_[tip_cfg['joint']]
+            tip_deg = tip_cfg['sign'] * math.degrees((tip_pos - tip_cfg['offset']) * tip_cfg['reduction'])
+            tip_rpm = tip_cfg['sign'] * (tip_vel * tip_cfg['reduction']) * (60.0 / (2.0 * math.pi))
+            buf[i3] = clamp_int16(tip_deg * 1.0)             # target: 1deg/LSB(アクチュエータ軸)
+            buf[4 + i3] = ROBOMAS_MODE_MIT
+            buf[8 + i3] = clamp_int16(tip_rpm * 1.0)         # mit_velocity_ff: 1rpm/LSB
+            buf[12 + i3] = clamp_int16(tip_cfg['kp'] * 1000.0)     # mit_kp: 0.001(A/deg)/LSB
+            buf[16 + i3] = clamp_int16(tip_cfg['kd'] * 10000.0)    # mit_kd: 0.0001(A/rpm)/LSB
+            buf[20 + i3] = clamp_int16(tip_cfg['current_ff'] * 1000.0)  # mit_current_ff: 0.001A/LSB
 
         msg = Int16MultiArray()
         msg.data = buf

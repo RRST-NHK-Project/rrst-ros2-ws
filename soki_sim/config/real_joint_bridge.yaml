@@ -3,19 +3,18 @@
 # 各値の根拠はnote/hardware_mapping.txt・note/can_mapping.txt参照。
 real_joint_bridge_node:
   ros__parameters:
-    # ---- CubeMars (root_theta_joint / tip_theta_joint) ----
+    # ---- CubeMars (root_theta_joint のみ。2026-09-08方針変更: root_theta側の
+    # AK40-10が電源逆接続で焼損したため、無事だったtip_theta側のAK40-10を
+    # root_theta へ転用。tip_thetaはRoboMas M2006+C610(ROBOMASブロックのM3)へ
+    # 移行した。R-Link側でCAN ID=101(M1)に設定し直す前提) ----
     cubemars_device_id: 11
     cubemars_root_theta_index: 0   # M1
-    cubemars_tip_theta_index: 1    # M2
     cubemars_position_scale_deg: 0.1
     root_theta_reduction: 4.666666666666667   # 112/24 (= 14/3)
-    tip_theta_reduction: 1.4                  # 28T/20T
     root_theta_sign: 1.0
-    tip_theta_sign: 1.0
     # root_theta_offset_radは廃止(2026-08-27)。CubeMars本体へSet Originコマンドを
     # 送ることで実機エンコーダ自体の原点を永続化する方式に変更した
     # (trajectory_follower_nodeの/set_root_theta_originサービス、note/hardware_mapping.txt参照)。
-    tip_theta_offset_rad: 0.0   # 要初回較正: 原点センサ位置での_unwrapped値から逆算して設定
 
     # ---- ROBOMAS (motor1_joint / motor2_joint、内蔵ロータエンコーダのCAN帰還を
     # 位置の真値として使う。2026-08-31方針転換で外付けAMTエンコーダ(ENC1/ENC2、
@@ -27,6 +26,15 @@ real_joint_bridge_node:
     mix_k: 0.5
     motor1_sign: 1.0
     motor2_sign: 1.0
+
+    # ---- ROBOMAS M3 (tip_theta_joint、2026-09-08新規。旧CubeMars M2のAK40-10から
+    # 移行。M1/M2(z/r)のような差動ミックスではなく単独直接駆動。原点センサ無しの
+    # ため、電源投入前に機構原点(0deg)へ手で合わせておく前提で、M2006内蔵エンコーダの
+    # 起動時リセット値(=0)をそのまま原点として扱う(ホーミング処理は無し)) ----
+    robomas_tip_theta_index: 2   # M3 angle帰還スロット
+    tip_theta_reduction: 1.4     # 28T/20T (旧CubeMars構成から流用)
+    tip_theta_sign: 1.0
+    tip_theta_offset_rad: 0.0    # 通常0(手動ゼロ合わせ前提)。微調整が必要な場合のみ設定
 
     # z_offset_m/r_offset_mはhoming_nodeが起動時にSetParametersで書き込む
     # ランタイム専用値。ここでの初期値(0.0)はホーミング未実施時の値。

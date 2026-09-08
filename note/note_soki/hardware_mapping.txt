@@ -10,7 +10,20 @@ CubeMars AK40-10 (Servo/MITモードで直接駆動、アクチュエータ内�
 
 tip_theta_jointは root_theta_joint とは別方式: タイミングベルト+プーリで
 モーター側20T・手先側28T(減速比 = 28/20 = 1.4 = 7/5)。
-  tip_theta_joint角度 = AK40-10エンコーダ角度 / 1.4 ( = * 5/7 )
+  tip_theta_joint角度 = アクチュエータ側エンコーダ角度 / 1.4 ( = * 5/7 )
+
+**方針変更(2026-09-08、ユーザー報告)**: root_theta側のAK40-10が電源逆接続で
+焼損した。無事だったtip_theta側のAK40-10をroot_thetaへ転用し(CubeMars駆動・
+Set Origin方式は変わらず)、tip_theta側には新規にRoboMas M2006+C610(z/rと
+同一device_id=21のバスに3台目、M3=motor index 2)を導入した。tip_thetaは
+z/rのような差動ミックスではなく単独直接駆動(joint_deg = actuator_deg /
+tip_theta_reduction、reduction値=1.4は変更無し)。原点センサが無いため、
+電源投入前に機構原点(0deg)へ手で合わせておく前提とし、M2006内蔵ロータ
+エンコーダの起動時リセット値(=0)をそのまま原点として使う(ホーミング処理は
+無し。real_joint_bridge.yaml/real_joint_bridge_node.py/trajectory_follower_node.py
+のtip_theta_offset_radは微調整用にのみ残す)。詳細はcommand_gui_node.py側の
+「原点センサ・ホーミング配線設定」注記、および下記「ros2can CAN_ID・スロット
+割当」「root_theta/tip_thetaの原点初期化」の各節も参照。
 
 ## z_joint / r_joint (motor1/motor2差動、M2006+C610)
 **方針変更(2026-08-31、ユーザー判断)**: 位置の真値はC610/M2006内蔵ロータ
@@ -38,15 +51,18 @@ robomas_device_id(21)のserial_rx_*_unwrappedを購読してM{n} angleを読む�
 (SW1/SW2のリミットスイッチ)の読み取りにのみ、引き続きhoming_nodeが使う。
 
 ## ros2can CAN_ID・スロット割当 (note/can_mapping.txt記入済み、2026-08-27。
-## デバイスIDは実機再確認により修正済み)
+## デバイスIDは実機再確認により修正済み。2026-09-08方針変更でtip_thetaは
+## CubeMars(M2)からROBOMAS(M3)へ移動、下表反映済み)
 MODE_CUBEMARSデバイス (device_id=11):
-  M1 (CAN_ID=101) → root_theta_joint (絶対値エンコーダ、M{n} position帰還を使用)
-  M2 (CAN_ID=102) → tip_theta_joint  (同上)
-  M3/M4 → 未使用
+  M1 (CAN_ID=101) → root_theta_joint (絶対値エンコーダ、M{n} position帰還を使用。
+                     旧tip_theta側のAK40-10を転用、R-LinkでCAN ID=101に設定)
+  M2/M3/M4 → 未使用
 MODE_ROBOMASデバイス (device_id=21):
   M1 (CAN_ID=0x201) → motor1_joint (速度指令・位置の真値(M{n} angle帰還)の両方に使用)
   M2 (CAN_ID=0x202) → motor2_joint (同上)
-  M3/M4 → 未使用
+  M3 (CAN_ID=0x203) → tip_theta_joint (2026-09-08新規。z/rと違いミックス無しの
+                       単独直接駆動、M{n} angle帰還を位置の真値として使用)
+  M4 → 未使用
 CAN_HOSTデバイス (device_id=101、xiao_esp32_s3_smd_serial_bridge):
   z/r原点センサ(SW1/SW2)のみ使用。ENC1/ENC2は不使用(上記方針変更参照)。
   グローバルスロット = node_index*5 + local_index
@@ -82,14 +98,16 @@ GUIプロセスのメモリ上限りで永続化されない(ros2canプロセス
   (エンコーダ自体がズレない限り。フラッシュ保存のためros2can側の
   プロセス再起動にも依存しない)。
 
-tip_thetaは引き続き従来方式のまま: real_joint_bridge_nodeがCubeMars側の
-_zeroedではなく_unwrapped(ラップアラウンド解決済みの生の絶対値)を購読し、
-real_joint_bridge.yamlのtip_theta_offset_rad(ノード側パラメータ、yamlに
-保存されるため永続)で真の原点とのズレを補正する。
-  較正手順(実機組み立て後に1回だけ): 関節を原点センサの位置(真の機械原点)へ
-  物理的に合わせ、その瞬間の_unwrapped値から逆算したoffsetをyamlへ書き込む。
-  以後はros2can・real_joint_bridge_nodeの再起動、電源off/onを跨いでも
-  再較正不要(エンコーダ自体がズレない限り)。
+tip_thetaは2026-09-08方針変更でCubeMars(絶対値エンコーダ)からROBOMAS M2006
+(相対エンコーダ)へ移行したため、root_thetaのSet Origin方式・旧来のyaml
+オフセット較正方式のどちらとも異なる第三の方式になった: 原点センサが無いため、
+電源投入前に機構原点(0deg)へ手で合わせておき、M2006内蔵ロータエンコーダの
+起動時リセット値(=0)をそのまま原点として扱う(ホーミング処理は無し)。
+real_joint_bridge.yaml/real_joint_bridge_node.py/trajectory_follower_node.pyの
+tip_theta_offset_radパラメータは残しているが、通常は0のままでよく、実機の
+微小な取付誤差を補正したい場合にのみ使う(root_thetaのSet Originのような
+「一度較正すれば恒久的に有効」という永続化ではない点に注意。電源off/onの
+たびに手動ゼロ合わせをやり直す運用が前提)。
 z_joint/r_jointは元々毎起動homing_nodeが/zero_channelを呼ぶ設計なので、
 こちらはros2can側オフセットが非永続でも問題ない(むしろ意図通り)。
 
@@ -135,6 +153,18 @@ ros2can/real_joint_bridge_node.py側のコード変更は不要(既存のpositio
   いずれもMITモードからServo(CAN)モードへの制御方式変更が必要で、
   現状は選択していない。
 
+**2026-09-08追記**: 上記のtip_theta可動域(±511.6°)はCubeMars駆動時代の
+制約(CUBEMARS_MIT_P_MIN/MAX_RAD=±12.5rad)に基づくもの。tip_thetaが
+ROBOMAS(M2006、M3)へ移行した後は、robomas.cpp側のMIT位置指令に
+CubeMarsのような明示的なmin/maxクランプが無く、int16(1deg/LSB、
+ROBOMAS_MIT_POSITION_LSB_DEG)の範囲=アクチュエータ軸±32767°(±91回転、
+tip_theta_reduction=1.4を通すと関節側±23383°=約65回転相当)まで指令できる
+ため、実質的にCubeMars時代より大幅に広い(このAK Series特有のMIT範囲制約
+自体がtip_thetaには適用されなくなった)。ただし依然としてcontinuous関節
+ではなく有限範囲である点は変わらないため、上記(a)(b)のようなServo(CAN)
+モードへの変更を行わない限り、ソフトウェア側(trajectory_follower_node.py
+のtarget_callback等)で想定外の大回転指令が来ないよう運用上の注意は必要。
+
 ## z_joint/r_jointのホーミング (homing_node、2026-08-27実装)
 z=k(m1+m2)/r=k(m1-m2)という合成後の量は、ros2canの/zero_channel(ENC単体を
 ゼロ化するだけ)では正しく較正できないため、root_theta/tip_thetaと同様に
@@ -178,6 +208,13 @@ z_joint/r_jointもtrajectory_follower_nodeからMIT指令を送れるように�
     z/r真値も同じロボマス内蔵エンコーダに統一されたため、以前あった「MIT側は
     内蔵エンコーダ、較正側は外付けENC1/ENC2」という基準のズレ(バックラッシュ差分)
     は解消された。
+
+**2026-09-08追記**: 同じdevice_id=21のM3(motor index=2)にtip_theta_jointも
+同居させた(root_theta側AK40-10焼損に伴う駆動系変更、上記「root_theta_joint
+(旋回)」節の方針変更参照)。z/rのようなmotor1/motor2の差動ミックスではなく、
+tip_theta_joint単独の直接駆動(joint_deg = actuator_deg / tip_theta_reduction)。
+ゲインはz/rの共有スカラー(robomas_kp/kd/current_ff)とは別に
+robomas_tip_theta_kp/kd/current_ffを持つ(動特性が異なるため)。
 
 **homing_nodeとの排他制御**: homing_nodeは起動時ホーミング中、同じ
 robomas_device_idへ独立に速度指令をpublishするため、trajectory_follower_nodeの
@@ -224,7 +261,8 @@ simが実機の実測値に追従して表示すべき(逆に実機がsimの理�
 そのためreal_joint_bridge_nodeにfallback_topicパラメータを追加し、実機テスト用
 launch4本では'trajectory_target_joint_states'(trajectory_follower_nodeの
 理想軌道)を指定した。real_joint_bridge_nodeはこれを購読し、まだ実機帰還を
-一度も受信していない関節群(root_theta/tip_theta、z/rの2グループ単位)に
+一度も受信していない関節群(root_theta、tip_theta/z/rの2グループ単位。
+2026-09-08方針変更でtip_thetaはCubeMars側からROBOMAS側グループへ移動)に
 ついてのみ、理想軌道の値をそのままmixed_joint_statesへ転送する
 (_on_fallback参照)。一度でも実機帰還を受信したグループは以後この転送を
 無視し実測値のみを使う(実測 -> 理想軌道への逆行はしない)。

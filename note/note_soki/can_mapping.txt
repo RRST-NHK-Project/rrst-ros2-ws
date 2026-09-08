@@ -9,26 +9,30 @@
   ros2can/firmware/xiao-esp32-s3_can2io/src/robomas.cpp (ロボマスのCAN_ID帯:
     C610/C620は0x201〜0x204、GM6020は0x205〜0x208。M{n}スロット = ID順で対応)
 
-## MODE_CUBEMARS デバイス (root_theta_joint / tip_theta_joint用)
+## MODE_CUBEMARS デバイス (root_theta_joint用。2026-09-08方針変更でtip_theta_jointは
+## MODE_ROBOMAS側(M3)へ移動、下記参照。root_theta側AK40-10が電源逆接続で焼損した
+## ため、無事だった旧tip_theta側のAK40-10をroot_thetaへ転用した経緯)
 device_id (ros2can GUIのデバイス一覧に出る番号、= このボード自身のCAN_ID):
   →11
 
 各M{n}スロット(config.hppのCUBEMARS_MOTOR_ID_n、デフォルト101/102/103/104)が
 実際にどの関節のCubeMarsモータに配線されているか:
-  M1 (デフォルトCAN_ID=101) → 対応関節:根本θ
-  M2 (デフォルトCAN_ID=102) → 対応関節:手先θ
+  M1 (デフォルトCAN_ID=101) → 対応関節:根本θ(旧手先θ側AK40-10を転用、
+                                R-LinkでCAN_ID=101に設定し直すこと)
+  M2 (デフォルトCAN_ID=102) → 対応関節:未使用(焼損・撤去)
   M3 (デフォルトCAN_ID=103) → 対応関節:未使用
   M4 (デフォルトCAN_ID=104) → 対応関節:未使用
 
-## MODE_ROBOMAS デバイス (motor1_joint / motor2_joint用)
+## MODE_ROBOMAS デバイス (motor1_joint / motor2_joint / tip_theta_joint用)
 device_id (ros2can GUIのデバイス一覧に出る番号、= このボード自身のCAN_ID):
   →　21
 
-各M{n}スロットが実際にどちらのロボマスモータ(motor1/motor2)に対応するか
+各M{n}スロットが実際にどちらのロボマスモータ(motor1/motor2/tip_theta)に対応するか
 (CAN_ID自体はC610本体のID設定スイッチで決まり、0x201=M1, 0x202=M2, ...):
   M1 (CAN_ID=0x201) → 対応: motor1_joint
   M2 (CAN_ID=0x202) → 対応: motor2_joint
-  M3 (CAN_ID=0x203) → 対応: 未使用
+  M3 (CAN_ID=0x203) → 対応: tip_theta_joint (2026-09-08新規。旧CubeMars AK40-10
+                       からの移行。z/rと違いミックス無しの単独直接駆動)
   M4 (CAN_ID=0x204) → 対応: 未使用
 
 ## 外付けAMTエンコーダ (ENC1/ENC2、z_joint/r_joint用、ROBOMASのCAN帰還とは別物)

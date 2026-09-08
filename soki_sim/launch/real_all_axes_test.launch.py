@@ -40,14 +40,18 @@ def generate_launch_description():
     本launchを起動する場合に、GUIの二重起動を防ぐために使う。デフォルトtrueで
     従来通りcommand_gui_nodeも起動する)。
 
-    root_theta/tip_theta用のdevice_id/motor_index/reduction/kp/kdは実機配線に
-    合わせて起動時に上書きすること(root_theta/tip_thetaは同一CubeMarsデバイス
-    (device_id共通)上のM1/M2として配線されている前提、note/hardware_mapping.txt
-    参照)。tip_thetaはroot_thetaと異なりCubeMars本体のSet Originコマンドを
-    使わず、real_joint_bridge.yamlのtip_theta_offset_radで原点較正する
-    (note/hardware_mapping.txt「root_theta/tip_thetaの原点初期化」参照)。
-    初回較正がまだなら、原点センサ位置で_unwrapped値を読みtip_theta_offset_radを
-    yamlへ書き込んでおくこと(でないとtip_thetaの位置がズレたまま動く)。
+    root_theta用のdevice_id/motor_index/reduction/kp/kdは実機配線に合わせて
+    起動時に上書きすること(note/hardware_mapping.txt参照)。
+
+    tip_thetaは2026-09-08方針変更でCubeMars AK40-10からRoboMas M2006(z/rと
+    同一device_id=21のM3)へ移行した(root_theta側のAK40-10が電源逆接続で焼損した
+    ため、無事だったtip_theta側のAK40-10をroot_thetaへ転用した経緯。
+    note/hardware_mapping.txt参照)。z/rのような差動ミックスではなく単独直接駆動
+    (robomas_tip_theta_kp/kdはz/rのrobomas_kp/kdと同じA/deg・A/rpmスケール)。
+    原点センサが無いため、電源投入前に機構原点(0deg)へ手で合わせておくこと
+    (tip_theta_offset_radは微調整のみに使う。M2006内蔵エンコーダの起動時
+    リセット値をそのまま原点として使うため、root_thetaのようなSet Origin
+    コマンドやホーミング処理は不要)。
 
     z/r用のrobomas_kp/robomas_kd/robomas_current_ffは要実機調整・低ゲインから
     開始すること(M2006の電流上限1.0A基準でデフォルト値を決めてある。詳細は
@@ -64,32 +68,46 @@ def generate_launch_description():
     real_joint_bridge_yaml = os.path.join(pkg_share, 'config', 'real_joint_bridge.yaml')
     hand_yaml = os.path.join(pkg_share, 'config', 'hand.yaml')
 
-    # ---- root_theta / tip_theta (CubeMars、同一device_id上のM1/M2) ----
+    # ---- root_theta (CubeMars) ----
     cubemars_device_id_arg = DeclareLaunchArgument(
         'cubemars_device_id', default_value='11',
-        description='root_theta/tip_theta共通のCubeMars(MODE_CUBEMARS)device_id')
+        description='root_thetaのCubeMars(MODE_CUBEMARS)device_id')
     root_theta_motor_index_arg = DeclareLaunchArgument(
         'root_theta_motor_index', default_value='0',
         description='root_thetaのモータ番号(0-3=M1-M4)')
-    tip_theta_motor_index_arg = DeclareLaunchArgument(
-        'tip_theta_motor_index', default_value='1',
-        description='tip_thetaのモータ番号(0-3=M1-M4)')
     root_theta_reduction_arg = DeclareLaunchArgument(
         'root_theta_reduction', default_value='4.666666666666667',
         description='root_theta外部減速比(112/24)。note/hardware_mapping.txt参照')
-    tip_theta_reduction_arg = DeclareLaunchArgument(
-        'tip_theta_reduction', default_value='1.4',
-        description='tip_theta外部減速比(28T/20T)。note/hardware_mapping.txt参照')
     root_theta_kp_arg = DeclareLaunchArgument(
         'root_theta_kp', default_value='5.0', description='root_theta MITモードKp(0-500)')
     root_theta_kd_arg = DeclareLaunchArgument(
         'root_theta_kd', default_value='0.5', description='root_theta MITモードKd(0-5)')
+
+    # ---- tip_theta (RoboMas M2006、z/rと同じdevice_idのM3。2026-09-08方針変更で
+    # CubeMarsから移行。z/rのrobomas_kp/kdと同じA/deg・A/rpmスケール) ----
+    robomas_tip_theta_index_arg = DeclareLaunchArgument(
+        'robomas_tip_theta_index', default_value='2',
+        description='tip_thetaのRoboMasモータ番号(0-3=M1-M4、既定2=M3)')
+    tip_theta_reduction_arg = DeclareLaunchArgument(
+        'tip_theta_reduction', default_value='1.4',
+        description='tip_theta外部減速比(28T/20T)。note/hardware_mapping.txt参照')
+    tip_theta_sign_arg = DeclareLaunchArgument(
+        'tip_theta_sign', default_value='1.0', description='tip_theta回転方向(±1)')
+    tip_theta_offset_rad_arg = DeclareLaunchArgument(
+        'tip_theta_offset_rad', default_value='0.0',
+        description='tip_theta原点オフセット[rad]。原点センサが無いため、電源投入前に'
+                    '機構原点(0deg)へ手で合わせておくのが基本で、これは微調整のみに使う')
     tip_theta_kp_arg = DeclareLaunchArgument(
-        'tip_theta_kp', default_value='5.0',
-        description='tip_theta MITモードKp(0-500)。要実機調整、低ゲインから開始すること')
+        'tip_theta_kp', default_value='0.02',
+        description='tip_theta MITモードKp[A/deg]。要実機調整、低ゲインから開始すること'
+                    '(robomas_kpと同じスケール)')
     tip_theta_kd_arg = DeclareLaunchArgument(
-        'tip_theta_kd', default_value='0.5',
-        description='tip_theta MITモードKd(0-5)。要実機調整、低ゲインから開始すること')
+        'tip_theta_kd', default_value='0.002',
+        description='tip_theta MITモードKd[A/rpm]。要実機調整、低ゲインから開始すること'
+                    '(robomas_kdと同じスケール)')
+    tip_theta_current_ff_arg = DeclareLaunchArgument(
+        'tip_theta_current_ff', default_value='0.0',
+        description='tip_theta MITモードcurrent_ff[A](フィードフォワード電流)')
     root_theta_max_velocity_arg = DeclareLaunchArgument(
         'root_theta_max_velocity', default_value='0.1',
         description='root_thetaの最大速度[rad/s](安全のため低めから)')
@@ -171,13 +189,16 @@ def generate_launch_description():
 
     cubemars_device_id = LaunchConfiguration('cubemars_device_id')
     root_theta_motor_index = LaunchConfiguration('root_theta_motor_index')
-    tip_theta_motor_index = LaunchConfiguration('tip_theta_motor_index')
     root_theta_reduction = LaunchConfiguration('root_theta_reduction')
-    tip_theta_reduction = LaunchConfiguration('tip_theta_reduction')
     root_theta_kp = LaunchConfiguration('root_theta_kp')
     root_theta_kd = LaunchConfiguration('root_theta_kd')
+    robomas_tip_theta_index = LaunchConfiguration('robomas_tip_theta_index')
+    tip_theta_reduction = LaunchConfiguration('tip_theta_reduction')
+    tip_theta_sign = LaunchConfiguration('tip_theta_sign')
+    tip_theta_offset_rad = LaunchConfiguration('tip_theta_offset_rad')
     tip_theta_kp = LaunchConfiguration('tip_theta_kp')
     tip_theta_kd = LaunchConfiguration('tip_theta_kd')
+    tip_theta_current_ff = LaunchConfiguration('tip_theta_current_ff')
     root_theta_max_velocity = LaunchConfiguration('root_theta_max_velocity')
     root_theta_max_acceleration = LaunchConfiguration('root_theta_max_acceleration')
     root_theta_max_deceleration = LaunchConfiguration('root_theta_max_deceleration')
@@ -231,7 +252,7 @@ def generate_launch_description():
             {
                 'cubemars_device_id': cubemars_device_id,
                 'cubemars_root_theta_index': root_theta_motor_index,
-                'cubemars_tip_theta_index': tip_theta_motor_index,
+                'robomas_tip_theta_index': robomas_tip_theta_index,
                 # trajectory_follower_node側のoutput_topic(下記)と一致させること。
                 # 起動直後、まだ実機帰還が届いていない軸はここから理想軌道を転送して
                 # sim表示を動かし続ける(note/hardware_mapping.txt
@@ -278,13 +299,16 @@ def generate_launch_description():
 
         device_id = int(cubemars_device_id.perform(context))
         root_index = int(root_theta_motor_index.perform(context))
-        tip_index = int(tip_theta_motor_index.perform(context))
         root_kp = float(root_theta_kp.perform(context))
         root_kd = float(root_theta_kd.perform(context))
+        root_reduction = float(root_theta_reduction.perform(context))
+        robomas_tip_index = int(robomas_tip_theta_index.perform(context))
+        tip_reduction = float(tip_theta_reduction.perform(context))
+        tip_sign = float(tip_theta_sign.perform(context))
+        tip_offset = float(tip_theta_offset_rad.perform(context))
         tip_kp = float(tip_theta_kp.perform(context))
         tip_kd = float(tip_theta_kd.perform(context))
-        root_reduction = float(root_theta_reduction.perform(context))
-        tip_reduction = float(tip_theta_reduction.perform(context))
+        tip_current_ff = float(tip_theta_current_ff.perform(context))
 
         return [Node(
             package='soki_sim',
@@ -313,18 +337,27 @@ def generate_launch_description():
                     'output_topic': 'trajectory_target_joint_states',
                     # 4軸ともCubeMars/RoboMasへのMIT実機出力を常時有効化する
                     # (本launchの目的そのものなのでトグルなし)。
-                    'cubemars_joint_names': ['root_theta_joint', 'tip_theta_joint'],
-                    'cubemars_device_ids': [device_id, device_id],
-                    'cubemars_motor_indices': [root_index, tip_index],
-                    'cubemars_kp': [root_kp, tip_kp],
-                    'cubemars_kd': [root_kd, tip_kd],
-                    'cubemars_torque_ff': [0.0, 0.0],
-                    'cubemars_reduction': [root_reduction, tip_reduction],
+                    'cubemars_joint_names': ['root_theta_joint'],
+                    'cubemars_device_ids': [device_id],
+                    'cubemars_motor_indices': [root_index],
+                    'cubemars_kp': [root_kp],
+                    'cubemars_kd': [root_kd],
+                    'cubemars_torque_ff': [0.0],
+                    'cubemars_reduction': [root_reduction],
                     # note/can_mapping.txt確認済みのdevice_id=21固定。
                     'robomas_device_id': 21,
                     'robomas_kp': float(robomas_kp.perform(context)),
                     'robomas_kd': float(robomas_kd.perform(context)),
                     'robomas_current_ff': float(robomas_current_ff.perform(context)),
+                    # tip_theta(M3、2026-09-08新規): z/rと違いミックス無しの単独直接駆動。
+                    'robomas_tip_theta_index': robomas_tip_index,
+                    'robomas_tip_theta_joint': 'tip_theta_joint',
+                    'tip_theta_reduction': tip_reduction,
+                    'tip_theta_sign': tip_sign,
+                    'tip_theta_offset_rad': tip_offset,
+                    'robomas_tip_theta_kp': tip_kp,
+                    'robomas_tip_theta_kd': tip_kd,
+                    'robomas_tip_theta_current_ff': tip_current_ff,
                 },
             ],
         )]
@@ -385,13 +418,16 @@ def generate_launch_description():
     return LaunchDescription([
         cubemars_device_id_arg,
         root_theta_motor_index_arg,
-        tip_theta_motor_index_arg,
         root_theta_reduction_arg,
-        tip_theta_reduction_arg,
         root_theta_kp_arg,
         root_theta_kd_arg,
+        robomas_tip_theta_index_arg,
+        tip_theta_reduction_arg,
+        tip_theta_sign_arg,
+        tip_theta_offset_rad_arg,
         tip_theta_kp_arg,
         tip_theta_kd_arg,
+        tip_theta_current_ff_arg,
         root_theta_max_velocity_arg,
         root_theta_max_acceleration_arg,
         root_theta_max_deceleration_arg,
