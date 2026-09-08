@@ -180,9 +180,12 @@ TRAJ_NODE_NAME = 'trajectory_follower_node'
 JOY_NODE_NAME = 'joy_teleop_node'
 HOMING_NODE_NAME = 'homing_node'
 REAL_JOINT_BRIDGE_NODE_NAME = 'real_joint_bridge_node'
+AUTOTUNE_NODE_NAME = 'autotune_node'
 # 統合操作タブの「機体ステータス」パネルで起動状況を表示するノード
-# (command_gui_nodeがサービス/パラメータ経由で直接やり取りする4つ)。
-STATUS_NODE_NAMES = [TRAJ_NODE_NAME, JOY_NODE_NAME, HOMING_NODE_NAME, REAL_JOINT_BRIDGE_NODE_NAME]
+# (command_gui_nodeがサービス/パラメータ・トピック経由で直接やり取りするノード。
+# autotune_nodeは2026-09-09追加)。
+STATUS_NODE_NAMES = [TRAJ_NODE_NAME, JOY_NODE_NAME, HOMING_NODE_NAME, REAL_JOINT_BRIDGE_NODE_NAME,
+                     AUTOTUNE_NODE_NAME]
 
 # 状態表示灯(赤色LED、2026-09-08追加)の「ノード未起動」判定対象デバイス。
 # CubeMars(root_theta/tip_theta、device_id=11)・ROBOMAS(z/r、device_id=21)・
@@ -220,7 +223,7 @@ ALL_AXES_LAUNCH_BASE_CMD = [
 # 発生したことへの対策)。GUI起動時に既にこれらのノードが動いていないかを
 # _check_existing_launch_nodesで確認する。
 ALL_AXES_LAUNCH_NODE_NAMES = {
-    'real_joint_bridge_node', 'homing_node', 'trajectory_follower_node',
+    'real_joint_bridge_node', 'homing_node', 'autotune_node', 'trajectory_follower_node',
     'hand_node', 'joy_teleop_node',
 }
 
@@ -1054,6 +1057,11 @@ class CommandGuiNode(Node):
         latched_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self._homing_state = None  # homing_node.STATE_*文字列。未受信ならNone
         self.create_subscription(String, 'homing_state', self._on_homing_state, latched_qos)
+        # z/rのMITゲイン自動調整(autotune_node)の状態・進捗表示用(2026-09-09追加)。
+        self._autotune_state = None
+        self._autotune_progress = None
+        self.create_subscription(String, 'autotune_state', self._on_autotune_state, latched_qos)
+        self.create_subscription(String, 'autotune_progress', self._on_autotune_progress, 10)
         self._estop_active = False
         self.create_subscription(Bool, 'estop_active', self._on_estop_active, latched_qos)
         self._limit_stop_active = False
@@ -1139,6 +1147,22 @@ class CommandGuiNode(Node):
         """homing_node.STATE_*文字列(idle/homing_z/homing_r/done/failed)。
         homing_node未起動でまだ受信していなければNone。"""
         return self._homing_state
+
+    def _on_autotune_state(self, msg):
+        self._autotune_state = msg.data
+
+    def get_autotune_state(self):
+        """autotune_node.STATE_*文字列(idle/running_z/running_r/done/failed)。
+        autotune_node未起動でまだ受信していなければNone。"""
+        return self._autotune_state
+
+    def _on_autotune_progress(self, msg):
+        self._autotune_progress = msg.data
+
+    def get_autotune_progress(self):
+        """autotune_nodeの直近の進捗メッセージ(試行ごとのkp/kd/score等)。
+        未受信ならNone。"""
+        return self._autotune_progress
 
     def _on_estop_active(self, msg):
         self._estop_active = msg.data
@@ -2050,7 +2074,8 @@ class CommandGuiApp(QWidget):
             parent,
             top_funcs=[self._build_apply_all_panel],
             left_funcs=[self._build_trajectory_panel, self._build_joy_speed_panel],
-            right_funcs=[self._build_mit_gain_panel, self._build_robomas_gain_panel])
+            right_funcs=[self._build_mit_gain_panel, self._build_robomas_gain_panel,
+                         self._build_robomas_autotune_panel])
 
     def _build_calibration_tab(self, parent):
         self._build_panel_tab(
@@ -2282,6 +2307,7 @@ class CommandGuiApp(QWidget):
 
     def _refresh_machine_status(self):
         self._update_status_leds()
+        self._refresh_autotune_progress()
         active = self.node.get_active_node_names()
         for name, label in self.node_status_labels.items():
             if name in active:
@@ -4568,6 +4594,98 @@ class CommandGuiApp(QWidget):
 
     def _on_robomas_pause_resume_done(self, success, message):
         _set_status(self.robomas_gain_status_label, message, 'success' if success else 'error')
+
+    def _build_robomas_autotune_panel(self, column):
+        # z/rのMITゲイン(robomas_kp/kd)をautotune_nodeで自動探索するパネル
+        # (2026-09-09追加)。motor1/motor2共通ゲインという実機構成上、z軸試験・
+        # r軸試験を別々に実行できるが提案されるゲインは両軸共通の1組になる点は
+        # 上のMITゲインパネルと同じ(_build_robomas_gain_panelのコメント参照)。
+        box = QGroupBox('MITゲイン 自動調整 (Z/R別、autotune_node)')
+        layout = QVBoxLayout(box)
+
+        desc = QLabel()
+        desc.setWordWrap(True)
+        _set_status(
+            desc,
+            '現在位置を中心に前後(既定±2cm)へ往復させながらkp/kdを自動探索する。\n'
+            'z軸試験・r軸試験は別々に実行できるが、実機がM1/M2共通ゲインのため\n'
+            '提案されるkp/kdは常に両軸で共通の1組になる。\n'
+            '開始前にリミットスイッチから十分離れた位置に置くこと。\n'
+            '完了・中断のいずれでも実機ゲインは自動で元の値へ戻る(提案値は\n'
+            '下の「読込」で表示させてから内容を確認し、必要ならkp/kd欄を書き換えて\n'
+            '「適用」で反映すること。振幅・試行回数等はros2 param(autotune_node)で調整可)。',
+            'muted')
+        layout.addWidget(desc)
+
+        self.autotune_status_label = QLabel()
+        self.autotune_status_label.setWordWrap(True)
+        _set_status(self.autotune_status_label, '未実行', 'muted')
+        layout.addWidget(self.autotune_status_label)
+
+        self.autotune_progress_label = QLabel()
+        self.autotune_progress_label.setWordWrap(True)
+        self.autotune_progress_label.setStyleSheet('font-size: 10px;')
+        _set_status(self.autotune_progress_label, '', 'muted')
+        layout.addWidget(self.autotune_progress_label)
+
+        start_row = QHBoxLayout()
+        start_z_btn = QPushButton('z軸 自動調整開始')
+        start_z_btn.setProperty('variant', 'primary')
+        start_r_btn = QPushButton('r軸 自動調整開始')
+        start_r_btn.setProperty('variant', 'primary')
+        start_z_btn.clicked.connect(self._on_start_autotune_z)
+        start_r_btn.clicked.connect(self._on_start_autotune_r)
+        start_row.addWidget(start_z_btn)
+        start_row.addWidget(start_r_btn)
+        layout.addLayout(start_row)
+
+        stop_btn = QPushButton('中断')
+        stop_btn.setProperty('variant', 'danger')
+        stop_btn.clicked.connect(self._on_stop_autotune)
+        layout.addWidget(stop_btn)
+
+        self._autotune_progress_shown = None  # 直近に表示した進捗文字列(重複更新防止)
+        column.addWidget(box)
+
+    def _on_start_autotune_axis(self, axis_label, service_name):
+        reply = QMessageBox.question(
+            self, f'{axis_label}自動ゲイン調整開始の確認',
+            f'現在位置を中心に前後へ{axis_label}を振幅ぶん動かしながらkp/kdを探索します\n'
+            '(数分かかります)。リミットスイッチから十分離れた位置にあるか確認してください。\n'
+            '探索中はkp/kdが実機へ一時的に反映されますが、完了・中断時に元の値へ戻ります。',
+            QMessageBox.Yes | QMessageBox.No)
+        if reply != QMessageBox.Yes:
+            return
+        _set_status(self.autotune_status_label, f'{axis_label}: 開始中...', 'muted')
+        ok = self.node.call_trigger_service(service_name, self._on_autotune_service_done)
+        if not ok:
+            _set_status(self.autotune_status_label, 'サービス未起動です(autotune_node起動確認)', 'error')
+
+    def _on_start_autotune_z(self):
+        self._on_start_autotune_axis('z軸', '/start_autotune_z')
+
+    def _on_start_autotune_r(self):
+        self._on_start_autotune_axis('r軸', '/start_autotune_r')
+
+    def _on_stop_autotune(self):
+        _set_status(self.autotune_status_label, '中断中...', 'muted')
+        ok = self.node.call_trigger_service('/stop_autotune', self._on_autotune_service_done)
+        if not ok:
+            _set_status(self.autotune_status_label, 'サービス未起動です(autotune_node起動確認)', 'error')
+
+    def _on_autotune_service_done(self, success, message):
+        _set_status(self.autotune_status_label, message, 'success' if success else 'error')
+
+    def _refresh_autotune_progress(self):
+        """autotune_progress(試行ごとのkp/kd/score)は文字列トピックのため、
+        homing_statusと違いサービス応答ではなくポーリングで表示を更新する
+        (_refresh_machine_statusから1秒間隔で呼ばれる)。"""
+        if not hasattr(self, 'autotune_progress_label'):
+            return
+        progress = self.node.get_autotune_progress()
+        if progress is not None and progress != self._autotune_progress_shown:
+            self._autotune_progress_shown = progress
+            _set_status(self.autotune_progress_label, progress, 'info')
 
     def _build_homing_panel(self, column):
         box = QGroupBox('z/rホーミング (homing_node)')

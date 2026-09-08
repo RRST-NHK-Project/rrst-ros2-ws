@@ -289,6 +289,13 @@ def generate_launch_description():
         parameters=[real_joint_bridge_yaml],
     )
 
+    autotune_node = Node(
+        package='soki_sim',
+        executable='autotune_node',
+        name='autotune_node',
+        output='screen',
+    )
+
     hand_node = Node(
         package='soki_sim',
         executable='hand_node',
@@ -471,6 +478,7 @@ def generate_launch_description():
         ros2can_nogui_node,
         real_joint_bridge_node,
         homing_node,
+        autotune_node,
         hand_node,
         trajectory_follower_node,
         command_gui_node,
