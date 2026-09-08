@@ -99,7 +99,7 @@ r軸原点センサ(同じくnode_index=0のSW2):
 可動域0.0~0.432、r_joint可動域-0.622~0.622を参照して、センサが実際に
 どちらの端に付いているか実測):
   z_ref_value_m →
-  r_ref_value_m →
+  r_ref_value_m → 0.135 (実測、2026-09-09。real_joint_bridge.yaml反映済み)
 
 motor1/motor2の速度指令符号とz/r移動方向の対応(実機で低速から試して
 向きを確認、逆なら符号を反転):

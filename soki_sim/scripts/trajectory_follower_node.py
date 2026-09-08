@@ -87,6 +87,7 @@ z/r軸にはそれぞれ上限・下限のリミットスイッチがある(homi
 ロックする(反対方向への後退は許可、_limit_triggered参照)。
 """
 import math
+import time
 
 import rclpy
 from rcl_interfaces.msg import ParameterDescriptor, SetParametersResult
@@ -241,6 +242,19 @@ class TrajectoryFollowerNode(Node):
         self.declare_parameter('robomas_kp', 0.0)
         self.declare_parameter('robomas_kd', 0.0)
         self.declare_parameter('robomas_current_ff', 0.0)
+        # 動き出しキック(静止摩擦補償、2026-09-09追加)。motor1/motor2それぞれの
+        # 台形プロファイル速度(vel_、m1_vel/m2_vel換算後)が0から動き出した瞬間から
+        # robomas_kick_duration_secの間だけ、robomas_kick_current_aをその方向
+        # (速度の符号)に応じた符号で電流指令へ上乗せする(current_ffと違い方向に
+        # 応じて符号が変わるため、逆方向の動きを阻害しない。ユーザー報告:
+        # 「差動のロボマスが片方だけ周りはじめのトルクが足りない」への対応。
+        # current_ffは方向非依存の固定符号なので今回のような動き出しの摩擦補償には
+        # 不向きと判断し、代わりにこちらを追加した。_compute_kick_current参照)。
+        # robomas_kick_enabled=falseなら既存動作のまま完全に無効(既定false)。
+        self.declare_parameter('robomas_kick_enabled', False)
+        self.declare_parameter('robomas_kick_current_a', 0.1)
+        self.declare_parameter('robomas_kick_duration_sec', 0.05)
+        self.declare_parameter('robomas_kick_vel_threshold_mps', 0.001)
         self.declare_parameter('robomas_z_joint', 'z_joint')
         self.declare_parameter('robomas_r_joint', 'r_joint')
         self.declare_parameter('robomas_mix_k', 0.5)
@@ -441,6 +455,11 @@ class TrajectoryFollowerNode(Node):
         # robomas_z_offset_m/r_offset_m変更時にpos_/target_を同期的に再計算する
         # 用(_on_robomas_feedback/_on_set_parameters参照)。帰還未受信ならNone。
         self._last_robomas_m1_m2_ = None
+        # 動き出しキック(_compute_kick_current参照)のモータ別状態。1=motor1,
+        # 2=motor2。was_moving: 前回周期で「動いていた」か。kick_start_time:
+        # 直近で停止->動き出しへ遷移したmonotonic時刻(未遷移ならNone)。
+        self._robomas_kick_was_moving_ = {1: False, 2: False}
+        self._robomas_kick_start_time_ = {1: None, 2: None}
         if device_id == 0:
             return
 
@@ -456,6 +475,10 @@ class TrajectoryFollowerNode(Node):
             'kp': float(self.get_parameter('robomas_kp').value),
             'kd': float(self.get_parameter('robomas_kd').value),
             'current_ff': float(self.get_parameter('robomas_current_ff').value),
+            'kick_enabled': bool(self.get_parameter('robomas_kick_enabled').value),
+            'kick_current_a': float(self.get_parameter('robomas_kick_current_a').value),
+            'kick_duration_sec': float(self.get_parameter('robomas_kick_duration_sec').value),
+            'kick_vel_threshold_mps': float(self.get_parameter('robomas_kick_vel_threshold_mps').value),
             'z_joint': z_name,
             'r_joint': r_name,
             'mix_k': float(self.get_parameter('robomas_mix_k').value),
@@ -716,6 +739,15 @@ class TrajectoryFollowerNode(Node):
                 key = {'robomas_tip_theta_kp': 'kp', 'robomas_tip_theta_kd': 'kd',
                        'robomas_tip_theta_current_ff': 'current_ff'}[p.name]
                 self.robomas_['tip_theta'][key] = float(p.value)
+            elif p.name == 'robomas_kick_enabled' and self.robomas_ is not None:
+                self.robomas_['kick_enabled'] = bool(p.value)
+            elif (p.name in ('robomas_kick_current_a', 'robomas_kick_duration_sec',
+                              'robomas_kick_vel_threshold_mps')
+                  and self.robomas_ is not None):
+                key = {'robomas_kick_current_a': 'kick_current_a',
+                       'robomas_kick_duration_sec': 'kick_duration_sec',
+                       'robomas_kick_vel_threshold_mps': 'kick_vel_threshold_mps'}[p.name]
+                self.robomas_[key] = float(p.value)
             elif (p.name in ('robomas_z_offset_m', 'robomas_r_offset_m')
                   and self.robomas_ is not None and self._last_robomas_m1_m2_ is not None):
                 # homing_node完了時にhoming_nodeから送られてくる(_apply_offset参照)。
@@ -870,6 +902,34 @@ class TrajectoryFollowerNode(Node):
             msg.data = list(buf)
             self.device_publishers_[device_id].publish(msg)
 
+    def _compute_kick_current(self, motor_key, vel_signed_mps, cfg):
+        """動き出しキック(静止摩擦補償)の電流[A]を返す(2026-09-08追加、ファイル
+        冒頭のrobomas_kick_*パラメータ宣言部コメント参照)。vel_signed_mpsは実際に
+        モータへ送る電流の符号と揃えた速度(motor1_sign/motor2_sign適用済み、
+        _publish_robomas_commands参照)。motor_keyは1または2で、motor1/motor2
+        それぞれ独立に「止まっていた(|vel|<=閾値)状態から動き出した」瞬間を
+        検出し、そこからkick_duration_secの間だけkick_current_aをvel_signed_mpsと
+        同じ符号で返す(current_ffと違い移動方向に応じて符号が変わるため、
+        逆方向の動きを阻害しない)。robomas_kick_enabled=falseなら常に0.0を返し、
+        内部状態もリセットする(無効化時は既存動作(current_ffのみ)に戻る)。"""
+        if not cfg['kick_enabled']:
+            self._robomas_kick_was_moving_[motor_key] = False
+            self._robomas_kick_start_time_[motor_key] = None
+            return 0.0
+
+        moving = abs(vel_signed_mps) > cfg['kick_vel_threshold_mps']
+        now = time.monotonic()
+        if moving and not self._robomas_kick_was_moving_[motor_key]:
+            self._robomas_kick_start_time_[motor_key] = now
+        self._robomas_kick_was_moving_[motor_key] = moving
+        if not moving:
+            return 0.0
+
+        start = self._robomas_kick_start_time_[motor_key]
+        if start is None or (now - start) >= cfg['kick_duration_sec']:
+            return 0.0
+        return cfg['kick_current_a'] if vel_signed_mps > 0.0 else -cfg['kick_current_a']
+
     def _publish_robomas_commands(self):
         if self.robomas_ is None or self.robomas_paused_:
             # pause中はhoming_node等の外部ノードがrobomas_device_idを制御している間
@@ -896,6 +956,14 @@ class TrajectoryFollowerNode(Node):
         m1_rpm = cfg['motor1_sign'] * (m1_vel / cfg['pulley_radius_m']) * (60.0 / (2.0 * math.pi))
         m2_rpm = cfg['motor2_sign'] * (m2_vel / cfg['pulley_radius_m']) * (60.0 / (2.0 * math.pi))
 
+        # 動き出しキック(静止摩擦補償)。motor1_sign/motor2_signを適用済みの
+        # 符号付き速度(実際にモータへ流す電流の符号と揃える)で、モータごとに
+        # 独立して停止->動き出しの遷移を検出する(_compute_kick_current参照)。
+        m1_signed_vel = cfg['motor1_sign'] * m1_vel
+        m2_signed_vel = cfg['motor2_sign'] * m2_vel
+        kick1 = self._compute_kick_current(1, m1_signed_vel, cfg)
+        kick2 = self._compute_kick_current(2, m2_signed_vel, cfg)
+
         i1, i2 = cfg['motor1_index'], cfg['motor2_index']
         buf = [0] * ROBOMAS_SLOT_COUNT
         buf[i1] = clamp_int16(m1_deg * 1.0)          # target: 1deg/LSB(アクチュエータ軸)
@@ -908,8 +976,8 @@ class TrajectoryFollowerNode(Node):
         buf[12 + i2] = clamp_int16(cfg['kp'] * 1000.0)
         buf[16 + i1] = clamp_int16(cfg['kd'] * 10000.0)  # mit_kd: 0.0001(A/rpm)/LSB
         buf[16 + i2] = clamp_int16(cfg['kd'] * 10000.0)
-        buf[20 + i1] = clamp_int16(cfg['current_ff'] * 1000.0)  # mit_current_ff: 0.001A/LSB
-        buf[20 + i2] = clamp_int16(cfg['current_ff'] * 1000.0)
+        buf[20 + i1] = clamp_int16((cfg['current_ff'] + kick1) * 1000.0)  # mit_current_ff: 0.001A/LSB
+        buf[20 + i2] = clamp_int16((cfg['current_ff'] + kick2) * 1000.0)
 
         # tip_theta(M3)はz/rの差動ミックスとは独立した単独直接駆動
         # (_publish_cubemars_commandsのroot_theta単軸パターンと同型、2026-09-08新規)。

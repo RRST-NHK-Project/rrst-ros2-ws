@@ -91,6 +91,13 @@ ROOT_THETA_REDUCTION = 112.0 / 24.0
 ROOT_THETA_LIMIT = 12.5 / ROOT_THETA_REDUCTION
 ROOT_THETA_LOWER, ROOT_THETA_UPPER = -ROOT_THETA_LIMIT, ROOT_THETA_LIMIT
 
+# tip_theta(手先θ)は機構的にはcontinuous(2026-09-08、CubeMarsからROBOMAS(M2006)へ
+# 移行し、CubeMars時代のMIT範囲制約(±511.6°相当)は無くなった。note/hardware_
+# mapping.txt「root_theta/tip_thetaはMITモードの都合上そもそも…」参照)だが、
+# 関節スライダー(_build_joint_slider_panel)のUI上の目盛り範囲としては手動ジョグ
+# 用途で十分な±180degにしておく(実機の可動域自体を制限する値ではない)。
+TIP_THETA_LOWER, TIP_THETA_UPPER = -math.pi, math.pi
+
 # lift_link原点(z_joint基準)の地面からの高さオフセット
 Z_OFFSET = BASE_HEIGHT + LIFT_SIZE_Z / 2.0
 WORLD_Z_LOWER = Z_OFFSET + Z_LOWER
@@ -1356,6 +1363,8 @@ class CommandGuiNode(Node):
                     values[name] = pv.string_value
                 elif pv.type == ParameterType.PARAMETER_STRING_ARRAY:
                     values[name] = list(pv.string_array_value)
+                elif pv.type == ParameterType.PARAMETER_BOOL:
+                    values[name] = pv.bool_value
             on_success(values)
 
         future.add_done_callback(_done)
@@ -1383,6 +1392,11 @@ class CommandGuiNode(Node):
                                          double_array_value=[float(x) for x in v])
             elif isinstance(v, str):
                 pv = ParameterValue(type=ParameterType.PARAMETER_STRING, string_value=v)
+            elif isinstance(v, bool):
+                # bool は int のサブクラスなので、下のfloat(v)分岐より先に判定する
+                # 必要がある(そうしないとPARAMETER_DOUBLEとして送ってしまい、
+                # ノード側がboolとして宣言したパラメータへの型不一致で拒否される)。
+                pv = ParameterValue(type=ParameterType.PARAMETER_BOOL, bool_value=v)
             else:
                 pv = ParameterValue(type=ParameterType.PARAMETER_DOUBLE, double_value=float(v))
             params.append(Parameter(name=name, value=pv))
@@ -1431,6 +1445,9 @@ class CommandGuiApp(QWidget):
     CANVAS_SIZE = 320
     MARGIN = 16
     Z_SLIDER_SCALE = 1000  # QSliderは整数値のみのため、mm単位の整数で表現する
+    JOINT_SLIDER_SCALE = 1000  # 関節スライダー(_build_joint_slider_panel)用。
+                                # rad/mどちらも1/1000刻み(約0.057deg、1mm相当)で
+                                # 手動ジョグには十分な分解能。
 
     def __init__(self, node: CommandGuiNode):
         super().__init__()
@@ -1729,6 +1746,102 @@ class CommandGuiApp(QWidget):
             btns.addWidget(b)
         right.addLayout(btns)
         layout.addLayout(right, 1)
+
+        joints = QVBoxLayout()
+        self._build_joint_slider_panel(joints)
+        joints.addStretch(1)
+        layout.addLayout(joints)
+
+    def _build_joint_slider_panel(self, layout):
+        """関節ごと(root_theta/tip_theta/z/r)に直接スライダーでジョグできる
+        パネル(2026-09-09追加、ユーザー要望: 「コントローラー操作は一旦おいて、
+        各軸をスライダーで操作できるように。ホーミング後にスライドバーの位置と
+        実機の位置が合うように」)。左のXY平面/座標入力(直交座標、IK経由)とは
+        独立な関節空間の直接操作。
+
+        「ホーミング後に実機の位置と合う」ようにするため、_refresh_joint_sliders
+        (_machine_status_timerとは別の専用QTimer、100ms間隔)がユーザーが
+        ドラッグ中でない(isSliderDown()==False)スライダーへ常時
+        get_current_positions()の値を反映し続ける(ホーミング後に限らず常時。
+        homing_nodeがoffsetを適用してmixed_joint_statesの値が飛んだ場合も、
+        次のタイマー周期で自動的に追従する)。この反映はblockSignals()で行うため
+        valueChangedは発火せず、ユーザーの実際の操作(ドラッグ・クリック・
+        キーボード)によるvalueChangedとは自己フィードバックなく区別できる。"""
+        box = QGroupBox('関節スライダー (直接ジョグ)')
+        col = QVBoxLayout(box)
+
+        note = QLabel()
+        note.setWordWrap(True)
+        _set_status(
+            note,
+            'ドラッグ中でない間は実機の現在値に自動追従する(ホーミング直後の\n'
+            '位置反映もここで行われる)。ドラッグ・クリック・キー操作で目標値を送信。',
+            'muted')
+        col.addWidget(note)
+
+        joint_slider_specs = (
+            ('root_theta_joint', 'root θ', ROOT_THETA_LOWER, ROOT_THETA_UPPER, 'rad'),
+            ('tip_theta_joint', 'tip θ', TIP_THETA_LOWER, TIP_THETA_UPPER, 'rad'),
+            ('z_joint', 'z', Z_LOWER, Z_UPPER, 'm'),
+            ('r_joint', 'r', R_LOWER, R_UPPER, 'm'),
+        )
+        self.joint_sliders = {}
+        self.joint_slider_value_labels = {}
+        for name, label, lower, upper, unit in joint_slider_specs:
+            row = QHBoxLayout()
+            name_label = QLabel(label)
+            name_label.setFixedWidth(36)
+            row.addWidget(name_label)
+            slider = QSlider(Qt.Horizontal)
+            slider.setMinimum(int(round(lower * self.JOINT_SLIDER_SCALE)))
+            slider.setMaximum(int(round(upper * self.JOINT_SLIDER_SCALE)))
+            slider.setFixedWidth(160)
+            value_label = QLabel('-')
+            value_label.setFixedWidth(64)
+            slider.valueChanged.connect(
+                lambda value, n=name, u=unit: self._on_joint_slider_changed(n, value, u))
+            self.joint_sliders[name] = slider
+            self.joint_slider_value_labels[name] = value_label
+            row.addWidget(slider)
+            row.addWidget(value_label)
+            col.addLayout(row)
+
+        layout.addWidget(box)
+
+        self._joint_slider_timer = QTimer(self)
+        self._joint_slider_timer.timeout.connect(self._refresh_joint_sliders)
+        self._joint_slider_timer.start(100)
+
+    def _refresh_joint_sliders(self):
+        if not self.node.has_current_state():
+            return
+        pos = self.node.get_current_positions()
+        for name, slider in self.joint_sliders.items():
+            if slider.isSliderDown():
+                continue
+            value = clamp(int(round(pos[name] * self.JOINT_SLIDER_SCALE)),
+                          slider.minimum(), slider.maximum())
+            if value == slider.value():
+                continue
+            slider.blockSignals(True)
+            slider.setValue(value)
+            slider.blockSignals(False)
+            self._set_joint_slider_label(name)
+
+    def _set_joint_slider_label(self, name):
+        unit = 'rad' if name in ('root_theta_joint', 'tip_theta_joint') else 'm'
+        value = self.joint_sliders[name].value() / self.JOINT_SLIDER_SCALE
+        self.joint_slider_value_labels[name].setText(f'{value:.3f}{unit}')
+
+    def _on_joint_slider_changed(self, name, _value, _unit):
+        # _refresh_joint_slidersからの反映はblockSignals()で行っているため、
+        # ここに来るのは常にユーザーの実操作(ドラッグ・クリック・キー)。
+        self._set_joint_slider_label(name)
+        theta = self.joint_sliders['root_theta_joint'].value() / self.JOINT_SLIDER_SCALE
+        tip_theta = self.joint_sliders['tip_theta_joint'].value() / self.JOINT_SLIDER_SCALE
+        z = self.joint_sliders['z_joint'].value() / self.JOINT_SLIDER_SCALE
+        r = self.joint_sliders['r_joint'].value() / self.JOINT_SLIDER_SCALE
+        self.node.send_target(theta, z, r, tip_theta)
 
     def _on_z_slider_changed(self, value):
         z = value / self.Z_SLIDER_SCALE
@@ -4277,6 +4390,38 @@ class CommandGuiApp(QWidget):
             grid.addWidget(edit, i, 1)
         layout.addLayout(grid)
 
+        # 動き出しキック(静止摩擦補償、2026-09-09追加。trajectory_follower_node.pyの
+        # robomas_kick_*パラメータ宣言部コメント参照)。current_ffと違い移動方向に
+        # 応じて符号が変わるため、逆方向の動きを阻害しない。motor1/motor2独立に
+        # 「止まっていた状態から動き出した」瞬間を検出し、一定時間だけ電流を上乗せする。
+        kick_box = QGroupBox('動き出しキック (静止摩擦補償)')
+        kick_layout = QVBoxLayout(kick_box)
+        kick_desc = QLabel()
+        kick_desc.setWordWrap(True)
+        _set_status(
+            kick_desc,
+            '差動の片方だけ動き出しのトルクが足りない場合用。current_ffと異なり\n'
+            '移動方向に応じて符号が変わるため、逆方向の動きを阻害しない\n'
+            '(motor1/motor2それぞれ独立に、停止->動き出しの瞬間だけ働く)。',
+            'muted')
+        kick_layout.addWidget(kick_desc)
+
+        self.robomas_kick_enabled_check = QCheckBox('有効化')
+        kick_layout.addWidget(self.robomas_kick_enabled_check)
+
+        kick_grid = QGridLayout()
+        self.robomas_kick_current_a_edit = make_float_edit(0.1, width=70)
+        self.robomas_kick_duration_sec_edit = make_float_edit(0.05, width=70)
+        self.robomas_kick_vel_threshold_mps_edit = make_float_edit(0.001, width=70)
+        for i, (label, edit) in enumerate((
+                ('キック電流 [A]', self.robomas_kick_current_a_edit),
+                ('持続時間 [s]', self.robomas_kick_duration_sec_edit),
+                ('動作判定しきい値 [m/s]', self.robomas_kick_vel_threshold_mps_edit))):
+            kick_grid.addWidget(QLabel(label), i, 0)
+            kick_grid.addWidget(edit, i, 1)
+        kick_layout.addLayout(kick_grid)
+        layout.addWidget(kick_box)
+
         # tip_theta(M3、2026-09-08新規)はz/r(motor1/motor2)と動特性が異なるため
         # 別ゲインを持つ。同じdeviceに同居するため読込/適用ボタンは共通のまま、
         # 入力欄だけ分ける。
@@ -4326,6 +4471,8 @@ class CommandGuiApp(QWidget):
         ok = self.node.request_node_params(
             TRAJ_NODE_NAME,
             ['robomas_kp', 'robomas_kd', 'robomas_current_ff',
+             'robomas_kick_enabled', 'robomas_kick_current_a',
+             'robomas_kick_duration_sec', 'robomas_kick_vel_threshold_mps',
              'robomas_tip_theta_kp', 'robomas_tip_theta_kd', 'robomas_tip_theta_current_ff',
              'robomas_device_id'],
             self._apply_loaded_robomas_gains,
@@ -4342,6 +4489,15 @@ class CommandGuiApp(QWidget):
             set_float(self.robomas_kd_edit, round(values['robomas_kd'], 6))
         if 'robomas_current_ff' in values:
             set_float(self.robomas_current_ff_edit, round(values['robomas_current_ff'], 6))
+        if 'robomas_kick_enabled' in values:
+            self.robomas_kick_enabled_check.setChecked(bool(values['robomas_kick_enabled']))
+        if 'robomas_kick_current_a' in values:
+            set_float(self.robomas_kick_current_a_edit, round(values['robomas_kick_current_a'], 6))
+        if 'robomas_kick_duration_sec' in values:
+            set_float(self.robomas_kick_duration_sec_edit, round(values['robomas_kick_duration_sec'], 6))
+        if 'robomas_kick_vel_threshold_mps' in values:
+            set_float(self.robomas_kick_vel_threshold_mps_edit,
+                      round(values['robomas_kick_vel_threshold_mps'], 6))
         if 'robomas_tip_theta_kp' in values:
             set_float(self.robomas_tip_theta_kp_edit, round(values['robomas_tip_theta_kp'], 6))
         if 'robomas_tip_theta_kd' in values:
@@ -4364,6 +4520,10 @@ class CommandGuiApp(QWidget):
             'robomas_kp': get_float(self.robomas_kp_edit),
             'robomas_kd': get_float(self.robomas_kd_edit),
             'robomas_current_ff': get_float(self.robomas_current_ff_edit),
+            'robomas_kick_enabled': self.robomas_kick_enabled_check.isChecked(),
+            'robomas_kick_current_a': get_float(self.robomas_kick_current_a_edit),
+            'robomas_kick_duration_sec': get_float(self.robomas_kick_duration_sec_edit),
+            'robomas_kick_vel_threshold_mps': get_float(self.robomas_kick_vel_threshold_mps_edit),
             'robomas_tip_theta_kp': get_float(self.robomas_tip_theta_kp_edit),
             'robomas_tip_theta_kd': get_float(self.robomas_tip_theta_kd_edit),
             'robomas_tip_theta_current_ff': get_float(self.robomas_tip_theta_current_ff_edit),
@@ -4753,6 +4913,14 @@ class CommandGuiApp(QWidget):
             set_float(self.robomas_kd_edit, robomas['robomas_kd'])
         if 'robomas_current_ff' in robomas:
             set_float(self.robomas_current_ff_edit, robomas['robomas_current_ff'])
+        if 'robomas_kick_enabled' in robomas:
+            self.robomas_kick_enabled_check.setChecked(bool(robomas['robomas_kick_enabled']))
+        if 'robomas_kick_current_a' in robomas:
+            set_float(self.robomas_kick_current_a_edit, robomas['robomas_kick_current_a'])
+        if 'robomas_kick_duration_sec' in robomas:
+            set_float(self.robomas_kick_duration_sec_edit, robomas['robomas_kick_duration_sec'])
+        if 'robomas_kick_vel_threshold_mps' in robomas:
+            set_float(self.robomas_kick_vel_threshold_mps_edit, robomas['robomas_kick_vel_threshold_mps'])
 
         joy = self._saved_gains.get('joy_speed', {})
         for name, edit in self.joy_speed_edits.items():

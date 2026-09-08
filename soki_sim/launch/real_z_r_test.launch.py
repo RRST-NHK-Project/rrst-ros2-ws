@@ -35,9 +35,13 @@ def generate_launch_description():
     (real_root_theta_test.launch.py参照、デフォルト-1=常時有効)。
     use_viz:=true でrobot_state_publisher/joint_state_publisher/rviz2も起動する。
 
-    robomas_kp/robomas_kd/robomas_current_ffは要実機調整・低ゲインから開始すること
-    (M2006の電流上限1.0A基準でデフォルト値を決めてある。詳細は
-    note/hardware_mapping.txt「z_joint/r_jointの実機出力(RoboMas MITモード)」参照)。
+    robomas_kp/robomas_kd/robomas_current_ffは要実機調整(M2006の電流上限1.0A基準で
+    デフォルト値を決めてある。詳細はnote/hardware_mapping.txt「z_joint/r_jointの
+    実機出力(RoboMas MITモード)」参照)。既定値は2026-09-09時点でsoki_sim/config/
+    gains.json経由の実機調整済み値(Kp=0.5, Kd=0.1)に合わせてあり、
+    z_max_velocity/r_max_velocity(既定0.036m/s)もhoming_nodeのホーミング速度と
+    揃えてある(ユーザー指定:「r,zのゲインを最高速度がホーミングのときと
+    同じくらいになるように」)。
     motor1_sign/motor2_sign(real_joint_bridge.yaml)は旧ENC1/ENC2較正時の値を
     そのまま流用しているだけなので、ロボマス内蔵エンコーダで符号が合っているか
     低速から要確認(note/hardware_mapping.txt「未確認事項」参照)。
@@ -58,33 +62,46 @@ def generate_launch_description():
     real_joint_bridge_yaml = os.path.join(pkg_share, 'config', 'real_joint_bridge.yaml')
 
     robomas_kp_arg = DeclareLaunchArgument(
-        'robomas_kp', default_value='0.02',
-        description='ロボマスMITモードKp[A/deg]。要実機調整、低ゲインから開始すること'
-                    '(M2006の電流上限1.0A基準、誤差10degで0.2A程度になる想定値)')
+        'robomas_kp', default_value='0.5',
+        description='ロボマスMITモードKp[A/deg]。2026-09-09、ユーザー指定「r,zの'
+                    'ゲインを最高速度がホーミングのときと同じくらいになるように」'
+                    'を受け、以前は低ゲインから開始する初期値0.02のままだったのを'
+                    '既にsoki_sim/config/gains.json経由で実機調整済みの値(0.5)に'
+                    '合わせた(GUIの「ゲイン調整」タブから自動適用される値と、この'
+                    'launch単体起動時の初期値が食い違っていたのを解消。M2006の'
+                    '電流上限1.0A基準、誤差2degで飽和する強さ)')
     robomas_kd_arg = DeclareLaunchArgument(
-        'robomas_kd', default_value='0.002',
-        description='ロボマスMITモードKd[A/rpm]。要実機調整、低ゲインから開始すること')
+        'robomas_kd', default_value='0.1',
+        description='ロボマスMITモードKd[A/rpm]。2026-09-09、robomas_kpと同じ理由で'
+                    'gains.jsonの実機調整済み値(0.1)に合わせた')
     robomas_current_ff_arg = DeclareLaunchArgument(
         'robomas_current_ff', default_value='0.0',
         description='ロボマスMITモードcurrent_ff[A](フィードフォワード電流)')
     z_max_velocity_arg = DeclareLaunchArgument(
-        'z_max_velocity', default_value='0.05',
-        description='z_jointの最大速度[m/s](安全のため低めから)')
+        'z_max_velocity', default_value='0.036',
+        description='z_jointの最大速度[m/s]。2026-09-09、ユーザー指定によりhoming_node'
+                    'のホーミング速度(homing_velocity_rpm=30rpm、pulley_pitch_'
+                    'diameter_mm=22.92、mix_k=0.5からz_dot=mix_k*2*(30rpm*pulley_'
+                    'radius)≒0.036m/sと計算)と揃えた(以前は0.05で、既にこれより'
+                    '速い設定だったが、MITゲインが低くこの上限まで実際には出て'
+                    'いなかった。今回ゲインと合わせて速度上限も明示的にホーミング'
+                    '基準に揃える)')
     z_max_acceleration_arg = DeclareLaunchArgument(
-        'z_max_acceleration', default_value='0.1',
-        description='z_jointの最大加速度[m/s^2]')
+        'z_max_acceleration', default_value='0.072',
+        description='z_jointの最大加速度[m/s^2](z_max_velocityの2倍のまま維持)')
     z_max_deceleration_arg = DeclareLaunchArgument(
-        'z_max_deceleration', default_value='0.2',
+        'z_max_deceleration', default_value='0.144',
         description='z_jointの最大減速度[m/s^2](既定はz_max_accelerationの2倍。'
                     '停止時の応答性向上、trajectory_follower_node.py参照)')
     r_max_velocity_arg = DeclareLaunchArgument(
-        'r_max_velocity', default_value='0.05',
-        description='r_jointの最大速度[m/s](安全のため低めから)')
+        'r_max_velocity', default_value='0.036',
+        description='r_jointの最大速度[m/s]。2026-09-09、z_max_velocityと同じ理由・'
+                    '同じ計算(ホーミング速度基準)で揃えた')
     r_max_acceleration_arg = DeclareLaunchArgument(
-        'r_max_acceleration', default_value='0.1',
-        description='r_jointの最大加速度[m/s^2]')
+        'r_max_acceleration', default_value='0.072',
+        description='r_jointの最大加速度[m/s^2](r_max_velocityの2倍のまま維持)')
     r_max_deceleration_arg = DeclareLaunchArgument(
-        'r_max_deceleration', default_value='0.2',
+        'r_max_deceleration', default_value='0.144',
         description='r_jointの最大減速度[m/s^2](既定はr_max_accelerationの2倍。'
                     '停止時の応答性向上、trajectory_follower_node.py参照)')
     use_joy_arg = DeclareLaunchArgument(

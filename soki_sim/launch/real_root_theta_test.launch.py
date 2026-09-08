@@ -35,12 +35,14 @@ def generate_launch_description():
 
     use_robomas:=true でz_joint/r_joint(motor1/motor2、ロボマスdevice_id=21、
     note/can_mapping.txt確認済み)へもMIT指令を送る(2026-08-29追加)。
-    robomas_kp/robomas_kdは要実機調整・低ゲインから開始すること(M2006の電流
-    上限1.0A(ros2can/firmware/.../config.hppのROBOMAS_MAX_CURRENT_A)基準で
-    デフォルト値を決めてある。詳細はnote/hardware_mapping.txt「z_joint/r_jointの
-    実機出力(RoboMas MITモード)」参照)。ホーミング未実施のままだとz/rの原点は
-    未較正(生値)のままなので、先にhoming_nodeのstart_homing_z/start_homing_r
-    を実施すること。
+    robomas_kp/robomas_kdは要実機調整(M2006の電流上限1.0A(ros2can/firmware/.../
+    config.hppのROBOMAS_MAX_CURRENT_A)基準でデフォルト値を決めてある。詳細は
+    note/hardware_mapping.txt「z_joint/r_jointの実機出力(RoboMas MITモード)」
+    参照)。既定値は2026-09-09時点でsoki_sim/config/gains.json経由の実機調整済み
+    値(Kp=0.5, Kd=0.1)に合わせてある(ユーザー指定:「r,zのゲインを最高速度が
+    ホーミングのときと同じくらいになるように」)。ホーミング未実施のままだと
+    z/rの原点は未較正(生値)のままなので、先にhoming_nodeのstart_homing_z/
+    start_homing_rを実施すること。
     """
     pkg_share = get_package_share_directory('soki_sim')
     xacro_file = os.path.join(pkg_share, 'urdf', 'soki_sim.urdf.xacro')
@@ -93,12 +95,18 @@ def generate_launch_description():
         description='trueならz_joint/r_joint(motor1/motor2、ロボマスdevice_id=21)へも'
                     'MIT指令を送る(実機出力有効化)。falseならこれまで通りsoki_sim表示のみ')
     robomas_kp_arg = DeclareLaunchArgument(
-        'robomas_kp', default_value='0.02',
-        description='ロボマスMITモードKp[A/deg]。要実機調整、低ゲインから開始すること'
-                    '(M2006の電流上限1.0A基準、誤差10degで0.2A程度になる想定値)')
+        'robomas_kp', default_value='0.5',
+        description='ロボマスMITモードKp[A/deg]。2026-09-09、ユーザー指定「r,zの'
+                    'ゲインを最高速度がホーミングのときと同じくらいになるように」'
+                    'を受け、以前は低ゲインから開始する初期値0.02のままだったのを'
+                    '既にsoki_sim/config/gains.json経由で実機調整済みの値(0.5)に'
+                    '合わせた(GUIの「ゲイン調整」タブから自動適用される値と、この'
+                    'launch単体起動時の初期値が食い違っていたのを解消。M2006の'
+                    '電流上限1.0A基準、誤差2degで飽和する強さ)')
     robomas_kd_arg = DeclareLaunchArgument(
-        'robomas_kd', default_value='0.002',
-        description='ロボマスMITモードKd[A/rpm]。要実機調整、低ゲインから開始すること')
+        'robomas_kd', default_value='0.1',
+        description='ロボマスMITモードKd[A/rpm]。2026-09-09、robomas_kpと同じ理由で'
+                    'gains.jsonの実機調整済み値(0.1)に合わせた')
 
     device_id = LaunchConfiguration('device_id')
     motor_index = LaunchConfiguration('motor_index')

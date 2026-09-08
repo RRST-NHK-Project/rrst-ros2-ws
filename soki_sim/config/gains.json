@@ -1,51 +1,55 @@
 {
   "trajectory": {
     "max_velocity": {
-      "root_theta_joint": 1.0,
-      "tip_theta_joint": 1.0,
-      "z_joint": 0.075,
-      "r_joint": 0.075
+      "root_theta_joint": 0.1,
+      "tip_theta_joint": 0.1,
+      "z_joint": 0.1,
+      "r_joint": 0.3
     },
     "max_acceleration": {
-      "root_theta_joint": 2.0,
-      "tip_theta_joint": 2.0,
-      "z_joint": 0.15,
-      "r_joint": 0.15
+      "root_theta_joint": 0.2,
+      "tip_theta_joint": 0.2,
+      "z_joint": 0.1,
+      "r_joint": 0.6
     },
     "max_deceleration": {
-      "root_theta_joint": 2.0,
-      "tip_theta_joint": 2.0,
-      "z_joint": 0.15,
-      "r_joint": 0.15
+      "root_theta_joint": 0.4,
+      "tip_theta_joint": 0.4,
+      "z_joint": 0.2,
+      "r_joint": 0.6
     }
   },
   "joy_speed": {
-    "theta_speed": 1.0,
-    "z_speed": 0.075,
-    "r_speed": 0.075,
-    "tip_theta_speed": 1.0
+    "theta_speed": 0.05,
+    "z_speed": 0.02,
+    "r_speed": 0.02,
+    "tip_theta_speed": 0.1
   },
   "mit_gain": {
     "cubemars_kp": {
-      "root_theta_joint": 5.0,
-      "tip_theta_joint": 5.0
+      "root_theta_joint": 5.0
     },
     "cubemars_kd": {
-      "root_theta_joint": 0.5,
-      "tip_theta_joint": 0.5
+      "root_theta_joint": 0.5
     },
     "cubemars_torque_ff": {
-      "root_theta_joint": 0.0,
-      "tip_theta_joint": 0.0
+      "root_theta_joint": 0.0
     }
   },
   "robomas_gain": {
-    "robomas_kp": 0.5,
+    "robomas_kp": 0.005,
     "robomas_kd": 0.1,
-    "robomas_current_ff": 0.0
+    "robomas_current_ff": 0.0,
+    "robomas_kick_enabled": false,
+    "robomas_kick_current_a": 0.1,
+    "robomas_kick_duration_sec": 0.05,
+    "robomas_kick_vel_threshold_mps": 0.001,
+    "robomas_tip_theta_kp": 0.02,
+    "robomas_tip_theta_kd": 0.002,
+    "robomas_tip_theta_current_ff": 0.0
   },
   "sequence": {
-    "safe_transit_z_m": 0.4842,
+    "safe_transit_z_m": 0.252,
     "r_retract_m": -0.322,
     "pickup_z_offset_m": 0.0758,
     "pickup_approach_clearance_m": 0.1,

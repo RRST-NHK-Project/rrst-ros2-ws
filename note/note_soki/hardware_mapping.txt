@@ -402,3 +402,134 @@ _check_homing_switch()として切り出し、_on_tick(タイムアウト監視�
 機構的な動作ストローク)自体が狭すぎるか、homing_velocity_rpm(既定30rpm)が
 残った遅延に対して速すぎる可能性がある。後者はhoming_velocity_rpmを下げることで
 軽減できる(real_joint_bridge.yamlのhoming_node節)。
+
+## z/rのMIT既定ゲイン・最大速度をホーミング速度基準に統一 (2026-09-09、
+## ユーザー指定「r,zのゲインを最高速度がホーミングのときと同じくらいになるように」)
+実機用launch(real_all_axes_test/real_axes_test/real_z_r_test/real_root_theta_
+test.launch.py)のrobomas_kp/robomas_kd既定値が、低ゲインから開始する初期値
+(Kp=0.02, Kd=0.002)のままになっており、soki_sim/config/gains.json経由でGUIの
+「ゲイン調整」タブから自動適用される実機調整済みの値(Kp=0.5, Kd=0.1)と食い違って
+いた(launchを単体で使う場合とGUI経由で使う場合とで実際に効くゲインが変わって
+しまっていた)。上記4つのlaunchファイルのrobomas_kp/robomas_kd既定値をgains.json
+に合わせてKp=0.5, Kd=0.1に更新した。
+
+あわせて、z_max_velocity/r_max_velocity(z/rの台形速度プロファイルの上限、
+real_all_axes_test/real_axes_test/real_z_r_test.launch.py)を、homing_nodeの
+実際のホーミング速度と揃えた:
+  homing_velocity_rpm=30rpm、pulley_pitch_diameter_mm=22.92(半径11.46mm)、
+  mix_k=0.5から、z軸ホーミング時の実速度 z_dot = mix_k*(v1+v2)
+  (v1=v2=30rpm*pulley_radius) ≒ 0.036 m/s(36mm/s)。r軸ホーミング(差動駆動)も
+  motor1/motor2の速さは同じ30rpmなので同じ0.036m/sになる。
+z_max_velocity/r_max_velocityを0.05→0.036、z_max_acceleration/r_max_
+accelerationを0.1→0.072(速度の2倍を維持)、z_max_deceleration/r_max_
+decelerationを0.2→0.144(速度の4倍/加速度の2倍を維持)にそれぞれ変更した。
+以前の0.05はこの0.036よりむしろ高い値だったが、低ゲイン(Kp=0.02)のせいで
+実際にはそこまで速度が出ておらず「もっさりしている」体感の一因になっていた
+可能性がある(ゲインを上げたことで到達できる速度も併せて明示的にホーミング
+速度基準へ揃えた)。
+**要実機確認**: Kp=0.5, Kd=0.1はgains.json記載の既存値をそのまま転記したもので、
+新規の実機測定に基づく値ではない。実機で振動・オーバーシュートが出ないか
+低速から確認すること。z_max_velocity等も同様に、実際にこの速度で動かして
+問題ないか確認すること。
+
+## z/rの動き出しキック(静止摩擦補償) (2026-09-09、ユーザー報告「差動のロボマスが
+## 片方だけ周りはじめのトルクが足りない」への対応)
+**症状**: 差動駆動(motor1/motor2)のうち片方だけ、動き出しのトルクが足りず
+すぐには動かない(位置誤差が溜まってから急に動き出す)。
+
+**検討した原因**: MIT位置PD制御(kp*位置誤差 + kd*速度誤差 + current_ff)は
+動き出し直後は位置誤差が小さいため電流も小さく、静止摩擦(ストライクション)の
+大きい側のモータだけ動き出しが遅れる。kp/kd/current_ffはmotor1/motor2で共通の
+値(_publish_robomas_commands確認済み、非対称の原因ではない)なので、根本原因は
+2台のモータ間の機械的な差(摩擦・プリロード等)と判断。current_ffは単純な
+固定符号の加算値なので、これを上げると一方向は改善するが逆方向は悪化する
+(current_ffは移動方向を見ずに常に同じ符号で加算されるため)、という制約がある。
+
+**対策(実装済み、trajectory_follower_node.py/command_gui_node.py)**: current_ffの
+代わりに、方向依存の「動き出しキック」を追加した。motor1/motor2それぞれ独立に
+台形プロファイル速度(m1_vel/m2_vel、motor1_sign/motor2_sign適用後)が
+robomas_kick_vel_threshold_mps(既定0.001m/s)を超えた瞬間(=停止から動き出した
+瞬間)を検出し、そこからrobomas_kick_duration_sec(既定0.05s)の間だけ
+robomas_kick_current_a(既定0.1A)を、その速度と同じ符号(方向)でcurrent_ffに
+上乗せする。robomas_kick_enabled(既定false)がfalseなら常に0で、既存動作(current_ff
+のみ)と完全に同じ。GUI(command_gui_node.py、「ゲイン調整」タブ→「MITゲイン」
+パネル内「動き出しキック」)から有効化・数値調整・gains.json永続化ができる
+(既存のrobomas_kp/kd等と同じ「読込/適用」パターン)。
+  実装のポイント:
+  - キックの符号はmotor1_sign/motor2_sign適用後の速度の符号を使うため、
+    m1_rpm/m2_rpmの符号(=実際にESCへ送る電流の符号)と一致する
+    (_publish_robomas_commandsのm1_signed_vel/m2_signed_vel参照)。
+  - robomas_kick_enabledはbool型パラメータのため、command_gui_node.pyの
+    set_node_params/request_node_paramsがPARAMETER_BOOLに未対応だったのを
+    今回あわせて対応した(boolはPythonのintサブクラスのため、float変換分岐より
+    先にbool判定する必要がある点に注意)。
+**要実機確認**: robomas_kick_current_a=0.1A、robomas_kick_duration_sec=0.05sは
+初期値の目安であり実機未検証。0.05Aから始めて動き出しが改善するか確認しながら
+0.02~0.05A刻みで調整すること(ユーザーとの会話で合意した進め方)。
+実機用launch(real_*_test.launch.py)にはLaunchArgumentとして未公開(GUIでの
+調整を主な操作経路として想定したため)。CLIから初期値を渡したい場合は
+LaunchArgument化が別途必要。
+
+## ロボマス電流上限(ROBOMAS_MAX_CURRENT_A)がC610の実仕様(10A)より
+## 大幅に低かった (2026-09-09、ユーザー指摘「M2006は10Aいけるはずだが」)
+**発見**: config.hpp(MODE_ROBOMAS、M2006セクション)のROBOMAS_MAX_CURRENT_Aが
+1.0Aになっていたが、これはC610の実仕様(10A、robomas.cppのsendCurC620()が
+M2006向けにMAX_CUR=10.0f/MAX_CUR_VAL=10000でCAN送信をクランプしているのが
+根拠)の1/10でしかなかった。M3508側は20.0Aに「C620仕様上限」という根拠コメントが
+付いているのに対し、M2006側の1.0AにはKP_VELチューニング議論のついでに決められた
+だけで仕様根拠の記載が無く、暫定値のまま放置されていたと見られる。
+ROBOMAS_MAX_CURRENT_AはMIT/速度PID制御ループ側のソフトウェア飽和値で、
+sendCurC620()より手前でconstrainFloat()により先に頭打ちにするため、これまでの
+セッションで議論・調整したKp/Kd/current_ff/動き出しキングは全て実際にはこの1.0A
+の天井の中で動いていたことになる。「差動z/rの動き出しトルク不足」の主因は
+ゲイン不足よりこの制限自体だった可能性が高い。
+**対策**: ユーザー判断で段階的に5.0Aへ引き上げ(config.hpp M2006セクション)。
+仕様上限の10Aまで一気に上げず、まず5Aで発熱・振動・機構への負荷を確認する
+運用とした。
+
+**重要: generated_firmware/はfirmware/xiao-esp32-s3_can2io/の一回限りのコピーで
+自動同期されない**(ros2can/ros2can/firmware_config.pyのgenerate_project()が
+shutil.copytreeで生成するだけで、以後テンプレート側を編集しても自動反映されない)。
+今回の修正前、実際にz/rを駆動する生成済み実機ファームウェア
+generated_firmware/soki_robomas_21/・soki_robomas_21_safe/ は、2026-09-08に
+robomas.cppへ実装したCAN帰還途絶検出(電源投入時の暴走対策)を一切含んでおらず、
+ROBOMAS_MAX_CURRENT_Aも今回の修正が反映されていない1.0Aのままだった(=このセッション
+で行ったrobomas.cpp/config.hppへのファームウェア修正が、実機へは全く反映されて
+いなかった)。両ディレクトリのconfig.hpp/robomas.cppをテンプレートの内容に合わせて
+手動で同期済み(DEVICE_ID/MODE_ROBOMAS/ENC1_MD等のデバイス固有差分は保持)。
+**今後firmware/xiao-esp32-s3_can2io/側を修正した場合は、generated_firmware/
+soki_robomas_21/・soki_robomas_21_safe/(他にMODE_ROBOMASを有効にした生成済み
+ディレクトリがあれば同様に)へも手動で反映すること。書き込み(flash)は
+generated_firmware/側のプロジェクトから行っているとみられるため、テンプレートを
+直すだけでは実機に反映されない。**
+
+## ROBOMAS_MAX_CURRENT_A引き上げの副作用: ホーミングがガクガクする
+## (2026-09-09、ユーザー報告)
+**症状**: 上記のROBOMAS_MAX_CURRENT_A(1.0A→5.0A)引き上げ後、ホーミング動作が
+ガクガクするようになった。
+
+**原因**: ホーミングはhoming_nodeが速度モード(control_mode=0)でmotor1/motor2を
+直接駆動する。robomas.cppの速度PIDはP制御のみ(ROBOMAS_KP_VEL=0.8f、Ki=Kd=0)で、
+「誤差1.25rpm(=電流上限/Kp)を超えると電流上限に張り付く」設計だった。
+  - 1.0A時代: 1.25rpm以上の誤差は常に1.0Aで頭打ち(飽和が事実上のダンピングとして
+    働き、なだらかに加速していた)
+  - 5.0A時代: 誤差1.25~6.25rpmの範囲で以前の最大5倍の電流が出るようになり、
+    Kd=0(微分ダンピング無し)のP制御がこの領域で強く効きすぎてオーバーシュート
+    →揺り戻しを繰り返す「ガクガク」した動きになった
+電流上限を上げたことで速度ループがより強い力を出せるようになった一方、それを
+抑えるダンピング(Kd)が元々0のままだったため、速度モード(ホーミング)で
+顕在化した。MIT位置制御側(通常操作)でも同じ電流上限拡大の影響を受けている
+はずだが、ユーザー報告は今のところホーミング(速度モード)のみ。
+
+**対策(暫定、試したが効果無し)**: ファームウェアの速度PID再チューニング(要再
+ビルド・書き込み)より先に、real_joint_bridge.yamlのhoming_node.homing_
+velocity_rpmを30→15rpmへ下げて試したが、ユーザー報告「だめ。もとのほうが
+良かった」により改善せず。homing_velocity_rpmは30へ戻した(2026-09-09)。
+rpmを下げても電流上限(ROBOMAS_MAX_CURRENT_A)自体は変わらないため、速度誤差が
+ダンピング不足の顕在化する範囲(1.25~6.25rpm)に入ること自体は避けられず、
+症状の根本解消にはならなかったと考えられる。
+**根本対策には再ビルド・書き込みが必要**: robomas.cppのROBOMAS_KP_VEL(M2006、
+現在0.8)を下げるか、ROBOMAS_KD_VELに適切にスケールしたダンピングを入れ直す
+(config.hppのM2006セクションのコメント参照、dt換算に注意)ファームウェア側の
+再チューニングが必要。次にこの症状に対応する際は、rpmを下げる案は既に試して
+効果が無かったことを踏まえ、最初からファームウェア側の再チューニングに進むこと。

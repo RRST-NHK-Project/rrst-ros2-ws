@@ -76,6 +76,14 @@ homing_node:
     motor2_sign: 1.0
 
     # 要実機調整。低速・短めのタイムアウトから試すこと。
+    # 2026-09-09、ROBOMAS_MAX_CURRENT_Aを1.0A→5.0Aへ引き上げた際、速度PID
+    # (robomas.cpp、Kp=0.8のみでKd=0)がダンピング不足でホーミングがガクガクする
+    # 症状が出た(note/hardware_mapping.txt参照)。homing_velocity_rpmを30→15へ
+    # 下げて試したが改善せず(ユーザー報告: 「だめ。もとのほうが良かった」)、
+    # 30へ戻した。ガクガクの根本原因は電流上限引き上げ自体(rpmを下げても
+    # 電流上限は変わらないため症状が残る)なので、対策するならファームウェア側の
+    # 速度PID再チューニング(ROBOMAS_KP_VELを下げる/ROBOMAS_KD_VELにダンピングを
+    # 入れ直す、要再ビルド・書き込み)が必要。
     homing_velocity_rpm: 30.0
     homing_timeout_sec: 20.0
     # 要実機調整: どちらの符号で回すとz/rのどちら向きに動くか
@@ -85,7 +93,7 @@ homing_node:
     r_home_motor2_vel_sign: 1.0
     # 要実測: 原点センサトリガー位置での真のz/r値(z_joint/r_jointの単位、m)
     z_ref_value_m: 0.33
-    r_ref_value_m: 0.0
+    r_ref_value_m: 0.135  # 実測(2026-09-09、+135mm)
 
     bridge_node_name: real_joint_bridge_node
     control_period_sec: 0.05
@@ -111,7 +119,7 @@ trajectory_follower_node:
     z_upper_limit_switch_local_index: 1
     r_lower_limit_switch_device_id: 101
     r_lower_limit_switch_node_index: 1
-    r_lower_limit_switch_local_index: 0
+    r_lower_limit_switch_local_index: 1
     r_upper_limit_switch_device_id: 101
     r_upper_limit_switch_node_index: 1
-    r_upper_limit_switch_local_index: 1
+    r_upper_limit_switch_local_index: 0
