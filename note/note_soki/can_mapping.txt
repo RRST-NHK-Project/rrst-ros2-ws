@@ -17,9 +17,11 @@ device_id (ros2can GUIのデバイス一覧に出る番号、= このボード�
 
 各M{n}スロット(config.hppのCUBEMARS_MOTOR_ID_n、デフォルト101/102/103/104)が
 実際にどの関節のCubeMarsモータに配線されているか:
-  M1 (デフォルトCAN_ID=101) → 対応関節:根本θ(旧手先θ側AK40-10を転用、
-                                R-LinkでCAN_ID=101に設定し直すこと)
-  M2 (デフォルトCAN_ID=102) → 対応関節:未使用(焼損・撤去)
+  M1 (デフォルトCAN_ID=101) → 対応関節:未使用(焼損・撤去)
+  M2 (デフォルトCAN_ID=102) → 対応関節:根本θ(旧手先θ側AK40-10を転用。
+                                R-LinkのCAN IDは据え置き(102=M2のまま)のため、
+                                cubemars_root_theta_index/root_theta_motor_index
+                                も1(M2)に変更済み、real_joint_bridge.yaml参照)
   M3 (デフォルトCAN_ID=103) → 対応関節:未使用
   M4 (デフォルトCAN_ID=104) → 対応関節:未使用
 

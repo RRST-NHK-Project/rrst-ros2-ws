@@ -92,6 +92,11 @@ from std_msgs.msg import Int16MultiArray, Int32MultiArray, String
 from std_srvs.srv import Trigger
 
 STATE_IDLE = 'idle'
+# pause_robomas_outputの応答待ち中(2026-09-08追加)。モータはまだ駆動しない。
+# trajectory_follower_node側が実際に出力を止めたことを確認してからでないと
+# motor1/motor2を動かし始めてはいけない(_start_homing_axisのコメント参照)。
+STATE_PAUSING_Z = 'pausing_z'
+STATE_PAUSING_R = 'pausing_r'
 STATE_HOMING_Z = 'homing_z'
 STATE_HOMING_R = 'homing_r'
 STATE_DONE = 'done'
@@ -182,6 +187,9 @@ class HomingNode(Node):
         self.robomas_data_ = None
         self.state_ = STATE_IDLE
         self.phase_start_time_ = None
+        # stop_homing/連続start_homingで無効化された、届くのが遅れたpause応答
+        # コールバックを無視するための世代カウンタ(_start_homing_axis参照)。
+        self._homing_request_id_ = 0
 
         # 状態表示灯(黄色LED、CAN_HOST device_id=101 MULTI1)用。GUIが購読して
         # 「ホーミング中(HOMING_Z/HOMING_R)」「未ホーミング(IDLE)」を判定する
@@ -222,13 +230,33 @@ class HomingNode(Node):
     # ---------------- サービス ----------------
 
     def _on_start_homing_z(self, request, response):
-        return self._start_homing_axis(STATE_HOMING_Z, 'z', response)
+        return self._start_homing_axis(STATE_PAUSING_Z, STATE_HOMING_Z, 'z', response)
 
     def _on_start_homing_r(self, request, response):
-        return self._start_homing_axis(STATE_HOMING_R, 'r', response)
+        return self._start_homing_axis(STATE_PAUSING_R, STATE_HOMING_R, 'r', response)
 
-    def _start_homing_axis(self, state, axis, response):
-        if self.state_ in (STATE_HOMING_Z, STATE_HOMING_R):
+    def _start_homing_axis(self, pausing_state, homing_state, axis, response):
+        """pause_robomas_outputを呼んでから、その応答が届く(=trajectory_follower_node
+        が実際にrobomas出力を止めた)のを確認してからモータを動かし始める
+        (2026-09-08変更、ユーザー報告: 「Z軸ホーミングでリミットスイッチに当たった
+        瞬間に暴走する。時々しか起きない」)。
+
+        以前はpause_robomas_output呼び出しを投げると同時に(応答を待たずに)
+        state_をHOMING_Z/HOMING_Rへ変えていたため、次のcontrol_period_sec(既定
+        50ms)後の_on_tickで即座にmotor1/motor2への速度指令送信を始めていた。
+        pause_robomas_outputの応答(=trajectory_follower_node側でrobomas_paused_
+        =Trueになるタイミング)がそれより遅れて届くと、trajectory_follower_node
+        がホーミング開始前の位置を保持しようとするMIT位置指令と、homing_node の
+        速度指令が同じserial_tx_{robomas_device_id}へ競合して送られる期間が
+        発生する。この間、実機はMIT指令(元の位置を維持しようとする力)と速度指令
+        (原点センサへ向かう力)の綱引き状態になり、原点センサ到達までの間に
+        蓄積したMIT側の位置誤差が、どちらの指令がESP32側の周期(200Hz)に
+        より遅く届くか という非決定的なタイミングに応じて、原点センサ到達
+        (=homing_node側の指令が0速度へ切り替わる)前後で電流指令に反映され、
+        暴走のように見える動きになっていた(pauseが確実に効くかどうかに依存する
+        ため再現しないこともある)。"""
+        busy_states = (STATE_PAUSING_Z, STATE_PAUSING_R, STATE_HOMING_Z, STATE_HOMING_R)
+        if self.state_ in busy_states:
             response.success = False
             response.message = f'already running (state={self.state_})'
             return response
@@ -236,16 +264,38 @@ class HomingNode(Node):
             response.success = False
             response.message = 'serial_rx_*_unwrapped not received yet'
             return response
-        self.state_ = state
+
+        self._homing_request_id_ += 1
+        request_id = self._homing_request_id_
+        self.state_ = pausing_state
         self._publish_state()
-        self.phase_start_time_ = time.monotonic()
-        self._call_trigger_async(self._pause_robomas_cli_, 'pause_robomas_output')
-        self.get_logger().info(f'homing_node: start (phase={axis})')
+        self.get_logger().info(
+            f'homing_node: pausing trajectory_follower_node robomas output (phase={axis})')
+
+        def _on_paused():
+            # stop_homing、または(理論上は)別のstart_homing呼び出しでこの
+            # リクエストが既に無効化されていれば、届いた応答は無視する(状態文字列
+            # 自体はpausing_z/pausing_rのように使い回されるため、文字列比較ではなく
+            # 世代カウンタで判定する)。
+            if request_id != self._homing_request_id_:
+                return
+            self.state_ = homing_state
+            self._publish_state()
+            self.phase_start_time_ = time.monotonic()
+            self.get_logger().info(f'homing_node: start (phase={axis})')
+
+        self._call_trigger_async(self._pause_robomas_cli_, 'pause_robomas_output', on_done=_on_paused)
         response.success = True
         response.message = f'homing started (phase={axis})'
         return response
 
     def _on_stop_homing(self, request, response):
+        # 保留中のpause応答コールバック(_start_homing_axisの_on_paused)がまだ
+        # 届いていなければ無効化する。無効化しないと、この後に別軸のstart_homingを
+        # 呼んだ場合、古いpause応答が新しいホーミングのHOMING_Z/HOMING_R遷移を
+        # (stateの文字列比較ではなく世代カウンタで防いでいるので)誤って引き起こす
+        # ことはないが、念のためここでも世代を進めておく。
+        self._homing_request_id_ += 1
         self._send_velocity(0.0, 0.0)
         self.state_ = STATE_IDLE
         self._publish_state()
@@ -259,7 +309,7 @@ class HomingNode(Node):
         """motor1/motor2を駆動せず、現在位置をz_ref_value_m/r_ref_value_mの位置と
         みなしてoffsetを即座に確定する(ファイル冒頭docstring参照)。呼び出し前に
         機体を原点センサ位置相当へ物理的に合わせておくこと。"""
-        if self.state_ in (STATE_HOMING_Z, STATE_HOMING_R):
+        if self.state_ in (STATE_PAUSING_Z, STATE_PAUSING_R, STATE_HOMING_Z, STATE_HOMING_R):
             response.success = False
             response.message = f'ホーミング動作中は使えません(state={self.state_})'
             return response
@@ -292,11 +342,17 @@ class HomingNode(Node):
         msg.data = self.state_
         self.state_pub_.publish(msg)
 
-    def _call_trigger_async(self, client, label):
-        # trajectory_follower_node未起動(実機出力無効)でも安全に無視できるよう、
-        # サービス未提供時はログ警告のみでホーミング自体は継続する。
+    def _call_trigger_async(self, client, label, on_done=None):
+        """on_done: 成功/失敗を問わず、応答が確定した後(またはサービス未提供で
+        即座に諦めた場合はその場)に呼ばれるコールバック(2026-09-08追加、
+        _start_homing_axisがpause_robomas_outputの完了を待ってからモータを
+        動かし始めるのに使う)。trajectory_follower_node未起動(実機出力無効)でも
+        安全に無視できるよう、サービス未提供時はログ警告のみでホーミング自体は
+        継続する(on_doneはこの場合も呼ぶ)。"""
         if not client.service_is_ready():
             self.get_logger().warning(f'homing_node: {label} service not available, skipped')
+            if on_done is not None:
+                on_done()
             return
 
         def _done(fut):
@@ -306,6 +362,9 @@ class HomingNode(Node):
                     self.get_logger().warning(f'homing_node: {label} failed: {res.message}')
             except Exception as exc:
                 self.get_logger().error(f'homing_node: {label} call error: {exc}')
+            finally:
+                if on_done is not None:
+                    on_done()
 
         client.call_async(Trigger.Request()).add_done_callback(_done)
 
@@ -313,6 +372,20 @@ class HomingNode(Node):
 
     def _on_can_host(self, msg: Int32MultiArray):
         self.can_host_data_ = msg.data
+        # ホーミング中は、次の_on_tick(最大control_period_sec後、既定50ms)を
+        # 待たずにCAN_HOSTの帰還が届いた瞬間に原点センサをチェックする
+        # (2026-09-08追加、ユーザー報告: 「R軸の原点取りがセンサが反応していない
+        # ような挙動(そのままつっこむ)をする。しっかりと止まることもある」)。
+        # IO_SW_Input()(ros2can firmware pin_ctrl_task.cpp)はSWの生値を
+        # デバウンス無しでそのまま送っており、ポーリング(_on_tick任せ)だと
+        # センサが実際に検出されてから停止指令を送るまでに最大control_period_sec
+        # ぶんの遅延が上乗せされる。原点センサの検出範囲(機構が停止指令に反応
+        # するまでに進める余裕)が狭いと、この遅延の間に通り過ぎてしまい
+        # 「センサ無反応で突っ込む」ように見える。帰還到着のたびに即座にチェック
+        # することでこの遅延を無くす(タイミング次第で再現したりしなかったりする
+        # のは、この遅延が固定値ではなくCAN/シリアル中継やexecutorのスケジュー
+        # リングに依存する非決定的な量だったため)。
+        self._check_homing_switch()
 
     def _on_robomas_feedback(self, msg: Int32MultiArray):
         self.robomas_data_ = msg.data
@@ -326,6 +399,39 @@ class HomingNode(Node):
 
     def _switch_triggered(self, slot):
         return self.can_host_data_[slot] == self.switch_triggered_value_
+
+    def _check_homing_switch(self):
+        """state_がHOMING_Z/HOMING_Rのとき、対応する原点センサが検出されて
+        いれば停止・offset確定まで行う。_on_tick(タイムアウト監視・速度指令の
+        継続送信)と_on_can_host(CAN_HOST帰還到着時の即時チェック、2026-09-08
+        追加)の両方から呼ばれる(_on_tick側で既にDONEへ遷移済みなら、この
+        メソッド冒頭のstate_チェックで何もせず戻るので二重発火はしない)。
+        センサ検出でoffsetを確定・停止した場合True、それ以外はFalseを返す。"""
+        if self.state_ == STATE_HOMING_Z:
+            axis, slot, ref_value = 'z', self.z_sw_slot_, self.z_ref_value_m_
+        elif self.state_ == STATE_HOMING_R:
+            axis, slot, ref_value = 'r', self.r_sw_slot_, self.r_ref_value_m_
+        else:
+            return False
+        if self.can_host_data_ is None or self.robomas_data_ is None:
+            return False
+        if not self._switch_triggered(slot):
+            return False
+
+        self._send_velocity(0.0, 0.0)
+        m1, m2 = self._current_motor_joints()
+        raw = self.mix_k_ * (m1 + m2) if axis == 'z' else self.mix_k_ * (m1 - m2)
+        offset_m = ref_value - raw
+        self.get_logger().info(
+            f'homing_node: {axis}-axis limit reached ({axis}_raw={raw:.5f}, '
+            f'{axis}_offset_m={offset_m:.5f}). applying offset')
+        self.state_ = STATE_DONE
+        self._publish_state()
+        self._apply_offset(
+            axis, offset_m,
+            on_all_done=lambda: self._call_trigger_async(
+                self._resume_robomas_cli_, 'resume_robomas_output'))
+        return True
 
     # ---------------- 制御ループ ----------------
 
@@ -355,43 +461,23 @@ class HomingNode(Node):
                 f'motors stopped.')
             return
 
+        # センサ検出チェックは_on_can_host側で帰還到着のたびに既に行っているが、
+        # (a)_on_tickの方が先に実行された場合の取りこぼし防止、(b)何らかの理由で
+        # _on_can_hostが呼ばれなかった場合の保険として、ここでも呼ぶ
+        # (_check_homing_switch冒頭のstate_チェックにより二重発火はしない)。
+        if self._check_homing_switch():
+            return
+
         if self.state_ == STATE_HOMING_Z:
-            if self._switch_triggered(self.z_sw_slot_):
-                self._send_velocity(0.0, 0.0)
-                m1, m2 = self._current_motor_joints()
-                z_raw = self.mix_k_ * (m1 + m2)
-                z_offset_m = self.z_ref_value_m_ - z_raw
-                self.get_logger().info(
-                    f'homing_node: z-axis limit reached (z_raw={z_raw:.5f}, '
-                    f'z_offset_m={z_offset_m:.5f}). applying offset')
-                self._apply_offset('z', z_offset_m)
-                self.state_ = STATE_DONE
-                self._publish_state()
-                self._call_trigger_async(self._resume_robomas_cli_, 'resume_robomas_output')
-                return
             self._send_velocity(
                 self.z_home_m1_sign_ * self.homing_velocity_rpm_,
                 self.z_home_m2_sign_ * self.homing_velocity_rpm_)
-
         elif self.state_ == STATE_HOMING_R:
-            if self._switch_triggered(self.r_sw_slot_):
-                self._send_velocity(0.0, 0.0)
-                m1, m2 = self._current_motor_joints()
-                r_raw = self.mix_k_ * (m1 - m2)
-                r_offset_m = self.r_ref_value_m_ - r_raw
-                self.get_logger().info(
-                    f'homing_node: r-axis limit reached (r_raw={r_raw:.5f}, '
-                    f'r_offset_m={r_offset_m:.5f}). applying offset')
-                self._apply_offset('r', r_offset_m)
-                self.state_ = STATE_DONE
-                self._publish_state()
-                self._call_trigger_async(self._resume_robomas_cli_, 'resume_robomas_output')
-                return
             self._send_velocity(
                 self.r_home_m1_sign_ * self.homing_velocity_rpm_,
                 self.r_home_m2_sign_ * self.homing_velocity_rpm_)
 
-    def _apply_offset(self, axis, offset_m):
+    def _apply_offset(self, axis, offset_m, on_all_done=None):
         """axis('z'/'r')のoffsetだけをreal_joint_bridge_node・trajectory_follower_node
         双方へ反映する(2026-09-05変更、以前は両軸まとめて反映していたが、z/rを
         独立にホーミングできるようにしたため片方ずつ送るようにした。もう一方の
@@ -399,17 +485,36 @@ class HomingNode(Node):
         trajectory_follower_node(実機MIT指令用)の両方が独自にoffsetを保持している
         (2026-08-29追加。trajectory_follower_node側はrobomas_z/r_offset_mという
         パラメータ名で、実機出力無効(robomas_device_id未設定)なら値自体は
-        使われないだけなので、未起動でも安全に無視できる)。"""
+        使われないだけなので、未起動でも安全に無視できる)。
+
+        on_all_done: 両方のSetParameters呼び出しが完了(成功/失敗問わず)した後に
+        呼ばれるコールバック(2026-09-08追加)。呼び出し元はこれを使って
+        resume_robomas_outputをoffset反映後まで遅らせること。trajectory_follower_node
+        は`robomas_paused_`がFalseに戻った瞬間に実機帰還でのpos_追従を止めるため
+        (_on_robomas_feedback参照)、new offsetの反映より先にresumeが届くと
+        pos_が古いoffset基準のまま凍結され、MIT指令がoffset分だけ瞬時にステップ
+        してしまう(実機急動作の原因になっていたレースコンディション)。"""
         bridge_param = 'z_offset_m' if axis == 'z' else 'r_offset_m'
         traj_param = 'robomas_z_offset_m' if axis == 'z' else 'robomas_r_offset_m'
-        self._apply_offset_to(self._set_params_cli, bridge_param, offset_m, 'real_joint_bridge_node')
-        self._apply_offset_to(self._set_params_cli_traj_, traj_param, offset_m, 'trajectory_follower_node')
 
-    def _apply_offset_to(self, client, param_name, offset_m, label):
+        remaining = [2]
+
+        def _one_done():
+            remaining[0] -= 1
+            if remaining[0] == 0 and on_all_done is not None:
+                on_all_done()
+
+        self._apply_offset_to(self._set_params_cli, bridge_param, offset_m,
+                               'real_joint_bridge_node', _one_done)
+        self._apply_offset_to(self._set_params_cli_traj_, traj_param, offset_m,
+                               'trajectory_follower_node', _one_done)
+
+    def _apply_offset_to(self, client, param_name, offset_m, label, on_done):
         if not client.service_is_ready():
             self.get_logger().error(
                 f'homing_node: {label} set_parameters service not available, '
                 f'offset NOT applied. Is {label} running?')
+            on_done()
             return
         params = [
             Parameter(name=param_name,
@@ -424,6 +529,8 @@ class HomingNode(Node):
                 self.get_logger().info(f'homing_node: {param_name} applied to {label}')
             except Exception as exc:
                 self.get_logger().error(f'homing_node: failed to apply {param_name} to {label}: {exc}')
+            finally:
+                on_done()
 
         future.add_done_callback(_done)
 

@@ -54,9 +54,13 @@ robomas_device_id(21)のserial_rx_*_unwrappedを購読してM{n} angleを読む�
 ## デバイスIDは実機再確認により修正済み。2026-09-08方針変更でtip_thetaは
 ## CubeMars(M2)からROBOMAS(M3)へ移動、下表反映済み)
 MODE_CUBEMARSデバイス (device_id=11):
-  M1 (CAN_ID=101) → root_theta_joint (絶対値エンコーダ、M{n} position帰還を使用。
-                     旧tip_theta側のAK40-10を転用、R-LinkでCAN ID=101に設定)
-  M2/M3/M4 → 未使用
+  M1 → 未使用(焼損・撤去)
+  M2 (CAN_ID=102) → root_theta_joint (絶対値エンコーダ、M{n} position帰還を使用。
+                     旧tip_theta側のAK40-10を転用。R-LinkのCAN IDは据え置き
+                     (102=M2のまま、101への設定変更はしていない)なので、
+                     cubemars_root_theta_index/root_theta_motor_indexも
+                     1(M2)に変更済み)
+  M3/M4 → 未使用
 MODE_ROBOMASデバイス (device_id=21):
   M1 (CAN_ID=0x201) → motor1_joint (速度指令・位置の真値(M{n} angle帰還)の両方に使用)
   M2 (CAN_ID=0x202) → motor2_joint (同上)
@@ -282,3 +286,119 @@ nodeが従来通りmixed_joint_statesへ直接publishする。
   (real_joint_bridge.yaml)をそのままロボマス内蔵エンコーダ帰還向けに転用している。
   2つのエンコーダで回転方向の符号が同じとは限らないため、実機でmotor1/motor2を
   それぞれ単体で少し回して符号が合っているか要再確認。
+
+## ロボマスCAN帰還の途絶検出 (2026-09-08、ユーザー報告の不具合対応)
+**症状**: マイコン(ros2can xiao-esp32-s3_can2io、MODE_ROBOMAS)の電源は入れた
+まま、C610/M2006側(モータ駆動)の電源だけを落として入れ直すと、電源投入の
+瞬間にロボマスが勝手に動き出す。
+
+**原因**: robomas.cppのreceiveFeedback()は、C610からのCAN帰還フレームが実際に
+届いたときだけangle[]/vel[]/current_a[]を更新する作りだった。C610側の電源を
+落とすと帰還フレーム自体が来なくなるが、マイコン自身は動き続けるため、
+angle[]等は電源断直前の値で凍結されたまま、robomasTask()は毎周期(200Hz)
+その凍結値を「現在値」としてMIT位置PD制御の誤差計算(pos_error = target -
+angle[i])に使い続け、かつTx_16Data経由でホストへも凍結値をそのまま送信し
+続けていた(ホスト側はメッセージ自体は正常な頻度で届くため途絶に気付けない)。
+C610の電源が復帰すると、その瞬間の実際のロータ角度(1回転内のraw値)と、
+凍結されたままのangle[]・ホストが送り続けている現在の目標値との間に大きな
+差分が生じ、MIT PD制御がその差分を電流指令に変換してモータが唐突に動き出す。
+さらに、周回検出(rotation_count、diffベース)が電源断中の物理的なズレを
+「1周した」と誤検出し、angle[]をさらに狂わせる場合もある。
+
+**対策(実装済み、robomas.cpp/config.hpp)**: モータごとにCAN帰還の最終受信
+時刻を記録し、ROBOMAS_FEEDBACK_STALE_MS(既定100ms)以上帰還が無ければ
+「途絶」とみなして電流指令を0に固定する(MIT/速度どちらのモードでも計算自体を
+スキップ)。途絶から復帰した最初のフレームでは周回カウントをその場でリセット
+(diffによる周回誤検出を防ぐ)し、復帰後ROBOMAS_RESYNC_HOLD_MS(既定200ms)は
+引き続き電流指令を0に固定してangle[]の飛びがそのままモータへ出力されるのを
+防ぐ。z/r側は元々毎起動homing_nodeでの再ホーミングが前提の設計なので、この
+対策を入れても「電源復帰後は再ホーミングが必要」という運用自体は変わらない
+(このケースはあくまで復帰の瞬間の唐突な動き出しを防ぐための安全対策)。
+**要実機確認**: ROBOMAS_FEEDBACK_STALE_MS/ROBOMAS_RESYNC_HOLD_MSの値は暫定
+(通常のCAN帰還間隔・電源off/onの時間スケールから逆算した値で、実機での
+挙動未検証)。ファームウェアの再ビルド・書き込みが必要。
+
+## homing_nodeのpause_robomas_output競合 (2026-09-08、ユーザー報告の不具合対応)
+**症状**: z軸ホーミングでリミットスイッチに当たった瞬間に暴走する。ただし
+毎回ではなく、時々しか起きない。
+
+**原因**: homing_node._start_homing_axis()が、trajectory_follower_nodeの
+pause_robomas_output(std_srvs/Trigger)を呼ぶのと同時に(応答を待たずに)
+state_をHOMING_Z/HOMING_Rへ変えていた。次のcontrol_period_sec(既定50ms)後の
+_on_tickはstate_だけを見てmotor1/motor2への速度指令送信を始めるため、
+pause_robomas_outputの応答(trajectory_follower_node側でrobomas_paused_=True
+になるタイミング)がそれより遅れて届くと、trajectory_follower_nodeがホーミング
+開始前の位置を保持しようとするMIT位置指令と、homing_nodeの速度指令が同じ
+serial_tx_{robomas_device_id}へ競合して送られる期間ができる。この間実機は
+「元の位置を維持しようとするMIT指令」と「原点センサへ向かう速度指令」の
+綱引き状態になり、原点センサ到達までに蓄積したMIT側の位置誤差が、どちらの
+指令がESP32側の周期(200Hz)により遅く届くかという非決定的なタイミングに
+応じて電流指令に反映される。pauseが実際に効くタイミング(ROS2のサービス
+呼び出し・実行順序)に依存するレースコンディションのため、再現したりしな
+かったりする。
+
+**対策(実装済み、homing_node.py)**: pause_robomas_outputの応答が届く(または
+サービス未提供と判明する)まではSTATE_PAUSING_Z/STATE_PAUSING_R状態に留まり、
+_on_tickはこの間モータに一切指令を送らない。応答確認後に初めてSTATE_HOMING_Z/
+STATE_HOMING_Rへ遷移してモータを動かし始める(ホーミング完了時にoffset適用を
+待ってからresume_robomas_outputを呼ぶ、という以前の修正と対称の構造。z_offset_m
+反映後のジャンプ対策と合わせて、「pause確認 → ホーミング駆動 → offset確認 →
+resume」の順序をコード上で保証するようにした)。
+
+**追加報告(2026-09-08、同日)**: 上記の順序保証だけでは直らず、依然として
+ホーミング終了直後に目標値へ向かって動く(暴走のように見える)症状が残って
+いた。ユーザー要望: 「ホーミング終了後に目標値に向かっているならやめて
+ほしい。その位置で停止してもらって構わない」。
+
+**根本原因**: trajectory_follower_node._on_robomas_feedback()は、
+robomas_paused_中(=ホーミング中)は帰還のたびにpos_/target_をその場の実位置へ
+追従させ続けるが、robomas_paused_がFalseに戻った(resume_robomas_output後)
+瞬間からこの追従を止める(has_target_かつnot paused、で即return)。一方
+homing_nodeがhoming完了時に送るrobomas_z_offset_m/r_offset_mのSetParameters
+は、_apply_offsetの完了を待ってからresume_robomas_outputを呼ぶよう順序は
+保証していても、「trajectory_follower_node側でoffsetパラメータの値が実際に
+更新されてから、_on_robomas_feedbackが少なくとも1回はその新しいoffsetで
+pos_/target_を再計算する」ことまでは保証していなかった。offset更新とresume
+の2つのサービス要求はtrajectory_follower_node自身のexecutor上で処理される
+ため、その間に_on_robomas_feedbackの呼び出しが挟まるかどうかはトピック到着と
+executorのスケジューリング順序次第の非決定的な事象で、挟まらなかった場合は
+pos_/target_が古いoffset基準のまま凍結され、resume後のMIT指令がその古い値
+(=現在位置から見て新旧offsetの差分だけ離れた「目標」)へ向けて動いてしまう。
+
+**対策(実装済み、trajectory_follower_node.py)**: _on_robomas_feedback()で
+毎回(has_target_/robomas_paused_の状態に関わらず)最新のm1/m2を
+self._last_robomas_m1_m2_へキャッシュしておき、_on_set_parameters()の
+robomas_z_offset_m/robomas_r_offset_m変更ハンドラの中で、そのキャッシュ済み
+m1/m2と新しいoffset値を使って同期的にpos_/target_/vel_を再計算・確定する
+(z/rは差動ミックスなので、片方のoffsetだけが変わってももう片方も一緒に
+再計算する)。これによりoffsetパラメータが変わった、まさにそのコールバックの
+中でpos_==target_(その場で静止)が確定するため、_on_robomas_feedbackの次回
+呼び出しタイミングやexecutorのスケジューリング順序に一切依存しなくなった。
+
+## homing_nodeの原点センサ検出遅延 (2026-09-08、ユーザー報告の不具合対応)
+**症状**: R軸の原点取りで、原点センサが反応していないような挙動(そのまま
+突っ込む)をする。ただし毎回ではなく、しっかり止まることもある。
+
+**原因**: 原点センサの検出は従来homing_node._on_tick()(control_period_sec
+既定50msのタイマー)でのみポーリングしていた。IO_SW_Input()(ros2can
+firmware pin_ctrl_task.cpp)はSWの生値をデバウンス無しでそのまま送っており、
+homing_node._switch_triggered()もその時点の値をそのまま見るだけの単純な
+レベル判定(エッジ検出・ラッチ無し)だった。センサが実際に検出されてから
+_on_tickが停止指令を送るまでには、CAN/シリアル中継の遅延に加え最大
+control_period_secぶんのポーリング遅延が上乗せされる。原点センサの検出範囲
+(停止指令が効くまでに機構が進める余裕)がこの合計遅延より狭いと、センサの
+検出範囲を通り過ぎてから停止指令が届くことになり「センサ無反応で突っ込む」
+ように見える。この遅延量はCAN/シリアル中継やexecutorのスケジューリングに
+依存する非決定的な量のため、状況によって間に合ったり間に合わなかったりする
+(再現したりしなかったりする)。
+
+**対策(実装済み、homing_node.py)**: 原点センサのチェックロジックを
+_check_homing_switch()として切り出し、_on_tick(タイムアウト監視用のポーリング、
+保険として引き続き呼ぶ)に加えて_on_can_host(CAN_HOSTの帰還を受信した
+まさにそのコールバック)からも即座に呼ぶようにした。これによりポーリング周期
+(最大50ms)ぶんの遅延が無くなり、CAN/シリアル中継の遅延だけが残る(こちらは
+ハードウェア/通信経路側の遅延なのでソフトウェア側では詰め切れない)。
+**要実機確認**: この対策後もまだ発生する場合は、原点センサの検出範囲(スイッチの
+機構的な動作ストローク)自体が狭すぎるか、homing_velocity_rpm(既定30rpm)が
+残った遅延に対して速すぎる可能性がある。後者はhoming_velocity_rpmを下げることで
+軽減できる(real_joint_bridge.yamlのhoming_node節)。

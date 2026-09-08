@@ -437,6 +437,10 @@ class TrajectoryFollowerNode(Node):
         device_id = int(self.get_parameter('robomas_device_id').value)
         self.robomas_ = None
         self.robomas_paused_ = False
+        # 最新のm1/m2(motor1_joint/motor2_joint、pulley_radius_m換算済み)。
+        # robomas_z_offset_m/r_offset_m変更時にpos_/target_を同期的に再計算する
+        # 用(_on_robomas_feedback/_on_set_parameters参照)。帰還未受信ならNone。
+        self._last_robomas_m1_m2_ = None
         if device_id == 0:
             return
 
@@ -557,13 +561,17 @@ class TrajectoryFollowerNode(Node):
         # 送ってしまう。
         if self.robomas_ is None:
             return
-        if self.has_target_ and not self.robomas_paused_:
-            return
         cfg = self.robomas_
         m1_deg = msg.data[cfg['motor1_index']] * ROBOMAS_FEEDBACK_POSITION_SCALE_DEG
         m2_deg = msg.data[cfg['motor2_index']] * ROBOMAS_FEEDBACK_POSITION_SCALE_DEG
         m1 = cfg['motor1_sign'] * math.radians(m1_deg) * cfg['pulley_radius_m']
         m2 = cfg['motor2_sign'] * math.radians(m2_deg) * cfg['pulley_radius_m']
+        # robomas_z_offset_m/r_offset_mが変わった瞬間にpos_/target_を同期的に
+        # 再計算するため(_on_set_parameters参照)、has_target_/robomas_paused_の
+        # 状態に関わらず常に最新のm1/m2をキャッシュしておく。
+        self._last_robomas_m1_m2_ = (m1, m2)
+        if self.has_target_ and not self.robomas_paused_:
+            return
         z_offset = self.get_parameter('robomas_z_offset_m').value
         r_offset = self.get_parameter('robomas_r_offset_m').value
         z = cfg['mix_k'] * (m1 + m2) + z_offset
@@ -708,6 +716,32 @@ class TrajectoryFollowerNode(Node):
                 key = {'robomas_tip_theta_kp': 'kp', 'robomas_tip_theta_kd': 'kd',
                        'robomas_tip_theta_current_ff': 'current_ff'}[p.name]
                 self.robomas_['tip_theta'][key] = float(p.value)
+            elif (p.name in ('robomas_z_offset_m', 'robomas_r_offset_m')
+                  and self.robomas_ is not None and self._last_robomas_m1_m2_ is not None):
+                # homing_node完了時にhoming_nodeから送られてくる(_apply_offset参照)。
+                # offsetの変更は「現在の実位置の基準を較正し直す」操作でしかない
+                # はずだが、pos_/target_の再計算を_on_robomas_feedbackの次回呼び出し
+                # 任せにすると、それがいつ来るか(robomas_paused_解除やhas_target_との
+                # 兼ね合い、executorのスケジューリング順序)に依存してしまい、古い
+                # 基準のままのpos_/target_へ向けてMIT指令が「唐突に動き出す」ことが
+                # あった(2026-09-08、ユーザー報告: 「ホーミング終了後に目標値に
+                # 向かっているならやめてほしい。その位置で停止してもらって構わない」)。
+                # そこでoffsetパラメータが変わったこのコールバックの中で同期的に
+                # pos_/target_を再計算し、そのまま静止させる(_on_robomas_feedbackの
+                # z/r計算と同じ式。z/rは差動ミックスなので、片方のoffsetだけが今回の
+                # paramsに含まれていてももう片方も一緒に再計算しておく)。
+                cfg = self.robomas_
+                m1, m2 = self._last_robomas_m1_m2_
+                z_offset = (float(p.value) if p.name == 'robomas_z_offset_m'
+                            else self.get_parameter('robomas_z_offset_m').value)
+                r_offset = (float(p.value) if p.name == 'robomas_r_offset_m'
+                            else self.get_parameter('robomas_r_offset_m').value)
+                z = cfg['mix_k'] * (m1 + m2) + z_offset
+                r = cfg['mix_k'] * (m1 - m2) + r_offset
+                for name, val in ((cfg['z_joint'], z), (cfg['r_joint'], r)):
+                    self.pos_[name] = val
+                    self.vel_[name] = 0.0
+                    self.target_[name] = val
         return SetParametersResult(successful=True)
 
     def target_callback(self, msg: JointState):

@@ -6,9 +6,10 @@ real_joint_bridge_node:
     # ---- CubeMars (root_theta_joint のみ。2026-09-08方針変更: root_theta側の
     # AK40-10が電源逆接続で焼損したため、無事だったtip_theta側のAK40-10を
     # root_theta へ転用。tip_thetaはRoboMas M2006+C610(ROBOMASブロックのM3)へ
-    # 移行した。R-Link側でCAN ID=101(M1)に設定し直す前提) ----
+    # 移行した。転用時にR-LinkのCAN IDは変更せず据え置き(旧tip_theta側のまま
+    # CAN_ID=102=M2)なので、root_theta_indexも1(M2)のまま) ----
     cubemars_device_id: 11
-    cubemars_root_theta_index: 0   # M1
+    cubemars_root_theta_index: 1   # M2 (旧tip_theta側のAK40-10をCAN ID据え置きで転用)
     cubemars_position_scale_deg: 0.1
     root_theta_reduction: 4.666666666666667   # 112/24 (= 14/3)
     root_theta_sign: 1.0
@@ -60,8 +61,8 @@ homing_node:
 
     # 実機確認済み(2026-09-05): z軸原点センサ=CAN_HOSTのスロット5、r軸原点センサ=
     # スロット6(can_host_slots_per_node=5なので node_index=1, local_index=0/1)。
-    z_limit_switch_node_index: 1
-    z_limit_switch_local_index: 0   # slot 5 (z軸SW)
+    z_limit_switch_node_index: 3
+    z_limit_switch_local_index: 1   # slot 5 (z軸SW)
     r_limit_switch_node_index: 1
     r_limit_switch_local_index: 1   # slot 6 (r軸SW)
     switch_triggered_value: 1        # firmwareの!digitalRead()相当(実機確認済み: 押すと1)
@@ -80,8 +81,8 @@ homing_node:
     # 要実機調整: どちらの符号で回すとz/rのどちら向きに動くか
     z_home_motor1_vel_sign: 1.0
     z_home_motor2_vel_sign: 1.0
-    r_home_motor1_vel_sign: 1.0
-    r_home_motor2_vel_sign: -1.0
+    r_home_motor1_vel_sign: -1.0
+    r_home_motor2_vel_sign: 1.0
     # 要実測: 原点センサトリガー位置での真のz/r値(z_joint/r_jointの単位、m)
     z_ref_value_m: 0.33
     r_ref_value_m: 0.0
@@ -102,15 +103,15 @@ trajectory_follower_node:
     limit_switch_triggered_value: 1        # firmwareの!digitalRead()相当(要確認)
 
     # 要実測(note/can_mapping.txt「z/r上限リミットスイッチ」参照)。0=未配線・無効。
-    z_lower_limit_switch_device_id: 0
-    z_lower_limit_switch_node_index: 0
+    z_lower_limit_switch_device_id: 101
+    z_lower_limit_switch_node_index: 3
     z_lower_limit_switch_local_index: 0
-    z_upper_limit_switch_device_id: 0
-    z_upper_limit_switch_node_index: 0
-    z_upper_limit_switch_local_index: 0
-    r_lower_limit_switch_device_id: 0
-    r_lower_limit_switch_node_index: 0
+    z_upper_limit_switch_device_id: 101
+    z_upper_limit_switch_node_index: 3
+    z_upper_limit_switch_local_index: 1
+    r_lower_limit_switch_device_id: 101
+    r_lower_limit_switch_node_index: 1
     r_lower_limit_switch_local_index: 0
-    r_upper_limit_switch_device_id: 0
-    r_upper_limit_switch_node_index: 0
-    r_upper_limit_switch_local_index: 0
+    r_upper_limit_switch_device_id: 101
+    r_upper_limit_switch_node_index: 1
+    r_upper_limit_switch_local_index: 1

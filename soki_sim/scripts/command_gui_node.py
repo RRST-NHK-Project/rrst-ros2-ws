@@ -185,6 +185,12 @@ STATUS_NODE_NAMES = [TRAJ_NODE_NAME, JOY_NODE_NAME, HOMING_NODE_NAME, REAL_JOINT
 STATUS_DEVICE_IDS = [11, 21, 101]
 STATUS_DEVICE_STALE_TIMEOUT_SEC = 2.0
 
+# CAN_HOSTのserial_rx_{device_id}_unwrappedの生値モニタ(配線設定パネルのz/r原点
+# センサのノード/スロット割当が実機と合っているか確認する用、2026-09-08追加)。
+# device_id自体は「原点センサ・ホーミング配線設定」パネルの入力値(既定101)を
+# 都度読む。スロット数はros2can/ros2can/device_profiles.pyのSLOT_COUNTと一致させること。
+CAN_HOST_RAW_SLOT_COUNT = 24
+
 # 統合操作タブの「実機セットアップ」パネルから起動する、本番でそのまま使う
 # launch構成(note/command.txt「4軸(root_theta/tip_theta/z/r)全軸の実機動作確認。
 # 本番でそのまま使う想定」のコマンドと同じ)。real_all_axes_test.launch.pyは
@@ -1061,6 +1067,10 @@ class CommandGuiNode(Node):
         # 記録し、STATUS_DEVICE_STALE_TIMEOUT_SEC以上届いていなければ未起動とみなす
         # (ros2can側の接続判定と同じ「最近データが来ているか」の考え方)。
         self._device_last_seen_monotonic = {}
+        # 上記の生存監視(最終受信時刻)に加え、CAN_HOST(101)については生スロット値
+        # そのものも保持する(原点センサ配線確認パネル用、2026-09-08追加、
+        # get_device_raw_slots参照)。
+        self._device_last_data = {}
         for device_id in STATUS_DEVICE_IDS:
             self.create_subscription(
                 Int32MultiArray, f'serial_rx_{device_id}_unwrapped',
@@ -1142,6 +1152,12 @@ class CommandGuiNode(Node):
 
     def _on_device_feedback(self, device_id, msg):
         self._device_last_seen_monotonic[device_id] = time.monotonic()
+        self._device_last_data[device_id] = msg.data
+
+    def get_device_raw_slots(self, device_id):
+        """serial_rx_{device_id}_unwrappedの最新の生スロット値(Int32MultiArray.data)。
+        未受信ならNone(原点センサ配線確認パネル用、2026-09-08追加)。"""
+        return self._device_last_data.get(device_id)
 
     def get_stale_device_ids(self):
         """STATUS_DEVICE_IDSのうち、STATUS_DEVICE_STALE_TIMEOUT_SEC以上
@@ -1936,7 +1952,8 @@ class CommandGuiApp(QWidget):
             top_funcs=[self._build_wiring_bulk_load_panel],
             left_funcs=[self._build_robomas_wiring_panel, self._build_cubemars_wiring_panel,
                         self._build_hand_wiring_panel],
-            right_funcs=[self._build_homing_wiring_panel, self._build_limit_switch_wiring_panel])
+            right_funcs=[self._build_homing_wiring_panel, self._build_can_host_raw_monitor_panel,
+                         self._build_limit_switch_wiring_panel])
 
     def _build_wiring_bulk_load_panel(self, layout):
         # 各配線設定パネルは_build_yaml_wiring_panelで起動時に自動読込済みだが、
@@ -2979,9 +2996,11 @@ class CommandGuiApp(QWidget):
         if self._seq_active:
             yellow = LedIndicatorWidget.STATE_BLINK_FAST
         else:
-            # 文字列はhoming_node.pyのSTATE_*定数と一致させること
+            # 文字列はhoming_node.pyのSTATE_*定数と一致させること。pausing_z/
+            # pausing_rはpause_robomas_output応答待ち(2026-09-08追加、モータは
+            # まだ動いていないがユーザー視点では「ホーミング中」に含めてよい)。
             homing_state = self.node.get_homing_state()
-            if homing_state in ('homing_z', 'homing_r'):
+            if homing_state in ('pausing_z', 'pausing_r', 'homing_z', 'homing_r'):
                 yellow = LedIndicatorWidget.STATE_BLINK_SLOW
             elif homing_state == 'done':
                 yellow = LedIndicatorWidget.STATE_OFF
@@ -3389,6 +3408,104 @@ class CommandGuiApp(QWidget):
                  'CAN_HOSTのENC1/ENC2は使わない。',
             description='homing_node起動時のみ反映。実行中には反映されません。',
             field_specs=HOMING_WIRING_FIELDS)
+
+    def _build_can_host_raw_monitor_panel(self, column):
+        """上の「原点センサ・ホーミング配線設定」で設定したノード/スロットが実機と
+        合っているかを確認するための生値モニタ(2026-09-08追加、ユーザー要望:
+        「現在割り当てられている原点センサの対応付けがあっているか確認できるように
+        GUIで表示」)。CAN_HOST(device_id=101)のserial_rx_101_unwrappedを直接
+        (ros2canのtopic_passthrough経由ではなく)購読してSLOT_COUNT分すべての
+        生値を一覧表示し、上のz/r原点センサ欄から計算したスロットに
+        →z原点/→r原点の印を付ける。原点センサを実機で手動操作しながらどの
+        スロットの値が変化するかを見比べることで、配線設定欄の値が正しいか
+        (このパネルの目的はnote/note_soki/hardware_mapping.txt「未確認事項」に
+        あった原点センサ配線の実機検証を、ノード再起動・ログ確認無しでGUI上から
+        直接行えるようにすること)確認できる。"""
+        box = QGroupBox('原点センサ 生値モニタ (実機確認用)')
+        layout = QVBoxLayout(box)
+
+        note = QLabel()
+        note.setWordWrap(True)
+        _set_status(
+            note,
+            '上の「原点センサ・ホーミング配線設定」のノード/スロット欄に対応する\n'
+            'スロットに →z原点 / →r原点 と表示する。原点センサを手で押しながら\n'
+            'どのslotの値がSW検出値に変わるか見比べ、印の付いた欄と一致していれば\n'
+            '設定は正しい。違うslotが反応する場合は上の欄をそのslot番号\n'
+            '(ノード=slot÷ノードあたりスロット数、スロット=slot mod ノードあたり\n'
+            'スロット数)に書き換えて保存すること。',
+            'muted')
+        layout.addWidget(note)
+
+        self.can_host_raw_status_label = QLabel()
+        _set_status(self.can_host_raw_status_label, '未受信', 'muted')
+        layout.addWidget(self.can_host_raw_status_label)
+
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(14)
+        grid.setVerticalSpacing(2)
+        self.can_host_raw_slot_labels = {}
+        cols = 4
+        for slot in range(CAN_HOST_RAW_SLOT_COUNT):
+            r, c = divmod(slot, cols)
+            label = QLabel()
+            _set_status(label, f'slot{slot}: -', 'muted')
+            self.can_host_raw_slot_labels[slot] = label
+            grid.addWidget(label, r, c)
+        layout.addLayout(grid)
+
+        column.addWidget(box)
+
+        # 実機のSW押下に追従して見えるよう、他の状態パネル(_machine_status_timer、
+        # 1000ms間隔)より短い周期で更新する専用タイマー。
+        self._can_host_raw_timer = QTimer(self)
+        self._can_host_raw_timer.timeout.connect(self._refresh_can_host_raw_monitor)
+        self._can_host_raw_timer.start(150)
+
+    def _refresh_can_host_raw_monitor(self):
+        edits = self._homing_wiring_edits
+        try:
+            device_id = get_int(edits['can_host_device_id'])
+            slots_per_node = get_int(edits['can_host_slots_per_node'])
+            triggered_value = get_int(edits['switch_triggered_value'])
+            z_slot = (get_int(edits['z_limit_switch_node_index']) * slots_per_node
+                      + get_int(edits['z_limit_switch_local_index']))
+            r_slot = (get_int(edits['r_limit_switch_node_index']) * slots_per_node
+                      + get_int(edits['r_limit_switch_local_index']))
+        except ValueError:
+            _set_status(self.can_host_raw_status_label, '上の配線設定欄の入力エラー', 'error')
+            return
+
+        data = self.node.get_device_raw_slots(device_id)
+        if data is None:
+            _set_status(self.can_host_raw_status_label,
+                        f'device_id={device_id}のserial_rx未受信(CAN_HOST起動・'
+                        'topic_passthrough ON確認)', 'error')
+            for slot, label in self.can_host_raw_slot_labels.items():
+                _set_status(label, f'slot{slot}: -', 'muted')
+            return
+        _set_status(self.can_host_raw_status_label,
+                    f'device_id={device_id} 受信中 (ノードあたりスロット数={slots_per_node})',
+                    'success')
+
+        for slot, label in self.can_host_raw_slot_labels.items():
+            if slot >= len(data):
+                _set_status(label, f'slot{slot}: -', 'muted')
+                continue
+            value = data[slot]
+            node_idx, local_idx = ((slot // slots_per_node, slot % slots_per_node)
+                                    if slots_per_node > 0 else (0, slot))
+            tag = ''
+            if slot == z_slot:
+                tag += ' →z原点'
+            if slot == r_slot:
+                tag += ' →r原点'
+            text = f'slot{slot}(n{node_idx}/{local_idx}): {value}{tag}'
+            if tag:
+                role = 'success' if value == triggered_value else 'error'
+            else:
+                role = 'info' if value == triggered_value else 'muted'
+            _set_status(label, text, role)
 
     def _build_limit_switch_wiring_panel(self, column):
         self._build_yaml_wiring_panel(

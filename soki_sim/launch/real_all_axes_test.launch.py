@@ -73,8 +73,10 @@ def generate_launch_description():
         'cubemars_device_id', default_value='11',
         description='root_thetaのCubeMars(MODE_CUBEMARS)device_id')
     root_theta_motor_index_arg = DeclareLaunchArgument(
-        'root_theta_motor_index', default_value='0',
-        description='root_thetaのモータ番号(0-3=M1-M4)')
+        'root_theta_motor_index', default_value='1',
+        description='root_thetaのモータ番号(0-3=M1-M4)。2026-09-08方針変更で'
+                    '旧tip_theta側のAK40-10をCAN ID据え置き(M2)で転用したため'
+                    '既定値は1(M2)')
     root_theta_reduction_arg = DeclareLaunchArgument(
         'root_theta_reduction', default_value='4.666666666666667',
         description='root_theta外部減速比(112/24)。note/hardware_mapping.txt参照')

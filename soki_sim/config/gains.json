@@ -11,6 +11,12 @@
       "tip_theta_joint": 2.0,
       "z_joint": 0.15,
       "r_joint": 0.15
+    },
+    "max_deceleration": {
+      "root_theta_joint": 2.0,
+      "tip_theta_joint": 2.0,
+      "z_joint": 0.15,
+      "r_joint": 0.15
     }
   },
   "joy_speed": {
@@ -39,12 +45,11 @@
     "robomas_current_ff": 0.0
   },
   "sequence": {
-    "safe_transit_z_m": 0.332,
-    "r_retract_m": -0.422,
+    "safe_transit_z_m": 0.4842,
+    "r_retract_m": -0.322,
     "pickup_z_offset_m": 0.0758,
     "pickup_approach_clearance_m": 0.1,
-    "shoot_approach_depth_m": 0.0,
     "shoot_tip_theta_rad": 0.0,
-    "pump_settle_sec": 0.4
+    "gather_settle_sec": 0.5
   }
 }

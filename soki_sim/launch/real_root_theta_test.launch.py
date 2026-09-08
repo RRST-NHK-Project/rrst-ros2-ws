@@ -29,8 +29,9 @@ def generate_launch_description():
 
     device_id/motor_index/reduction/kp/kdは実機配線・note/hardware_mapping.txtの
     値に合わせて起動時に上書きすること(例: motor_index:=0 でM1配線に変更)。
-    デフォルトは2026-08-27の動作確認時点の配線(root_theta=M2)・低ゲイン
-    (Kp=5, Kd=0.5)。詳細はnote/command.txt参照。
+    デフォルトは2026-09-08時点の配線(root_theta=M2、旧tip_theta側AK40-10を
+    CAN ID据え置きで転用)・低ゲイン(Kp=5, Kd=0.5)。詳細はnote/hardware_mapping.txt
+    「root_theta_joint (旋回)」節参照。
 
     use_robomas:=true でz_joint/r_joint(motor1/motor2、ロボマスdevice_id=21、
     note/can_mapping.txt確認済み)へもMIT指令を送る(2026-08-29追加)。
@@ -50,8 +51,10 @@ def generate_launch_description():
         'device_id', default_value='11',
         description='root_thetaのCubeMars(MODE_CUBEMARS)device_id')
     motor_index_arg = DeclareLaunchArgument(
-        'motor_index', default_value='0',
-        description='root_thetaのモータ番号(0-3=M1-M4)。2026-08-27時点はM2配線')
+        'motor_index', default_value='1',
+        description='root_thetaのモータ番号(0-3=M1-M4)。2026-09-08方針変更で'
+                    '旧tip_theta側のAK40-10をCAN ID据え置き(M2)で転用したため'
+                    '既定値は1(M2)')
     reduction_arg = DeclareLaunchArgument(
         'reduction', default_value='4.666666666666667',
         description='外部減速比(112/24)。note/hardware_mapping.txt参照')

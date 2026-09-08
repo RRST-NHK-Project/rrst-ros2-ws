@@ -15,14 +15,13 @@ def generate_launch_description():
 
     real_root_theta_test.launch.py(root_theta単独確認用)をベースに、z/r
     (motor1/motor2、ロボマスdevice_id=21、note/can_mapping.txt確認済み)への
-    MIT出力も常時有効にしたもの(2026-08-29追加)。tip_theta_jointは初回較正
-    (tip_theta_offset_rad、note/hardware_mapping.txt参照)が未実施のため、
-    このlaunchでは対象外のまま(cubemars_joint_namesにroot_theta_jointしか
-    含めない。real_joint_bridge_node自体はCubeMars側M2の帰還を使って
-    tip_theta_jointの表示は続けるが、trajectory_follower_nodeからのMIT指令は
-    送らない。device 11のM2スロットは未更新のまま=0=速度ループ・target=0の
-    安全なデフォルトで停止し続ける、ros2can/firmware/.../cubemars.cppの
-    control_mode全ゼロ挙動と同じ)。
+    MIT出力も常時有効にしたもの(2026-08-29追加)。tip_theta_jointはこのlaunchでは
+    trajectory_follower_nodeからのMIT指令対象外のまま(cubemars_joint_namesに
+    root_theta_jointしか含めない。2026-09-08方針変更でtip_theta_joint自体は
+    ROBOMAS側(device_id=21のM3)へ移行済みのため、real_joint_bridge_nodeは
+    本launchでも常時M3の帰還を使ってtip_theta_jointの表示を続ける。
+    trajectory_follower_node側でtip_thetaへMIT指令を送りたい場合は
+    real_all_axes_test.launch.pyを使うこと)。
 
     display.launch.py・real_root_theta_test.launch.pyと同時起動しないこと
     (いずれもtrajectory_follower_nodeを起動するため二重起動になり衝突する)。
@@ -59,8 +58,10 @@ def generate_launch_description():
         'device_id', default_value='11',
         description='root_thetaのCubeMars(MODE_CUBEMARS)device_id')
     motor_index_arg = DeclareLaunchArgument(
-        'motor_index', default_value='0',
-        description='root_thetaのモータ番号(0-3=M1-M4)')
+        'motor_index', default_value='1',
+        description='root_thetaのモータ番号(0-3=M1-M4)。2026-09-08方針変更で'
+                    '旧tip_theta側のAK40-10をCAN ID据え置き(M2)で転用したため'
+                    '既定値は1(M2)')
     reduction_arg = DeclareLaunchArgument(
         'reduction', default_value='4.666666666666667',
         description='外部減速比(112/24)。note/hardware_mapping.txt参照')
