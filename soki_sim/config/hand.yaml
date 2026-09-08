@@ -66,3 +66,14 @@ hand_node:
     vacuum_release_node_index: 0   # ホスト自身(xiao-esp32-s3_can2io)= node0、pumpと同じCAN_HOST
     vacuum_release_local_index: 4   # MD2
     vacuum_release_duty_percent: 50.0   # DIRピンのみ使うため量自体は無関係(符号だけ意味を持つ)
+
+    # ---- 状態表示灯(黄色/赤色LED、CAN_HOST device_id=101のMULTI1/MULTI2、
+    # 2026-09-08追加)。ファームウェアはsoki_host_led_101(MULTI1/MULTI2=2の
+    # デジタル出力モード、CanIoRxData[0]/[1]の非ゼロでHIGH)を使用。pump/
+    # vacuum_releaseと同じdevice_id=101・node_index=0(汎用IOノードのSERVO1/
+    # SERVO2=local0/local1)のため、CAN送信バッファはhand_node内で共有される
+    # (note/note_soki/can_mapping.txt「## 状態表示灯」参照)。 ----
+    led_device_id: 101
+    led_node_index: 0   # ホスト自身(xiao-esp32-s3_can2io)= node0、pump/vacuum_releaseと同じCAN_HOST
+    led_yellow_local_index: 0   # SERVO1=MULTI1
+    led_red_local_index: 1      # SERVO2=MULTI2

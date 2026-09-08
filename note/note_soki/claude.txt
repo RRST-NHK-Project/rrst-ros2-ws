@@ -259,6 +259,87 @@ gains.json(git管理下)を、テスト用の簡易構成(tip_theta_joint無し)
 また、テスト前に`ps aux`で同名ノードが既に稼働していないか確認し、動作確認後は
 自分が起動したプロセスを確実に終了(process groupごとkillするなど)すること。
 
+## 状態表示灯 (黄色/赤色LED、2026-09-08追加)
+CAN_HOST(device_id=101、実機の状態表示等)のMULTI1/MULTI2に、黄色LED・赤色LED
+をそれぞれ接続済み(ユーザー確認、マイコンのファームウェアも書き込み済み)。
+  MULTI1 → 黄色LED (注意系)
+  MULTI2 → 赤色LED (異常系)
+消灯/点灯/点滅(速)/点滅(遅)の4パターンで状態表現する(status_led.cpp、
+pin21の既存LEDの3状態点滅パターンを参考に拡張)。2026-09-08確定の対応:
+  黄(注意系): 点滅速=自動シーケンス実行中/点滅遅=ホーミング中/
+    点灯=未ホーミング/消灯=通常
+  赤(異常系): 点滅速=ソフト緊急停止押下中/点滅遅=ノード未起動/
+    点灯=リミットスイッチ安全停止中/消灯=異常なし
+(2026-09-08訂正: 赤の点滅速は当初CAN Bus-Offを想定していたが、実装可否の
+検討中にユーザー判断でソフト緊急停止押下中に差し替えた。Bus-Off検知は
+ファームウェアのテレメトリ拡張が必要なため今回はスコープ外)。
+本リポジトリのconfig.hpp(MULTI1=0/MULTI2=0のまま)は未反映、詳細は
+note/can_mapping.txt「## 状態表示灯」節参照。
+
+## soki_simのGUI実装 (状態表示灯シミュレート・ソフト緊急停止、2026-09-08追加)
+上記の状態表示灯・ソフト緊急停止をsoki_sim側にも実装した(表示のシミュレートだけ
+でなく、緊急停止は実機/simどちらに対しても実際に出力を止める機能)。
+
+  - command_gui_node.py: 新規LedIndicatorWidget(丸ランプ、消灯/点灯/点滅速/
+    点滅遅を内蔵QTimerで自己アニメーション)を追加し、どのタブを開いていても
+    見える位置(root_layout、タブの直上)に黄・赤2灯と「緊急停止」「解除」
+    ボタンを常設。表示ロジック(_update_status_leds、優先度は上記の表と一致)は
+    1秒周期の_refresh_machine_statusから呼ぶ。
+  - 黄(注意系)の判定: self._seq_active(ピック/投入自動シーケンス、GUI内部の
+    既存フラグ)、homing_node.pyが新規publishするhoming_state(std_msgs/String、
+    TRANSIENT_LOCAL)のSTATE_*文字列。
+  - 赤(異常系)の判定: trajectory_follower_node.pyが新規publishするestop_active・
+    limit_stop_active(いずれもstd_msgs/Bool、TRANSIENT_LOCAL)、および
+    serial_rx_{11,21,101}_unwrapped(CubeMars/ROBOMAS/CAN_HOST)の受信タイムスタンプ
+    (STATUS_DEVICE_STALE_TIMEOUT_SEC=2.0秒、command_gui_node.py)による
+    「ノード未起動」判定。
+  - ソフト緊急停止の実処理: trajectory_follower_node.pyに新規Trigger
+    engage_estop/release_estopを追加し、estop_active_フラグがTrueの間は
+    timer_callbackが早期returnしてcubemars/robomas双方への指令publish自体を
+    止める(pause_robomas_output/resume_robomas_outputと同じ「送らない」方式、
+    実機側は最後の指令のまま位置保持する)。command_gui_node.pyの/emergency_stop
+    サービス(GUIの「緊急停止」ボタン・joy_teleop_nodeのPSボタン両方から呼べる)
+    が、自動シーケンス中断(_abort_sequence)・homing_node停止(/stop_homing、
+    ベストエフォート)・trajectory_follower_nodeの/engage_estopをまとめて呼ぶ。
+    解除は/clear_emergency_stopのみ(緊急停止ボタン自体はトグルにせず、誤操作で
+    即再始動しない設計)。ホーミング・自動シーケンスの自動再開はしない。
+  - joy_teleop_node.py: 回収実行確定(pick_confirm_button)をPSボタン(10)から
+    R2ボタン(7、標準的なPS4/PS5 Linuxドライバ割当想定)へ変更し、空いたPSボタンを
+    新規estop_buttonとして緊急停止(/emergency_stop)に割り当てた
+    (2026-09-08、ユーザー指定)。
+
+  - 実機LEDへの送信(2026-09-08追加。ユーザーから「マイコンへの送信処理は?」と
+    指摘があり、GUI表示だけで実機CAN送信が抜けていたのを追加): 書き込み済みの
+    ファームウェア soki_host_led_101 を確認したところ、MULTI1/MULTI2=2
+    (デジタル出力モード、通常のsoki_host_101には無いソキ_host_led_101独自の
+    拡張)で、SERVOnピンをCanIoRxData[local_index]の非ゼロ/ゼロでHIGH/LOW
+    出力するよう既に改造されていた(pin_ctrl_init.cpp/pin_ctrl_task.cpp diff
+    で確認済み、R-Link等の追加設定は不要)。CAN_HOST device_id=101・node_index=0
+    (ホスト自身)のSERVO1=local0(MULTI1)/SERVO2=local1(MULTI2)は、
+    serial_tx_101(Int16MultiArray、24スロット)のslot0/1に対応する。
+    問題: この同じdevice_id=101・node_index=0のバッファ(MD1=slot3をポンプ、
+    MD2=slot4を真空破壊リレーに)は既にhand_node.pyが単独の送信元として
+    保持・送信している(「同じdevice_idを複数チャンネルで共有する場合に備え、
+    device_idごとに24スロットのバッファを保持し、対象スロットのみ更新して
+    送信する」という既存パターン、hand_node.pyモジュールdocstring参照)。
+    ここへ別ノード(command_gui_node.py等)から独立にInt16MultiArrayを
+    publishすると、同じトピックへ2つの発行元が競合し、互いに自分が知らない
+    スロットを0で上書きし合ってポンプ/リレーとLEDの両方が壊れる
+    (ROSトピックは複数publisherがあっても本文をマージしない)。
+    対応: LED点灯/点滅の論理判定(_update_status_leds)は従来通り
+    command_gui_node.pyに一元化したまま、その結果(led_yellow_state/
+    led_red_state、std_msgs/String、TRANSIENT_LOCAL、値はLedIndicatorWidget.
+    STATE_*と同じ'off'/'on'/'blink_fast'/'blink_slow')をpublishするだけに
+    留め、実際のCAN送信(=serial_tx_101への書き込み)はhand_node.py側に
+    実装した(_on_led_yellow_state/_on_led_red_state で購読し、0.1秒周期の
+    _led_blink_timer_→_update_led_outputで点滅の位相を自前計算してpump/
+    vacuum_releaseと同じdevice_buffers_[101]へ書き込み、他スロットを保持した
+    まま送信する)。point設定はsoki_sim/config/hand.yamlに追加
+    (led_device_id: 101, led_node_index: 0, led_yellow_local_index: 0,
+    led_red_local_index: 1)。command_gui_node.py単体(hand_node未起動)でも
+    GUIのシミュレート表示自体は従来通り動く(led_*_state購読はhand_node側の
+    仕事なので、GUI側の表示は影響されない)。
+
 ##未確認・要確認事項
 - soki_simのURDF寸法(base_height/lift_size_z/arm_length等)と実機寸法の対応
 - フィールド(ワーク配置環境)の前面の板の幅・奥行き寸法、板厚(すべて仮値のまま)

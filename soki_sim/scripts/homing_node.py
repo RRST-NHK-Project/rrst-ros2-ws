@@ -87,7 +87,8 @@ import rclpy
 from rcl_interfaces.msg import Parameter, ParameterType, ParameterValue
 from rcl_interfaces.srv import SetParameters
 from rclpy.node import Node
-from std_msgs.msg import Int16MultiArray, Int32MultiArray
+from rclpy.qos import DurabilityPolicy, QoSProfile
+from std_msgs.msg import Int16MultiArray, Int32MultiArray, String
 from std_srvs.srv import Trigger
 
 STATE_IDLE = 'idle'
@@ -182,6 +183,13 @@ class HomingNode(Node):
         self.state_ = STATE_IDLE
         self.phase_start_time_ = None
 
+        # 状態表示灯(黄色LED、CAN_HOST device_id=101 MULTI1)用。GUIが購読して
+        # 「ホーミング中(HOMING_Z/HOMING_R)」「未ホーミング(IDLE)」を判定する
+        # (2026-09-08追加、note/note_soki/can_mapping.txt「## 状態表示灯」参照)。
+        state_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self.state_pub_ = self.create_publisher(String, 'homing_state', state_qos)
+        self._publish_state()
+
         self.create_subscription(
             Int32MultiArray, f'serial_rx_{self.can_host_device_id_}_unwrapped',
             self._on_can_host, 10)
@@ -229,6 +237,7 @@ class HomingNode(Node):
             response.message = 'serial_rx_*_unwrapped not received yet'
             return response
         self.state_ = state
+        self._publish_state()
         self.phase_start_time_ = time.monotonic()
         self._call_trigger_async(self._pause_robomas_cli_, 'pause_robomas_output')
         self.get_logger().info(f'homing_node: start (phase={axis})')
@@ -239,6 +248,7 @@ class HomingNode(Node):
     def _on_stop_homing(self, request, response):
         self._send_velocity(0.0, 0.0)
         self.state_ = STATE_IDLE
+        self._publish_state()
         self._call_trigger_async(self._resume_robomas_cli_, 'resume_robomas_output')
         self.get_logger().warning('homing_node: stopped by request')
         response.success = True
@@ -266,6 +276,7 @@ class HomingNode(Node):
         self._apply_offset('z', z_offset_m)
         self._apply_offset('r', r_offset_m)
         self.state_ = STATE_DONE
+        self._publish_state()
         self.get_logger().warning(
             f'homing_node: skip_homing実行(モータ駆動なし)。現在位置を'
             f'z={self.z_ref_value_m_:.5f}, r={self.r_ref_value_m_:.5f} とみなしました '
@@ -275,6 +286,11 @@ class HomingNode(Node):
             f'skip_homing: z_offset_m={z_offset_m:.5f}, r_offset_m={r_offset_m:.5f} '
             f'を反映しました(機体が正しい位置にあった前提)')
         return response
+
+    def _publish_state(self):
+        msg = String()
+        msg.data = self.state_
+        self.state_pub_.publish(msg)
 
     def _call_trigger_async(self, client, label):
         # trajectory_follower_node未起動(実機出力無効)でも安全に無視できるよう、
@@ -332,6 +348,7 @@ class HomingNode(Node):
             failed_phase = self.state_
             self._send_velocity(0.0, 0.0)
             self.state_ = STATE_FAILED
+            self._publish_state()
             self._call_trigger_async(self._resume_robomas_cli_, 'resume_robomas_output')
             self.get_logger().error(
                 f'homing_node: TIMEOUT during {failed_phase} (>{self.homing_timeout_sec_}s). '
@@ -349,6 +366,7 @@ class HomingNode(Node):
                     f'z_offset_m={z_offset_m:.5f}). applying offset')
                 self._apply_offset('z', z_offset_m)
                 self.state_ = STATE_DONE
+                self._publish_state()
                 self._call_trigger_async(self._resume_robomas_cli_, 'resume_robomas_output')
                 return
             self._send_velocity(
@@ -366,6 +384,7 @@ class HomingNode(Node):
                     f'r_offset_m={r_offset_m:.5f}). applying offset')
                 self._apply_offset('r', r_offset_m)
                 self.state_ = STATE_DONE
+                self._publish_state()
                 self._call_trigger_async(self._resume_robomas_cli_, 'resume_robomas_output')
                 return
             self._send_velocity(

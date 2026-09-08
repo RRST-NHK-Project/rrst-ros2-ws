@@ -56,10 +56,13 @@ pump_toggle_buttonパラメータで合わせること):
                                          「回収ボタンをバツ長押しからPSボタンに
                                          変更」により、確定は別ボタン(下記PSボタン)
                                          へ分離し、×は単純な即時押下のみに戻した)
-  PSボタン         -> 回収実行(確定)   (pick_confirm_button, デフォルト10。
+  R2               -> 回収実行(確定)   (pick_confirm_button, デフォルト7。
                                          PS4/PS5コントローラの一般的なLinux
                                          ドライバ割り当てを仮定した値、実機で要確認。
-                                         2026-09-03追加。立ち上がりエッジ即時で
+                                         2026-09-03追加、2026-09-08にPSボタンから
+                                         R2ボタンへ変更(PSボタンはソフト緊急停止
+                                         へ再割当、下記PSボタンの項目参照)。
+                                         立ち上がりエッジ即時で
                                          command_gui_nodeの/pick_sequence_confirm
                                          サービスを呼び、「ワーク手前で自動停止→
                                          回収実行待ち」の状態を1回だけ進める
@@ -67,6 +70,21 @@ pump_toggle_buttonパラメータで合わせること):
                                          同じ効果。誤操作でワークに接触・吸着して
                                          しまうことを防ぐため、移動用の×ボタンとは
                                          意図的に別ボタンにしている))
+  PSボタン         -> ソフト緊急停止   (estop_button, デフォルト10。PS4/PS5
+                                         コントローラの一般的なLinuxドライバ
+                                         割り当てを仮定した値、実機で要確認。
+                                         2026-09-08追加。立ち上がりエッジ即時で
+                                         command_gui_nodeの/emergency_stop
+                                         サービスを呼ぶ(GUIの「緊急停止」ボタンと
+                                         同じ効果。trajectory_follower_nodeの
+                                         cubemars/robomas出力を凍結し、homing_node
+                                         実行中ならstop_homingで停止、GUIの自動
+                                         シーケンスも中断する。解除はGUI側の
+                                         「解除」ボタンのみ(誤操作で即再始動しない
+                                         よう、ボタン一つでは解除できない設計)。
+                                         移動系のenable_button(デッドマン)とは
+                                         独立に扱う(安全機能のため常に効くように
+                                         する))
   □(四角)ボタン   -> L4へ移動          (shoot_start_l4_button, デフォルト3。
                                          PS4/PS5コントローラの一般的なLinux
                                          ドライバ割り当てを仮定した値、実機で要確認。
@@ -140,9 +158,9 @@ pump_toggle_buttonパラメータで合わせること):
                                          ボタンと同じ理由)。選択カーソルの移動のみで
                                          シーケンス開始は行わない(開始は×ボタン=
                                          pickup_confirm_buttonが選択中ワークへの
-                                         移動を、PSボタン=pick_confirm_buttonが
+                                         移動を、R2=pick_confirm_buttonが
                                          回収実行の確定を、それぞれ別ボタンで担う。
-                                         上記×・PSボタンの項目参照)
+                                         上記×・R2ボタンの項目参照)
 
 いずれもレート方式: 倒している間、target += 入力値*speed*dt で積分し続ける。
 入力が中立/デッドマン未押下の間は目標を/mixed_joint_statesの現在値に同期する
@@ -255,11 +273,15 @@ class JoyTeleopNode(Node):
         # 状態を壊してしまう不具合が発生。ユーザー指定:「回収ボタンをバツ長押し
         # からPSボタンに変更」により確定は下記pick_confirm_buttonへ分離した)。
         self.declare_parameter('pickup_confirm_button', 0)
-        # 回収実行(確定)ボタン(PSボタン、2026-09-03追加)。-1ならボタン操作無効。
-        # 立ち上がりエッジ即時でpick_sequence_confirmを呼ぶだけの単純なボタン。
-        # 誤操作でワークに接触・吸着してしまうことを防ぐため、移動用の
-        # pickup_confirm_buttonとは意図的に別ボタンにしている。
-        self.declare_parameter('pick_confirm_button', 10)
+        # 回収実行(確定)ボタン(R2ボタン、2026-09-03追加、2026-09-08にPSボタンから
+        # 変更。-1ならボタン操作無効。立ち上がりエッジ即時でpick_sequence_confirmを
+        # 呼ぶだけの単純なボタン。誤操作でワークに接触・吸着してしまうことを
+        # 防ぐため、移動用のpickup_confirm_buttonとは意図的に別ボタンにしている。
+        self.declare_parameter('pick_confirm_button', 7)
+        # ソフト緊急停止ボタン(PSボタン、2026-09-08追加)。-1ならボタン操作無効。
+        # 立ち上がりエッジ即時でcommand_gui_nodeの/emergency_stopサービスを呼ぶ
+        # (_update_estop_button参照)。
+        self.declare_parameter('estop_button', 10)
         # L4/R4へ移動ボタン(2026-09-03追加、同日□/○ボタンへ再割当)。
         # -1ならボタン操作無効。
         self.declare_parameter('shoot_start_l4_button', 3)
@@ -306,6 +328,7 @@ class JoyTeleopNode(Node):
         self.pump_toggle_button_ = int(self.get_parameter('pump_toggle_button').value)
         self.pickup_confirm_button_ = int(self.get_parameter('pickup_confirm_button').value)
         self.pick_confirm_button_ = int(self.get_parameter('pick_confirm_button').value)
+        self.estop_button_ = int(self.get_parameter('estop_button').value)
         self.shoot_start_l4_button_ = int(self.get_parameter('shoot_start_l4_button').value)
         self.shoot_start_r4_button_ = int(self.get_parameter('shoot_start_r4_button').value)
         self.tip_theta_follow_theta_button_ = int(
@@ -356,6 +379,11 @@ class JoyTeleopNode(Node):
         # 待ち」のときに続行させる。
         self._prev_pick_confirm_button_pressed_ = False
         self._pickup_confirm_client_ = self.create_client(Trigger, 'pick_sequence_confirm')
+
+        # ソフト緊急停止ボタン(PSボタン、2026-09-08追加)。立ち上がりエッジ即時で
+        # command_gui_nodeの/emergency_stopを呼ぶ(_update_estop_button参照)。
+        self._prev_estop_button_pressed_ = False
+        self._estop_client_ = self.create_client(Trigger, 'emergency_stop')
 
         # L4/R4へ移動ボタン(□/○ボタン、2026-09-03追加)。command_gui_node側の
         # /shoot_sequence_start_l4・_r4サービスを呼び、固定のシューティングエリア
@@ -424,6 +452,7 @@ class JoyTeleopNode(Node):
             f'axis_select_col={self.axis_select_col_}, axis_select_row={self.axis_select_row_}, '
             f'pickup_confirm_button={self.pickup_confirm_button_}, '
             f'pick_confirm_button={self.pick_confirm_button_}, '
+            f'estop_button={self.estop_button_}, '
             f'rate={update_rate_hz}Hz')
 
     def _on_set_parameters(self, params):
@@ -509,6 +538,21 @@ class JoyTeleopNode(Node):
         if pressed and not self._prev_pick_confirm_button_pressed_:
             self._call_trigger(self._pickup_confirm_client_, '回収実行確定(pick_sequence_confirm)')
         self._prev_pick_confirm_button_pressed_ = pressed
+
+    def _update_estop_button(self, msg: Joy):
+        """PSボタンの立ち上がりエッジで、command_gui_nodeの/emergency_stop
+        (std_srvs/Trigger、2026-09-08追加)を呼ぶ。GUIの「緊急停止」ボタンと同じ
+        効果(trajectory_follower_nodeの出力凍結・ホーミング中断・自動シーケンス
+        中断をまとめて行う)。移動系のenable_button(デッドマン)とは独立に扱う
+        (安全機能のため、デッドマンを離していても常に効くようにする)。"""
+        if self.estop_button_ < 0:
+            return
+        buttons = msg.buttons
+        pressed = (0 <= self.estop_button_ < len(buttons)
+                   and bool(buttons[self.estop_button_]))
+        if pressed and not self._prev_estop_button_pressed_:
+            self._call_trigger(self._estop_client_, '緊急停止(emergency_stop)')
+        self._prev_estop_button_pressed_ = pressed
 
     def _update_shoot_start_l4(self, msg: Joy):
         """□ボタンの立ち上がりエッジで、command_gui_nodeの
@@ -683,6 +727,7 @@ class JoyTeleopNode(Node):
         self._update_pump_toggle(msg)
         self._update_pickup_move(msg)
         self._update_pick_confirm_button(msg)
+        self._update_estop_button(msg)
         self._update_shoot_start_l4(msg)
         self._update_shoot_start_r4(msg)
         self._update_tip_theta_follow_toggle(msg)

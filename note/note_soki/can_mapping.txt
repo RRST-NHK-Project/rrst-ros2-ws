@@ -189,5 +189,50 @@ ENC1_MD=1/ENC2_MD=1、note/hardware_mapping.txt「z_joint/r_jointの実機出力
 参照)。上記device_id/node_index/local_indexは実機配線からの申告ベースで
 soki_sim/config/hand.yamlに反映済みだが、現物での最終確認はまだ。
 
+## 状態表示灯 (黄色/赤色LED、2026-09-08追加)
+CAN_HOST(device_id=101)自身のノード(node_index=0)のMULTI1/MULTI2に、状態表示用の
+黄色LED・赤色LEDをそれぞれ追加接続(ユーザー確認)。マイコンのファームウェアは
+書き込み済みだが、本リポジトリのros2can/generated_firmware/soki_host_101/src/
+config.hppはMULTI1=0/MULTI2=0(スイッチ入力モード)のまま未反映(実機では
+MULTI1=1/MULTI2=1のservo/PWM出力モードになっているはず、要確認)。
+
+  MULTI1 → 黄色LED (注意系)
+  MULTI2 → 赤色LED (異常系)
+
+各色とも 消灯/点灯/点滅(速)/点滅(遅) の4パターンで状態を表現する(既存の
+status_led.cpp、pin21の単色LEDが実装済みの「CAN活動中=100ms周期点滅/シリアルのみ
+活動=短いパルス点滅/非活動=消灯」という3状態パターンを参考に拡張したもの)。
+状態⇔パターンの対応(2026-09-08確定):
+
+黄色LED(注意系。複数該当時は上の行を優先表示):
+  点滅(速) → 自動シーケンス実行中(ピック/投入、hand_node)
+  点滅(遅) → ホーミング実行中
+  点灯     → 未ホーミング(起動直後の待機)
+  消灯     → 通常(準備完了)
+
+赤色LED(異常系。複数該当時は上の行を優先表示):
+  点滅(速) → ソフト緊急停止押下中(2026-09-08訂正: 当初CAN Bus-Offを想定していたが、
+              Bus-Off検知にはファームウェアのテレメトリ拡張が必要なため今回は
+              スコープ外にし、代わりにソフト緊急停止に差し替えた。ユーザー指定)
+  点滅(遅) → ノード未起動(想定しているノードが応答していない)
+  点灯     → リミットスイッチによる安全停止中(trajectory_follower_nodeが移動ロック中)
+  消灯     → 異常なし
+
+備考: MULTI1/MULTI2はSERVO1/SW1、SERVO2/SW2とピン共有(config.hppのMULTIn設定で
+切替)。上の「## ハンド」節でこの2ポートを吸着パッド展開/ワークピッチサーボに
+使う可能性が「未確定」と記載されていたが、soki_sim/config/hand.yaml確認済み:
+実際は deploy_servo_device_id/pitch_servo_device_id とも31(CAN_HOST device_id=
+101とは別のボード)のため、この2ポートとの競合は無かった。
+
+soki_simのGUI(command_gui_node.py)にも上記と同じ判定ロジックで黄・赤LEDの
+シミュレート表示を実装済み(2026-09-08、実装内容の詳細はnote/claude.txt
+「## soki_simのGUI実装」節参照)。ソフト緊急停止はGUI/joy_teleop_node(PSボタン)
+双方から呼べ、単なる表示ではなくtrajectory_follower_nodeの実機/sim出力を
+実際に凍結する。実機LEDへのCAN送信(serial_tx_101のslot0/1)はhand_node.pyが
+担う(pump/vacuum_releaseと同じdevice_id=101のバッファを共有するため、
+送信元を1つにまとめる必要があった。ファームウェアはsoki_host_led_101、
+MULTI1/MULTI2=2のデジタル出力モードを使用。詳細はnote/claude.txt「## soki_sim
+のGUI実装」節の「実機LEDへの送信」項参照)。
+
 ## 備考・その他気づいた点
 (自由記入)

@@ -84,15 +84,20 @@ suction_pad_1/2/3_jointはprismatic関節で、joint値0=spread(展開、同一�
 (soki_sim.urdf.xacroのhand_pad_side_travelと一致させること)。
 """
 import math
+import time
 
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Bool, Int16MultiArray
+from std_msgs.msg import Bool, Int16MultiArray, String
 from std_srvs.srv import Trigger
 
 SLOT_COUNT = 24
+# 状態表示灯の点滅トグル間隔[ms]。command_gui_node.pyのLedIndicatorWidgetと
+# 一致させること(sim表示と実機LEDの見た目を揃えるため、2026-09-08追加)。
+LED_BLINK_FAST_PERIOD_MS = 150
+LED_BLINK_SLOW_PERIOD_MS = 500
 HAND_PITCH_JOINT = 'hand_pitch_joint'
 # soki_sim.urdf.xacroのhand_pad_side_travelと一致させること。
 # joint値0=spread(展開)、joint値=この上限値=gathered(収納、正三角形)。
@@ -179,15 +184,47 @@ class HandNode(Node):
         self.declare_parameter('vacuum_release_local_index', 4)  # MD2
         self.declare_parameter('vacuum_release_duty_percent', 50.0)
 
+        # ---- 状態表示灯(黄色/赤色LED、SERVOn=デジタル出力。2026-09-08追加) ----
+        # CAN_HOST device_id=101のMULTI1/MULTI2にそれぞれ接続(ファームウェアは
+        # soki_host_led_101、MULTI1/MULTI2=2でSERVOnピンをデジタル出力へ切替済み、
+        # CanIoRxData[local_index]の非ゼロでHIGH)。pump/vacuum_releaseと同じ
+        # device_id=101・node_index=0(汎用IOノードの自ノード分)を共有するため、
+        # 送信は本ノード(device_id=101のCAN送信元)にまとめる必要がある
+        # (note/note_soki/can_mapping.txt「## 状態表示灯」参照)。状態自体の
+        # 判定ロジックはcommand_gui_node.py(_update_status_leds)に一元化してあり、
+        # 本ノードはled_yellow_state/led_red_state(std_msgs/String、値は
+        # LedIndicatorWidget.STATE_*と同じ'off'/'on'/'blink_fast'/'blink_slow')を
+        # 購読して点滅の位相だけを自前で計算する(_update_led_output参照)。
+        self.declare_parameter('led_device_id', 0)
+        self.declare_parameter('led_node_index', 0)
+        self.declare_parameter('led_yellow_local_index', 0)  # SERVO1=MULTI1
+        self.declare_parameter('led_red_local_index', 1)      # SERVO2=MULTI2
+
         self._deploy = self._make_channel_cfg('deploy_servo')
         self._pitch = self._make_channel_cfg('pitch_servo')
         self._pump = self._make_channel_cfg('pump')
         self._vacuum_release = self._make_channel_cfg('vacuum_release')
+        self._led = {
+            'device_id': int(self.get_parameter('led_device_id').value),
+            'node_index': int(self.get_parameter('led_node_index').value),
+            'yellow_local_index': int(self.get_parameter('led_yellow_local_index').value),
+            'red_local_index': int(self.get_parameter('led_red_local_index').value),
+        }
 
         self.device_buffers_ = {}
         self.device_publishers_ = {}
         for cfg in (self._deploy, self._pitch, self._pump, self._vacuum_release):
             self._ensure_publisher(cfg['device_id'])
+        self._ensure_publisher(self._led['device_id'])
+
+        self._led_yellow_state_ = 'off'
+        self._led_red_state_ = 'off'
+        led_state_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self.create_subscription(String, 'led_yellow_state', self._on_led_yellow_state, led_state_qos)
+        self.create_subscription(String, 'led_red_state', self._on_led_red_state, led_state_qos)
+        # 点滅のトグルには周期的な再送が要るため、pump/deploy等と違いタイマ駆動にする
+        # (他チャンネルはservice呼び出し時のイベント駆動のみ)。
+        self._led_blink_timer_ = self.create_timer(0.1, self._update_led_output)
 
         # RViz表示用(soki_sim.urdf.xacroのhand_deploy_joint/hand_pitch_joint、
         # モジュールdocstring参照)。実機配線(device_id)の有無に関わらず送る。
@@ -228,7 +265,8 @@ class HandNode(Node):
             f'pitch_servo(device_id={self._pitch["device_id"]}), '
             f'pump(device_id={self._pump["device_id"]}, '
             f'duty={self.get_parameter("pump_duty_percent").value}%), '
-            f'vacuum_release(device_id={self._vacuum_release["device_id"]})')
+            f'vacuum_release(device_id={self._vacuum_release["device_id"]}), '
+            f'led(device_id={self._led["device_id"]})')
 
     def _publish_joint_state(self, joint_name, deg):
         msg = JointState()
@@ -279,6 +317,43 @@ class HandNode(Node):
         msg.data = list(buf)
         self.device_publishers_[device_id].publish(msg)
         return True
+
+    def _on_led_yellow_state(self, msg):
+        self._led_yellow_state_ = msg.data
+
+    def _on_led_red_state(self, msg):
+        self._led_red_state_ = msg.data
+
+    def _led_lit(self, state):
+        """state('off'/'on'/'blink_fast'/'blink_slow')から、現在の瞬間の
+        点灯/消灯(bool)を計算する。位相はノード起動時刻からの経過時間を使う
+        自由継続方式(command_gui_node.pyのLedIndicatorWidgetと違い、状態が
+        変わった瞬間に位相をリセットしない。実機側では見た目の違いは無視できる)。"""
+        if state == 'on':
+            return True
+        if state not in ('blink_fast', 'blink_slow'):
+            return False
+        period_ms = LED_BLINK_FAST_PERIOD_MS if state == 'blink_fast' else LED_BLINK_SLOW_PERIOD_MS
+        phase_ms = int(time.monotonic() * 1000) % (period_ms * 2)
+        return phase_ms < period_ms
+
+    def _update_led_output(self):
+        """led_yellow_state/led_red_state(購読済み)から現在の点灯/消灯を計算し、
+        device_id=101の24スロットバッファへ反映して送信する(pump/vacuum_release
+        と同じバッファを共有するため、他スロットは前回値を保持したまま送る、
+        _send参照)。led_device_id=0(未配線)なら何もしない。0.1秒周期タイマ
+        (_led_blink_timer_)から呼ばれる。"""
+        device_id = self._led['device_id']
+        if device_id == 0:
+            return
+        buf = self.device_buffers_[device_id]
+        yellow_slot = self._led['node_index'] * self.slots_per_node_ + self._led['yellow_local_index']
+        red_slot = self._led['node_index'] * self.slots_per_node_ + self._led['red_local_index']
+        buf[yellow_slot] = 1 if self._led_lit(self._led_yellow_state_) else 0
+        buf[red_slot] = 1 if self._led_lit(self._led_red_state_) else 0
+        msg = Int16MultiArray()
+        msg.data = list(buf)
+        self.device_publishers_[device_id].publish(msg)
 
     def _resolve_can_deg(self, sim_deg, offset_deg, override_prefix):
         """実機へ送るCAN角度[deg]を決定する。<override_prefix>_can_deg_overrideが

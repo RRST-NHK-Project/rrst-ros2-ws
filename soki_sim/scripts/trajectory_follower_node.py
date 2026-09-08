@@ -83,8 +83,9 @@ import math
 import rclpy
 from rcl_interfaces.msg import ParameterDescriptor, SetParametersResult
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Int16MultiArray, Int32MultiArray
+from std_msgs.msg import Bool, Int16MultiArray, Int32MultiArray
 from std_srvs.srv import Trigger
 
 CUBEMARS_MODE_MIT = 2
@@ -298,6 +299,28 @@ class TrajectoryFollowerNode(Node):
         self._setup_limit_switches()
         self.create_service(Trigger, 'set_root_theta_origin', self._on_set_root_theta_origin)
         self.create_service(Trigger, 'set_tip_theta_origin', self._on_set_tip_theta_origin)
+
+        # ---- ソフト緊急停止 (2026-09-08追加、CAN_HOST(device_id=101)実機の赤色状態
+        # 表示灯の「点滅(速)」に対応。engage_estop中はtimer_callbackが早い段階で
+        # returnするため、trap_stepの進行もcubemars/robomas双方への指令publishも完全に
+        # 止まる(pause_robomas_output/resume_robomas_outputと同じ「publish自体を
+        # スキップする」方式。実機側は最後に受け取ったMIT指令をそのまま保持し続ける
+        # ため、現在位置で静止する)。command_gui_node側がホーミングの中断・
+        # 自動シーケンスの中断と合わせて呼び出す想定(単体ではhoming_nodeの動作は
+        # 止まらない、そちらはstop_homingを別途呼ぶ必要がある)。 ----
+        latched_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self.estop_active_ = False
+        self.estop_pub_ = self.create_publisher(Bool, 'estop_active', latched_qos)
+        self._publish_estop_state()
+        self.create_service(Trigger, 'engage_estop', self._on_engage_estop)
+        self.create_service(Trigger, 'release_estop', self._on_release_estop)
+
+        # ---- リミットスイッチによる安全停止中フラグ (2026-09-08追加、赤色状態表示灯の
+        # 「点灯」に対応。z/r上限・下限いずれか1個でもトリガーされていればTrueとする
+        # (どちらの方向への移動をロックしているかまでは区別しない、GUI表示用の集約値)。----
+        self.limit_stop_active_ = False
+        self.limit_stop_pub_ = self.create_publisher(Bool, 'limit_stop_active', latched_qos)
+        self._publish_limit_stop_state()
 
         # max_velocity/max_accelerationは起動時にself.max_vel_/max_accel_へ
         # 取り込んだ後は参照されないため、command_gui_node等がros2 param set(GUIの
@@ -536,6 +559,40 @@ class TrajectoryFollowerNode(Node):
         response.message = 'robomas出力を再開しました'
         return response
 
+    def _publish_estop_state(self):
+        msg = Bool()
+        msg.data = self.estop_active_
+        self.estop_pub_.publish(msg)
+
+    def _on_engage_estop(self, request, response):
+        self.estop_active_ = True
+        self._publish_estop_state()
+        self.get_logger().warning(
+            'trajectory_follower_node: emergency stop engaged, cubemars/robomas output frozen')
+        response.success = True
+        response.message = 'emergency stop engaged'
+        return response
+
+    def _on_release_estop(self, request, response):
+        self.estop_active_ = False
+        self._publish_estop_state()
+        self.get_logger().warning('trajectory_follower_node: emergency stop released')
+        response.success = True
+        response.message = 'emergency stop released'
+        return response
+
+    def _publish_limit_stop_state(self):
+        msg = Bool()
+        msg.data = self.limit_stop_active_
+        self.limit_stop_pub_.publish(msg)
+
+    def _update_limit_stop_status(self):
+        active = any(self._limit_triggered(axis, direction)
+                     for axis, direction in self._limit_switches_.keys())
+        if active != self.limit_stop_active_:
+            self.limit_stop_active_ = active
+            self._publish_limit_stop_state()
+
     def _on_set_parameters(self, params):
         # add_on_set_parameters_callbackに渡されるのはrclpy.parameter.Parameter
         # (Pythonラッパー)であり、.valueはParameterValueメッセージではなく
@@ -655,6 +712,12 @@ class TrajectoryFollowerNode(Node):
 
     def timer_callback(self):
         if not self.has_target_:
+            return
+
+        self._update_limit_stop_status()
+        if self.estop_active_:
+            # 緊急停止中はtrap_stepの進行・cubemars/robomasへのpublishを一切行わない
+            # (最後に送った指令のまま実機側で位置保持される、engage_estop参照)。
             return
 
         # z/rはリミットスイッチがトリガーされている方向への移動だけをロックする

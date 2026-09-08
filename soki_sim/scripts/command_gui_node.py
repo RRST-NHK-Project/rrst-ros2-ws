@@ -64,7 +64,7 @@ from rcl_interfaces.srv import GetParameters, SetParameters
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, Int32MultiArray, String
 from std_srvs.srv import SetBool, Trigger
 
 from PyQt5.QtCore import Qt, QPointF, QTimer
@@ -174,6 +174,14 @@ REAL_JOINT_BRIDGE_NODE_NAME = 'real_joint_bridge_node'
 # 統合操作タブの「機体ステータス」パネルで起動状況を表示するノード
 # (command_gui_nodeがサービス/パラメータ経由で直接やり取りする4つ)。
 STATUS_NODE_NAMES = [TRAJ_NODE_NAME, JOY_NODE_NAME, HOMING_NODE_NAME, REAL_JOINT_BRIDGE_NODE_NAME]
+
+# 状態表示灯(赤色LED、2026-09-08追加)の「ノード未起動」判定対象デバイス。
+# CubeMars(root_theta/tip_theta、device_id=11)・ROBOMAS(z/r、device_id=21)・
+# CAN_HOST自身(device_id=101)のいずれかのserial_rx_{id}_unwrappedが一定時間
+# 届いていなければ未起動とみなす(note/note_soki/can_mapping.txt「## 状態表示灯」
+# 参照)。device_idはlaunchファイル・note/can_mapping.txtの実機割当と一致させること。
+STATUS_DEVICE_IDS = [11, 21, 101]
+STATUS_DEVICE_STALE_TIMEOUT_SEC = 2.0
 
 # 統合操作タブの「実機セットアップ」パネルから起動する、本番でそのまま使う
 # launch構成(note/command.txt「4軸(root_theta/tip_theta/z/r)全軸の実機動作確認。
@@ -891,6 +899,65 @@ class ZGaugeWidget(QWidget):
                           f'{self._z:.2f}')
 
 
+class LedIndicatorWidget(QWidget):
+    """状態表示灯(黄色/赤色LED)を模した丸ランプ(2026-09-08新規)。実機の
+    CAN_HOST(device_id=101、MULTI1=黄色LED/MULTI2=赤色LED)・status_led.cppと
+    同じ「消灯/点灯/点滅(速)/点滅(遅)」の4状態で表現する
+    (note/note_soki/can_mapping.txt「## 状態表示灯」参照)。"""
+
+    STATE_OFF = 'off'
+    STATE_ON = 'on'
+    STATE_BLINK_FAST = 'blink_fast'
+    STATE_BLINK_SLOW = 'blink_slow'
+    _VALID_STATES = (STATE_OFF, STATE_ON, STATE_BLINK_FAST, STATE_BLINK_SLOW)
+
+    # 実機status_led.cppのCAN_BLINK_INTERVAL_MS(100ms)のトグル間隔感覚に合わせつつ、
+    # 画面上で見やすいよう気持ち長め・遅い側とはっきり区別できる値にしてある。
+    _TICK_MS = 50
+    _BLINK_FAST_PERIOD_MS = 150
+    _BLINK_SLOW_PERIOD_MS = 500
+
+    def __init__(self, on_color: str, size=20, parent=None):
+        super().__init__(parent)
+        self._on_color = QColor(on_color)
+        self._off_color = QColor('#3c3c3c')
+        self._state = self.STATE_OFF
+        self._lit = False
+        self._elapsed_ms = 0
+        self.setFixedSize(size, size)
+        self._timer = QTimer(self)
+        self._timer.timeout.connect(self._on_tick)
+        self._timer.start(self._TICK_MS)
+
+    def set_state(self, state):
+        if state not in self._VALID_STATES:
+            state = self.STATE_OFF
+        if state != self._state:
+            self._state = state
+            self._elapsed_ms = 0
+            self._apply_lit(state == self.STATE_ON)
+
+    def _on_tick(self):
+        if self._state not in (self.STATE_BLINK_FAST, self.STATE_BLINK_SLOW):
+            return
+        self._elapsed_ms += self._TICK_MS
+        period = (self._BLINK_FAST_PERIOD_MS if self._state == self.STATE_BLINK_FAST
+                  else self._BLINK_SLOW_PERIOD_MS)
+        self._apply_lit((self._elapsed_ms % (period * 2)) < period)
+
+    def _apply_lit(self, lit):
+        if lit != self._lit:
+            self._lit = lit
+            self.update()
+
+    def paintEvent(self, _event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setPen(QColor('#1a1a1a'))
+        painter.setBrush(self._on_color if self._lit else self._off_color)
+        painter.drawEllipse(1, 1, self.width() - 2, self.height() - 2)
+
+
 class CommandGuiNode(Node):
 
     def __init__(self):
@@ -967,6 +1034,47 @@ class CommandGuiNode(Node):
         pump_state_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self.create_subscription(Bool, 'hand_pump_state', self._on_pump_state, pump_state_qos)
 
+        # ---- 状態表示灯(黄色/赤色LED)用の状態購読 (2026-09-08追加、
+        # note/note_soki/can_mapping.txt「## 状態表示灯」参照) ----
+        latched_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self._homing_state = None  # homing_node.STATE_*文字列。未受信ならNone
+        self.create_subscription(String, 'homing_state', self._on_homing_state, latched_qos)
+        self._estop_active = False
+        self.create_subscription(Bool, 'estop_active', self._on_estop_active, latched_qos)
+        self._limit_stop_active = False
+        self.create_subscription(Bool, 'limit_stop_active', self._on_limit_stop_active, latched_qos)
+
+        # 上記から計算した最終的なLED論理状態('off'/'on'/'blink_fast'/'blink_slow'、
+        # LedIndicatorWidget.STATE_*と同じ値)をpublishする(2026-09-08追加)。
+        # 実機のCAN_HOST(101)のMULTI1/MULTI2を駆動するのはhand_node.py
+        # (pump/vacuum_releaseと同じdevice_id=101のCAN送信バッファを共有するため、
+        # 送信元を1つにまとめる必要がある。詳細はhand_node.py _update_led_output・
+        # note/note_soki/can_mapping.txt「## 状態表示灯」参照)。ここでは判定ロジック
+        # の結果を配るだけで、実機へのCAN送信は行わない。
+        self.led_yellow_state_pub_ = self.create_publisher(String, 'led_yellow_state', latched_qos)
+        self.led_red_state_pub_ = self.create_publisher(String, 'led_red_state', latched_qos)
+
+        # CAN_HOST(101)・CubeMars(11)・ROBOMAS(21)それぞれの生存監視(赤色LEDの
+        # 「ノード未起動」判定用)。serial_rx_{device_id}_unwrappedの最終受信時刻を
+        # 記録し、STATUS_DEVICE_STALE_TIMEOUT_SEC以上届いていなければ未起動とみなす
+        # (ros2can側の接続判定と同じ「最近データが来ているか」の考え方)。
+        self._device_last_seen_monotonic = {}
+        for device_id in STATUS_DEVICE_IDS:
+            self.create_subscription(
+                Int32MultiArray, f'serial_rx_{device_id}_unwrapped',
+                functools.partial(self._on_device_feedback, device_id), 10)
+
+        # ---- ソフト緊急停止 (2026-09-08追加) ----
+        # PSコン(joy_teleop_node)のPSボタン・GUIの「緊急停止」ボタンいずれからも
+        # 呼べるTriggerサービス。実際の処理(自動シーケンス中断・ホーミング中断・
+        # trajectory_follower_node出力凍結)はset_estop_handler/set_estop_clear_
+        # handlerで登録されたCommandGuiAppのコールバックに委譲する
+        # (pick_sequence_confirm等と同じ構造)。
+        self._estop_handler = None
+        self._estop_clear_handler = None
+        self.create_service(Trigger, 'emergency_stop', self._on_emergency_stop_srv)
+        self.create_service(Trigger, 'clear_emergency_stop', self._on_clear_emergency_stop_srv)
+
         # trajectory_follower_node/joy_teleop_nodeいずれのros2パラメータも同じ
         # get_parameters/set_parametersサービス経由でGUIから読込・変更できるよう、
         # 対象ノード名ごとにクライアントの組を保持する。
@@ -1004,6 +1112,88 @@ class CommandGuiNode(Node):
     def get_pump_on_state(self):
         """ポンプの現在ON/OFF状態(hand_pump_state購読)。まだ受信していなければNone。"""
         return self._pump_on_state
+
+    def _on_homing_state(self, msg):
+        self._homing_state = msg.data
+
+    def get_homing_state(self):
+        """homing_node.STATE_*文字列(idle/homing_z/homing_r/done/failed)。
+        homing_node未起動でまだ受信していなければNone。"""
+        return self._homing_state
+
+    def _on_estop_active(self, msg):
+        self._estop_active = msg.data
+
+    def get_estop_active(self):
+        """trajectory_follower_nodeが緊急停止で出力を凍結中かどうか
+        (estop_active購読)。未受信ならFalse(trajectory_follower_node未起動時は
+        そもそも出力自体が無いため安全側)。"""
+        return self._estop_active
+
+    def _on_limit_stop_active(self, msg):
+        self._limit_stop_active = msg.data
+
+    def get_limit_stop_active(self):
+        """z/rいずれかのリミットスイッチが現在トリガーされ安全停止中かどうか
+        (limit_stop_active購読)。"""
+        return self._limit_stop_active
+
+    def _on_device_feedback(self, device_id, msg):
+        self._device_last_seen_monotonic[device_id] = time.monotonic()
+
+    def get_stale_device_ids(self):
+        """STATUS_DEVICE_IDSのうち、STATUS_DEVICE_STALE_TIMEOUT_SEC以上
+        serial_rx_{id}_unwrappedが届いていない(=一度も受信していない場合を含む)
+        deviceのidリストを返す(赤色LEDの「ノード未起動」判定用)。"""
+        now = time.monotonic()
+        stale = []
+        for device_id in STATUS_DEVICE_IDS:
+            last_seen = self._device_last_seen_monotonic.get(device_id)
+            if last_seen is None or (now - last_seen) >= STATUS_DEVICE_STALE_TIMEOUT_SEC:
+                stale.append(device_id)
+        return stale
+
+    def publish_led_states(self, yellow, red):
+        """状態表示灯の最終ロジック状態(LedIndicatorWidget.STATE_*文字列)を
+        led_yellow_state/led_red_stateへpublishする(2026-09-08追加、実機の
+        LEDはhand_node.pyが購読して駆動する。CommandGuiApp._update_status_leds
+        から呼ばれる)。"""
+        msg = String()
+        msg.data = yellow
+        self.led_yellow_state_pub_.publish(msg)
+        msg = String()
+        msg.data = red
+        self.led_red_state_pub_.publish(msg)
+
+    def set_estop_handler(self, handler):
+        """CommandGuiApp._on_emergency_stop_requested(引数無し、戻り値無し)を
+        登録する(2026-09-08追加)。"""
+        self._estop_handler = handler
+
+    def _on_emergency_stop_srv(self, request, response):
+        if self._estop_handler is None:
+            response.success = False
+            response.message = 'GUI未初期化です'
+            return response
+        self._estop_handler()
+        response.success = True
+        response.message = '緊急停止しました'
+        return response
+
+    def set_estop_clear_handler(self, handler):
+        """CommandGuiApp._on_clear_emergency_stop_requested(引数無し、戻り値無し)を
+        登録する(2026-09-08追加)。"""
+        self._estop_clear_handler = handler
+
+    def _on_clear_emergency_stop_srv(self, request, response):
+        if self._estop_clear_handler is None:
+            response.success = False
+            response.message = 'GUI未初期化です'
+            return response
+        self._estop_clear_handler()
+        response.success = True
+        response.message = '緊急停止を解除しました'
+        return response
 
     def set_pick_confirm_handler(self, handler):
         """CommandGuiApp._on_pick_confirm_only_requested(引数無し、bool返却)を
@@ -1303,6 +1493,32 @@ class CommandGuiApp(QWidget):
             header.addWidget(logo_label)
             root_layout.addLayout(header)
 
+        # ---- 状態表示灯・緊急停止バー (2026-09-08新規) ----
+        # 実機CAN_HOST(device_id=101、MULTI1=黄色LED/MULTI2=赤色LED)の状態表示灯を
+        # 模した表示と、ソフト緊急停止の操作をどのタブを開いていても見える位置に置く
+        # (note/note_soki/can_mapping.txt「## 状態表示灯」参照)。
+        estop_bar = QHBoxLayout()
+        estop_bar.addWidget(QLabel('状態表示灯:'))
+        estop_bar.addWidget(QLabel('注意'))
+        self.yellow_led = LedIndicatorWidget('#f4b400')
+        estop_bar.addWidget(self.yellow_led)
+        estop_bar.addWidget(QLabel('異常'))
+        self.red_led = LedIndicatorWidget('#d93025')
+        estop_bar.addWidget(self.red_led)
+        estop_bar.addSpacing(16)
+        self.estop_status_label = QLabel()
+        self.estop_status_label.setWordWrap(True)
+        _set_status(self.estop_status_label, '', 'muted')
+        estop_bar.addWidget(self.estop_status_label, 1)
+        estop_btn = QPushButton('緊急停止')
+        estop_btn.setProperty('variant', 'danger')
+        estop_btn.clicked.connect(self._on_emergency_stop_requested)
+        estop_bar.addWidget(estop_btn)
+        estop_clear_btn = QPushButton('解除')
+        estop_clear_btn.clicked.connect(self._on_clear_emergency_stop_requested)
+        estop_bar.addWidget(estop_clear_btn)
+        root_layout.addLayout(estop_bar)
+
         self.tabs = QTabWidget()
         root_layout.addWidget(self.tabs)
 
@@ -1344,6 +1560,11 @@ class CommandGuiApp(QWidget):
         # _left・_rightサービス経由で呼ばれた際、ワーク選択カーソルを動かす
         # (2026-09-03、ユーザー指定:「矢印キーでGUI上で目標ワークを選択し移動」)。
         self.node.set_work_select_handler(self._on_work_select_requested)
+        # PSコン(joy_teleop_node)のPSボタンから/emergency_stop・/clear_emergency_stop
+        # サービス経由で呼ばれた際、GUIの「緊急停止」「解除」ボタンと同じ処理を行わせる
+        # (2026-09-08追加)。
+        self.node.set_estop_handler(self._on_emergency_stop_requested)
+        self.node.set_estop_clear_handler(self._on_clear_emergency_stop_requested)
 
         self.tabs.setCurrentWidget(overview_tab)
 
@@ -1928,6 +2149,7 @@ class CommandGuiApp(QWidget):
         column.addWidget(box)
 
     def _refresh_machine_status(self):
+        self._update_status_leds()
         active = self.node.get_active_node_names()
         for name, label in self.node_status_labels.items():
             if name in active:
@@ -2721,6 +2943,66 @@ class CommandGuiApp(QWidget):
             _set_status(self.sequence_status_label, '実行中のシーケンスはありません', 'muted')
             return
         self._abort_sequence(f'{self._seq_kind}シーケンスを中断しました')
+
+    def _on_emergency_stop_requested(self):
+        """ソフト緊急停止(2026-09-08追加)。GUIの「緊急停止」ボタン・PSコン
+        (joy_teleop_node)のPSボタン(/emergency_stopサービス経由)いずれからも
+        呼ばれる。自動シーケンスの中断・ホーミングの中断・trajectory_follower_node
+        のcubemars/robomas出力凍結をまとめて行う。解除は_on_clear_emergency_stop_
+        requested(GUIの「解除」ボタンのみ)からしか行えない(誤操作で即再始動しない
+        よう、緊急停止ボタン自体はトグルにしていない)。"""
+        if self._seq_active:
+            self._abort_sequence('緊急停止によりシーケンスを中断しました')
+        # 未実行時も無条件成功で返るだけなので結果は無視してよい(homing_node.
+        # _on_stop_homing参照)。homing_node未起動でも安全に無視できる。
+        self.node.call_trigger_service('/stop_homing', lambda success, message: None)
+        # trajectory_follower_node未起動時もcall_trigger_serviceが同期的に
+        # on_done(False, ...)を呼ぶため、ここでの戻り値チェックは不要
+        # (_on_estop_engage_doneがどちらの場合もestop_status_labelを更新する)。
+        self.node.call_trigger_service('/engage_estop', self._on_estop_engage_done)
+
+    def _on_estop_engage_done(self, success, message):
+        _set_status(self.estop_status_label, f'緊急停止: {message}', 'error')
+
+    def _on_clear_emergency_stop_requested(self):
+        """緊急停止の解除(2026-09-08追加)。ホーミング・自動シーケンスは自動で
+        再開しない(安全のため、必要ならユーザーが個別に再度開始すること)。"""
+        self.node.call_trigger_service('/release_estop', self._on_estop_release_done)
+
+    def _on_estop_release_done(self, success, message):
+        _set_status(self.estop_status_label, f'解除: {message}', 'success' if success else 'error')
+
+    def _update_status_leds(self):
+        """状態表示灯(黄色/赤色LED)の表示を更新する(2026-09-08追加、1秒周期の
+        _refresh_machine_statusから呼ばれる。点滅アニメーション自体はLedIndicator
+        Widget側の内蔵タイマーが行うため、ここではロジック状態の設定のみ)。
+        優先順位はnote/note_soki/can_mapping.txt「## 状態表示灯」の表と一致させる
+        こと(複数の状態が同時に該当する場合は上位を優先表示)。"""
+        # 黄色LED(注意系): シーケンス実行中 > ホーミング中 > 未ホーミング > 通常
+        if self._seq_active:
+            yellow = LedIndicatorWidget.STATE_BLINK_FAST
+        else:
+            # 文字列はhoming_node.pyのSTATE_*定数と一致させること
+            homing_state = self.node.get_homing_state()
+            if homing_state in ('homing_z', 'homing_r'):
+                yellow = LedIndicatorWidget.STATE_BLINK_SLOW
+            elif homing_state == 'done':
+                yellow = LedIndicatorWidget.STATE_OFF
+            else:  # None(未受信/homing_node未起動)・'idle'・'failed'
+                yellow = LedIndicatorWidget.STATE_ON
+        self.yellow_led.set_state(yellow)
+
+        # 赤色LED(異常系): 緊急停止中 > ノード未起動 > リミットスイッチ安全停止中 > 異常なし
+        if self.node.get_estop_active():
+            red = LedIndicatorWidget.STATE_BLINK_FAST
+        elif self.node.get_stale_device_ids():
+            red = LedIndicatorWidget.STATE_BLINK_SLOW
+        elif self.node.get_limit_stop_active():
+            red = LedIndicatorWidget.STATE_ON
+        else:
+            red = LedIndicatorWidget.STATE_OFF
+        self.red_led.set_state(red)
+        self.node.publish_led_states(yellow, red)
 
     def _build_trajectory_panel(self, column):
         box = QGroupBox('軌道生成パラメータ (trajectory_follower_node)')
