@@ -1077,10 +1077,23 @@ class CommandGuiNode(Node):
         トリガーされているか({axis}_{direction}_limit_triggered購読)。"""
         return self._limit_switch_triggered.get(f'{axis}_{direction}', False)
 
-    def get_r_lower_limit_triggered(self):
-        """R軸下限リミットスイッチ(しまう/収納側)が現在トリガーされているか。
-        投入シーケンスのR軸リトラクト完了判定用。"""
-        return self.get_limit_switch_triggered('r', 'lower')
+    def get_r_retract_limit_triggered(self):
+        """R軸を収納方向(r減少方向)へ動かした時に当たるリミットスイッチが現在
+        トリガーされているか。投入シーケンスのR軸リトラクト完了判定用。
+
+        R軸は名前と向きの対応がz軸と逆で、収納方向(r減少)で当たるのは
+        'r_upper'側になる(2026-09-10修正、ユーザー報告:「R軸自動収納が
+        動かない」)。note/note_soki/can_mapping.txtの実機報告参照:
+        「R軸のリミットスイッチは中心付近に2箇所配置されており、R軸両端の板が
+        外側から侵入することで反応する配線のため...r_lowerトリガー→増加方向を
+        ブロック、r_upperトリガー→減少方向をブロック」。
+        trajectory_follower_node側は_BLOCK_DIRECTION_FOR_INCREASEでこの逆転を
+        吸収済みだが、こちらの完了判定だけが'r_lower'を見たままだったため、
+        -r方向へ駆動しているのに永久に反応しない'r_lower'を待ち続けていた。
+        さらに実際にはr_upperがトリガーされた時点で_velocity_mode_target_rpmが
+        速度を0にクランプするため、R軸は端で止まったままタイムアウトするか、
+        既に収納位置にいる場合は最初から1mmも動かない状態になっていた。"""
+        return self.get_limit_switch_triggered('r', 'upper')
 
     def _on_device_feedback(self, device_id, msg):
         self._device_last_seen_monotonic[device_id] = time.monotonic()
@@ -1784,7 +1797,9 @@ class CommandGuiApp(QWidget):
             parent,
             top_funcs=[self._build_apply_all_panel],
             left_funcs=[self._build_trajectory_panel, self._build_joy_speed_panel],
-            right_funcs=[self._build_mit_gain_panel, self._build_robomas_gain_panel,
+            right_funcs=[self._build_mit_gain_panel, self._build_cubemars_resync_panel,
+                         self._build_cubemars_overspeed_panel,
+                         self._build_robomas_gain_panel,
                          self._build_robomas_autotune_panel, self._build_robomas_vel_gain_panel,
                          self._build_velocity_mode_panel])
 
@@ -2589,8 +2604,9 @@ class CommandGuiApp(QWidget):
         行う」)。r_retract_m(既存のR退避量設定、_start_pick_sequence用)のような
         特定のエンコーダ位置は使わず、trajectory_follower_node側のリミット
         スイッチ安全クランプ(_velocity_mode_target_rpm)が実際にR軸を止める
-        まで一定速度を送り続ける。r_lower_limit_triggered(個別状態、
-        get_r_lower_limit_triggered参照)がTrueになったら完了とする
+        まで一定速度を送り続ける。収納方向(r減少)で当たるスイッチの個別状態
+        (get_r_retract_limit_triggered参照。R軸は名前と向きの対応がz軸と逆で
+        'r_upper'側になる)がTrueになったら完了とする
         (集約フラグlimit_stop_activeを使わないのは、人が同時にZ軸を操作して
         Z側のスイッチが先に反応した場合に誤ってR軸到達と判定しないため)。
         速度はGUIのsequence_edits['retract_r_speed_mps']から読む(2026-09-09、
@@ -2608,7 +2624,7 @@ class CommandGuiApp(QWidget):
             _set_status(self.sequence_status_label,
                         f'{self._seq_kind}: R軸リトラクト中 (ステップ{self._seq_index + 1}/'
                         f'{len(self._seq_steps)})', 'muted')
-        if self.node.get_r_lower_limit_triggered():
+        if self.node.get_r_retract_limit_triggered():
             self.node.send_velocity_r(0.0)
             self._seq_retract_start_time = None
             self._seq_index += 1
@@ -2617,7 +2633,7 @@ class CommandGuiApp(QWidget):
             self.node.send_velocity_r(0.0)
             self._abort_sequence(
                 f'{self._seq_kind}: R軸リトラクトタイムアウト(ステップ{self._seq_index + 1}、'
-                'r_lower_limit_triggeredを受信できていない可能性があります)')
+                'r_upper_limit_triggered(収納方向側)を受信できていない可能性があります)')
             return
         self.node.send_velocity_r(-self._seq_retract_speed_mps)
 
@@ -2864,6 +2880,153 @@ class CommandGuiApp(QWidget):
         grid.addLayout(btn_row, len(CUBEMARS_JOINT_NAMES) + 2, 0, 1, 4)
 
         column.addWidget(box)
+
+    def _build_cubemars_resync_panel(self, column):
+        # trajectory_follower_node._on_cubemars_feedbackの「静止を指令中に実機
+        # 帰還と乖離したらtarget_ごと強制的に実角度へ再同期する」安全機構
+        # (CubeMars/root_theta用、物理緊急停止をソフト緊急停止なしで行った場合や
+        # 実機スタックの検知用)のON/OFF切替(2026-09-10追加、ユーザー報告:
+        # 「根本θにキックが発生。反対方向にガクッとなるもしくは目標値に到達しない
+        # まま止まる。手動、自動シーケンスのどちらでも発生」の原因切り分け用)。
+        # OFFにするとこの保護が失われるため、原因切り分けの一時的な用途以外では
+        # 基本的にONのままにすること(trajectory_follower_node.pyの
+        # cubemars_divergence_resync_enabled宣言部のコメント参照)。
+        box = QGroupBox('根本θ 静止乖離時の強制再同期')
+        layout = QVBoxLayout(box)
+
+        desc = QLabel()
+        desc.setWordWrap(True)
+        _set_status(
+            desc,
+            '静止を指令中に実機帰還(絶対値エンコーダ)と5°以上ズレたらtarget_ごと\n'
+            '実角度へ強制的に再同期する安全機構(物理緊急停止・スタック検知用)。\n'
+            'OFFにすると保護が失われるため、キック/未到達停止の原因切り分け以外\n'
+            'では基本的にONのままにすること。', 'muted')
+        layout.addWidget(desc)
+
+        self.cubemars_resync_check = QCheckBox('強制再同期を有効にする')
+        self.cubemars_resync_check.setChecked(True)
+        self.cubemars_resync_check.toggled.connect(self._on_cubemars_resync_toggled)
+        layout.addWidget(self.cubemars_resync_check)
+
+        self.cubemars_resync_status_label = QLabel()
+        self.cubemars_resync_status_label.setWordWrap(True)
+        _set_status(self.cubemars_resync_status_label, '有効', 'muted')
+        layout.addWidget(self.cubemars_resync_status_label)
+
+        column.addWidget(box)
+
+    def _on_cubemars_resync_toggled(self, checked):
+        ok = self.node.set_node_params(
+            TRAJ_NODE_NAME, {'cubemars_divergence_resync_enabled': checked},
+            self._apply_cubemars_resync_result)
+        if not ok:
+            _set_status(self.cubemars_resync_status_label,
+                        'trajectory_follower_nodeに接続できません(未起動?)', 'error')
+        else:
+            _set_status(self.cubemars_resync_status_label, '適用中...', 'muted')
+
+    def _apply_cubemars_resync_result(self, results):
+        if results is None:
+            _set_status(self.cubemars_resync_status_label, '適用失敗(通信エラー)', 'error')
+            return
+        if all(r.successful for r in results):
+            checked = self.cubemars_resync_check.isChecked()
+            _set_status(
+                self.cubemars_resync_status_label,
+                '有効' if checked else '無効(安全機構OFF、切り分け用途以外では戻すこと)',
+                'muted' if checked else 'error')
+        else:
+            reasons = '; '.join(r.reason for r in results if not r.successful)
+            _set_status(self.cubemars_resync_status_label, f'適用失敗: {reasons}', 'error')
+
+    def _build_cubemars_overspeed_panel(self, column):
+        # trajectory_follower_node._on_cubemars_feedbackの、実機帰還(エンコーダ)
+        # から計算した実速度・実加速度が閾値を超えたら自動でソフト緊急停止を
+        # 入れる機能(2026-09-10追加、ユーザー提案:「実機のスタックとかって
+        # エンコーダー見てたら分かる気がする」「一定の速度以上でソフト緊急停止を
+        # 入れられないか」「加速度でもいい」)。静止判定に頼る上のパネル(静止乖離時
+        # の強制再同期)とは独立に、実機の動きそのものを毎回見るため、キックの
+        # ような急な異常動作を静止/移動中を問わず検知できる。しきい値は実機で
+        # 未検証の仮の値(trajectory_follower_node.pyのcubemars_overspeed_
+        # limit_radps/cubemars_overaccel_limit_radps2宣言部のコメント参照)なので、
+        # 実機の挙動を見ながらここで調整すること。
+        box = QGroupBox('根本θ 過速度/急加速で自動緊急停止')
+        layout = QVBoxLayout(box)
+
+        desc = QLabel()
+        desc.setWordWrap(True)
+        _set_status(
+            desc,
+            '実機帰還(エンコーダ)から計算した実速度・実加速度がしきい値を超えたら\n'
+            '自動でソフト緊急停止を入れる(キック等の異常な動きを静止/移動中を問わず\n'
+            '検知)。しきい値はまだ実機で検証していない仮の値。', 'muted')
+        layout.addWidget(desc)
+
+        self.cubemars_overspeed_check = QCheckBox('自動緊急停止を有効にする')
+        self.cubemars_overspeed_check.setChecked(True)
+        layout.addWidget(self.cubemars_overspeed_check)
+
+        grid = QGridLayout()
+        grid.addWidget(QLabel('速度しきい値 [rad/s]'), 0, 0)
+        self.cubemars_overspeed_limit_edit = make_float_edit(3.0, width=70)
+        grid.addWidget(self.cubemars_overspeed_limit_edit, 0, 1)
+        grid.addWidget(QLabel('加速度しきい値 [rad/s^2]'), 1, 0)
+        self.cubemars_overaccel_limit_edit = make_float_edit(15.0, width=70)
+        grid.addWidget(self.cubemars_overaccel_limit_edit, 1, 1)
+        layout.addLayout(grid)
+
+        apply_btn = QPushButton('適用')
+        apply_btn.setProperty('variant', 'primary')
+        apply_btn.clicked.connect(self._on_apply_cubemars_overspeed)
+        layout.addWidget(apply_btn)
+
+        self.cubemars_overspeed_status_label = QLabel()
+        self.cubemars_overspeed_status_label.setWordWrap(True)
+        _set_status(self.cubemars_overspeed_status_label,
+                    '有効 (速度3.00rad/s, 加速度15.00rad/s^2)', 'muted')
+        layout.addWidget(self.cubemars_overspeed_status_label)
+
+        column.addWidget(box)
+
+    def _on_apply_cubemars_overspeed(self):
+        try:
+            vel_limit = get_float(self.cubemars_overspeed_limit_edit)
+            accel_limit = get_float(self.cubemars_overaccel_limit_edit)
+        except ValueError:
+            QMessageBox.critical(self, '入力エラー', '速度・加速度のしきい値に数値を入力してください')
+            return
+        if vel_limit <= 0.0 or accel_limit <= 0.0:
+            QMessageBox.critical(self, '入力エラー', 'しきい値は正の値にしてください')
+            return
+        values = {
+            'cubemars_overspeed_estop_enabled': self.cubemars_overspeed_check.isChecked(),
+            'cubemars_overspeed_limit_radps': vel_limit,
+            'cubemars_overaccel_limit_radps2': accel_limit,
+        }
+        ok = self.node.set_node_params(
+            TRAJ_NODE_NAME, values, self._apply_cubemars_overspeed_result)
+        _set_status(self.cubemars_overspeed_status_label,
+                    '適用中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
+                    'muted' if ok else 'error')
+
+    def _apply_cubemars_overspeed_result(self, results):
+        if results is None:
+            _set_status(self.cubemars_overspeed_status_label, '適用失敗(通信エラー)', 'error')
+            return
+        if all(r.successful for r in results):
+            enabled = self.cubemars_overspeed_check.isChecked()
+            if enabled:
+                vel_limit = get_float(self.cubemars_overspeed_limit_edit)
+                accel_limit = get_float(self.cubemars_overaccel_limit_edit)
+                _set_status(self.cubemars_overspeed_status_label,
+                            f'有効 (速度{vel_limit:.2f}rad/s, 加速度{accel_limit:.2f}rad/s^2)',
+                            'muted')
+            else:
+                _set_status(self.cubemars_overspeed_status_label, '無効', 'error')
+        else:
+            reasons = '; '.join(r.reason for r in results if not r.successful)
+            _set_status(self.cubemars_overspeed_status_label, f'適用失敗: {reasons}', 'error')
 
     def _build_machine_origin_offset_panel(self, column):
         box = QGroupBox('機体原点オフセット (soki_sim.urdf.xacro)')

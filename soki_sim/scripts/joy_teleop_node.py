@@ -809,6 +809,20 @@ class JoyTeleopNode(Node):
         self._update_low_speed_toggle(msg)
         self._update_work_selection(msg)
         enabled = self._is_enabled(msg)
+        # ソフト緊急停止中(estop_active購読、_on_estop_active参照)は移動系の入力を
+        # 一切通さない(2026-09-10追加)。以前はestop状態を見ずにジョグ入力を積分し
+        # 続けていたため、estop中にトリガー/スティックを倒していると、
+        # (1) target_theta_が実機と無関係に伸び続ける、
+        # (2) 速度指令モードのz/rはestop中も非ゼロ速度をpublishし続け、
+        #     trajectory_follower_node側の_velocity_targets_に残り続ける、
+        # という状態になり、解除した瞬間にその目標/速度がそのまま効いて急に動いた。
+        # enabled=Falseにすると各軸とも「現在値へ同期するだけ/速度0を送るだけ」の
+        # 分岐に落ちるため、estop解除時点の実機位置から自然に再開できる
+        # (trajectory_follower_nodeはestop中も/mixed_joint_statesをpublishし続ける
+        # ので、この同期先は脱力して動いた後の実位置になる)。ボタン系(ポンプ・
+        # PSボタンのestopトグル等)はデッドマンと同様ここでは止めない。
+        if self._estop_active_:
+            enabled = False
 
         # 低速モード(SHAREボタン、2026-09-09追加)。ONの間、以下の全ジョグ速度を
         # low_speed_multiplier倍に落として精密操作しやすくする
@@ -904,7 +918,15 @@ class JoyTeleopNode(Node):
         # 同期グループを分離する。
         tip_theta_names = []
         tip_theta_positions = []
-        if self._tip_theta_follow_theta_:
+        if self._estop_active_:
+            # estop中は手先θも指令しない(2026-09-10追加)。追従ON時のこの分岐は
+            # enabled(デッドマン)と無関係に毎周期publishするため、上のenabled=False
+            # だけでは止まらない。estop中に脱力したroot_thetaが重力で動くと、その
+            # 追従先(-root_theta)を指令し続けてしまい、解除直後に手先θだけが
+            # 動き出す。現在値へ同期するだけにして、解除後の値から再開させる。
+            if self.has_tip_theta_state_:
+                self.target_tip_theta_ = self._current_tip_theta_
+        elif self._tip_theta_follow_theta_:
             # OPTIONSボタンでON(既定ON、_update_tip_theta_follow_toggle参照)の
             # 間は、回収シーケンスと同じ追従式(tip_theta=-root_theta、ワークの
             # 行と平行を保つ)を手動ジョグ中も毎周期指令し続ける。右スティック
@@ -930,6 +952,19 @@ class JoyTeleopNode(Node):
         if vel_names:
             vel_out = JointState()
             vel_out.header.stamp = self.get_clock().now().to_msg()
+            # joint_targets側(上のout/tip_theta_out)と同じくframe_id='manual'を付ける
+            # (2026-09-10修正、ユーザー報告:「R軸自動収納が動かない」)。
+            # ここだけ付け忘れていたため、trajectory_follower_node._on_velocity_targets
+            # の source = msg.header.frame_id or 'auto' が空文字→'auto'と解釈し、
+            # joyの速度指令が「自動シーケンス(command_gui_node)からの指令」として
+            # 扱われていた。結果:
+            #  - control_modeによる送信元フィルタがjoyの速度指令に対して逆に効く
+            #    (control_mode='manual'ではjoyのz/rジョグが弾かれる)。
+            #  - スティックを触っていない間も50Hzで送られる速度0.0が'auto'扱いに
+            #    なるため、GUIの投入シーケンスのR軸リトラクト(20Hz)を打ち消し、
+            #    R軸が微振動するだけでほとんど進まなかった(手動優先の調停も
+            #    送信元を区別できず素通りしていた)。
+            vel_out.header.frame_id = 'manual'
             vel_out.name = vel_names
             vel_out.velocity = vel_values
             self.vel_pub_.publish(vel_out)

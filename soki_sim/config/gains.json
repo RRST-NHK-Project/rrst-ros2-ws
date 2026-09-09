@@ -28,7 +28,7 @@
   },
   "mit_gain": {
     "cubemars_kp": {
-      "root_theta_joint": 5.0
+      "root_theta_joint": 2.0
     },
     "cubemars_kd": {
       "root_theta_joint": 0.5
@@ -50,12 +50,8 @@
     "robomas_tip_theta_current_ff": 0.0
   },
   "sequence": {
-    "safe_transit_z_m": 0.252,
-    "r_retract_m": -0.322,
-    "pickup_z_offset_m": 0.0758,
-    "pickup_approach_clearance_m": 0.1,
     "shoot_tip_theta_rad": 0.0,
-    "gather_settle_sec": 0.5
+    "retract_r_speed_mps": 0.2
   },
   "robomas_vel_gain": {
     "robomas_vel_kp": 1.0,

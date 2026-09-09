@@ -131,6 +131,21 @@ CUBEMARS_POS_DIVERGENCE_LIMIT_RAD = math.radians(5.0)
 # いるとみなせるため、そこでの乖離は正常な追従遅れではなく実機側の異常
 # (物理緊急停止・スタック等)を意味する。
 CUBEMARS_HOLDING_VEL_LIMIT_RADPS = 0.02
+# 「静止を指令中」の判定にvel_だけでなくpos_がtarget_へ実際に到達しているかも
+# 併せて見るための許容誤差(2026-09-10追加、ユーザー報告:「根本θにキックが
+# 発生。反対方向にガクッとなるもしくは目標値に到達しないまま止まる。手動、
+# 自動シーケンスのどちらでも発生」への対策)。vel_だけで「静止中」を判定すると、
+# 新しい目標を受け取った直後(target_callbackがtarget_を書き換えた直後、まだ
+# timer_callbackがtrap_stepを1回も回していない間)はvel_が前回停止時の0.0の
+# ままのため、大きく離れた新目標へ動き出す直前の一瞬も「静止中」と誤判定
+# されてしまう。この間にpos_(まだ古い位置のまま)と実機帰還の乖離が
+# CUBEMARS_POS_DIVERGENCE_LIMIT_RADを超えていると(kp不足による重力/摩擦での
+# 定常偏差など)、動き出す前にtarget_ごと実機の現在角度へ巻き戻されてしまい、
+# 「キックして目標に到達しないまま止まる」不具合になっていた。pos_がtarget_へ
+# 実際に到達している(=trap_step側が一区切りついている)ことも条件に加えることで、
+# 移動開始直後の誤判定を防ぐ(移動が真に完了して静止した後の乖離だけを異常として
+# 検出する、という本来の意図に合わせる)。
+CUBEMARS_HOLDING_POS_TOL_RAD = math.radians(1.0)
 
 # ROBOMAS(z_joint/r_joint、motor1/motor2)のMITモード。cubemarsとスケールが異なる点に
 # 注意(robomas.cpp/config.hppのROBOMAS_MIT_*参照)。
@@ -155,6 +170,18 @@ ROBOMAS_VEL_MAX_CURRENT_LSB = 0.001
 # joint_velocity_targetsの受信がこれ以上途絶えたら、速度モード中でも安全側で
 # 0指令とみなす(joy_teleop_node異常終了・トピック未接続対策)。
 ROBOMAS_VELOCITY_TARGET_STALE_SEC = 0.3
+# 自動シーケンス(frame_id='auto')が非ゼロの速度指令を出している間、手動
+# (frame_id='manual')側の「入力ゼロ」で上書きされないように保持する時間
+# (2026-09-10追加、ユーザー報告:「R軸の自動格納が機能しない」)。
+# control_mode='both'(use_joy:=trueのlaunch既定・GUIの動作モード既定)では
+# _on_velocity_targetsがjoyとGUI両方の速度指令を受け付けるが、
+# joy_teleop_nodeはスティックを触っていなくてもz/r速度0.0を50Hzで送り続ける
+# 一方、GUIの投入シーケンスのR軸リトラクトは50ms周期(20Hz)でしか送れないため、
+# 単純な後着優先だとjoyのゼロが2.5倍の頻度で勝ってR軸がほとんど動かなかった。
+# この保持時間中は手動側のゼロを無視する(人がスティックを実際に倒した=非ゼロを
+# 送ってきた場合は即座に手動優先へ切り替えるので、操作を奪われることはない)。
+# GUIが異常終了して0.0を送れないまま止まっても、この時間で自動的に解除される。
+ROBOMAS_VELOCITY_AUTO_HOLD_SEC = 0.3
 
 # /set_root_theta_originサービス呼び出し後、Set Originコマンドの送信を保証するために
 # 通常のMIT指令を止めてSET_ORIGINモードを保持する周期数(update_rate_hzでの周期数)。
@@ -250,6 +277,32 @@ class TrajectoryFollowerNode(Node):
         self.declare_parameter('output_topic', 'mixed_joint_states')
         # 'auto'=command_gui_nodeのみ受付, 'manual'=joy_teleop_nodeのみ受付, 'both'=両方受付
         self.declare_parameter('control_mode', 'auto')
+        # _on_cubemars_feedbackの「静止中に実機帰還と乖離したらtarget_ごと強制
+        # 再同期する」安全機構(CUBEMARS_POS_DIVERGENCE_LIMIT_RAD宣言部のコメント
+        # 参照)のON/OFF切替(2026-09-10追加、ユーザー報告:「根本θにキックが発生。
+        # 反対方向にガクッとなるもしくは目標値に到達しないまま止まる」の原因切り分け
+        # 用)。既定true(安全機構は既定で有効のまま)。command_gui_nodeのチェック
+        # ボックスから切り替えられる(_on_cubemars_resync_toggled参照)。OFFにする
+        # と物理緊急停止をソフト緊急停止なしで行った場合や実機スタック時の保護が
+        # 失われるため、原因切り分けの一時的な用途以外では基本的にONのままにする
+        # こと。
+        self.declare_parameter('cubemars_divergence_resync_enabled', True)
+        # CubeMars(root_theta)の実機帰還(絶対値エンコーダ)から計算した実速度・
+        # 実加速度が閾値を超えたら自動でソフト緊急停止を入れる安全機構
+        # (2026-09-10追加、ユーザー提案:「実機のスタックとかってエンコーダー見て
+        # たら分かる気がする」「一定の速度以上でソフト緊急停止を入れられないか」
+        # 「加速度でもいい」)。cubemars_divergence_resync_enabled(静止中の乖離
+        # 検知)とは別の観点の安全機構: こちらは静止判定に頼らず、実機帰還の
+        # 動き自体(速度・加速度)を毎回直接見るため、キックのような急な異常動作を
+        # 静止/移動中を問わず検知できる。全cubemars関節に同じ閾値を適用する
+        # (現状root_thetaのみのため関節ごとの配列にはしていない。将来関節が
+        # 増えて別々の閾値が必要になったらcubemars_kp等と同じ配列パラメータへ
+        # 変更すること)。しきい値はまだ実機で検証していない仮の値のため、
+        # command_gui_nodeのパネルから実機の様子を見ながら調整すること
+        # (_build_cubemars_overspeed_panel参照)。
+        self.declare_parameter('cubemars_overspeed_estop_enabled', True)
+        self.declare_parameter('cubemars_overspeed_limit_radps', 3.0)
+        self.declare_parameter('cubemars_overaccel_limit_radps2', 15.0)
         # 組立中・不具合時に特定の軸を無視するためのランタイム設定(2026-09-05追加、
         # command_gui_nodeの「軸の有効/無効」パネルから変更する)。ここに含まれる
         # joint_namesはtarget_callbackで目標更新を無視し、現在位置で凍結される
@@ -385,6 +438,15 @@ class TrajectoryFollowerNode(Node):
         self.control_mode_ = self.get_parameter('control_mode').value
         if self.control_mode_ not in VALID_CONTROL_MODES:
             raise ValueError(f'control_mode must be one of {VALID_CONTROL_MODES}')
+
+        self.cubemars_divergence_resync_enabled_ = bool(
+            self.get_parameter('cubemars_divergence_resync_enabled').value)
+        self.cubemars_overspeed_estop_enabled_ = bool(
+            self.get_parameter('cubemars_overspeed_estop_enabled').value)
+        self.cubemars_overspeed_limit_radps_ = float(
+            self.get_parameter('cubemars_overspeed_limit_radps').value)
+        self.cubemars_overaccel_limit_radps2_ = float(
+            self.get_parameter('cubemars_overaccel_limit_radps2').value)
 
         self.disabled_joints_ = set(self.get_parameter('disabled_joints').value)
         if any(name not in self.joint_names_ for name in self.disabled_joints_):
@@ -533,6 +595,10 @@ class TrajectoryFollowerNode(Node):
         # ソフト緊急停止解除時のkpランプ開始時刻(name -> monotonic時刻、ランプ
         # 中でなければNone)。CUBEMARS_KP_RAMP_SEC宣言部のコメント参照。
         self._cubemars_kp_ramp_start_ = {name: None for name in self.cubemars_}
+        # 実機帰還から実速度・実加速度を計算するための直前値(name -> (joint_rad,
+        # monotonic時刻, 直前の実速度)、cubemars_overspeed_estop_enabled宣言部の
+        # コメント参照)。1回目の帰還では差分が取れないためNoneのまま。
+        self._cubemars_prev_actual_ = {name: None for name in self.cubemars_}
 
     def _on_cubemars_feedback(self, msg: Int32MultiArray, device_id: int):
         self._last_cubemars_raw_[device_id] = msg.data
@@ -589,8 +655,48 @@ class TrajectoryFollowerNode(Node):
                 continue
             raw_deg = msg.data[cfg['motor_index']] * CUBEMARS_POSITION_SCALE_DEG
             joint_rad = math.radians(raw_deg) / cfg['reduction']
+
+            # 実機帰還そのものの速度・加速度から過速度/急加速を検知して自動で
+            # ソフト緊急停止を入れる(cubemars_overspeed_estop_enabled宣言部の
+            # コメント参照)。static/holding判定に頼らず実機の動き自体を毎回直接
+            # 見るため、上のdivergence-resyncとは独立に、静止/移動中を問わず
+            # キックのような急な異常動作を検知できる。estop_active_中は既に
+            # 出力凍結済みで再検知の意味が無いためスキップする。
+            if self.cubemars_overspeed_estop_enabled_ and not self.estop_active_:
+                now = time.monotonic()
+                prev = self._cubemars_prev_actual_.get(name)
+                if prev is None:
+                    self._cubemars_prev_actual_[name] = (joint_rad, now, 0.0)
+                else:
+                    prev_rad, prev_time, prev_vel = prev
+                    dt_actual = now - prev_time
+                    if dt_actual > 1e-4:  # 極端に短い間隔(0除算回避)はスキップし前回値を維持
+                        actual_vel = (joint_rad - prev_rad) / dt_actual
+                        actual_accel = (actual_vel - prev_vel) / dt_actual
+                        if (abs(actual_vel) > self.cubemars_overspeed_limit_radps_
+                                or abs(actual_accel) > self.cubemars_overaccel_limit_radps2_):
+                            self.get_logger().error(
+                                f'trajectory_follower_node: {name} overspeed/overaccel detected '
+                                f'from real feedback (vel={math.degrees(actual_vel):.0f}deg/s, '
+                                f'accel={math.degrees(actual_accel):.0f}deg/s^2, limits='
+                                f'{math.degrees(self.cubemars_overspeed_limit_radps_):.0f}deg/s/'
+                                f'{math.degrees(self.cubemars_overaccel_limit_radps2_):.0f}deg/s^2). '
+                                'engaging emergency stop.')
+                            self._engage_estop(f'{name} overspeed/overaccel')
+                        self._cubemars_prev_actual_[name] = (joint_rad, now, actual_vel)
+
             if self._cubemars_joint_has_target_.get(name, False) and not self.estop_active_:
-                holding_still = abs(self.vel_.get(name, 0.0)) < CUBEMARS_HOLDING_VEL_LIMIT_RADPS
+                if not self.cubemars_divergence_resync_enabled_:
+                    # GUIの「静止乖離時の強制再同期」チェックボックスでOFFにした場合
+                    # (declare_parameter部コメント参照)。この関節は目標受信済み・
+                    # estop中でもないため、以下の無条件resync(has_target_未受信/
+                    # estop中用)には絶対に落とさず、常にプロファイル側(pos_/target_)を
+                    # 信用する(従来のholding_still判定自体を丸ごとスキップする)。
+                    continue
+                holding_still = (
+                    abs(self.vel_.get(name, 0.0)) < CUBEMARS_HOLDING_VEL_LIMIT_RADPS
+                    and abs(self.pos_[name] - self.target_.get(name, self.pos_[name]))
+                    <= CUBEMARS_HOLDING_POS_TOL_RAD)
                 if not holding_still or abs(self.pos_[name] - joint_rad) <= CUBEMARS_POS_DIVERGENCE_LIMIT_RAD:
                     continue
                 self.get_logger().warning(
@@ -703,6 +809,12 @@ class TrajectoryFollowerNode(Node):
         # _velocity_mode_target_rpm参照)。
         self._velocity_targets_ = {z_name: 0.0, r_name: 0.0}
         self._velocity_targets_stamp_ = None
+        # 自動シーケンス(frame_id='auto')が非ゼロ速度を指令中の関節と、その最終
+        # 受信時刻(ROBOMAS_VELOCITY_AUTO_HOLD_SEC宣言部のコメント参照)。
+        self._velocity_auto_hold_ = {z_name: None, r_name: None}
+        # 逆に、人がスティックを倒している(非ゼロを送ってきた)関節と最終受信時刻。
+        # この間は自動シーケンス側の指令を無視して人を優先する(_on_velocity_targets参照)。
+        self._velocity_manual_override_ = {z_name: None, r_name: None}
         # 速度モードでも位置モードと同じmax_velocity/max_acceleration/
         # max_decelerationを効かせるためのスルーレート制限状態(前周期に実際に
         # 指令したz/r速度[m/s])。_slew_velocity/_reset_velocity_mode_slew参照。
@@ -920,10 +1032,45 @@ class TrajectoryFollowerNode(Node):
             return
         if self.control_mode_ == 'manual' and source != 'manual':
             return
+        # control_mode='both'ではjoy(manual)とGUIの自動シーケンス(auto)の両方が
+        # このトピックへ送ってくる。単純な後着優先だと、スティックを触っていない
+        # 間もz/r速度0.0を50Hzで送り続けるjoy側が、20HzでしかR軸リトラクト速度を
+        # 送れないGUI側に競り勝ってしまう(ユーザー報告:「R軸の自動格納が機能
+        # しない」)。自動側が非ゼロを指令している間は手動側の「ゼロ」だけを無視して
+        # 調停する(ROBOMAS_VELOCITY_AUTO_HOLD_SEC宣言部のコメント参照)。
+        now = time.monotonic()
         for name, vel in zip(msg.name, msg.velocity):
-            if name in self._velocity_targets_:
-                self._velocity_targets_[name] = vel
-        self._velocity_targets_stamp_ = time.monotonic()
+            if name not in self._velocity_targets_:
+                continue
+            manual_override = self._velocity_manual_override_.get(name)
+            manual_active = (manual_override is not None
+                             and now - manual_override <= ROBOMAS_VELOCITY_AUTO_HOLD_SEC)
+            auto_hold = self._velocity_auto_hold_.get(name)
+            auto_active = (auto_hold is not None
+                           and now - auto_hold <= ROBOMAS_VELOCITY_AUTO_HOLD_SEC)
+
+            if source == 'auto':
+                if manual_active:
+                    # 人がスティックを倒している間はシーケンスより人を優先する
+                    # (両方が非ゼロを送り続ける状況で、送信頻度の差による
+                    # 早い者勝ちのガタつきにならないよう明示的に人を勝たせる)。
+                    continue
+                # 自動側の非ゼロで保持を開始/延長し、0.0で明示的に解除する
+                # (シーケンス完了・中断時にGUIが0.0を送る、_abort_sequence参照)。
+                self._velocity_auto_hold_[name] = now if vel != 0.0 else None
+            elif vel != 0.0:
+                # 人が実際にスティックを倒した: 即座に手動優先へ切り替える。
+                self._velocity_manual_override_[name] = now
+                self._velocity_auto_hold_[name] = None
+            else:
+                # 手動側の入力ゼロ。スティックから手を離した合図なので手動優先は
+                # 解除するが、自動シーケンスが駆動中ならこのゼロ自体は捨てる
+                # (触っていないjoyが50Hzで送り続けるゼロで自動側を潰さない)。
+                self._velocity_manual_override_[name] = None
+                if auto_active:
+                    continue
+            self._velocity_targets_[name] = vel
+        self._velocity_targets_stamp_ = now
 
     def _on_low_speed_active(self, msg: Bool):
         self._low_speed_active_ = msg.data
@@ -1016,7 +1163,10 @@ class TrajectoryFollowerNode(Node):
         msg.data = self.estop_active_
         self.estop_pub_.publish(msg)
 
-    def _on_engage_estop(self, request, response):
+    def _engage_estop(self, reason):
+        """ソフト緊急停止を実際に入れる本体。/engage_estopサービス(_on_engage_estop)
+        と、実機帰還の過速度/急加速検知(_on_cubemars_feedback、2026-09-10追加)の
+        両方から呼ばれる共通処理。reasonはログ出力用(呼び出し元を区別するため)。"""
         self.estop_active_ = True
         self._reset_velocity_mode_slew()
         # 物理緊急停止(モーター電源切断、CAN_HOST=マイコンはON)と併用された場合の
@@ -1041,12 +1191,23 @@ class TrajectoryFollowerNode(Node):
         if self.robomas_ is not None:
             for name in self._velocity_targets_:
                 self._velocity_targets_[name] = 0.0
+            # 自動シーケンスのR軸リトラクト中に緊急停止した場合、その保持が残った
+            # ままだと解除後に手動側のゼロが無視され続ける(_on_velocity_targets
+            # 参照)。シーケンス自体もGUI側で中断されるためここで解除しておく。
+            for name in self._velocity_auto_hold_:
+                self._velocity_auto_hold_[name] = None
+            for name in self._velocity_manual_override_:
+                self._velocity_manual_override_[name] = None
         if self.has_target_:
             self._publish_cubemars_commands()
             self._publish_robomas_commands()
         self._publish_estop_state()
         self.get_logger().warning(
-            'trajectory_follower_node: emergency stop engaged, cubemars/robomas output frozen')
+            f'trajectory_follower_node: emergency stop engaged ({reason}), '
+            'cubemars/robomas output frozen')
+
+    def _on_engage_estop(self, request, response):
+        self._engage_estop('service request')
         response.success = True
         response.message = 'emergency stop engaged'
         return response
@@ -1077,6 +1238,13 @@ class TrajectoryFollowerNode(Node):
         now = time.monotonic()
         for name in self._cubemars_kp_ramp_start_:
             self._cubemars_kp_ramp_start_[name] = now
+        # 過速度/急加速検知(cubemars_overspeed_estop_enabled参照)の直前値も
+        # リセットする。estop中は長時間フィードバックを無視していた(手で動かした
+        # 場合を含む)ため、そのまま次のフィードバックとの差分を取ると大きなdtに
+        # 対する見かけ上の値になり不正確(誤検知/見逃しどちらの向きにもなり得る)。
+        # Noneに戻して次回フィードバックで改めて基準を取り直させる。
+        for name in self._cubemars_prev_actual_:
+            self._cubemars_prev_actual_[name] = None
         self._publish_estop_state()
         self.get_logger().warning('trajectory_follower_node: emergency stop released')
         response.success = True
@@ -1138,6 +1306,9 @@ class TrajectoryFollowerNode(Node):
             if p.name == 'low_speed_multiplier' and not (0.0 < p.value <= 1.0):
                 return SetParametersResult(
                     successful=False, reason='low_speed_multiplier must be in (0.0, 1.0]')
+            if p.name in ('cubemars_overspeed_limit_radps', 'cubemars_overaccel_limit_radps2') \
+                    and p.value <= 0.0:
+                return SetParametersResult(successful=False, reason=f'{p.name} must be positive')
         for p in params:
             if p.name == 'max_velocity':
                 self.max_vel_ = dict(zip(self.joint_names_, p.value))
@@ -1147,6 +1318,14 @@ class TrajectoryFollowerNode(Node):
                 self.max_decel_ = dict(zip(self.joint_names_, p.value))
             elif p.name == 'control_mode':
                 self.control_mode_ = p.value
+            elif p.name == 'cubemars_divergence_resync_enabled':
+                self.cubemars_divergence_resync_enabled_ = bool(p.value)
+            elif p.name == 'cubemars_overspeed_estop_enabled':
+                self.cubemars_overspeed_estop_enabled_ = bool(p.value)
+            elif p.name == 'cubemars_overspeed_limit_radps':
+                self.cubemars_overspeed_limit_radps_ = float(p.value)
+            elif p.name == 'cubemars_overaccel_limit_radps2':
+                self.cubemars_overaccel_limit_radps2_ = float(p.value)
             elif p.name == 'disabled_joints':
                 # 新たに無効化された軸は、以後target_callbackが目標更新を無視するだけ
                 # でなく、ここで即座にtarget_を現在位置へ固定して移動中なら滑らかに
@@ -1310,8 +1489,19 @@ class TrajectoryFollowerNode(Node):
 
         self._update_limit_stop_status()
         if self.estop_active_:
-            # 緊急停止中はtrap_stepの進行・cubemars/robomasへのpublishを一切行わない
-            # (最後に送った指令のまま実機側で位置保持される、engage_estop参照)。
+            # 緊急停止中はtrap_stepの進行・cubemars/robomasへの指令publishを一切
+            # 行わない(最後に送った0ゲイン=脱力のMITフレームがros2can側で送られ
+            # 続ける、_engage_estop/_publish_cubemars_commands参照)。
+            # ただし現在位置(/mixed_joint_states)のpublishだけは続ける
+            # (2026-09-10追加)。estop中はkp/kd=0で脱力させるようになったため、
+            # root_thetaが重力や手で実際に動き得る。ここでpublishを止めると
+            # joy_teleop_node/command_gui_node/rvizが持つ「現在位置」がestop突入
+            # 時点の値で凍結し、解除後にjoy_teleop_nodeがその古い位置を目標として
+            # 送ってしまう(=解除後に元の位置へ戻ろうとする)。pos_はestop中も
+            # _on_cubemars_feedbackが実機帰還へ追従させ続けているため、そのまま
+            # 流すだけで各ノードの現在位置が実機と一致し続ける(rvizと実機の角度が
+            # ズレる問題への対策も兼ねる)。
+            self._publish_joint_states()
             return
 
         # z/rはリミットスイッチがトリガーされている方向への移動だけをロックする
@@ -1353,14 +1543,19 @@ class TrajectoryFollowerNode(Node):
                 self.pos_[name], self.vel_[name], target,
                 self.eff_max_vel_[name], self.eff_max_accel_[name], self.eff_max_decel_[name], self.dt_)
 
+        self._publish_joint_states()
+
+        self._publish_cubemars_commands()
+        self._publish_robomas_commands()
+
+    def _publish_joint_states(self):
+        """現在位置(self.pos_)を/mixed_joint_statesへ流す。通常周期に加え、
+        estop中(timer_callbackが指令publishを行わない間)からも呼ばれる。"""
         out = JointState()
         out.header.stamp = self.get_clock().now().to_msg()
         out.name = list(self.joint_names_)
         out.position = [self.pos_[name] for name in self.joint_names_]
         self.pub_.publish(out)
-
-        self._publish_cubemars_commands()
-        self._publish_robomas_commands()
 
     def _publish_cubemars_commands(self):
         for name, cfg in self.cubemars_.items():
@@ -1418,14 +1613,28 @@ class TrajectoryFollowerNode(Node):
                 if kp_scale >= 1.0:
                     self._cubemars_kp_ramp_start_[name] = None
 
+            # ソフト緊急停止中はkp/kd/torque_ffを全て0にして送る=「estop中である」
+            # ことを実質的にAK側マイコンへ通知する(2026-09-10追加、ユーザー提案:
+            # 「そもそもestop中であることをAKのマイコンに通知できたらいいのでは？」)。
+            # MITの指令トルクはkp*(p_des-p)+kd*(v_des-v)+torque_ffなので、3つとも0なら
+            # p_des/v_desが実機とどれだけズレていても発生トルクは0になる(脱力)。
+            # ros2can側(cubemars.cpp sendCommands())は最後に受け取ったRx_16Dataを
+            # 200Hzで送り続けるため、ここで一度0ゲインのフレームを送っておけば、
+            # ROS側が以後publishしなくても(estop中はtimer_callbackが早期returnして
+            # publishしない)解除まで脱力状態が維持される。
+            # これにより「estop中もフルkpで古いp_desへ張り付き続ける」状態自体が
+            # 無くなり、乖離・過速度検知が守っていた事故シナリオが原理的に起きなく
+            # なる(それらは多重の保険として残す)。
+            estop_limp = self.estop_active_
             actuator_deg = math.degrees(self.pos_[name]) * cfg['reduction']
             buf[m] = clamp_int16(actuator_deg * 10.0)               # target: 0.1deg/LSB(アクチュエータ軸)
             buf[4 + m] = CUBEMARS_MODE_MIT
             actuator_vel_radps = self.vel_[name] * cfg['reduction']
             buf[8 + m] = clamp_int16(actuator_vel_radps * 100.0)    # mit_velocity: 0.01rad/s/LSB(アクチュエータ軸)
-            buf[12 + m] = clamp_int16(cfg['kp'] * kp_scale * 10.0)  # mit_kp: 0.1/LSB(estop解除直後はランプ中)
-            buf[16 + m] = clamp_int16(cfg['kd'] * 100.0)            # mit_kd: 0.01/LSB
-            buf[20 + m] = clamp_int16(cfg['torque_ff'] * 100.0)     # mit_torque_ff: 0.01N・m/LSB
+            # mit_kp: 0.1/LSB(estop中は0=脱力、解除直後はランプ中)
+            buf[12 + m] = 0 if estop_limp else clamp_int16(cfg['kp'] * kp_scale * 10.0)
+            buf[16 + m] = 0 if estop_limp else clamp_int16(cfg['kd'] * 100.0)         # mit_kd: 0.01/LSB
+            buf[20 + m] = 0 if estop_limp else clamp_int16(cfg['torque_ff'] * 100.0)  # mit_torque_ff: 0.01N・m/LSB
 
         for device_id, buf in self.device_buffers_.items():
             msg = Int16MultiArray()
@@ -1465,6 +1674,25 @@ class TrajectoryFollowerNode(Node):
             # pause中はhoming_node等の外部ノードがrobomas_device_idを制御している間
             # なので、target=0固定送信すら行わずpublish自体を完全にスキップする。
             return
+
+        if self.estop_active_:
+            # ソフト緊急停止中はz/r・手先θ(ロボマス)も全スロット0のフレームを送って
+            # 脱力させる(2026-09-10追加、cubemars側の0ゲイン化と同じ考え方。
+            # ユーザー報告:「物理緊急停止解除後にソフト緊急停止がかかっていても
+            # 機体が動く」)。
+            # 全0はrobomas.cppではmode=0(速度)・target=0・vel_kp/ki/kd=0・
+            # vel_max_current=0と解釈され、PID出力が電流上限0でクランプされるため
+            # 出力電流0になる(MITモードのkp=kd=current_ff=0と同じく脱力)。
+            # これを送らないと、estop突入直前のフルゲインMIT位置指令がros2can側の
+            # Rx_16Dataに残ったまま200Hzで送られ続ける。物理緊急停止(モータ電源
+            # 切断)からの復帰時、モータはその古い位置指令を受け取って一気にそこへ
+            # 動いてしまう(手先θ(M3)は速度指令モード中もMIT位置指令のままなので、
+            # velocity_mode_enabledの設定に関わらずこの経路で動き得た)。
+            msg = Int16MultiArray()
+            msg.data = [0] * ROBOMAS_SLOT_COUNT
+            self.robomas_pub_.publish(msg)
+            return
+
         cfg = self.robomas_
         i1, i2 = cfg['motor1_index'], cfg['motor2_index']
         buf = [0] * ROBOMAS_SLOT_COUNT
