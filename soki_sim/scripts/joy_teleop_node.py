@@ -5,17 +5,15 @@ soki_sim: joyパッケージのjoy_node(/joy, sensor_msgs/Joy)を購読し、ス
 手動操作ノード。
 
 操作割り当て(デフォルト。実際のコントローラのaxes/buttons番号は`ros2 topic echo /joy`で
-確認し、axis_theta/axis_z/axis_r/axis_tip_theta/axis_x/axis_y・invert_*・
-pump_toggle_buttonパラメータで合わせること):
+確認し、axis_theta/axis_z/axis_r/axis_tip_theta・invert_*・pump_toggle_button
+パラメータで合わせること):
   右スティック上下 -> z_joint (axis_z, デフォルト4。2026-09-03、ユーザー指定:
                                          「Zは右スティック上下で」により変更
-                                         (以前は左スティック上下)。XYモード・
-                                         関節モードのどちらでも常にこの軸が
+                                         (以前は左スティック上下)。常にこの軸が
                                          z_jointを操作する)
   右スティック左右 -> tip_theta_joint  (axis_tip_theta, デフォルト3。手先θ、
                                          continuous(可動域制限なし))
-  左スティック左右 -> X(XYモード時)/root_theta_joint(関節モード時、既定
-                                         theta_jog_enabled=falseのため実際には
+  左スティック左右 -> root_theta_joint(既定theta_jog_enabled=falseのため実際には
                                          無効。2026-09-09、manualブランチでの
                                          操作方針「根本θのみ自動で位置合わせ、
                                          RとZは人が速度制御」によりroot_thetaの
@@ -23,12 +21,10 @@ pump_toggle_buttonパラメータで合わせること):
                                          nodeの既存の回収/投入シーケンスによる
                                          自動位置合わせに任せている。
                                          theta_jog_enabled=trueで手動ジョグへ
-                                         戻せる。axis_x/axis_theta、いずれも
-                                         デフォルト0。下記SHAREボタンの項目参照)
-  左スティック上下 -> Y(XYモード時、既定)/r_joint(関節モード時)
-                                         (axis_y/axis_r、いずれもデフォルト1。
-                                         2026-09-03、ユーザー指定:「XYは左スティック」
-                                         によりaxis_yを4→1に変更。axis_rも右
+                                         戻せる。axis_theta、デフォルト0)
+  左スティック上下 -> r_joint          (axis_r、デフォルト1。2026-09-03、
+                                         ユーザー指定:「XYは左スティック」により
+                                         axis_yを4→1に変更した名残。axis_rも右
                                          スティック上下(z_joint)との競合を避けるため
                                          4→1に変更(以前はaxis_r=4=axis_zの旧値と
                                          同じ軸で、z_jointが右スティック上下に
@@ -127,30 +123,21 @@ pump_toggle_buttonパラメータで合わせること):
                                          ままだと本ノードが毎周期-root_thetaへ上書き
                                          して競合するのを防ぐ、_on_set_tip_theta_
                                          follow_srv参照))
-  SHAREボタン      -> XY移動モードトグル (xy_move_toggle_button, デフォルト8。
+  SHAREボタン      -> 低速モードトグル (low_speed_toggle_button, デフォルト8。
                                          PS4/PS5コントローラの一般的なLinux
                                          ドライバ割り当てを仮定した値、実機で要確認。
-                                         2026-09-03追加、ユーザー指定:「SHAREでX,Y
-                                         移動モードに切り替え。現状は各関節の角度を
-                                         人が調整しているがこのモードではスティックで
-                                         X,Y方向に手先を動かせる」。ONの間は左スティック
-                                         左右(axis_x、既定はaxis_thetaと同じ0)・左
-                                         スティック上下(axis_y、既定はaxis_rと同じ1)を
-                                         root_theta_joint/r_jointの直接ジョグではなく
-                                         ワールドXY(command_gui_node.xyz_to_joint/
-                                         joint_to_xyzと同じ極座標変換、X軸正=右向き・
-                                         Y軸正=前方)へのジョグとして解釈し、逆変換で
-                                         target_theta_・target_r_を同時に更新する。
-                                         OFFなら従来通りroot_theta/rを別々に直接
-                                         ジョグする(関節モード)。既定OFF(起動直後は
-                                         関節モード、SHAREを押すとXYモードへ切り替わる。
-                                         2026-09-03に一度既定ONへ変更したが、
-                                         2026-09-09、手動移動にフォーカスするmanual
-                                         ブランチでの方針変更によりデフォルトの移動
-                                         モードを速度指令(velocity_mode_enabled)に
-                                         した際、速度指令モードがXYモード中のr_joint/
-                                         thetaを対象外にしているため関節モードへ
-                                         再度デフォルトを戻した)
+                                         2026-09-09追加、ユーザー指定:「SHAREボタンで
+                                         低速モードと通常モードを切り替え」。以前は
+                                         ワールドXYジョグへの切り替え(XY移動モード)に
+                                         割り当てていたが、joy速度指令モード中心の
+                                         運用ではワールドXYジョグの使い道が無くなった
+                                         ため廃止し(ユーザー指摘:「SHAREにはXYモード
+                                         があったと思うが不要」)、低速モードの
+                                         トグルに差し替えた。ONの間、theta_speed/
+                                         z_speed/r_speed/tip_theta_speedをすべて
+                                         low_speed_multiplier(既定0.3、command_gui_
+                                         nodeの「joy速度」パネルから調整可能)倍に
+                                         落として精密操作しやすくする)
 
 いずれもレート方式: 倒している間、target += 入力値*speed*dt で積分し続ける。
 入力が中立/デッドマン未押下の間は目標を/mixed_joint_statesの現在値に同期する
@@ -227,21 +214,10 @@ class JoyTeleopNode(Node):
         # 手先θ(tip_theta_joint)の手動ジョグ軸(2026-09-03追加)。右スティック
         # 左右を想定、-1で無効。
         self.declare_parameter('axis_tip_theta', 3)
-        # XY移動モード(xy_move_toggle_button参照、2026-09-03追加)でのワールドXY
-        # ジョグ軸。既定はaxis_theta/axis_rと同じ物理スティック、左スティックの
-        # 左右・上下を両方使う(2026-09-03、同日ユーザー指定:「XYは左スティック」
-        # によりaxis_yを4→1に変更)。
-        self.declare_parameter('axis_x', 0)
-        self.declare_parameter('axis_y', 1)
         self.declare_parameter('invert_theta', False)
         self.declare_parameter('invert_z', False)
         self.declare_parameter('invert_r', False)
         self.declare_parameter('invert_tip_theta', False)
-        # 実機/シミュレータで確認したところXY移動モードのX(左スティック左右)が
-        # 逆方向だったため既定Trueに変更(2026-09-03、ユーザー指摘:「左右が
-        # 反転している」)。
-        self.declare_parameter('invert_x', True)
-        self.declare_parameter('invert_y', False)
         # -1ならデッドマンボタン無効(常時有効)。実機ではボタンを割り当てて
         # 誤操作による意図しない動作を防ぐことを推奨。
         self.declare_parameter('enable_button', -1)
@@ -249,13 +225,18 @@ class JoyTeleopNode(Node):
         self.declare_parameter('z_speed', 0.2)       # m/s (フル入力時)
         self.declare_parameter('r_speed', 0.2)       # m/s (フル入力時)
         self.declare_parameter('tip_theta_speed', 1.0)  # rad/s (フル入力時、2026-09-03追加)
-        self.declare_parameter('xy_speed', 0.2)         # m/s (フル入力時、2026-09-03追加)
+        # 低速モード(SHAREボタン、2026-09-09追加。以前はXY移動モードのトグルに
+        # 割り当てていたが、joy速度指令モード中心の運用ではワールドXYジョグの
+        # 使い道が無くなったため、SHAREボタンごと低速モードのトグルに差し替えた。
+        # ユーザー指摘:「SHAREにはXYモードがあったと思うが不要」)。ONの間、
+        # theta_speed/z_speed/r_speed/tip_theta_speedをlow_speed_multiplier倍に
+        # 落として精密操作しやすくする(_timer_callback参照)。
+        self.declare_parameter('low_speed_multiplier', 0.3)
         # z/rのjoy出力を位置目標(target_z_/target_r_を積分してjoint_targetsへ)
         # ではなく、trajectory_follower_nodeの速度モード(robomas_velocity_mode)
         # 向けにスティック入力をそのまま速度指令(joint_velocity_targets)として
         # 送るモード(2026-09-09追加、command_gui_nodeの「joy速度指令モード」
-        # チェックボックスから切り替える想定)。XY移動モード中はr_joint/theta側は
-        # このモードの対象外(XY変換のみ、_timer_callback参照)。ONの間、z_speed_/
+        # チェックボックスから切り替える想定)。ONの間、z_speed_/
         # r_speed_はそのまま「フル入力時の速度[m/s]」としてtarget_z_/target_r_の
         # 積分ではなく直接の速度指令値に使う(既存のレート方式と単位を揃えるため
         # 新規パラメータは追加しない)。既定true(2026-09-09、手動移動にフォーカス
@@ -291,9 +272,10 @@ class JoyTeleopNode(Node):
         # 手先θのroot_theta追従トグルボタン(2026-09-03追加)。OPTIONSボタンを
         # 想定。-1ならボタン操作無効(常にトグル状態は初期値のまま変わらない)。
         self.declare_parameter('tip_theta_follow_theta_button', 9)
-        # XY移動モードトグルボタン(2026-09-03追加)。SHAREボタンを想定。
-        # -1ならボタン操作無効。
-        self.declare_parameter('xy_move_toggle_button', 8)
+        # 低速モードトグルボタン(SHAREボタンを想定、2026-09-09追加。以前はXY
+        # 移動モードのトグルだった、declare_parameter('low_speed_multiplier'...)
+        # のコメント参照)。-1ならボタン操作無効。
+        self.declare_parameter('low_speed_toggle_button', 8)
         # GUI上のワーク選択カーソル移動軸(十字キー、2026-09-03追加)。多くの
         # Linuxジョイスティックドライバでは十字キーがaxes配列の末尾2要素として
         # 出てくる想定。-1で該当方向を無効。
@@ -306,16 +288,12 @@ class JoyTeleopNode(Node):
         self.axis_z_ = int(self.get_parameter('axis_z').value)
         self.axis_r_ = int(self.get_parameter('axis_r').value)
         self.axis_tip_theta_ = int(self.get_parameter('axis_tip_theta').value)
-        self.axis_x_ = int(self.get_parameter('axis_x').value)
-        self.axis_y_ = int(self.get_parameter('axis_y').value)
         self.axis_select_col_ = int(self.get_parameter('axis_select_col').value)
         self.axis_select_row_ = int(self.get_parameter('axis_select_row').value)
         self.sign_theta_ = -1.0 if self.get_parameter('invert_theta').value else 1.0
         self.sign_z_ = -1.0 if self.get_parameter('invert_z').value else 1.0
         self.sign_r_ = -1.0 if self.get_parameter('invert_r').value else 1.0
         self.sign_tip_theta_ = -1.0 if self.get_parameter('invert_tip_theta').value else 1.0
-        self.sign_x_ = -1.0 if self.get_parameter('invert_x').value else 1.0
-        self.sign_y_ = -1.0 if self.get_parameter('invert_y').value else 1.0
         self.sign_select_col_ = -1.0 if self.get_parameter('invert_select_col').value else 1.0
         self.sign_select_row_ = -1.0 if self.get_parameter('invert_select_row').value else 1.0
         self.enable_button_ = int(self.get_parameter('enable_button').value)
@@ -323,7 +301,7 @@ class JoyTeleopNode(Node):
         self.z_speed_ = float(self.get_parameter('z_speed').value)
         self.r_speed_ = float(self.get_parameter('r_speed').value)
         self.tip_theta_speed_ = float(self.get_parameter('tip_theta_speed').value)
-        self.xy_speed_ = float(self.get_parameter('xy_speed').value)
+        self.low_speed_multiplier_ = float(self.get_parameter('low_speed_multiplier').value)
         self.velocity_mode_enabled_ = bool(self.get_parameter('velocity_mode_enabled').value)
         self.theta_jog_enabled_ = bool(self.get_parameter('theta_jog_enabled').value)
         self.deadzone_ = float(self.get_parameter('deadzone').value)
@@ -336,7 +314,7 @@ class JoyTeleopNode(Node):
         self.shoot_start_r4_button_ = int(self.get_parameter('shoot_start_r4_button').value)
         self.tip_theta_follow_theta_button_ = int(
             self.get_parameter('tip_theta_follow_theta_button').value)
-        self.xy_move_toggle_button_ = int(self.get_parameter('xy_move_toggle_button').value)
+        self.low_speed_toggle_button_ = int(self.get_parameter('low_speed_toggle_button').value)
 
         # 現在の目標関節角度(スティック/十字キー入力をここへ積分していく)。
         # /mixed_joint_statesを受信するまでは、trajectory_follower_node起動直後の
@@ -408,19 +386,14 @@ class JoyTeleopNode(Node):
         self.create_service(
             SetBool, 'set_tip_theta_follow_theta', self._on_set_tip_theta_follow_srv)
 
-        # XY移動モード(SHAREボタン、2026-09-03追加)。ONの間はaxis_x/axis_yの
-        # 入力をワールドXYのジョグとして解釈し、target_theta_・target_r_を
-        # 同時に更新する(_timer_callback参照。ユーザー指定:「SHAREでX,Y移動
-        # モードに切り替え」)。既定OFF=起動直後はroot_theta/rを別々に直接
-        # ジョグする関節モード(2026-09-09、手動移動にフォーカスするmanual
-        # ブランチでの方針変更により関節モードへ再度デフォルトを戻した。
-        # 2026-09-03に一度既定ONへ変更していたが、速度指令モード(velocity_
-        # mode_enabled)がXY移動モード中のr_joint/thetaを対象外にしている
-        # ため、速度指令モードをデフォルトにする以上、関節モードもデフォルトに
-        # しないとr軸が速度指令の対象外のままになってしまう)。SHAREを押すと
-        # XY移動モードへ切り替わる。
-        self._xy_move_mode_ = False
-        self._prev_xy_move_toggle_pressed_ = False
+        # 低速モード(SHAREボタン、2026-09-09追加。以前はXY移動モードのトグルに
+        # 割り当てていたが、joy速度指令モード中心の運用ではワールドXYジョグの
+        # 使い道が無くなったため廃止し、SHAREボタンごと低速モードのトグルに
+        # 差し替えた。ユーザー指摘:「SHAREにはXYモードがあったと思うが不要」)。
+        # ONの間はtheta_speed/z_speed/r_speed/tip_theta_speedをlow_speed_
+        # multiplier倍に落とす(_timer_callback参照)。
+        self._low_speed_enabled_ = False
+        self._prev_low_speed_toggle_pressed_ = False
 
         # 十字キー(D-pad)でのGUIワーク選択カーソル移動(2026-09-03追加、
         # ユーザー指定:「矢印キーでGUI上で目標ワークを選択し移動」)。
@@ -451,7 +424,8 @@ class JoyTeleopNode(Node):
             f'r_speed={self.r_speed_}m/s, tip_theta_speed={self.tip_theta_speed_}rad/s, '
             f'tip_theta_follow_theta_button={self.tip_theta_follow_theta_button_} '
             f'(follow={self._tip_theta_follow_theta_}), '
-            f'xy_move_toggle_button={self.xy_move_toggle_button_}, xy_speed={self.xy_speed_}m/s, '
+            f'low_speed_toggle_button={self.low_speed_toggle_button_}, '
+            f'low_speed_multiplier={self.low_speed_multiplier_}, '
             f'axis_select_col={self.axis_select_col_}, axis_select_row={self.axis_select_row_}, '
             f'pickup_confirm_button={self.pickup_confirm_button_}, '
             f'estop_button={self.estop_button_}, '
@@ -461,9 +435,12 @@ class JoyTeleopNode(Node):
 
     def _on_set_parameters(self, params):
         for p in params:
-            if (p.name in ('theta_speed', 'z_speed', 'r_speed', 'tip_theta_speed', 'xy_speed')
+            if (p.name in ('theta_speed', 'z_speed', 'r_speed', 'tip_theta_speed')
                     and p.value <= 0.0):
                 return SetParametersResult(successful=False, reason=f'{p.name} must be positive')
+            if p.name == 'low_speed_multiplier' and not (0.0 < p.value <= 1.0):
+                return SetParametersResult(
+                    successful=False, reason='low_speed_multiplier must be in (0.0, 1.0]')
         for p in params:
             if p.name == 'theta_speed':
                 self.theta_speed_ = float(p.value)
@@ -473,8 +450,8 @@ class JoyTeleopNode(Node):
                 self.tip_theta_speed_ = float(p.value)
             elif p.name == 'r_speed':
                 self.r_speed_ = float(p.value)
-            elif p.name == 'xy_speed':
-                self.xy_speed_ = float(p.value)
+            elif p.name == 'low_speed_multiplier':
+                self.low_speed_multiplier_ = float(p.value)
             elif p.name == 'velocity_mode_enabled':
                 self.velocity_mode_enabled_ = bool(p.value)
             elif p.name == 'theta_jog_enabled':
@@ -617,24 +594,23 @@ class JoyTeleopNode(Node):
         response.message = f'tip_theta_follow_theta={self._tip_theta_follow_theta_}'
         return response
 
-    def _update_xy_move_toggle(self, msg: Joy):
-        """SHAREボタンの立ち上がりエッジで、XY移動モードのローカルなトグル状態を
-        反転する(2026-09-03追加、ユーザー指定:「SHAREでX,Y移動モードに切り替え。
-        現状は各関節の角度を人が調整しているがこのモードではスティックでX,Y方向に
-        手先を動かせる」)。self._xy_move_mode_を直接書き換えるだけ(_timer_callback
-        側のtheta/r計算が参照する)。移動系のenable_button(デッドマン)とは独立に
-        扱う(ポンプトグルボタンと同じ理由)。"""
-        if self.xy_move_toggle_button_ < 0:
+    def _update_low_speed_toggle(self, msg: Joy):
+        """SHAREボタンの立ち上がりエッジで、低速モードのローカルなトグル状態を
+        反転する(2026-09-09追加、ユーザー指摘:「SHAREボタンで低速モードと通常
+        モードを切り替え」)。self._low_speed_enabled_を直接書き換えるだけ
+        (_timer_callback側の速度計算が参照する)。移動系のenable_button
+        (デッドマン)とは独立に扱う(ポンプトグルボタンと同じ理由)。"""
+        if self.low_speed_toggle_button_ < 0:
             return
         buttons = msg.buttons
-        pressed = (0 <= self.xy_move_toggle_button_ < len(buttons)
-                   and bool(buttons[self.xy_move_toggle_button_]))
-        if pressed and not self._prev_xy_move_toggle_pressed_:
-            self._xy_move_mode_ = not self._xy_move_mode_
+        pressed = (0 <= self.low_speed_toggle_button_ < len(buttons)
+                   and bool(buttons[self.low_speed_toggle_button_]))
+        if pressed and not self._prev_low_speed_toggle_pressed_:
+            self._low_speed_enabled_ = not self._low_speed_enabled_
             self.get_logger().info(
-                'joy_teleop_node: XY移動モードを'
-                f'{"ON" if self._xy_move_mode_ else "OFF"}にしました')
-        self._prev_xy_move_toggle_pressed_ = pressed
+                'joy_teleop_node: 低速モードを'
+                f'{"ON" if self._low_speed_enabled_ else "OFF"}にしました')
+        self._prev_low_speed_toggle_pressed_ = pressed
 
     def _call_trigger(self, client, description):
         if client.service_is_ready():
@@ -713,17 +689,20 @@ class JoyTeleopNode(Node):
         self._update_shoot_start_l4(msg)
         self._update_shoot_start_r4(msg)
         self._update_tip_theta_follow_toggle(msg)
-        self._update_xy_move_toggle(msg)
+        self._update_low_speed_toggle(msg)
         self._update_work_selection(msg)
         enabled = self._is_enabled(msg)
+
+        # 低速モード(SHAREボタン、2026-09-09追加)。ONの間、以下の全ジョグ速度を
+        # low_speed_multiplier倍に落として精密操作しやすくする
+        # (_update_low_speed_toggle参照)。
+        speed_scale = self.low_speed_multiplier_ if self._low_speed_enabled_ else 1.0
 
         theta_in = apply_deadzone(self._axis(msg.axes, self.axis_theta_), self.deadzone_) * self.sign_theta_
         z_in = apply_deadzone(self._axis(msg.axes, self.axis_z_), self.deadzone_) * self.sign_z_
         r_in = apply_deadzone(self._axis(msg.axes, self.axis_r_), self.deadzone_) * self.sign_r_
         tip_theta_in = (apply_deadzone(self._axis(msg.axes, self.axis_tip_theta_), self.deadzone_)
                         * self.sign_tip_theta_)
-        x_in = apply_deadzone(self._axis(msg.axes, self.axis_x_), self.deadzone_) * self.sign_x_
-        y_in = apply_deadzone(self._axis(msg.axes, self.axis_y_), self.deadzone_) * self.sign_y_
 
         names = []
         positions = []
@@ -741,66 +720,43 @@ class JoyTeleopNode(Node):
             # 位置モードへ戻したときに違和感なく再開できるよう、target_z_は
             # 引き続き実位置に同期しておく。
             vel_names.append('z_joint')
-            vel_values.append(z_in * self.z_speed_ if enabled else 0.0)
+            vel_values.append(z_in * self.z_speed_ * speed_scale if enabled else 0.0)
             if self.has_current_state_:
                 self.target_z_ = self._current_z_
         elif enabled and z_in != 0.0:
-            self.target_z_ = clamp(self.target_z_ + z_in * self.z_speed_ * self.dt_, Z_LOWER, Z_UPPER)
+            self.target_z_ = clamp(
+                self.target_z_ + z_in * self.z_speed_ * speed_scale * self.dt_, Z_LOWER, Z_UPPER)
             names.append('z_joint')
             positions.append(self.target_z_)
         elif self.has_current_state_:
             self.target_z_ = self._current_z_
 
-        if self._xy_move_mode_:
-            # SHAREボタンでトグル(既定OFF、_update_xy_move_toggle参照)の間は、
-            # axis_theta/axis_rを直接ジョグする代わりに、axis_x/axis_y(既定は
-            # 同じ物理スティック)をワールドXYのジョグとして解釈する
-            # (command_gui_node.xyz_to_joint/joint_to_xyzと同じ極座標変換、
-            # X軸正=右向き・Y軸正=前方。ユーザー指定:「SHAREでX,Y移動モードに
-            # 切り替え。このモードではスティックでX,Y方向に手先を動かせる」)。
-            if enabled and (x_in != 0.0 or y_in != 0.0):
-                radius = self.target_r_ + ARM_LENGTH / 2.0
-                x = -radius * math.sin(self.target_theta_) + x_in * self.xy_speed_ * self.dt_
-                y = radius * math.cos(self.target_theta_) + y_in * self.xy_speed_ * self.dt_
-                self.target_theta_ = clamp(math.atan2(-x, y), ROOT_THETA_LOWER, ROOT_THETA_UPPER)
-                self.target_r_ = clamp(math.hypot(x, y) - ARM_LENGTH / 2.0, R_LOWER, R_UPPER)
-                names.append('root_theta_joint')
-                positions.append(self.target_theta_)
-                names.append('r_joint')
-                positions.append(self.target_r_)
-            elif self.has_current_state_:
-                self.target_theta_ = self._current_theta_
-                self.target_r_ = self._current_r_
-        else:
-            # theta_jog_enabled_が既定falseの間、root_theta_jointはjoyから直接
-            # ジョグしない(declare_parameter部コメント参照。command_gui_nodeの
-            # 既存の回収/投入シーケンスによる自動位置合わせに任せる)。current
-            # 状態への同期だけは続け、joyからの手動制御が無効の間もtarget_theta_が
-            # 古い値のまま固定されないようにする。
-            if self.theta_jog_enabled_ and enabled and theta_in != 0.0:
-                self.target_theta_ = clamp(
-                    self.target_theta_ + theta_in * self.theta_speed_ * self.dt_,
-                    ROOT_THETA_LOWER, ROOT_THETA_UPPER)
-                names.append('root_theta_joint')
-                positions.append(self.target_theta_)
-            elif self.has_current_state_:
-                self.target_theta_ = self._current_theta_
+        # theta_jog_enabled_が既定falseの間、root_theta_jointはjoyから直接
+        # ジョグしない(declare_parameter部コメント参照。command_gui_nodeの
+        # 既存の回収/投入シーケンスによる自動位置合わせに任せる)。current
+        # 状態への同期だけは続け、joyからの手動制御が無効の間もtarget_theta_が
+        # 古い値のまま固定されないようにする。
+        if self.theta_jog_enabled_ and enabled and theta_in != 0.0:
+            self.target_theta_ = clamp(
+                self.target_theta_ + theta_in * self.theta_speed_ * speed_scale * self.dt_,
+                ROOT_THETA_LOWER, ROOT_THETA_UPPER)
+            names.append('root_theta_joint')
+            positions.append(self.target_theta_)
+        elif self.has_current_state_:
+            self.target_theta_ = self._current_theta_
 
-            if self.velocity_mode_enabled_:
-                # z_jointと同じ理由(velocity_mode_enabled_の分岐参照)。XY移動
-                # モード中はr_jointがXY変換側で扱われるため、ここ(関節モード)
-                # でのみ速度指令化する。
-                vel_names.append('r_joint')
-                vel_values.append(r_in * self.r_speed_ if enabled else 0.0)
-                if self.has_current_state_:
-                    self.target_r_ = self._current_r_
-            elif enabled and r_in != 0.0:
-                self.target_r_ = clamp(
-                    self.target_r_ + r_in * self.r_speed_ * self.dt_, R_LOWER, R_UPPER)
-                names.append('r_joint')
-                positions.append(self.target_r_)
-            elif self.has_current_state_:
+        if self.velocity_mode_enabled_:
+            vel_names.append('r_joint')
+            vel_values.append(r_in * self.r_speed_ * speed_scale if enabled else 0.0)
+            if self.has_current_state_:
                 self.target_r_ = self._current_r_
+        elif enabled and r_in != 0.0:
+            self.target_r_ = clamp(
+                self.target_r_ + r_in * self.r_speed_ * speed_scale * self.dt_, R_LOWER, R_UPPER)
+            names.append('r_joint')
+            positions.append(self.target_r_)
+        elif self.has_current_state_:
+            self.target_r_ = self._current_r_
 
         # tip_theta_jointはcontinuous(可動域制限なし)なのでclampしない。
         # trajectory_follower_nodeがtip_theta_joint未構成の場合はpublishしても
@@ -815,7 +771,7 @@ class JoyTeleopNode(Node):
             names.append('tip_theta_joint')
             positions.append(self.target_tip_theta_)
         elif enabled and tip_theta_in != 0.0:
-            self.target_tip_theta_ += tip_theta_in * self.tip_theta_speed_ * self.dt_
+            self.target_tip_theta_ += tip_theta_in * self.tip_theta_speed_ * speed_scale * self.dt_
             names.append('tip_theta_joint')
             positions.append(self.target_tip_theta_)
         elif self.has_tip_theta_state_:

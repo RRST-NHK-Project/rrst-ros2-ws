@@ -620,6 +620,18 @@ class TrajectoryFollowerNode(Node):
 
     def _on_limit_switch_feedback(self, msg: Int32MultiArray, device_id: int):
         self._limit_switch_can_host_data_[device_id] = msg.data
+        # timer_callback(update_rate_hz、既定50Hz=最大20ms周期)の次回実行を
+        # 待たずに、CAN帰還が届いたこの瞬間に安全関連の指令を即時再評価・
+        # 再送信する(2026-09-09、ユーザー報告「ワンテンポ遅れている」)。
+        # homing_node.py _on_can_hostが原点センサ検出をポーリングに頼らず
+        # 即時チェックしているのと同じパターン(あちらのコメント参照: 「ポーリング
+        # 周期ぶんの遅延が無くなり、CAN/シリアル中継の遅延だけが残る」)。
+        # timer_callback冒頭と同じガード(has_target_未受信・estop中)を通さずに
+        # _publish_robomas_commandsを呼ぶと、最初の目標受信前やestop中でも
+        # 出力してしまう(安全性の後退)ため、ここでも同じガードを再現する。
+        self._update_limit_stop_status()
+        if self.has_target_ and not self.estop_active_:
+            self._publish_robomas_commands()
 
     def _limit_triggered(self, axis, direction):
         """axis('z'/'r')のdirection('lower'/'upper')側リミットスイッチが現在
@@ -794,17 +806,28 @@ class TrajectoryFollowerNode(Node):
                  or time.monotonic() - self._velocity_targets_stamp_ > ROBOMAS_VELOCITY_TARGET_STALE_SEC)
         z_vel = 0.0 if stale else self._velocity_targets_.get(cfg['z_joint'], 0.0)
         r_vel = 0.0 if stale else self._velocity_targets_.get(cfg['r_joint'], 0.0)
-        if z_vel > 0.0 and self._limit_triggered('z', 'upper'):
-            z_vel = 0.0
-        elif z_vel < 0.0 and self._limit_triggered('z', 'lower'):
-            z_vel = 0.0
-        if r_vel > 0.0 and self._limit_triggered('r', 'upper'):
-            r_vel = 0.0
-        elif r_vel < 0.0 and self._limit_triggered('r', 'lower'):
-            r_vel = 0.0
+        z_blocked = ((z_vel > 0.0 and self._limit_triggered('z', 'upper'))
+                     or (z_vel < 0.0 and self._limit_triggered('z', 'lower')))
+        r_blocked = ((r_vel > 0.0 and self._limit_triggered('r', 'upper'))
+                     or (r_vel < 0.0 and self._limit_triggered('r', 'lower')))
 
-        z_vel = self._slew_velocity(cfg['z_joint'], z_vel)
-        r_vel = self._slew_velocity(cfg['r_joint'], r_vel)
+        # リミットスイッチによるクランプは_slew_velocity(max_decelerationでの
+        # なだらかな減速)を経由させず、即座に0へ切る(2026-09-09、ユーザー報告:
+        # 「リミットセンサの反応が遅い」。_slew_velocityは通常のジョグ操作を
+        # 滑らかにするためのものであり、安全停止用のクランプに巻き込むとmax_
+        # decelerationの時間(例: 0.1m/s÷0.4m/s^2≒0.25秒)だけ実際の停止が
+        # 遅れてしまっていた。内部のスルーレート状態自体も0へ戻しておかないと、
+        # 次にブロックが外れた瞬間に「凍結中に貯まった速度差分」で急発進する)。
+        if z_blocked:
+            z_vel = 0.0
+            self._velocity_mode_cmd_[cfg['z_joint']] = 0.0
+        else:
+            z_vel = self._slew_velocity(cfg['z_joint'], z_vel)
+        if r_blocked:
+            r_vel = 0.0
+            self._velocity_mode_cmd_[cfg['r_joint']] = 0.0
+        else:
+            r_vel = self._slew_velocity(cfg['r_joint'], r_vel)
 
         m1_vel = (z_vel + r_vel) / (2.0 * cfg['mix_k'])
         m2_vel = (z_vel - r_vel) / (2.0 * cfg['mix_k'])

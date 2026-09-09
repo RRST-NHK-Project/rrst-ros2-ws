@@ -190,6 +190,12 @@ STATUS_NODE_NAMES = [TRAJ_NODE_NAME, JOY_NODE_NAME, REAL_JOINT_BRIDGE_NODE_NAME,
 STATUS_DEVICE_IDS = [11, 21, 101]
 STATUS_DEVICE_STALE_TIMEOUT_SEC = 2.0
 
+# _spin_ros1回あたりのrclpy.spin_once()呼び出し回数(2026-09-09追加、
+# _spin_rosのコメント参照)。spin_once(timeout_sec=0)は1回につき保留中の
+# コールバックを1つしか処理しないため、購読トピック数の多いこのGUIでは
+# 複数回呼ばないと同じ50ms枠に届いた分を処理しきれない。
+_SPIN_ROS_DRAIN_COUNT = 10
+
 # CAN_HOSTのserial_rx_{device_id}_unwrappedの生値モニタ(配線設定パネルのz/r原点
 # センサのノード/スロット割当が実機と合っているか確認する用、2026-09-08追加)。
 # device_id自体は「原点センサ・ホーミング配線設定」パネルの入力値(既定101)を
@@ -939,15 +945,21 @@ class CommandGuiNode(Node):
         self.create_subscription(Bool, 'estop_active', self._on_estop_active, latched_qos)
         self._limit_stop_active = False
         self.create_subscription(Bool, 'limit_stop_active', self._on_limit_stop_active, latched_qos)
-        # R軸下限リミット(r_lowerリミットスイッチ、しまう/収納側)の個別状態
-        # (2026-09-09追加。投入シーケンスのR軸リトラクトステップが「limit_stop_
-        # active(集約フラグ、どの軸のどちら側かは区別しない)」ではなくこちらを
-        # 見て、人が同時にZ軸を操作してZ側のスイッチが反応した場合に誤ってR軸が
-        # 到達したと判定しないようにする。trajectory_follower_node.py
-        # _setup_limit_switches参照)。
-        self._r_lower_limit_triggered = False
-        self.create_subscription(
-            Bool, 'r_lower_limit_triggered', self._on_r_lower_limit_triggered, latched_qos)
+        # z/r × lower/upper各リミットスイッチの個別状態(2026-09-09追加。投入
+        # シーケンスのR軸リトラクトステップが「limit_stop_active(集約フラグ、
+        # どの軸のどちら側かは区別しない)」ではなくr_lowerの個別状態を見て、
+        # 人が同時にZ軸を操作してZ側のスイッチが反応した場合に誤ってR軸が到達
+        # したと判定しないようにするために元々r_lowerのみ購読していたが、
+        # 「リミットセンサの反応が遅い」調査用に残り3つも購読し、GUIで一覧
+        # 確認できるようにした(_build_limit_switch_status_panel参照)。
+        # trajectory_follower_node.py _setup_limit_switches参照。
+        self._limit_switch_triggered = {}
+        for axis, direction in (('z', 'lower'), ('z', 'upper'), ('r', 'lower'), ('r', 'upper')):
+            key = f'{axis}_{direction}'
+            self._limit_switch_triggered[key] = False
+            self.create_subscription(
+                Bool, f'{key}_limit_triggered',
+                functools.partial(self._on_limit_switch_triggered, key), latched_qos)
 
         # 上記から計算した最終的なLED論理状態('off'/'on'/'blink_fast'/'blink_slow'、
         # LedIndicatorWidget.STATE_*と同じ値)をpublishする(2026-09-08追加)。
@@ -1051,13 +1063,18 @@ class CommandGuiNode(Node):
         (limit_stop_active購読)。"""
         return self._limit_stop_active
 
-    def _on_r_lower_limit_triggered(self, msg):
-        self._r_lower_limit_triggered = msg.data
+    def _on_limit_switch_triggered(self, key, msg):
+        self._limit_switch_triggered[key] = msg.data
+
+    def get_limit_switch_triggered(self, axis, direction):
+        """axis('z'/'r')のdirection('lower'/'upper')側リミットスイッチが現在
+        トリガーされているか({axis}_{direction}_limit_triggered購読)。"""
+        return self._limit_switch_triggered.get(f'{axis}_{direction}', False)
 
     def get_r_lower_limit_triggered(self):
-        """R軸下限リミットスイッチ(しまう/収納側)が現在トリガーされているか
-        (r_lower_limit_triggered購読)。投入シーケンスのR軸リトラクト完了判定用。"""
-        return self._r_lower_limit_triggered
+        """R軸下限リミットスイッチ(しまう/収納側)が現在トリガーされているか。
+        投入シーケンスのR軸リトラクト完了判定用。"""
+        return self.get_limit_switch_triggered('r', 'lower')
 
     def _on_device_feedback(self, device_id, msg):
         self._device_last_seen_monotonic[device_id] = time.monotonic()
@@ -1965,7 +1982,11 @@ class CommandGuiApp(QWidget):
         column.addWidget(box)
 
     def _refresh_machine_status(self):
-        self._update_status_leds()
+        # _update_status_ledsは_spin_ros(50ms)側で呼ぶため、ここでは呼ばない
+        # (2026-09-09、ユーザー報告「表示灯の応答が遅い」。このメソッド自体は
+        # ノード起動状況のROSグラフ照会等それなりに重い処理を含むため1秒周期の
+        # ままでよいが、状態表示灯だけは既にpublish済みのbool値を読むだけの
+        # 軽い処理なので、1秒待たず_spin_rosの周期で反映できる)。
         self._refresh_autotune_progress()
         active = self.node.get_active_node_names()
         for name, label in self.node_status_labels.items():
@@ -2747,6 +2768,9 @@ class CommandGuiApp(QWidget):
             ('z_speed', 'z', 'm/s'),
             ('r_speed', 'r', 'm/s'),
             ('tip_theta_speed', 'tip_theta', 'rad/s'),
+            # 低速モード(SHAREボタン、2026-09-09追加)の倍率。上記速度全てに掛かる
+            # (joy_teleop_node.py _timer_callbackのspeed_scale参照)。
+            ('low_speed_multiplier', '低速モード倍率', '倍'),
         )
         for i, (name, label, unit) in enumerate(fields):
             grid.addWidget(QLabel(f'{label} [{unit}]'), i, 0)
@@ -3250,6 +3274,51 @@ class CommandGuiApp(QWidget):
                  'IDを0のままにするとそのスイッチは無効(未配線)扱い。',
             description='trajectory_follower_node起動時のみ反映。実行中には反映されません。',
             field_specs=LIMIT_SWITCH_WIRING_FIELDS)
+        self._build_limit_switch_status_panel(column)
+
+    def _build_limit_switch_status_panel(self, column):
+        """z/r×lower/upper 4個のリミットスイッチの個別状態をリアルタイム表示する
+        (2026-09-09追加、ユーザー報告「リミットセンサの反応が遅い」の調査用。
+        上の配線設定と実際に当たっているスイッチが対応しているか、実機で手で
+        押しながらその場で確認できる。集約フラグlimit_stop_active(状態表示灯)
+        だけでは「どれか1個」しか分からず、配線・方向の食い違いに気付けない
+        ため個別に見えるようにした)。"""
+        box = QGroupBox('リミットスイッチ 個別状態 (実機確認用)')
+        layout = QVBoxLayout(box)
+
+        desc = QLabel()
+        desc.setWordWrap(True)
+        _set_status(
+            desc,
+            '実機のスイッチを手で押しながら、押した方向と対応するラベルが\n'
+            '赤(トリガー中)になるか確認する。違う方向のラベルが反応する場合は\n'
+            '上の配線設定(ノード/スロット)が実機と食い違っている。', 'muted')
+        layout.addWidget(desc)
+
+        grid = QGridLayout()
+        self._limit_switch_status_labels = {}
+        for i, (axis, direction) in enumerate((('z', 'lower'), ('z', 'upper'),
+                                                 ('r', 'lower'), ('r', 'upper'))):
+            key = f'{axis}_{direction}'
+            grid.addWidget(QLabel(f'{axis}軸 {direction}'), i, 0)
+            label = QLabel()
+            _set_status(label, '未受信', 'muted')
+            self._limit_switch_status_labels[key] = label
+            grid.addWidget(label, i, 1)
+        layout.addLayout(grid)
+        column.addWidget(box)
+        # 独自タイマーは持たず_spin_ros(50ms、rclpy.spin_once実行と同じ場所)から
+        # 呼ぶ(2026-09-09、ユーザー報告「センサ反応からGUI表示までワンテンポ
+        # 遅れる」。当初は専用の100msタイマーで更新していたが、rclpy.spin_once
+        # (新しいsubscriptionデータの取り込み自体)を待たずに独自周期で"表示だけ"
+        # 更新しても意味が無く、むしろ100ms分の遅延を上乗せしていただけだった)。
+
+    def _refresh_limit_switch_status_panel(self):
+        for key, label in self._limit_switch_status_labels.items():
+            axis, direction = key.split('_', 1)
+            triggered = self.node.get_limit_switch_triggered(axis, direction)
+            _set_status(label, 'トリガー中' if triggered else '未トリガー',
+                        'error' if triggered else 'success')
 
     def _build_hand_wiring_panel(self, column):
         self._build_yaml_wiring_panel(
@@ -3634,10 +3703,23 @@ class CommandGuiApp(QWidget):
     def _spin_ros(self):
         # rclpy.spin_once()はmixed_joint_states購読・パラメータサービスの
         # 応答処理に必要(このメソッドの呼び出し=QTimer=Qtのイベントループと
-        # 同じメインスレッド上で完結する)。
-        rclpy.spin_once(self.node, timeout_sec=0)
+        # 同じメインスレッド上で完結する)。spin_once(timeout_sec=0)は1回の呼び出し
+        # につき保留中のコールバックを1つしか処理しないため、この購読数の多い
+        # GUI(mixed_joint_states・ポンプ状態・リミットスイッチ4個・autotune状態等)
+        # では、同じ50ms枠に複数メッセージが届くと後回しにされるものが出て
+        # 数ティック分の遅延になる(2026-09-09、ユーザー報告「センサ反応から
+        # GUI表示までワンテンポ遅れる」)。1tickあたり複数回spinして、その時点で
+        # 溜まっている分をまとめて処理する。
+        for _ in range(_SPIN_ROS_DRAIN_COUNT):
+            rclpy.spin_once(self.node, timeout_sec=0)
+        # 状態表示灯(黄色/赤色LED)は既にpublish済みのbool値(estop_active・
+        # limit_stop_active等)を読むだけの軽い処理なので、_refresh_machine_status
+        # (1秒周期)を待たずここで毎tick更新する(2026-09-09、ユーザー報告
+        # 「表示灯の応答が遅い」。以前は1秒周期のみだったため最大1秒待たされていた)。
+        self._update_status_leds()
         self._refresh_current_state()
         self._refresh_sequence_pump_status()
+        self._refresh_limit_switch_status_panel()
         self._advance_sequence()
         self._refresh_status_display_tab()
 
