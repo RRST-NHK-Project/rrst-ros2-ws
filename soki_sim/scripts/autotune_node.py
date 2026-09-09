@@ -39,6 +39,17 @@ step_down)、その追従誤差の時間積分(IAE)の合計をスコアとす�
   ゲインへ復元する。提案値はautotune_progressへログするのみで、実際に反映するかは
   command_gui_nodeの「ゲイン」タブから操作者が内容を確認した上で明示的に行う
   (既存の「読込は表示のみ、適用は確認ダイアログ付き」という設計方針に合わせる)。
+- Twiddle法は改善が続く限りdparams(探索幅)を1.1倍ずつ無制限に拡大し続けるため、
+  上限なしだとkp/kdが発振領域まで際限なく増大し、そのオーバーシュートが徐々に
+  拡大して(暴走検知やリミットスイッチに引っかかるまで気づけない)実機がリミット
+  スイッチへ少しずつ近づいていってしまう問題があった(2026-09-09、実機検証で
+  確認)。max_error_amplitude_multで検知を厳しくする対策も検討したが、発散判定を
+  厳しくするほど「まだ改善の余地がある/発振はしていないが大きめの」試行まで
+  誤って中断してしまい、良いゲインへ収束する前に打ち切られやすくなる
+  (ユーザー判断、2026-09-09)。そのため、暴走を後から検知するのではなく探索
+  そのものにkp_max_mult/kd_max_mult(元のkp0/kd0からの倍率)による上限を設け、
+  探索が発振領域へ踏み込むこと自体を防ぐ方式にした(_begin_twiddle/
+  _clamp_param参照)。
 """
 
 import time
@@ -77,6 +88,10 @@ class AutotuneNode(Node):
         self.declare_parameter('kd_step_min', 0.0001)
         self.declare_parameter('max_error_amplitude_mult', 2.5)
         self.declare_parameter('max_error_hold_sec', 0.3)
+        # 探索そのものの上限(開始時のkp0/kd0からの倍率)。dparamsの無制限拡大で
+        # 発振領域まで踏み込まないようにする安全上限(ファイル冒頭コメント参照)。
+        self.declare_parameter('kp_max_mult', 3.0)
+        self.declare_parameter('kd_max_mult', 3.0)
 
         gp = self.get_parameter
         self._traj_node_name = gp('traj_node_name').value
@@ -90,6 +105,8 @@ class AutotuneNode(Node):
         self._kd_step_min = float(gp('kd_step_min').value)
         self._max_error_amplitude_mult = float(gp('max_error_amplitude_mult').value)
         self._max_error_hold_sec = float(gp('max_error_hold_sec').value)
+        self._kp_max_mult = float(gp('kp_max_mult').value)
+        self._kd_max_mult = float(gp('kd_max_mult').value)
 
         self._current_positions = {name: None for name in JOINT_NAMES}
         self._estop_active = False
@@ -278,11 +295,18 @@ class AutotuneNode(Node):
             max(kp0 * self._kp_step_frac, self._kp_step_min),
             max(kd0 * self._kd_step_frac, self._kd_step_min),
         ]
+        # 探索の安全上限/下限(元のkp0/kd0からの倍率、0未満にはしない)。
+        # _clamp_paramでtry_plus/try_minusの候補値をこの範囲内に丸める。
+        self._param_min = [0.0, 0.0]
+        self._param_max = [kp0 * self._kp_max_mult, kd0 * self._kd_max_mult]
         self._best_score = None
         self._coord_idx = 0
         self._iteration = 0
         self._trial_no = 0
         self._run_trial(list(self._params))
+
+    def _clamp_param(self, i, value):
+        return max(self._param_min[i], min(self._param_max[i], value))
 
     def _run_trial(self, candidate):
         kp, kd = candidate
@@ -336,25 +360,51 @@ class AutotuneNode(Node):
         if self._twiddle_phase == 'try_plus':
             if score < self._best_score:
                 self._best_score = score
-                self._dparams[i] *= 1.1
+                self._grow_dparam(i)
                 self._finish_coord()
             else:
-                self._params[i] = self._coord_original - self._dparams[i]
-                self._twiddle_phase = 'try_minus'
-                self._run_trial(list(self._params))
+                self._try_minus_or_finish()
         elif self._twiddle_phase == 'try_minus':
             if score < self._best_score:
                 self._best_score = score
-                self._dparams[i] *= 1.1
+                self._grow_dparam(i)
             else:
                 self._params[i] = self._coord_original
                 self._dparams[i] *= 0.9
             self._finish_coord()
 
+    def _grow_dparam(self, i):
+        # 探索幅を拡大する際、安全上限/下限の範囲(_param_max-_param_min)を
+        # 超えて無制限に育たないようクランプする(ファイル冒頭コメント参照。
+        # これをしないと改善が続く限りdparamsが際限なく拡大し、次第に大きな
+        # オーバーシュートでリミットスイッチへ近づいていってしまう)。
+        span = self._param_max[i] - self._param_min[i]
+        self._dparams[i] = min(self._dparams[i] * 1.1, span)
+
+    def _try_minus_or_finish(self):
+        i = self._coord_idx
+        candidate = self._clamp_param(i, self._coord_original - self._dparams[i])
+        if candidate == self._coord_original:
+            # 安全上限/下限で+/-どちらの方向にも動かせない(既に張り付いている)。
+            # 実機を動かさず、改善なしとして探索幅を縮小して次の座標へ進む。
+            self._dparams[i] *= 0.9
+            self._finish_coord()
+            return
+        self._params[i] = candidate
+        self._twiddle_phase = 'try_minus'
+        self._run_trial(list(self._params))
+
     def _start_coord_trial(self):
         i = self._coord_idx
         self._coord_original = self._params[i]
-        self._params[i] = self._coord_original + self._dparams[i]
+        candidate = self._clamp_param(i, self._coord_original + self._dparams[i])
+        if candidate == self._coord_original:
+            # try_plus方向に動かす余地が無い(安全上限/下限に張り付き済み)。
+            # 実機を動かさずtry_minus側の判定へ進む。
+            self._twiddle_phase = 'try_plus'
+            self._try_minus_or_finish()
+            return
+        self._params[i] = candidate
         self._twiddle_phase = 'try_plus'
         self._run_trial(list(self._params))
 
