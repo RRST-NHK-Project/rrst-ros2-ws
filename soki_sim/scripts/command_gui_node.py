@@ -663,28 +663,58 @@ def _normalize_numeral_text(text: str) -> str:
 
 
 class _NormalizingDoubleValidator(QDoubleValidator):
-    """全角入力を正規化してから検証するQDoubleValidator。"""
+    """全角入力を正規化して「検証だけ」行うQDoubleValidator。
+
+    validate()は(State, 文字列, 位置)を返し、Qtは返した文字列でウィジェットの
+    テキストを置き換える。以前はここで正規化後の文字列を返していたため、
+    日本語IMEでの入力中に「バリデータが半角へ書き換える」→「その直後にIMEが
+    変換確定した文字を追記する」が重なり、1と入力したのに11、2なら22になる
+    ことがあった(2026-09-10、ユーザー報告:「ゲインの入力欄、たまに1と入力
+    したのに11となったりして危険」。ゲイン欄で起きると桁が一つ増えた値が
+    そのまま実機へ適用されるため極めて危険)。
+    バリデータは判定に徹し、入力文字列は書き換えずそのまま返す。全角のまま
+    保持されても、値の読み出し側(get_float/get_int)が_normalize_numeral_textで
+    正規化するため実害はない。"""
 
     def validate(self, input_str, pos):
         normalized = _normalize_numeral_text(input_str)
-        return super().validate(normalized, min(pos, len(normalized)))
+        state, _fixed, _fixed_pos = super().validate(normalized, min(pos, len(normalized)))
+        return state, input_str, pos
 
 
 class _NormalizingIntValidator(QIntValidator):
-    """全角入力を正規化してから検証するQIntValidator。"""
+    """全角入力を正規化して「検証だけ」行うQIntValidator
+    (_NormalizingDoubleValidatorと同じ理由で入力文字列は書き換えない)。"""
 
     def validate(self, input_str, pos):
         normalized = _normalize_numeral_text(input_str)
-        return super().validate(normalized, min(pos, len(normalized)))
+        state, _fixed, _fixed_pos = super().validate(normalized, min(pos, len(normalized)))
+        return state, input_str, pos
 
 
-def make_float_edit(initial: float, width: int = 80) -> QLineEdit:
-    """数値入力用QLineEdit(Tkinter版のtk.Entry+DoubleVarに相当)を生成する。"""
+def make_float_edit(initial: float, width: int = 80, minimum: float = -1.0e6) -> QLineEdit:
+    """数値入力用QLineEdit(Tkinter版のtk.Entry+DoubleVarに相当)を生成する。
+
+    minimumで下限を指定できる(既定は従来どおり負値も許容)。ゲイン欄には
+    make_gain_editを使い、負値を入力できないようにすること。"""
     edit = QLineEdit()
-    edit.setValidator(_NormalizingDoubleValidator(-1.0e6, 1.0e6, 6))
+    edit.setValidator(_NormalizingDoubleValidator(minimum, 1.0e6, 6))
     edit.setMaximumWidth(width)
     set_float(edit, initial)
     return edit
+
+
+def make_gain_edit(initial: float, width: int = 80) -> QLineEdit:
+    """フィードバックゲイン専用の入力欄(負値を入力できない、2026-09-10追加)。
+
+    ユーザー報告:「手先θのゲインに誤って負の値を代入すると暴走、機構を破壊した」。
+    kpが負だと目標から遠ざかる向きにトルクが出る正帰還になり必ず暴走し、kdが
+    負だと負性ダンピングで振動が発散する。trajectory_follower_node側でも
+    _on_set_parametersで拒否・指令生成時にnonneg_gainでクランプしているが、
+    そもそも入力できないようにするのが一番安全なのでここでも下限0にする。
+    トルク/電流フィードフォワードは一定バイアスで正帰還にならず、重力補償で
+    負値が正当な場合もあるため通常のmake_float_editのままにする。"""
+    return make_float_edit(initial, width=width, minimum=0.0)
 
 
 def get_float(edit: QLineEdit) -> float:
@@ -2583,12 +2613,22 @@ class CommandGuiApp(QWidget):
         if not self.node.has_current_state():
             return
         pos = self.node.get_current_positions()
-        reached = abs(pos['root_theta_joint'] - theta) <= SEQ_MOVE_THETA_TOL
-        if zj is not None:
+        # 「軸の有効/無効」パネルで無効にした軸は到達判定から外す(2026-09-10追加、
+        # ユーザー報告:「ワーク位置移動の際に最後にタイムアウトになる」「手先θの
+        # モーターは未配線」)。trajectory_follower_node.target_callbackは
+        # disabled_jointsに入っている関節の目標更新を捨てて現在位置で凍結するため、
+        # その軸のpos_は目標へ永久に到達しない。ここで待ち続けると必ず
+        # SEQ_MOVE_TIMEOUT_SECでシーケンスが中断されてしまう(未配線の軸を
+        # 無効化する、というこのパネル本来の使い方をするとシーケンスが一切
+        # 完走できなくなっていた)。
+        reached = True
+        if self._axis_enabled('root_theta_joint'):
+            reached = abs(pos['root_theta_joint'] - theta) <= SEQ_MOVE_THETA_TOL
+        if zj is not None and self._axis_enabled('z_joint'):
             reached = reached and abs(pos['z_joint'] - zj) <= SEQ_MOVE_LINEAR_TOL
-        if r is not None:
+        if r is not None and self._axis_enabled('r_joint'):
             reached = reached and abs(pos['r_joint'] - r) <= SEQ_MOVE_LINEAR_TOL
-        if tip_theta is not None:
+        if tip_theta is not None and self._axis_enabled('tip_theta_joint'):
             reached = reached and abs(pos['tip_theta_joint'] - tip_theta) <= SEQ_MOVE_THETA_TOL
         if reached:
             self._seq_leg_target = None
@@ -2614,6 +2654,13 @@ class CommandGuiApp(QWidget):
         ステップ開始時に一度だけ読んで以降は使い回す(タイムアウト判定や停止
         処理の途中で毎周期パースし直すと、編集中の一時的な不正値で例外に
         なりR軸が速度指令を送りっぱなしのまま止まる恐れがあるため)。"""
+        if not self._axis_enabled('r_joint'):
+            # R軸を「軸の有効/無効」パネルで無効にしている場合、速度指令を送っても
+            # 動かずリミットスイッチにも当たらないため、待つだけ無駄にタイムアウト
+            # する(2026-09-10追加、_advance_move_stepの到達判定と同じ理由)。
+            self._seq_retract_start_time = None
+            self._seq_index += 1
+            return
         if self._seq_retract_start_time is None:
             self._seq_retract_start_time = time.monotonic()
             try:
@@ -2771,12 +2818,12 @@ class CommandGuiApp(QWidget):
             # 行ラベルは"_joint"を省いて表示(ボックス見出しで対象は自明なため、
             # 列幅を無駄に広げないようにする)。辞書キーは元のjoint名のまま。
             grid.addWidget(QLabel(name.removesuffix('_joint')), i + 1, 0)
-            vel_edit = make_float_edit(0.0, width=70)
-            accel_edit = make_float_edit(0.0, width=70)
+            vel_edit = make_gain_edit(0.0, width=70)
+            accel_edit = make_gain_edit(0.0, width=70)
             # 減速度(max_decel、2026-09-07新規: 停止時の応答性向上のため
             # 加速度と別値にできるようにした。trajectory_follower_node.py
             # trap_step/move_time参照)。
-            decel_edit = make_float_edit(0.0, width=70)
+            decel_edit = make_gain_edit(0.0, width=70)
             self.traj_vel_edits[name] = vel_edit
             self.traj_accel_edits[name] = accel_edit
             self.traj_decel_edits[name] = decel_edit
@@ -2854,8 +2901,8 @@ class CommandGuiApp(QWidget):
         self.mit_torque_edits = {}
         for i, name in enumerate(CUBEMARS_JOINT_NAMES):
             grid.addWidget(QLabel(name.removesuffix('_joint')), i + 1, 0)
-            kp_edit = make_float_edit(0.0, width=60)
-            kd_edit = make_float_edit(0.0, width=60)
+            kp_edit = make_gain_edit(0.0, width=60)
+            kd_edit = make_gain_edit(0.0, width=60)
             tff_edit = make_float_edit(0.0, width=60)
             self.mit_kp_edits[name] = kp_edit
             self.mit_kd_edits[name] = kd_edit
@@ -3232,10 +3279,10 @@ class CommandGuiApp(QWidget):
         layout.addWidget(desc)
 
         grid = QGridLayout()
-        self.robomas_vel_kp_edit = make_float_edit(0.8, width=70)
-        self.robomas_vel_ki_edit = make_float_edit(0.0, width=70)
-        self.robomas_vel_kd_edit = make_float_edit(0.0, width=70)
-        self.robomas_vel_max_current_a_edit = make_float_edit(1.0, width=70)
+        self.robomas_vel_kp_edit = make_gain_edit(0.8, width=70)
+        self.robomas_vel_ki_edit = make_gain_edit(0.0, width=70)
+        self.robomas_vel_kd_edit = make_gain_edit(0.0, width=70)
+        self.robomas_vel_max_current_a_edit = make_gain_edit(1.0, width=70)
         for i, (label, edit) in enumerate((
                 ('Kp', self.robomas_vel_kp_edit),
                 ('Ki', self.robomas_vel_ki_edit),
@@ -3358,6 +3405,15 @@ class CommandGuiApp(QWidget):
         layout.addWidget(self.axis_enable_status_label)
 
         column.addWidget(box)
+
+    def _axis_enabled(self, name):
+        """「軸の有効/無効」パネルでその軸が有効か(2026-09-10追加)。
+        シーケンスの到達判定・R軸リトラクトが、無効化された軸(=trajectory_
+        follower_node側がdisabled_jointsとして目標を捨て、現在位置で凍結する軸)を
+        待ち続けてタイムアウトしないようにするために使う(_advance_move_step/
+        _advance_retract_r_step参照)。パネル未構築時は有効扱い。"""
+        cb = self.axis_enable_checks.get(name)
+        return True if cb is None else cb.isChecked()
 
     def _on_axis_enable_toggled(self, _checked=None):
         disabled = [name for name, cb in self.axis_enable_checks.items() if not cb.isChecked()]
@@ -4034,6 +4090,24 @@ class CommandGuiApp(QWidget):
             'max_acceleration': [accel_map[n] for n in names],
             'max_deceleration': [decel_map[n] if n in decel_map else accel_map[n] * 2.0 for n in names],
         }
+        # 送る値で入力欄も上書きしておく(2026-09-10追加、ユーザー報告:「ゲイン調整
+        # タブを開くと適用しましたと表示される。しかし表示されているのはデフォルト
+        # ゲイン」)。この自動適用は必ず_apply_loaded_traj_params(読込応答)の後に
+        # 走る(_traj_names_knownで待っているため)ので、入力欄にはこの直前に
+        # 読み込んだ「適用前のノードの値」=launchファイルの既定値が入っている。
+        # 適用結果のコールバック(_apply_traj_set_result)はステータス文字列を
+        # 更新するだけなので、ここで揃えておかないと「表示はlaunch既定値・実機は
+        # gains.jsonの値」という食い違いが残り続ける。表示された既定値は「適用」
+        # ボタン1回で本物になってしまうため(例: root_thetaのmax_velocityが
+        # 1.0→0.1)、実態に合わせておく。
+        for name in names:
+            if name in self.traj_vel_edits:
+                set_float(self.traj_vel_edits[name], round(vel_map[name], 4))
+            if name in self.traj_accel_edits:
+                set_float(self.traj_accel_edits[name], round(accel_map[name], 4))
+            if name in self.traj_decel_edits:
+                decel = decel_map[name] if name in decel_map else accel_map[name] * 2.0
+                set_float(self.traj_decel_edits[name], round(decel, 4))
         _set_status(self.traj_status_label, '自動適用中(gains.json)...', 'muted')
         return self.node.set_node_params(TRAJ_NODE_NAME, payload, self._apply_traj_set_result)
 
@@ -4052,6 +4126,17 @@ class CommandGuiApp(QWidget):
             'cubemars_kd': [kd_map[n] for n in names],
             'cubemars_torque_ff': [tff_map.get(n, 0.0) for n in names],
         }
+        # 軌道生成パネルと同じ理由で、送る値を入力欄にも反映しておく
+        # (_auto_apply_saved_trajのコメント参照)。MITゲインは表示された既定値を
+        # そのまま適用してしまうとkp/kdが実機の調整値から戻ってしまうため、
+        # 特に食い違いを残したくない。
+        for name in names:
+            if name in self.mit_kp_edits:
+                set_float(self.mit_kp_edits[name], round(kp_map[name], 4))
+            if name in self.mit_kd_edits:
+                set_float(self.mit_kd_edits[name], round(kd_map[name], 4))
+            if name in self.mit_torque_edits:
+                set_float(self.mit_torque_edits[name], round(tff_map.get(name, 0.0), 4))
         _set_status(self.mit_gain_status_label, '自動適用中(gains.json)...', 'muted')
         return self.node.set_node_params(TRAJ_NODE_NAME, payload, self._apply_mit_gain_set_result)
 
@@ -4284,8 +4369,8 @@ class CommandGuiApp(QWidget):
         layout.addWidget(desc)
 
         grid = QGridLayout()
-        self.robomas_kp_edit = make_float_edit(0.0, width=70)
-        self.robomas_kd_edit = make_float_edit(0.0, width=70)
+        self.robomas_kp_edit = make_gain_edit(0.0, width=70)
+        self.robomas_kd_edit = make_gain_edit(0.0, width=70)
         self.robomas_current_ff_edit = make_float_edit(0.0, width=70)
         for i, (label, edit) in enumerate((
                 ('Kp [A/deg]', self.robomas_kp_edit),
@@ -4332,8 +4417,8 @@ class CommandGuiApp(QWidget):
         # 入力欄だけ分ける。
         layout.addWidget(QLabel('tip_theta(M3)'))
         tip_grid = QGridLayout()
-        self.robomas_tip_theta_kp_edit = make_float_edit(0.0, width=70)
-        self.robomas_tip_theta_kd_edit = make_float_edit(0.0, width=70)
+        self.robomas_tip_theta_kp_edit = make_gain_edit(0.0, width=70)
+        self.robomas_tip_theta_kd_edit = make_gain_edit(0.0, width=70)
         self.robomas_tip_theta_current_ff_edit = make_float_edit(0.0, width=70)
         for i, (label, edit) in enumerate((
                 ('Kp [A/deg]', self.robomas_tip_theta_kp_edit),

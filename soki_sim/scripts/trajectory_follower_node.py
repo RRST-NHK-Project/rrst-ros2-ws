@@ -169,6 +169,21 @@ ROBOMAS_VEL_KD_LSB = 0.0000005
 ROBOMAS_VEL_MAX_CURRENT_LSB = 0.001
 # joint_velocity_targetsの受信がこれ以上途絶えたら、速度モード中でも安全側で
 # 0指令とみなす(joy_teleop_node異常終了・トピック未接続対策)。
+# 負値を入れてはいけないフィードバックゲイン(2026-09-10追加、ユーザー報告:
+# 「手先θのゲインに誤って負の値を代入すると暴走、機構を破壊した」)。
+# kpが負だと目標から遠ざかる向きにトルクが出る正帰還になり必ず暴走する。
+# kdが負だと負性ダンピングで振動が発散する。速度PIDのゲイン・電流上限も同様。
+# _on_set_parametersで拒否し、さらに指令生成時(_publish_*_commands)でも
+# 0でクランプする(launchファイル/yamlの初期値はon_set_parameters_callbackを
+# 通らないため、二重に防ぐ)。トルク/電流フィードフォワードは一定バイアスで
+# 正帰還にならず、重力補償で負値が正当な場合もあるため対象外。
+NON_NEGATIVE_GAIN_ARRAY_PARAMS = ('cubemars_kp', 'cubemars_kd')
+NON_NEGATIVE_GAIN_SCALAR_PARAMS = (
+    'robomas_kp', 'robomas_kd',
+    'robomas_tip_theta_kp', 'robomas_tip_theta_kd',
+    'robomas_vel_kp', 'robomas_vel_ki', 'robomas_vel_kd', 'robomas_vel_max_current_a',
+)
+
 ROBOMAS_VELOCITY_TARGET_STALE_SEC = 0.3
 # 自動シーケンス(frame_id='auto')が非ゼロの速度指令を出している間、手動
 # (frame_id='manual')側の「入力ゼロ」で上書きされないように保持する時間
@@ -204,6 +219,16 @@ INITIAL_ROOT_THETA_RAD = -math.pi / 2.0
 
 def clamp_int16(value: float) -> int:
     return max(INT16_MIN, min(INT16_MAX, int(round(value))))
+
+
+def nonneg_gain(value: float) -> float:
+    """フィードバックゲインを0以上へクランプする(NON_NEGATIVE_GAIN_*参照)。
+
+    _on_set_parametersでも負値は拒否しているが、launchファイル/yamlで与えた
+    起動時の初期値はon_set_parameters_callbackを通らないため、実際にMITフレームを
+    組み立てるここでも最後の砦としてクランプする。NaNもこの式で0になる
+    (NaN > 0.0 はFalse)。"""
+    return value if value > 0.0 else 0.0
 
 
 def trap_step(pos: float, vel: float, target: float, max_vel: float, max_accel: float,
@@ -1309,6 +1334,32 @@ class TrajectoryFollowerNode(Node):
             if p.name in ('cubemars_overspeed_limit_radps', 'cubemars_overaccel_limit_radps2') \
                     and p.value <= 0.0:
                 return SetParametersResult(successful=False, reason=f'{p.name} must be positive')
+            # フィードバックゲインの符号チェック(2026-09-10追加、ユーザー報告:
+            # 「手先θのゲインに誤って負の値を代入すると暴走、機構を破壊した」)。
+            # MITの指令トルクはkp*(p_des-p)+kd*(v_des-v)+ffなので、kpが負だと
+            # 目標から遠ざかる向きにトルクが出て誤差がさらに増える正帰還になり、
+            # 原理的に必ず暴走する。kdが負の場合も負性ダンピングとなり振動が
+            # 発散する。速度PID(robomas_vel_*)も同じ。いずれも「入力ミスで
+            # 一瞬でも入ると機構を壊す」種類の値なので、ここで拒否する。
+            # トルク/電流フィードフォワード(*_torque_ff/*_current_ff)は
+            # 一定バイアスであり正帰還にはならない(重力補償で負値が正当な場合も
+            # ある)ため対象外。
+            if p.name in NON_NEGATIVE_GAIN_ARRAY_PARAMS and any(v < 0.0 for v in p.value):
+                return SetParametersResult(
+                    successful=False,
+                    reason=f'{p.name} must not contain negative values '
+                           '(negative feedback gain causes runaway)')
+            if p.name in NON_NEGATIVE_GAIN_SCALAR_PARAMS and p.value < 0.0:
+                return SetParametersResult(
+                    successful=False,
+                    reason=f'{p.name} must not be negative (negative feedback gain causes runaway)')
+            # 台形プロファイルの速度・加減速は正でなければならない。0以下だと
+            # trap_stepが「制限なし」とみなしてpos_を1周期でtargetへ飛ばすため、
+            # MIT位置指令が巨大なステップ入力になり実機が激しく動く。
+            if p.name in ('max_velocity', 'max_acceleration', 'max_deceleration') \
+                    and any(v <= 0.0 for v in p.value):
+                return SetParametersResult(
+                    successful=False, reason=f'{p.name} elements must be positive')
         for p in params:
             if p.name == 'max_velocity':
                 self.max_vel_ = dict(zip(self.joint_names_, p.value))
@@ -1632,8 +1683,8 @@ class TrajectoryFollowerNode(Node):
             actuator_vel_radps = self.vel_[name] * cfg['reduction']
             buf[8 + m] = clamp_int16(actuator_vel_radps * 100.0)    # mit_velocity: 0.01rad/s/LSB(アクチュエータ軸)
             # mit_kp: 0.1/LSB(estop中は0=脱力、解除直後はランプ中)
-            buf[12 + m] = 0 if estop_limp else clamp_int16(cfg['kp'] * kp_scale * 10.0)
-            buf[16 + m] = 0 if estop_limp else clamp_int16(cfg['kd'] * 100.0)         # mit_kd: 0.01/LSB
+            buf[12 + m] = 0 if estop_limp else clamp_int16(nonneg_gain(cfg['kp']) * kp_scale * 10.0)
+            buf[16 + m] = 0 if estop_limp else clamp_int16(nonneg_gain(cfg['kd']) * 100.0)         # mit_kd: 0.01/LSB
             buf[20 + m] = 0 if estop_limp else clamp_int16(cfg['torque_ff'] * 100.0)  # mit_torque_ff: 0.01N・m/LSB
 
         for device_id, buf in self.device_buffers_.items():
@@ -1709,11 +1760,11 @@ class TrajectoryFollowerNode(Node):
             buf[4 + i1] = ROBOMAS_MODE_VELOCITY
             buf[4 + i2] = ROBOMAS_MODE_VELOCITY
             for i in (i1, i2):
-                buf[ROBOMAS_VEL_SLOT_KP + i] = clamp_int16(self.robomas_vel_kp_ / ROBOMAS_VEL_KP_LSB)
-                buf[ROBOMAS_VEL_SLOT_KI + i] = clamp_int16(self.robomas_vel_ki_ / ROBOMAS_VEL_KI_LSB)
-                buf[ROBOMAS_VEL_SLOT_KD + i] = clamp_int16(self.robomas_vel_kd_ / ROBOMAS_VEL_KD_LSB)
+                buf[ROBOMAS_VEL_SLOT_KP + i] = clamp_int16(nonneg_gain(self.robomas_vel_kp_) / ROBOMAS_VEL_KP_LSB)
+                buf[ROBOMAS_VEL_SLOT_KI + i] = clamp_int16(nonneg_gain(self.robomas_vel_ki_) / ROBOMAS_VEL_KI_LSB)
+                buf[ROBOMAS_VEL_SLOT_KD + i] = clamp_int16(nonneg_gain(self.robomas_vel_kd_) / ROBOMAS_VEL_KD_LSB)
                 buf[ROBOMAS_VEL_SLOT_MAX_CURRENT + i] = clamp_int16(
-                    self.robomas_vel_max_current_a_ / ROBOMAS_VEL_MAX_CURRENT_LSB)
+                    nonneg_gain(self.robomas_vel_max_current_a_) / ROBOMAS_VEL_MAX_CURRENT_LSB)
         else:
             z_offset = self.get_parameter('robomas_z_offset_m').value
             r_offset = self.get_parameter('robomas_r_offset_m').value
@@ -1748,10 +1799,10 @@ class TrajectoryFollowerNode(Node):
             buf[4 + i2] = ROBOMAS_MODE_MIT
             buf[8 + i1] = clamp_int16(m1_rpm * 1.0)      # mit_velocity_ff: 1rpm/LSB
             buf[8 + i2] = clamp_int16(m2_rpm * 1.0)
-            buf[12 + i1] = clamp_int16(cfg['kp'] * 1000.0)   # mit_kp: 0.001(A/deg)/LSB
-            buf[12 + i2] = clamp_int16(cfg['kp'] * 1000.0)
-            buf[16 + i1] = clamp_int16(cfg['kd'] * 10000.0)  # mit_kd: 0.0001(A/rpm)/LSB
-            buf[16 + i2] = clamp_int16(cfg['kd'] * 10000.0)
+            buf[12 + i1] = clamp_int16(nonneg_gain(cfg['kp']) * 1000.0)   # mit_kp: 0.001(A/deg)/LSB
+            buf[12 + i2] = clamp_int16(nonneg_gain(cfg['kp']) * 1000.0)
+            buf[16 + i1] = clamp_int16(nonneg_gain(cfg['kd']) * 10000.0)  # mit_kd: 0.0001(A/rpm)/LSB
+            buf[16 + i2] = clamp_int16(nonneg_gain(cfg['kd']) * 10000.0)
             buf[20 + i1] = clamp_int16((cfg['current_ff'] + kick1) * 1000.0)  # mit_current_ff: 0.001A/LSB
             buf[20 + i2] = clamp_int16((cfg['current_ff'] + kick2) * 1000.0)
 
@@ -1767,8 +1818,8 @@ class TrajectoryFollowerNode(Node):
             buf[i3] = clamp_int16(tip_deg * 1.0)             # target: 1deg/LSB(アクチュエータ軸)
             buf[4 + i3] = ROBOMAS_MODE_MIT
             buf[8 + i3] = clamp_int16(tip_rpm * 1.0)         # mit_velocity_ff: 1rpm/LSB
-            buf[12 + i3] = clamp_int16(tip_cfg['kp'] * 1000.0)     # mit_kp: 0.001(A/deg)/LSB
-            buf[16 + i3] = clamp_int16(tip_cfg['kd'] * 10000.0)    # mit_kd: 0.0001(A/rpm)/LSB
+            buf[12 + i3] = clamp_int16(nonneg_gain(tip_cfg['kp']) * 1000.0)     # mit_kp: 0.001(A/deg)/LSB
+            buf[16 + i3] = clamp_int16(nonneg_gain(tip_cfg['kd']) * 10000.0)    # mit_kd: 0.0001(A/rpm)/LSB
             buf[20 + i3] = clamp_int16(tip_cfg['current_ff'] * 1000.0)  # mit_current_ff: 0.001A/LSB
 
         msg = Int16MultiArray()
