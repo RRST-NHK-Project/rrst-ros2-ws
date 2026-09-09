@@ -3,20 +3,20 @@
     "max_velocity": {
       "root_theta_joint": 0.1,
       "tip_theta_joint": 0.1,
-      "z_joint": 0.1,
-      "r_joint": 0.3
+      "z_joint": 0.036,
+      "r_joint": 0.036
     },
     "max_acceleration": {
       "root_theta_joint": 0.2,
       "tip_theta_joint": 0.2,
-      "z_joint": 0.1,
-      "r_joint": 0.6
+      "z_joint": 0.036,
+      "r_joint": 0.036
     },
     "max_deceleration": {
       "root_theta_joint": 0.4,
       "tip_theta_joint": 0.4,
-      "z_joint": 0.2,
-      "r_joint": 0.6
+      "z_joint": 0.072,
+      "r_joint": 0.072
     }
   },
   "joy_speed": {
@@ -37,7 +37,7 @@
     }
   },
   "robomas_gain": {
-    "robomas_kp": 0.005,
+    "robomas_kp": 0.055,
     "robomas_kd": 0.1,
     "robomas_current_ff": 0.0,
     "robomas_kick_enabled": false,
