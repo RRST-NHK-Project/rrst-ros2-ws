@@ -1662,6 +1662,7 @@ class CommandGuiApp(QWidget):
         self._traj_auto_loaded = False
         self._mit_auto_loaded = False
         self._robomas_auto_loaded = False
+        self._robomas_vel_auto_loaded = False
         self._joy_auto_loaded = False
         # _traj_auto_loaded/_mit_auto_loadedは読込「リクエスト送信済み」を表すだけ
         # (request_node_paramsは非同期のため)。実際に_traj_joint_names/
@@ -1672,6 +1673,7 @@ class CommandGuiApp(QWidget):
         self._traj_auto_applied = False
         self._mit_auto_applied = False
         self._robomas_auto_applied = False
+        self._robomas_vel_auto_applied = False
         self._joy_auto_applied = False
         self._auto_load_timer = QTimer(self)
         self._auto_load_timer.timeout.connect(self._try_auto_setup_gains)
@@ -2075,7 +2077,8 @@ class CommandGuiApp(QWidget):
             top_funcs=[self._build_apply_all_panel],
             left_funcs=[self._build_trajectory_panel, self._build_joy_speed_panel],
             right_funcs=[self._build_mit_gain_panel, self._build_robomas_gain_panel,
-                         self._build_robomas_autotune_panel])
+                         self._build_robomas_autotune_panel, self._build_robomas_vel_gain_panel,
+                         self._build_velocity_mode_panel])
 
     def _build_calibration_tab(self, parent):
         self._build_panel_tab(
@@ -2172,6 +2175,7 @@ class CommandGuiApp(QWidget):
             'trajectory_follower_node(軌道生成)': self._on_load_traj_params(),
             'trajectory_follower_node(MIT)': self._on_load_mit_gains(),
             'trajectory_follower_node(robomas)': self._on_load_robomas_gains(),
+            'trajectory_follower_node(速度モード)': self._on_load_robomas_vel_gains(),
             'joy_teleop_node': self._on_load_joy_speed(),
         }
         failed = [label for label, ok in results.items() if not ok]
@@ -2186,18 +2190,19 @@ class CommandGuiApp(QWidget):
             traj = self._collect_traj_values()
             mit = self._collect_mit_values()
             robomas = self._collect_robomas_values()
+            robomas_vel = self._collect_robomas_vel_values()
             joy = self._collect_joy_speed_values()
         except (ValueError, KeyError):
             QMessageBox.critical(
                 self, '入力エラー',
-                '軌道生成・MIT・robomas・joy速度のいずれかに数値以外の入力があります')
+                '軌道生成・MIT・robomas・速度モード・joy速度のいずれかに数値以外の入力があります')
             return
 
         reply = QMessageBox.question(
             self, '全ゲイン一括適用の確認',
             'GUIが保持している軌道生成パラメータ・MITゲイン・robomasゲイン・\n'
-            'joy速度を、まとめて実機(trajectory_follower_node/joy_teleop_node)\n'
-            'へ即座に反映します。\n\n'
+            '速度モードゲイン・joy速度を、まとめて実機(trajectory_follower_node/\n'
+            'joy_teleop_node)へ即座に反映します。\n\n'
             'Kpを大きくするほど保持力・応答性が上がりますが、\n'
             '実機にかかる力も大きくなります。よろしいですか？',
             QMessageBox.Yes | QMessageBox.No)
@@ -2207,11 +2212,13 @@ class CommandGuiApp(QWidget):
         self._persist_traj_values(traj)
         self._persist_mit_values(mit)
         self._persist_gains('robomas_gain', robomas)
+        self._persist_gains('robomas_vel_gain', robomas_vel)
         self._persist_gains('joy_speed', joy)
 
         traj_node_values = dict(traj)
         traj_node_values.update(mit)
         traj_node_values.update(robomas)
+        traj_node_values.update(robomas_vel)
         self._apply_all_results = {}
         ok_traj = self.node.set_node_params(TRAJ_NODE_NAME, traj_node_values, self._apply_all_traj_result)
         ok_joy = self.node.set_node_params(JOY_NODE_NAME, joy, self._apply_all_joy_result)
@@ -3407,6 +3414,171 @@ class CommandGuiApp(QWidget):
             text += '\n(可動範囲外のためクランプされました)'
         _set_status(self.hand_offset_status_label, text, 'success')
 
+    def _build_velocity_mode_panel(self, column):
+        # joyのz/r出力を位置目標(台形プロファイル経由のMIT位置PD制御)ではなく、
+        # trajectory_follower_nodeの速度モード(firmware側の速度PID、robomas_vel_kp/
+        # ki/kd/max_current_a)へ直接の速度指令として送るモード(2026-09-09追加、
+        # note/note_soki/hardware_mapping.txt参照)。位置モードより応答が速い反面、
+        # 速度PIDのチューニング状況に依存する。チェックはjoy_teleop_node
+        # (velocity_mode_enabled)とtrajectory_follower_node(robomas_velocity_mode)
+        # 両方のパラメータを同時に切り替える(両者が揃っていないと、joyの速度指令が
+        # 送られてもtrajectory_follower_node側は位置モードのままで無視される)。
+        box = QGroupBox('joy速度指令モード')
+        layout = QVBoxLayout(box)
+
+        desc = QLabel()
+        desc.setWordWrap(True)
+        _set_status(desc, 'チェックを入れると、joyのz/rスティック入力(関節モード時のみ、\n'
+                          'XY移動モード中のr軸は対象外)を位置目標ではなく速度指令として\n'
+                          '直接送る。速度PID(robomas_vel_kp/ki/kd/max_current_a、ros2 param\n'
+                          'setで調整)のチューニング状況に応答が依存する。', 'muted')
+        layout.addWidget(desc)
+
+        self.velocity_mode_check = QCheckBox('joy出力を速度指令にする')
+        self.velocity_mode_check.toggled.connect(self._on_velocity_mode_toggled)
+        layout.addWidget(self.velocity_mode_check)
+
+        self.velocity_mode_status_label = QLabel()
+        self.velocity_mode_status_label.setWordWrap(True)
+        _set_status(self.velocity_mode_status_label, '位置指令モード', 'muted')
+        layout.addWidget(self.velocity_mode_status_label)
+
+        column.addWidget(box)
+
+    def _on_velocity_mode_toggled(self, checked):
+        ok_traj = self.node.set_node_params(
+            TRAJ_NODE_NAME, {'robomas_velocity_mode': checked}, self._apply_velocity_mode_result)
+        ok_joy = self.node.set_node_params(
+            JOY_NODE_NAME, {'velocity_mode_enabled': checked}, self._apply_velocity_mode_result)
+        if not (ok_traj and ok_joy):
+            _set_status(self.velocity_mode_status_label,
+                        'trajectory_follower_node/joy_teleop_nodeに接続できません(未起動?)',
+                        'error')
+        else:
+            _set_status(self.velocity_mode_status_label, '適用中...', 'muted')
+
+    def _apply_velocity_mode_result(self, results):
+        if results is None:
+            _set_status(self.velocity_mode_status_label, '適用失敗(通信エラー)', 'error')
+            return
+        if all(r.successful for r in results):
+            checked = self.velocity_mode_check.isChecked()
+            _set_status(self.velocity_mode_status_label,
+                        '速度指令モード' if checked else '位置指令モード',
+                        'success' if checked else 'muted')
+        else:
+            reasons = '; '.join(r.reason for r in results if not r.successful)
+            _set_status(self.velocity_mode_status_label, f'適用失敗: {reasons}', 'error')
+
+    def _build_robomas_vel_gain_panel(self, column):
+        # z/rの速度モード(joy速度指令モード、上の_build_velocity_mode_panel参照)で
+        # 使う速度PID(firmware側robomas.cppのROBOMAS_MODE_VELOCITY分岐)のゲイン・
+        # 電流上限。以前はfirmware(config.hpp)のコンパイル時固定値だったが、
+        # MITゲインと同様にCAN経由でROSから可変にした(2026-09-09追加、
+        # trajectory_follower_node.pyのrobomas_vel_kp宣言部コメント参照)。
+        # motor1/motor2(z/r)共通のスカラー値。
+        box = QGroupBox('速度モードゲイン (joy速度指令モード用)')
+        layout = QVBoxLayout(box)
+
+        desc = QLabel()
+        desc.setWordWrap(True)
+        _set_status(desc, 'motor1/motor2(z/r)共通の値。上の「joy速度指令モード」\n'
+                          'チェックがONのときだけ実際に使われる。', 'muted')
+        layout.addWidget(desc)
+
+        grid = QGridLayout()
+        self.robomas_vel_kp_edit = make_float_edit(0.8, width=70)
+        self.robomas_vel_ki_edit = make_float_edit(0.0, width=70)
+        self.robomas_vel_kd_edit = make_float_edit(0.0, width=70)
+        self.robomas_vel_max_current_a_edit = make_float_edit(1.0, width=70)
+        for i, (label, edit) in enumerate((
+                ('Kp', self.robomas_vel_kp_edit),
+                ('Ki', self.robomas_vel_ki_edit),
+                ('Kd', self.robomas_vel_kd_edit),
+                ('電流上限 [A]', self.robomas_vel_max_current_a_edit))):
+            grid.addWidget(QLabel(label), i, 0)
+            grid.addWidget(edit, i, 1)
+        layout.addLayout(grid)
+
+        self.robomas_vel_gain_status_label = QLabel()
+        self.robomas_vel_gain_status_label.setWordWrap(True)
+        _set_status(self.robomas_vel_gain_status_label, '未読込', 'muted')
+        layout.addWidget(self.robomas_vel_gain_status_label)
+
+        btn_row = QHBoxLayout()
+        load_btn = QPushButton('読込')
+        apply_btn = QPushButton('適用')
+        apply_btn.setProperty('variant', 'danger')
+        load_btn.clicked.connect(self._on_load_robomas_vel_gains)
+        apply_btn.clicked.connect(self._on_apply_robomas_vel_gains)
+        btn_row.addWidget(load_btn)
+        btn_row.addWidget(apply_btn)
+        layout.addLayout(btn_row)
+
+        column.addWidget(box)
+
+    def _on_load_robomas_vel_gains(self):
+        ok = self.node.request_node_params(
+            TRAJ_NODE_NAME,
+            ['robomas_vel_kp', 'robomas_vel_ki', 'robomas_vel_kd', 'robomas_vel_max_current_a'],
+            self._apply_loaded_robomas_vel_gains,
+            lambda reason: _set_status(self.robomas_vel_gain_status_label, f'読込失敗: {reason}', 'error'))
+        _set_status(self.robomas_vel_gain_status_label,
+                    '読込中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
+                    'muted' if ok else 'error')
+        return ok
+
+    def _apply_loaded_robomas_vel_gains(self, values):
+        if 'robomas_vel_kp' in values:
+            set_float(self.robomas_vel_kp_edit, round(values['robomas_vel_kp'], 6))
+        if 'robomas_vel_ki' in values:
+            set_float(self.robomas_vel_ki_edit, round(values['robomas_vel_ki'], 6))
+        if 'robomas_vel_kd' in values:
+            set_float(self.robomas_vel_kd_edit, round(values['robomas_vel_kd'], 6))
+        if 'robomas_vel_max_current_a' in values:
+            set_float(self.robomas_vel_max_current_a_edit,
+                      round(values['robomas_vel_max_current_a'], 6))
+        # 「読込」はノードの現在値をGUIに表示するだけに留め、gains.jsonへは
+        # 「適用」時のみ永続化する(他のゲインパネルと同じ方針)。
+        _set_status(self.robomas_vel_gain_status_label, '読込完了', 'info')
+
+    def _collect_robomas_vel_values(self):
+        return {
+            'robomas_vel_kp': get_float(self.robomas_vel_kp_edit),
+            'robomas_vel_ki': get_float(self.robomas_vel_ki_edit),
+            'robomas_vel_kd': get_float(self.robomas_vel_kd_edit),
+            'robomas_vel_max_current_a': get_float(self.robomas_vel_max_current_a_edit),
+        }
+
+    def _on_apply_robomas_vel_gains(self):
+        try:
+            values = self._collect_robomas_vel_values()
+        except ValueError:
+            QMessageBox.critical(self, '入力エラー', 'Kp/Ki/Kd/電流上限に数値を入力してください')
+            return
+        reply = QMessageBox.question(
+            self, '速度モードゲイン適用の確認',
+            'motor1/motor2(z/r)の速度モードゲイン・電流上限を実機へ即座に反映します。\n'
+            '「joy速度指令モード」がONの間は実際の動きにすぐ影響します。よろしいですか？',
+            QMessageBox.Yes | QMessageBox.No)
+        if reply != QMessageBox.Yes:
+            return
+        self._persist_gains('robomas_vel_gain', values)
+        ok = self.node.set_node_params(TRAJ_NODE_NAME, values, self._apply_robomas_vel_gain_set_result)
+        _set_status(self.robomas_vel_gain_status_label,
+                    '適用中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
+                    'muted' if ok else 'error')
+
+    def _apply_robomas_vel_gain_set_result(self, results):
+        if results is None:
+            _set_status(self.robomas_vel_gain_status_label, '適用に失敗しました(応答なし)', 'error')
+            return
+        if all(r.successful for r in results):
+            _set_status(self.robomas_vel_gain_status_label, '適用しました', 'success')
+        else:
+            reasons = '; '.join(r.reason for r in results if not r.successful)
+            _set_status(self.robomas_vel_gain_status_label, f'適用失敗: {reasons}', 'error')
+
     def _build_axis_enable_panel(self, column):
         # 組立中(まだ配線・組付けが終わっていない軸がある)や実機の不具合発生時に、
         # その軸だけソフトウェア側で無視できるようにするパネル(2026-09-05追加)。
@@ -4125,6 +4297,8 @@ class CommandGuiApp(QWidget):
             self._mit_auto_loaded = True
         if not self._robomas_auto_loaded and self._on_load_robomas_gains():
             self._robomas_auto_loaded = True
+        if not self._robomas_vel_auto_loaded and self._on_load_robomas_vel_gains():
+            self._robomas_vel_auto_loaded = True
         if not self._joy_auto_loaded and self._on_load_joy_speed():
             self._joy_auto_loaded = True
 
@@ -4141,13 +4315,15 @@ class CommandGuiApp(QWidget):
             self._mit_auto_applied = True
         if not self._robomas_auto_applied and self._auto_apply_saved_robomas():
             self._robomas_auto_applied = True
+        if not self._robomas_vel_auto_applied and self._auto_apply_saved_robomas_vel():
+            self._robomas_vel_auto_applied = True
         if not self._joy_auto_applied and self._auto_apply_saved_joy():
             self._joy_auto_applied = True
 
         if all((self._traj_auto_loaded, self._mit_auto_loaded,
-                self._robomas_auto_loaded, self._joy_auto_loaded,
+                self._robomas_auto_loaded, self._robomas_vel_auto_loaded, self._joy_auto_loaded,
                 self._traj_auto_applied, self._mit_auto_applied,
-                self._robomas_auto_applied, self._joy_auto_applied)):
+                self._robomas_auto_applied, self._robomas_vel_auto_applied, self._joy_auto_applied)):
             self._auto_load_timer.stop()
 
     def _auto_apply_saved_traj(self):
@@ -4199,6 +4375,13 @@ class CommandGuiApp(QWidget):
             return True
         _set_status(self.robomas_gain_status_label, '自動適用中(gains.json)...', 'muted')
         return self.node.set_node_params(TRAJ_NODE_NAME, saved, self._apply_robomas_gain_set_result)
+
+    def _auto_apply_saved_robomas_vel(self):
+        saved = self._saved_gains.get('robomas_vel_gain')
+        if not saved:
+            return True
+        _set_status(self.robomas_vel_gain_status_label, '自動適用中(gains.json)...', 'muted')
+        return self.node.set_node_params(TRAJ_NODE_NAME, saved, self._apply_robomas_vel_gain_set_result)
 
     def _auto_apply_saved_joy(self):
         saved = self._saved_gains.get('joy_speed')

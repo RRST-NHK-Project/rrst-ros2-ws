@@ -111,6 +111,22 @@ ROBOMAS_MIT_POSITION_CMD_SCALE_DEG = 1.0     # 指令(target): 1deg/LSB(帰還�
 ROBOMAS_FEEDBACK_POSITION_SCALE_DEG = 0.1    # 帰還(angle): 0.1deg/LSB(cubemarsの帰還と同じ)
 ROBOMAS_SLOT_COUNT = 24
 
+# z/rの速度モード(joyの直接速度指令、2026-09-09追加)用スロット・LSBスケール。
+# homing_node.py/ros2can firmwareのconfig.hpp「速度モード ゲイン/電流上限のROS
+# 可変スロット」と一致させること(MITモードでは未使用のスロット8-23を、
+# control_modeで排他的に切り替えて流用している)。
+ROBOMAS_VEL_SLOT_KP = 8            # 8-11
+ROBOMAS_VEL_SLOT_KI = 12           # 12-15
+ROBOMAS_VEL_SLOT_KD = 16           # 16-19
+ROBOMAS_VEL_SLOT_MAX_CURRENT = 20  # 20-23
+ROBOMAS_VEL_KP_LSB = 0.001
+ROBOMAS_VEL_KI_LSB = 0.001
+ROBOMAS_VEL_KD_LSB = 0.0000005
+ROBOMAS_VEL_MAX_CURRENT_LSB = 0.001
+# joint_velocity_targetsの受信がこれ以上途絶えたら、速度モード中でも安全側で
+# 0指令とみなす(joy_teleop_node異常終了・トピック未接続対策)。
+ROBOMAS_VELOCITY_TARGET_STALE_SEC = 0.3
+
 # /set_root_theta_originサービス呼び出し後、Set Originコマンドの送信を保証するために
 # 通常のMIT指令を止めてSET_ORIGINモードを保持する周期数(update_rate_hzでの周期数)。
 # ros2can側firmwareは実際のCANコマンド送信をエッジ検出で1回だけ行うため、この間に
@@ -255,6 +271,17 @@ class TrajectoryFollowerNode(Node):
         self.declare_parameter('robomas_kick_current_a', 0.1)
         self.declare_parameter('robomas_kick_duration_sec', 0.05)
         self.declare_parameter('robomas_kick_vel_threshold_mps', 0.001)
+        # z/rの速度モード(joyからの直接速度指令、2026-09-09追加)。trueの間、
+        # z/rはMIT位置PD制御ではなく速度モード(ROBOMAS_MODE_VELOCITY)で駆動し、
+        # target_(位置)ではなくjoint_velocity_targetsトピックで受け取った速度を
+        # そのまま(リミットスイッチでクランプした上で)指令する
+        # (_publish_robomas_commands/_on_velocity_targets参照)。command_gui_node
+        # の「joy速度指令モード」チェックボックスから切り替える想定。
+        self.declare_parameter('robomas_velocity_mode', False)
+        self.declare_parameter('robomas_vel_kp', 0.8)
+        self.declare_parameter('robomas_vel_ki', 0.0)
+        self.declare_parameter('robomas_vel_kd', 0.0)
+        self.declare_parameter('robomas_vel_max_current_a', 1.0)
         self.declare_parameter('robomas_z_joint', 'z_joint')
         self.declare_parameter('robomas_r_joint', 'r_joint')
         self.declare_parameter('robomas_mix_k', 0.5)
@@ -510,6 +537,21 @@ class TrajectoryFollowerNode(Node):
         self.create_service(Trigger, 'pause_robomas_output', self._on_pause_robomas_output)
         self.create_service(Trigger, 'resume_robomas_output', self._on_resume_robomas_output)
 
+        # z/rの速度モード(2026-09-09追加、ファイル冒頭のrobomas_velocity_mode宣言部
+        # コメント参照)。
+        self.robomas_velocity_mode_ = bool(self.get_parameter('robomas_velocity_mode').value)
+        self.robomas_vel_kp_ = float(self.get_parameter('robomas_vel_kp').value)
+        self.robomas_vel_ki_ = float(self.get_parameter('robomas_vel_ki').value)
+        self.robomas_vel_kd_ = float(self.get_parameter('robomas_vel_kd').value)
+        self.robomas_vel_max_current_a_ = float(self.get_parameter('robomas_vel_max_current_a').value)
+        # joy_teleop_nodeからのjoint_velocity_targets(m/s、joint空間)の最新値と
+        # 受信時刻(ROBOMAS_VELOCITY_TARGET_STALE_SEC超で途絶とみなし0指令にする、
+        # _velocity_mode_target_rpm参照)。
+        self._velocity_targets_ = {z_name: 0.0, r_name: 0.0}
+        self._velocity_targets_stamp_ = None
+        self.create_subscription(
+            JointState, 'joint_velocity_targets', self._on_velocity_targets, 10)
+
     def _setup_limit_switches(self):
         """z/r軸それぞれの上限・下限リミットスイッチ(CAN_HOST経由)を監視する。
         robomas_device_id未設定(実機出力無効)なら対象のz_joint/r_joint自体が
@@ -653,6 +695,42 @@ class TrajectoryFollowerNode(Node):
         response.message = 'robomas出力を再開しました'
         return response
 
+    def _on_velocity_targets(self, msg: JointState):
+        """joy_teleop_nodeのjoy速度指令モード(robomas_velocity_mode)がONの間、
+        z_joint/r_jointの目標速度[m/s]をここで受け取る(位置(target_)ではなく
+        速度そのものを毎周期送ってもらう想定。_velocity_mode_target_rpm参照)。"""
+        if self.robomas_ is None:
+            return
+        for name, vel in zip(msg.name, msg.velocity):
+            if name in self._velocity_targets_:
+                self._velocity_targets_[name] = vel
+        self._velocity_targets_stamp_ = time.monotonic()
+
+    def _velocity_mode_target_rpm(self, cfg):
+        """robomas_velocity_mode中のmotor1/motor2目標rpmを計算する。
+        joint_velocity_targetsが一定時間(ROBOMAS_VELOCITY_TARGET_STALE_SEC)
+        途絶していれば安全側で0とみなす(joy_teleop_node異常終了対策)。
+        リミットスイッチがトリガーされている方向への速度指令は0にクランプする
+        (timer_callbackの位置モード側クランプと同じ考え方、反対方向への後退は許可)。"""
+        stale = (self._velocity_targets_stamp_ is None
+                 or time.monotonic() - self._velocity_targets_stamp_ > ROBOMAS_VELOCITY_TARGET_STALE_SEC)
+        z_vel = 0.0 if stale else self._velocity_targets_.get(cfg['z_joint'], 0.0)
+        r_vel = 0.0 if stale else self._velocity_targets_.get(cfg['r_joint'], 0.0)
+        if z_vel > 0.0 and self._limit_triggered('z', 'upper'):
+            z_vel = 0.0
+        elif z_vel < 0.0 and self._limit_triggered('z', 'lower'):
+            z_vel = 0.0
+        if r_vel > 0.0 and self._limit_triggered('r', 'upper'):
+            r_vel = 0.0
+        elif r_vel < 0.0 and self._limit_triggered('r', 'lower'):
+            r_vel = 0.0
+
+        m1_vel = (z_vel + r_vel) / (2.0 * cfg['mix_k'])
+        m2_vel = (z_vel - r_vel) / (2.0 * cfg['mix_k'])
+        m1_rpm = cfg['motor1_sign'] * (m1_vel / cfg['pulley_radius_m']) * (60.0 / (2.0 * math.pi))
+        m2_rpm = cfg['motor2_sign'] * (m2_vel / cfg['pulley_radius_m']) * (60.0 / (2.0 * math.pi))
+        return m1_rpm, m2_rpm
+
     def _publish_estop_state(self):
         msg = Bool()
         msg.data = self.estop_active_
@@ -788,6 +866,28 @@ class TrajectoryFollowerNode(Node):
                     self.pos_[name] = val
                     self.vel_[name] = 0.0
                     self.target_[name] = val
+            elif p.name == 'robomas_velocity_mode' and self.robomas_ is not None:
+                new_value = bool(p.value)
+                if self.robomas_velocity_mode_ and not new_value:
+                    # 速度モード->位置モードへ戻る瞬間。速度モード中はpos_/target_を
+                    # 更新していない(open-loopのままなので実位置とズレている)ため、
+                    # MIT位置制御を再開する前に実機帰還のz/r位置へ同期しておかないと
+                    # 大きな位置誤差でカクつく(timer_callbackのリミットスイッチ
+                    # 復帰時の同期と同じ理由、_compute_real_zr参照)。
+                    real_zr = self._compute_real_zr()
+                    if real_zr is not None:
+                        for name, val in real_zr.items():
+                            self.pos_[name] = val
+                            self.vel_[name] = 0.0
+                            self.target_[name] = val
+                self.robomas_velocity_mode_ = new_value
+            elif (p.name in ('robomas_vel_kp', 'robomas_vel_ki', 'robomas_vel_kd',
+                              'robomas_vel_max_current_a')
+                  and self.robomas_ is not None):
+                key = {'robomas_vel_kp': 'robomas_vel_kp_', 'robomas_vel_ki': 'robomas_vel_ki_',
+                       'robomas_vel_kd': 'robomas_vel_kd_',
+                       'robomas_vel_max_current_a': 'robomas_vel_max_current_a_'}[p.name]
+                setattr(self, key, float(p.value))
         return SetParametersResult(successful=True)
 
     def target_callback(self, msg: JointState):
@@ -967,48 +1067,66 @@ class TrajectoryFollowerNode(Node):
             # なので、target=0固定送信すら行わずpublish自体を完全にスキップする。
             return
         cfg = self.robomas_
-
-        z_offset = self.get_parameter('robomas_z_offset_m').value
-        r_offset = self.get_parameter('robomas_r_offset_m').value
-        # real_joint_bridge_nodeの z = mix_k*(m1+m2) + z_offset_m の逆変換
-        # (joint側の値からモータ側の生の変位を求めるため、ここではoffsetを引く)。
-        z = self.pos_[cfg['z_joint']] - z_offset
-        r = self.pos_[cfg['r_joint']] - r_offset
-        z_vel = self.vel_[cfg['z_joint']]
-        r_vel = self.vel_[cfg['r_joint']]
-
-        m1 = (z + r) / (2.0 * cfg['mix_k'])
-        m2 = (z - r) / (2.0 * cfg['mix_k'])
-        m1_vel = (z_vel + r_vel) / (2.0 * cfg['mix_k'])
-        m2_vel = (z_vel - r_vel) / (2.0 * cfg['mix_k'])
-
-        m1_deg = cfg['motor1_sign'] * math.degrees(m1 / cfg['pulley_radius_m'])
-        m2_deg = cfg['motor2_sign'] * math.degrees(m2 / cfg['pulley_radius_m'])
-        m1_rpm = cfg['motor1_sign'] * (m1_vel / cfg['pulley_radius_m']) * (60.0 / (2.0 * math.pi))
-        m2_rpm = cfg['motor2_sign'] * (m2_vel / cfg['pulley_radius_m']) * (60.0 / (2.0 * math.pi))
-
-        # 動き出しキック(静止摩擦補償)。motor1_sign/motor2_signを適用済みの
-        # 符号付き速度(実際にモータへ流す電流の符号と揃える)で、モータごとに
-        # 独立して停止->動き出しの遷移を検出する(_compute_kick_current参照)。
-        m1_signed_vel = cfg['motor1_sign'] * m1_vel
-        m2_signed_vel = cfg['motor2_sign'] * m2_vel
-        kick1 = self._compute_kick_current(1, m1_signed_vel, cfg)
-        kick2 = self._compute_kick_current(2, m2_signed_vel, cfg)
-
         i1, i2 = cfg['motor1_index'], cfg['motor2_index']
         buf = [0] * ROBOMAS_SLOT_COUNT
-        buf[i1] = clamp_int16(m1_deg * 1.0)          # target: 1deg/LSB(アクチュエータ軸)
-        buf[i2] = clamp_int16(m2_deg * 1.0)
-        buf[4 + i1] = ROBOMAS_MODE_MIT
-        buf[4 + i2] = ROBOMAS_MODE_MIT
-        buf[8 + i1] = clamp_int16(m1_rpm * 1.0)      # mit_velocity_ff: 1rpm/LSB
-        buf[8 + i2] = clamp_int16(m2_rpm * 1.0)
-        buf[12 + i1] = clamp_int16(cfg['kp'] * 1000.0)   # mit_kp: 0.001(A/deg)/LSB
-        buf[12 + i2] = clamp_int16(cfg['kp'] * 1000.0)
-        buf[16 + i1] = clamp_int16(cfg['kd'] * 10000.0)  # mit_kd: 0.0001(A/rpm)/LSB
-        buf[16 + i2] = clamp_int16(cfg['kd'] * 10000.0)
-        buf[20 + i1] = clamp_int16((cfg['current_ff'] + kick1) * 1000.0)  # mit_current_ff: 0.001A/LSB
-        buf[20 + i2] = clamp_int16((cfg['current_ff'] + kick2) * 1000.0)
+
+        if self.robomas_velocity_mode_:
+            # joyの直接速度指令モード(2026-09-09追加、ファイル冒頭のrobomas_velocity_mode
+            # 宣言部コメント参照)。位置PD制御ではなくfirmware側の速度PID
+            # (vel_kp/vel_ki/vel_kd、robomas.cppのROBOMAS_MODE_VELOCITY分岐)に
+            # target_rpmを直接渡す。current_ff・動き出しキックは速度モードには
+            # 無い(firmware側のスロット未対応)ため適用しない。
+            m1_rpm, m2_rpm = self._velocity_mode_target_rpm(cfg)
+            buf[i1] = clamp_int16(m1_rpm * 1.0)      # target: 1rpm/LSB、生値スケール無し
+            buf[i2] = clamp_int16(m2_rpm * 1.0)
+            buf[4 + i1] = ROBOMAS_MODE_VELOCITY
+            buf[4 + i2] = ROBOMAS_MODE_VELOCITY
+            for i in (i1, i2):
+                buf[ROBOMAS_VEL_SLOT_KP + i] = clamp_int16(self.robomas_vel_kp_ / ROBOMAS_VEL_KP_LSB)
+                buf[ROBOMAS_VEL_SLOT_KI + i] = clamp_int16(self.robomas_vel_ki_ / ROBOMAS_VEL_KI_LSB)
+                buf[ROBOMAS_VEL_SLOT_KD + i] = clamp_int16(self.robomas_vel_kd_ / ROBOMAS_VEL_KD_LSB)
+                buf[ROBOMAS_VEL_SLOT_MAX_CURRENT + i] = clamp_int16(
+                    self.robomas_vel_max_current_a_ / ROBOMAS_VEL_MAX_CURRENT_LSB)
+        else:
+            z_offset = self.get_parameter('robomas_z_offset_m').value
+            r_offset = self.get_parameter('robomas_r_offset_m').value
+            # real_joint_bridge_nodeの z = mix_k*(m1+m2) + z_offset_m の逆変換
+            # (joint側の値からモータ側の生の変位を求めるため、ここではoffsetを引く)。
+            z = self.pos_[cfg['z_joint']] - z_offset
+            r = self.pos_[cfg['r_joint']] - r_offset
+            z_vel = self.vel_[cfg['z_joint']]
+            r_vel = self.vel_[cfg['r_joint']]
+
+            m1 = (z + r) / (2.0 * cfg['mix_k'])
+            m2 = (z - r) / (2.0 * cfg['mix_k'])
+            m1_vel = (z_vel + r_vel) / (2.0 * cfg['mix_k'])
+            m2_vel = (z_vel - r_vel) / (2.0 * cfg['mix_k'])
+
+            m1_deg = cfg['motor1_sign'] * math.degrees(m1 / cfg['pulley_radius_m'])
+            m2_deg = cfg['motor2_sign'] * math.degrees(m2 / cfg['pulley_radius_m'])
+            m1_rpm = cfg['motor1_sign'] * (m1_vel / cfg['pulley_radius_m']) * (60.0 / (2.0 * math.pi))
+            m2_rpm = cfg['motor2_sign'] * (m2_vel / cfg['pulley_radius_m']) * (60.0 / (2.0 * math.pi))
+
+            # 動き出しキック(静止摩擦補償)。motor1_sign/motor2_signを適用済みの
+            # 符号付き速度(実際にモータへ流す電流の符号と揃える)で、モータごとに
+            # 独立して停止->動き出しの遷移を検出する(_compute_kick_current参照)。
+            m1_signed_vel = cfg['motor1_sign'] * m1_vel
+            m2_signed_vel = cfg['motor2_sign'] * m2_vel
+            kick1 = self._compute_kick_current(1, m1_signed_vel, cfg)
+            kick2 = self._compute_kick_current(2, m2_signed_vel, cfg)
+
+            buf[i1] = clamp_int16(m1_deg * 1.0)          # target: 1deg/LSB(アクチュエータ軸)
+            buf[i2] = clamp_int16(m2_deg * 1.0)
+            buf[4 + i1] = ROBOMAS_MODE_MIT
+            buf[4 + i2] = ROBOMAS_MODE_MIT
+            buf[8 + i1] = clamp_int16(m1_rpm * 1.0)      # mit_velocity_ff: 1rpm/LSB
+            buf[8 + i2] = clamp_int16(m2_rpm * 1.0)
+            buf[12 + i1] = clamp_int16(cfg['kp'] * 1000.0)   # mit_kp: 0.001(A/deg)/LSB
+            buf[12 + i2] = clamp_int16(cfg['kp'] * 1000.0)
+            buf[16 + i1] = clamp_int16(cfg['kd'] * 10000.0)  # mit_kd: 0.0001(A/rpm)/LSB
+            buf[16 + i2] = clamp_int16(cfg['kd'] * 10000.0)
+            buf[20 + i1] = clamp_int16((cfg['current_ff'] + kick1) * 1000.0)  # mit_current_ff: 0.001A/LSB
+            buf[20 + i2] = clamp_int16((cfg['current_ff'] + kick2) * 1000.0)
 
         # tip_theta(M3)はz/rの差動ミックスとは独立した単独直接駆動
         # (_publish_cubemars_commandsのroot_theta単軸パターンと同型、2026-09-08新規)。

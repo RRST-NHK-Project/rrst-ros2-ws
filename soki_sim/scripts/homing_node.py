@@ -78,13 +78,23 @@ ros2can側の前提:
     真値(z_ref_value_m/r_ref_value_m)は実測が必要。実機で少しずつ検証しながら
     調整すること。低速(デフォルト30rpm)・タイムアウト(デフォルト20秒)を
     必ず設定した状態で試すこと。
+
+速度モード(motor1/motor2を直接駆動する本ノードの制御方式)のPIDゲイン
+(robomas_vel_kp/ki/kd)・電流上限(robomas_vel_max_current_a)は、2026-09-09までは
+firmware(robomas.cpp)のconfig.hppに焼き込まれたコンパイル時固定値だったが、
+MITモードのkp/kd/current_ffと同様に毎周期CAN経由でROSから送る可変値にした
+(ros2 param set homing_node robomas_vel_kp 0.8 等でホーミング実行中でも変更でき、
+_send_velocity/_on_set_parameters参照)。joy操作を将来的にMIT位置モードでは
+なく速度モードへ切り替える構想(2026-09-09)で、ファームウェア再書き込み無しに
+速度PIDと電流上限を実機で試行錯誤できるようにする狙い。既定値は従来の
+config.hpp M2006セクションの値(Kp=0.8, Ki=0.0, Kd=0.0, 電流上限=1.0A)のまま。
 """
 
 import math
 import time
 
 import rclpy
-from rcl_interfaces.msg import Parameter, ParameterType, ParameterValue
+from rcl_interfaces.msg import Parameter, ParameterType, ParameterValue, SetParametersResult
 from rcl_interfaces.srv import SetParameters
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile
@@ -106,6 +116,27 @@ SLOT_COUNT = 24
 # ROBOMASの帰還(angle)スケール。real_joint_bridge_node.py/trajectory_follower_node.pyの
 # ROBOMAS_FEEDBACK_POSITION_SCALE_DEGと一致させること(0.1deg/LSB、robomas.cpp参照)。
 ROBOMAS_FEEDBACK_POSITION_SCALE_DEG = 0.1
+
+# 速度モード用ゲイン・電流上限スロット(2026-09-09追加。以前はtarget(0-3)しか
+# 埋めていなかったが、robomas.cpp側がMIT用に空いていた8-23を速度モードのKp/Ki/Kd・
+# 電流上限として読むようになったため、ここも毎周期送る必要がある。送らない
+# (全ゼロの)場合、firmware側はKp=Ki=Kd=電流上限=0とみなし出力常に0になる
+# (config.hpp「速度モード ゲイン/電流上限のROS可変スロット」参照)。
+# LSBスケールはconfig.hppのROBOMAS_VEL_*_LSBと一致させること。
+VEL_SLOT_KP = 8
+VEL_SLOT_KI = 12
+VEL_SLOT_KD = 16
+VEL_SLOT_MAX_CURRENT = 20
+ROBOMAS_VEL_KP_LSB = 0.001
+ROBOMAS_VEL_KI_LSB = 0.001
+ROBOMAS_VEL_KD_LSB = 0.0000005
+ROBOMAS_VEL_MAX_CURRENT_LSB = 0.001
+
+INT16_MIN, INT16_MAX = -32768, 32767
+
+
+def clamp_int16(value: float) -> int:
+    return max(INT16_MIN, min(INT16_MAX, int(round(value))))
 
 
 class HomingNode(Node):
@@ -134,6 +165,17 @@ class HomingNode(Node):
         self.declare_parameter('mix_k', 0.5)
         self.declare_parameter('motor1_sign', 1.0)
         self.declare_parameter('motor2_sign', 1.0)
+
+        # ---- 速度モードのゲイン・電流上限 (2026-09-09追加) ----
+        # firmware(robomas.cpp)側が毎周期CAN経由で読む可変値。以前はfirmware側の
+        # config.hpp(ROBOMAS_KP_VEL等)に焼き込まれたコンパイル時固定値だったが、
+        # MITモードのkp/kd/current_ffと同様にROSから調整できるようにした
+        # (_send_velocity参照)。既定値はconfig.hpp M2006セクションの従来値
+        # (Kp=0.8, Ki=0.0, Kd=0.0, 電流上限=1.0A)に合わせてある。
+        self.declare_parameter('robomas_vel_kp', 0.8)
+        self.declare_parameter('robomas_vel_ki', 0.0)
+        self.declare_parameter('robomas_vel_kd', 0.0)
+        self.declare_parameter('robomas_vel_max_current_a', 1.0)
 
         # ---- ホーミング動作パラメータ(要実機調整) ----
         self.declare_parameter('homing_velocity_rpm', 30.0)
@@ -166,6 +208,11 @@ class HomingNode(Node):
         self.mix_k_ = gp('mix_k').value
         self.motor1_sign_ = gp('motor1_sign').value
         self.motor2_sign_ = gp('motor2_sign').value
+
+        self.vel_kp_ = gp('robomas_vel_kp').value
+        self.vel_ki_ = gp('robomas_vel_ki').value
+        self.vel_kd_ = gp('robomas_vel_kd').value
+        self.vel_max_current_a_ = gp('robomas_vel_max_current_a').value
 
         self.homing_velocity_rpm_ = gp('homing_velocity_rpm').value
         self.homing_timeout_sec_ = gp('homing_timeout_sec').value
@@ -220,6 +267,13 @@ class HomingNode(Node):
         self.create_service(Trigger, 'skip_homing', self._on_skip_homing)
 
         self.create_timer(control_period, self._on_tick)
+
+        # robomas_vel_kp/ki/kd/max_current_aは起動時にself.vel_*_へ取り込んだ後は
+        # 参照されないため、GUI/ros2 param setで変更してもホーミング実行中に
+        # 反映されない(trajectory_follower_node.pyの_on_set_parametersと同じ理由)。
+        # キャッシュ側も更新することで、ホーミング中でも次回の_send_velocityから
+        # 新しい値が反映されるようにする。
+        self.add_on_set_parameters_callback(self._on_set_parameters)
 
         self.get_logger().info(
             f'homing_node started (idle): z_sw=slot{self.z_sw_slot_}, r_sw=slot{self.r_sw_slot_}, '
@@ -368,6 +422,20 @@ class HomingNode(Node):
 
         client.call_async(Trigger.Request()).add_done_callback(_done)
 
+    # ---------------- パラメータ ----------------
+
+    def _on_set_parameters(self, params):
+        for p in params:
+            if p.name == 'robomas_vel_kp':
+                self.vel_kp_ = float(p.value)
+            elif p.name == 'robomas_vel_ki':
+                self.vel_ki_ = float(p.value)
+            elif p.name == 'robomas_vel_kd':
+                self.vel_kd_ = float(p.value)
+            elif p.name == 'robomas_vel_max_current_a':
+                self.vel_max_current_a_ = float(p.value)
+        return SetParametersResult(successful=True)
+
     # ---------------- センサ購読 ----------------
 
     def _on_can_host(self, msg: Int32MultiArray):
@@ -439,6 +507,15 @@ class HomingNode(Node):
         data = [0] * SLOT_COUNT
         data[self.robomas_motor1_index_] = int(motor1_rpm)
         data[self.robomas_motor2_index_] = int(motor2_rpm)
+        # 速度モードのKp/Ki/Kd・電流上限も毎回送る(送らない=全ゼロのままだと
+        # firmware側は出力常に0とみなし、target(上記)を送っても動かない。
+        # config.hpp「速度モード ゲイン/電流上限のROS可変スロット」参照)。
+        for motor_index in (self.robomas_motor1_index_, self.robomas_motor2_index_):
+            data[VEL_SLOT_KP + motor_index] = clamp_int16(self.vel_kp_ / ROBOMAS_VEL_KP_LSB)
+            data[VEL_SLOT_KI + motor_index] = clamp_int16(self.vel_ki_ / ROBOMAS_VEL_KI_LSB)
+            data[VEL_SLOT_KD + motor_index] = clamp_int16(self.vel_kd_ / ROBOMAS_VEL_KD_LSB)
+            data[VEL_SLOT_MAX_CURRENT + motor_index] = clamp_int16(
+                self.vel_max_current_a_ / ROBOMAS_VEL_MAX_CURRENT_LSB)
         msg = Int16MultiArray()
         msg.data = data
         self.tx_pub_.publish(msg)

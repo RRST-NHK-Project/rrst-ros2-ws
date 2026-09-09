@@ -260,6 +260,16 @@ class JoyTeleopNode(Node):
         self.declare_parameter('r_speed', 0.2)       # m/s (フル入力時)
         self.declare_parameter('tip_theta_speed', 1.0)  # rad/s (フル入力時、2026-09-03追加)
         self.declare_parameter('xy_speed', 0.2)         # m/s (フル入力時、2026-09-03追加)
+        # z/rのjoy出力を位置目標(target_z_/target_r_を積分してjoint_targetsへ)
+        # ではなく、trajectory_follower_nodeの速度モード(robomas_velocity_mode)
+        # 向けにスティック入力をそのまま速度指令(joint_velocity_targets)として
+        # 送るモード(2026-09-09追加、command_gui_nodeの「joy速度指令モード」
+        # チェックボックスから切り替える想定)。XY移動モード中はr_joint/theta側は
+        # このモードの対象外(XY変換のみ、_timer_callback参照)。ONの間、z_speed_/
+        # r_speed_はそのまま「フル入力時の速度[m/s]」としてtarget_z_/target_r_の
+        # 積分ではなく直接の速度指令値に使う(既存のレート方式と単位を揃えるため
+        # 新規パラメータは追加しない)。
+        self.declare_parameter('velocity_mode_enabled', False)
         self.declare_parameter('deadzone', 0.15)
         self.declare_parameter('update_rate_hz', 50.0)
         # ポンプON/OFFトグル用ボタン(2026-09-03追加、同日△ボタンへ再割当)。
@@ -322,6 +332,7 @@ class JoyTeleopNode(Node):
         self.r_speed_ = float(self.get_parameter('r_speed').value)
         self.tip_theta_speed_ = float(self.get_parameter('tip_theta_speed').value)
         self.xy_speed_ = float(self.get_parameter('xy_speed').value)
+        self.velocity_mode_enabled_ = bool(self.get_parameter('velocity_mode_enabled').value)
         self.deadzone_ = float(self.get_parameter('deadzone').value)
         update_rate_hz = float(self.get_parameter('update_rate_hz').value)
         self.dt_ = 1.0 / update_rate_hz
@@ -349,6 +360,10 @@ class JoyTeleopNode(Node):
 
         self.latest_joy_ = None
         self.pub_ = self.create_publisher(JointState, 'joint_targets', 10)
+        # velocity_mode_enabled中、z/rの速度指令をtrajectory_follower_nodeへ送る
+        # (joint_targetsとは別トピック、trajectory_follower_node.pyの
+        # _on_velocity_targets参照)。
+        self.vel_pub_ = self.create_publisher(JointState, 'joint_velocity_targets', 10)
         self.create_subscription(Joy, 'joy', self._on_joy, 10)
         self.create_subscription(JointState, 'mixed_joint_states', self._on_mixed_joint_state, 10)
         self.timer_ = self.create_timer(self.dt_, self._timer_callback)
@@ -471,6 +486,8 @@ class JoyTeleopNode(Node):
                 self.r_speed_ = float(p.value)
             elif p.name == 'xy_speed':
                 self.xy_speed_ = float(p.value)
+            elif p.name == 'velocity_mode_enabled':
+                self.velocity_mode_enabled_ = bool(p.value)
         return SetParametersResult(successful=True)
 
     def _on_joy(self, msg: Joy):
@@ -745,11 +762,24 @@ class JoyTeleopNode(Node):
 
         names = []
         positions = []
+        vel_names = []
+        vel_values = []
 
         # レート方式。入力が中立/デッドマン未押下の間は目標を現在値に同期する
         # だけでpublishに含めない(離した位置を保持する。autoモードの動作を
         # 妨げず、モード切替時の急変も防ぐ)。
-        if enabled and z_in != 0.0:
+        if self.velocity_mode_enabled_:
+            # joy速度指令モード(2026-09-09追加、declare_parameter部コメント参照)。
+            # target_z_を積分せず、スティック入力をそのまま速度[m/s]として毎周期
+            # 送る(離せば0を送り続けて実機側の速度PIDでブレーキがかかる、
+            # trajectory_follower_node.py _velocity_mode_target_rpm参照)。
+            # 位置モードへ戻したときに違和感なく再開できるよう、target_z_は
+            # 引き続き実位置に同期しておく。
+            vel_names.append('z_joint')
+            vel_values.append(z_in * self.z_speed_ if enabled else 0.0)
+            if self.has_current_state_:
+                self.target_z_ = self._current_z_
+        elif enabled and z_in != 0.0:
             self.target_z_ = clamp(self.target_z_ + z_in * self.z_speed_ * self.dt_, Z_LOWER, Z_UPPER)
             names.append('z_joint')
             positions.append(self.target_z_)
@@ -786,7 +816,15 @@ class JoyTeleopNode(Node):
             elif self.has_current_state_:
                 self.target_theta_ = self._current_theta_
 
-            if enabled and r_in != 0.0:
+            if self.velocity_mode_enabled_:
+                # z_jointと同じ理由(velocity_mode_enabled_の分岐参照)。XY移動
+                # モード中はr_jointがXY変換側で扱われるため、ここ(関節モード)
+                # でのみ速度指令化する。
+                vel_names.append('r_joint')
+                vel_values.append(r_in * self.r_speed_ if enabled else 0.0)
+                if self.has_current_state_:
+                    self.target_r_ = self._current_r_
+            elif enabled and r_in != 0.0:
                 self.target_r_ = clamp(
                     self.target_r_ + r_in * self.r_speed_ * self.dt_, R_LOWER, R_UPPER)
                 names.append('r_joint')
@@ -812,6 +850,13 @@ class JoyTeleopNode(Node):
             positions.append(self.target_tip_theta_)
         elif self.has_tip_theta_state_:
             self.target_tip_theta_ = self._current_tip_theta_
+
+        if vel_names:
+            vel_out = JointState()
+            vel_out.header.stamp = self.get_clock().now().to_msg()
+            vel_out.name = vel_names
+            vel_out.velocity = vel_values
+            self.vel_pub_.publish(vel_out)
 
         if not names:
             return

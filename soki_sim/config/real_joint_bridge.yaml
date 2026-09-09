@@ -119,10 +119,10 @@ trajectory_follower_node:
     z_upper_limit_switch_local_index: 1
     r_lower_limit_switch_device_id: 101
     r_lower_limit_switch_node_index: 1
-    r_lower_limit_switch_local_index: 1
+    r_lower_limit_switch_local_index: 0
     r_upper_limit_switch_device_id: 101
     r_upper_limit_switch_node_index: 1
-    r_upper_limit_switch_local_index: 0
+    r_upper_limit_switch_local_index: 1
 
 # limit_switch_marker_node のパラメータ(2026-09-09追加、rvizへのz/rリミット
 # スイッチ位置表示用)。device_id/node_index/local_indexは上のtrajectory_follower_node
@@ -148,10 +148,10 @@ limit_switch_marker_node:
 
     r_lower_limit_switch_device_id: 101
     r_lower_limit_switch_node_index: 1
-    r_lower_limit_switch_local_index: 1
+    r_lower_limit_switch_local_index: 0
     r_lower_limit_switch_position_m: 0.135  # homing_node節のr_ref_value_mと一致させる
 
     r_upper_limit_switch_device_id: 101
     r_upper_limit_switch_node_index: 1
-    r_upper_limit_switch_local_index: 0
+    r_upper_limit_switch_local_index: 1
     r_upper_limit_switch_position_m: 0.50975  # 要実測。soki_sim.urdf.xacroのr_upper流用
