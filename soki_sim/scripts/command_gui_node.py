@@ -2812,7 +2812,16 @@ class CommandGuiApp(QWidget):
         # 起動構成次第で一部の関節だけのことがある(例: root_thetaのみ)ため、
         # 軌道生成パラメータパネルと同じく実際のjoint_names順に読込・適用する。
         box = QGroupBox('MITゲイン (実機CubeMars、trajectory_follower_node)')
-        grid = QGridLayout(box)
+        outer = QVBoxLayout(box)
+        note = QLabel()
+        note.setWordWrap(True)
+        _set_status(note, 'cubemars_velocity_mode(速度指令モード)中はKpは0に上書きされ、\n'
+                          'Kdだけで速度追従する(ジョグしていない間の位置保持はKpが有効)。', 'muted')
+        outer.addWidget(note)
+        grid_widget = QWidget()
+        outer.addWidget(grid_widget)
+        grid = QGridLayout(grid_widget)
+        grid.setContentsMargins(0, 0, 0, 0)
         grid.addWidget(QLabel('Kp'), 0, 1)
         grid.addWidget(QLabel('Kd'), 0, 2)
         grid.addWidget(QLabel('torque_ff'), 0, 3)
@@ -2977,26 +2986,33 @@ class CommandGuiApp(QWidget):
         _set_status(self.hand_offset_status_label, text, 'success')
 
     def _build_velocity_mode_panel(self, column):
-        # joyのz/r出力を位置目標(台形プロファイル経由のMIT位置PD制御)ではなく、
-        # trajectory_follower_nodeの速度モード(firmware側の速度PID、robomas_vel_kp/
-        # ki/kd/max_current_a)へ直接の速度指令として送るモード(2026-09-09追加、
-        # note/note_soki/hardware_mapping.txt参照)。位置モードより応答が速い反面、
-        # 速度PIDのチューニング状況に依存する。チェックはjoy_teleop_node
-        # (velocity_mode_enabled)とtrajectory_follower_node(robomas_velocity_mode)
-        # 両方のパラメータを同時に切り替える(両者が揃っていないと、joyの速度指令が
-        # 送られてもtrajectory_follower_node側は位置モードのままで無視される)。
-        box = QGroupBox('joy速度指令モード')
+        # joyのz/r/root_theta/tip_theta出力を位置目標(台形プロファイル経由の
+        # MIT位置PD制御)ではなく、trajectory_follower_nodeの速度モードへ直接の
+        # 速度指令として送るモード(2026-09-09追加、2026-09-10、manual_vel
+        # ブランチでroot_theta(cubemars_velocity_mode)・tip_theta(robomas_
+        # velocity_modeにz/rと相乗り)にも拡張。ユーザー指定:「このブランチでは
+        # すべてのモーターを速度制御する」。note/note_soki/hardware_mapping.txt
+        # 参照)。位置モードより応答が速い反面、速度ゲイン(z/r/tip_theta:
+        # robomas_vel_kp/ki/kd/max_current_a、root_theta: cubemars_kd)の
+        # チューニング状況に依存する。チェックはjoy_teleop_node
+        # (velocity_mode_enabled)とtrajectory_follower_node(robomas_velocity_mode・
+        # cubemars_velocity_mode)を同時に切り替える(揃っていないと、joyの速度
+        # 指令が送られてもtrajectory_follower_node側は位置モードのままで無視
+        # される)。
+        box = QGroupBox('joy速度指令モード(全モーター)')
         layout = QVBoxLayout(box)
 
         desc = QLabel()
         desc.setWordWrap(True)
-        _set_status(desc, 'チェックを入れると、joyのz/rスティック入力(関節モード時のみ、\n'
-                          'XY移動モード中のr軸は対象外)を位置目標ではなく速度指令として\n'
-                          '直接送る。速度PID(robomas_vel_kp/ki/kd/max_current_a、ros2 param\n'
-                          'setで調整)のチューニング状況に応答が依存する。', 'muted')
+        _set_status(desc, 'チェックを入れると、joyのL2/R2(root_theta)・右スティック\n'
+                          '(z/tip_theta)・左スティック上下(r)の入力を位置目標ではなく\n'
+                          '速度指令として直接送る(manual_velブランチの既定)。速度ゲイン\n'
+                          '(z/r/tip_theta: robomas_vel_kp/ki/kd/max_current_a、root_theta:\n'
+                          'cubemars_kd、いずれもros2 param setで調整)のチューニング状況に\n'
+                          '応答が依存する。', 'muted')
         layout.addWidget(desc)
 
-        self.velocity_mode_check = QCheckBox('joy出力を速度指令にする')
+        self.velocity_mode_check = QCheckBox('joy出力を速度指令にする(全モーター)')
         # 既定ON(2026-09-09、手動移動にフォーカスするmanualブランチでの方針変更。
         # joy_teleop_node/trajectory_follower_node双方のデフォルトも合わせて
         # trueにしてあるので、ここはノードの実際の既定値に表示を揃えているだけ)。
@@ -3013,7 +3029,8 @@ class CommandGuiApp(QWidget):
 
     def _on_velocity_mode_toggled(self, checked):
         ok_traj = self.node.set_node_params(
-            TRAJ_NODE_NAME, {'robomas_velocity_mode': checked}, self._apply_velocity_mode_result)
+            TRAJ_NODE_NAME, {'robomas_velocity_mode': checked, 'cubemars_velocity_mode': checked},
+            self._apply_velocity_mode_result)
         ok_joy = self.node.set_node_params(
             JOY_NODE_NAME, {'velocity_mode_enabled': checked}, self._apply_velocity_mode_result)
         if not (ok_traj and ok_joy):

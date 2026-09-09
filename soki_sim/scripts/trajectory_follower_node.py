@@ -102,6 +102,16 @@ CUBEMARS_POSITION_SCALE_DEG = 0.1  # 帰還/MIT指令とも0.1deg/LSB(cubemars.c
 CUBEMARS_MODE_SET_ORIGIN = 3  # ros2can/firmware/.../cubemars.cppのcontrol_mode enumと一致させること
 CUBEMARS_ORIGIN_MODE_PERMANENT = 1  # target流用: 0=一時原点/1=永久原点(フラッシュ保存)/2=デフォルト復元
 CUBEMARS_SLOT_COUNT = 24
+# CubeMars MITモードの指令可能範囲(アクチュエータ軸、±12.5rad固定。マニュアル/
+# joy_teleop_node.pyのROOT_THETA_LIMIT算出と同じ値)。位置モード中はjoy_teleop_
+# node側のクランプ(target_theta_の積分をROOT_THETA_LOWER/UPPERでclamp)が
+# ソフト上の可動域リミットとして働いていたが、速度モード(cubemars_velocity_mode、
+# manual_velブランチ新規)では位置を積分しないためこのクランプが効かない。
+# root_thetaにはz/rのような物理リミットスイッチも無いため、ここ
+# (_publish_cubemars_commands)でこの範囲を超える方向への速度指令を自前で
+# ブロックしないと、配線に無理な巻き込みが起きるまで回り続けてしまう
+# (root_thetaは過去に配線の極性ミスで一度焼損した実績がある関節、note参照)。
+CUBEMARS_ACTUATOR_ANGLE_LIMIT_RAD = 12.5
 # ソフト緊急停止解除直後、MITのkpをここで指定する秒数かけて0→設定値まで
 # 線形に立ち上げる(2026-09-09追加)。物理緊急停止と併用する運用(モーター電源が
 # 切れている間、保持トルクが無いためroot_thetaを手で動かしたり機体ごと移動させる
@@ -314,6 +324,20 @@ class TrajectoryFollowerNode(Node):
         # 無視していたが、GUI/paramでmax_velocityを変えても速度モードだけ効かないのが
         # 分かりにくいとのユーザー指摘で変更した)。
         self.declare_parameter('robomas_velocity_mode', True)
+        # root_theta(CubeMars)の速度モード(manual_velブランチ新規、2026-09-10)。
+        # ユーザー指定:「このブランチではすべてのモーターを速度制御する」。
+        # robomas_velocity_modeと同じ考え方(既定True)。CubeMars MITフレームには
+        # 元々kp/kd/pos_des/vel_des/torque_ffが1フレームに乗っているため、firmware
+        # 変更・新規CAN slot確保なしで実現できる: ONの間はkpを0にしてmit_velocityの
+        # みで駆動する(kp*(p_des-p)の項が消えるため、pos_(開ループのシミュレーション
+        # 位置)が実位置とズレていても絶対位置コマンドとして悪さをしない。これまでの
+        # 「pos_が実位置とズレたまま送られて根本θが暴走する」系のバグは全てこの
+        # p_des絶対位置指令に起因していたため、構造的に同じ問題が起きなくなる)。
+        # OFFの間(ジョグしていない=保持中)は従来通りcfg['kp']でのMIT位置保持に
+        # なる。この保持中は継続的に実機帰還へ同期する(_on_cubemars_feedback参照)
+        # ため、切り替わった瞬間には常に現在地を保持するだけで、古い目標へ
+        # 動き出すことはない。
+        self.declare_parameter('cubemars_velocity_mode', True)
         self.declare_parameter('robomas_vel_kp', 0.8)
         self.declare_parameter('robomas_vel_ki', 0.0)
         self.declare_parameter('robomas_vel_kd', 0.0)
@@ -405,9 +429,36 @@ class TrajectoryFollowerNode(Node):
         self.target_ = dict(self.pos_)
         self.has_target_ = False
 
+        # manual_velブランチ: 全モーター(root_theta/tip_theta/z/r)を速度指令で
+        # 手動操作できるようにする共通インフラ(2026-09-10新規)。以前はz/r
+        # (robomas_)専用に_setup_robomas_outputs内でのみ用意していたが、
+        # root_theta(cubemars_)・tip_theta(robomas_内だがz/rの差動ミックスとは
+        # 独立)も同じ仕組みに乗せるため、robomas_の有無に関わらず先に用意して
+        # おき、_setup_cubemars_outputs/_setup_robomas_outputsがそれぞれ自分の
+        # 担当関節のキーを追加する。
+        #   _velocity_targets_/_velocity_targets_stamp_: joy_teleop_nodeからの
+        #     joint_velocity_targets(関節空間の目標速度)の最新値と受信時刻
+        #     (VELOCITY_TARGET_STALE_SEC超で途絶とみなし0指令にする)。
+        #   _velocity_mode_cmd_: 速度モードでも位置モードと同じmax_velocity/
+        #     max_acceleration/max_decelerationを効かせるためのスルーレート制限
+        #     状態(_slew_velocity参照)。
+        #   low_speed_active/low_speed_multiplier_: SHAREボタン低速モード
+        #     (joy_teleop_node発)。全速度モード関節に共通で効かせる。
+        self._velocity_targets_ = {}
+        self._velocity_targets_stamp_ = None
+        self._velocity_mode_cmd_ = {}
+        # low_speed_multiplierのdeclare_parameter自体はパラメータ宣言セクション
+        # (declare_parameter('robomas_velocity_mode', ...)の並び)に既にある。
+        self.low_speed_multiplier_ = float(self.get_parameter('low_speed_multiplier').value)
+        self._low_speed_active_ = False
+        low_speed_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self.create_subscription(Bool, 'low_speed_active', self._on_low_speed_active, low_speed_qos)
+
         self._setup_cubemars_outputs()
         self._setup_robomas_outputs()
         self._setup_limit_switches()
+        self.create_subscription(
+            JointState, 'joint_velocity_targets', self._on_velocity_targets, 10)
         self.create_service(Trigger, 'set_root_theta_origin', self._on_set_root_theta_origin)
 
         # ---- ソフト緊急停止 (2026-09-08追加、CAN_HOST(device_id=101)実機の赤色状態
@@ -533,6 +584,13 @@ class TrajectoryFollowerNode(Node):
         # ソフト緊急停止解除時のkpランプ開始時刻(name -> monotonic時刻、ランプ
         # 中でなければNone)。CUBEMARS_KP_RAMP_SEC宣言部のコメント参照。
         self._cubemars_kp_ramp_start_ = {name: None for name in self.cubemars_}
+        # 速度モード(cubemars_velocity_mode宣言部のコメント参照)。__init__冒頭で
+        # 用意済みの共通インフラ(_velocity_targets_/_velocity_mode_cmd_)へ、
+        # このノードが担当するcubemars関節ぶんのキーを追加する。
+        self.cubemars_velocity_mode_ = bool(self.get_parameter('cubemars_velocity_mode').value)
+        for name in self.cubemars_:
+            self._velocity_targets_[name] = 0.0
+            self._velocity_mode_cmd_[name] = 0.0
 
     def _on_cubemars_feedback(self, msg: Int32MultiArray, device_id: int):
         self._last_cubemars_raw_[device_id] = msg.data
@@ -589,7 +647,14 @@ class TrajectoryFollowerNode(Node):
                 continue
             raw_deg = msg.data[cfg['motor_index']] * CUBEMARS_POSITION_SCALE_DEG
             joint_rad = math.radians(raw_deg) / cfg['reduction']
-            if self._cubemars_joint_has_target_.get(name, False) and not self.estop_active_:
+            # 速度モードで駆動中(_joint_in_velocity_mode)は、pos_/vel_をこの関節の
+            # CAN指令に一切使わない(_publish_cubemars_commands参照)ため、
+            # 常時無条件で実機帰還に同期しておく(2026-09-10追加、
+            # timer_callbackのtrap_stepスキップと対になる処理。位置保持モードへ
+            # 戻った瞬間に「速度モード中trap_stepが裏で進めていた古いpos_」を
+            # 使ってしまう事故を防ぐ)。
+            if (self._cubemars_joint_has_target_.get(name, False) and not self.estop_active_
+                    and not self._joint_in_velocity_mode(name)):
                 holding_still = abs(self.vel_.get(name, 0.0)) < CUBEMARS_HOLDING_VEL_LIMIT_RADPS
                 if not holding_still or abs(self.pos_[name] - joint_rad) <= CUBEMARS_POS_DIVERGENCE_LIMIT_RAD:
                     continue
@@ -675,6 +740,8 @@ class TrajectoryFollowerNode(Node):
                 'kd': float(self.get_parameter('robomas_tip_theta_kd').value),
                 'current_ff': float(self.get_parameter('robomas_tip_theta_current_ff').value),
             }
+            self._velocity_targets_[tip_theta_name] = 0.0
+            self._velocity_mode_cmd_[tip_theta_name] = 0.0
 
         self.robomas_pub_ = self.create_publisher(
             Int16MultiArray, f'serial_tx_{device_id}', 10)
@@ -690,29 +757,13 @@ class TrajectoryFollowerNode(Node):
         self.robomas_vel_ki_ = float(self.get_parameter('robomas_vel_ki').value)
         self.robomas_vel_kd_ = float(self.get_parameter('robomas_vel_kd').value)
         self.robomas_vel_max_current_a_ = float(self.get_parameter('robomas_vel_max_current_a').value)
-        # 低速モード(SHAREボタン、joy_teleop_node側)の倍率とON/OFF状態
-        # (low_speed_multiplier宣言部のコメント参照)。joy_teleop_node発の
-        # low_speed_active(latched)を購読し、ONの間は_slew_velocityのmax_vへ
-        # この倍率を掛けて実際の速度モード上限を下げる。
-        self.low_speed_multiplier_ = float(self.get_parameter('low_speed_multiplier').value)
-        self._low_speed_active_ = False
-        low_speed_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
-        self.create_subscription(Bool, 'low_speed_active', self._on_low_speed_active, low_speed_qos)
-        # joy_teleop_nodeからのjoint_velocity_targets(m/s、joint空間)の最新値と
-        # 受信時刻(ROBOMAS_VELOCITY_TARGET_STALE_SEC超で途絶とみなし0指令にする、
-        # _velocity_mode_target_rpm参照)。
-        self._velocity_targets_ = {z_name: 0.0, r_name: 0.0}
-        self._velocity_targets_stamp_ = None
-        # 速度モードでも位置モードと同じmax_velocity/max_acceleration/
-        # max_decelerationを効かせるためのスルーレート制限状態(前周期に実際に
-        # 指令したz/r速度[m/s])。_slew_velocity/_reset_velocity_mode_slew参照。
-        # 以前は速度モード中このリミットを完全に無視してスティック速度(z_speed/
-        # r_speed)を直結していたが、GUI/paramでmax_velocityを変えても速度モードだけ
-        # 反映されない挙動が分かりにくいとのユーザー指摘により、速度モードでも
-        # クランプ・ランプするよう変更した(2026-09-09)。
-        self._velocity_mode_cmd_ = {z_name: 0.0, r_name: 0.0}
-        self.create_subscription(
-            JointState, 'joint_velocity_targets', self._on_velocity_targets, 10)
+        # z/rの速度目標・スルーレート状態は__init__冒頭で共通インフラとして
+        # 用意済み(_velocity_targets_/_velocity_mode_cmd_宣言部のコメント参照)。
+        # ここではこの2関節ぶんのキーを追加するだけでよい。
+        self._velocity_targets_[z_name] = 0.0
+        self._velocity_targets_[r_name] = 0.0
+        self._velocity_mode_cmd_[z_name] = 0.0
+        self._velocity_mode_cmd_[r_name] = 0.0
 
     def _setup_limit_switches(self):
         """z/r軸それぞれの上限・下限リミットスイッチ(CAN_HOST経由)を監視する。
@@ -834,6 +885,22 @@ class TrajectoryFollowerNode(Node):
             cfg['r_joint']: cfg['mix_k'] * (m1 - m2) + r_offset,
         }
 
+    def _joint_in_velocity_mode(self, name):
+        """nameが現在、速度モード(cubemars_velocity_mode/robomas_velocity_mode、
+        manual_velブランチ新規)で駆動されているかを返す。timer_callbackの
+        trap_stepスキップ判定と、_on_cubemars_feedback/_on_robomas_feedbackの
+        「速度モード中も継続的に実機帰還へ同期する」判定の両方で使う共通ロジック。
+        z_joint/r_joint/tip_theta_jointはrobomas_velocity_mode(既存)で、
+        root_theta_jointはcubemars_velocity_mode(新規)で、それぞれ一括制御する。"""
+        if name in self.cubemars_:
+            return self.cubemars_velocity_mode_
+        if self.robomas_ is not None:
+            tip_cfg = self.robomas_.get('tip_theta')
+            if (name == self.robomas_['z_joint'] or name == self.robomas_['r_joint']
+                    or (tip_cfg is not None and name == tip_cfg['joint'])):
+                return self.robomas_velocity_mode_
+        return False
+
     def _on_robomas_feedback(self, msg: Int32MultiArray):
         # _on_cubemars_feedbackと同じ理由(起動直後の位置ジャンプ防止)。
         # motor1/motor2の帰還(内蔵ロータエンコーダ基準)からz/rを合成して初期値とする。
@@ -859,7 +926,13 @@ class TrajectoryFollowerNode(Node):
         # 再計算するため(_on_set_parameters参照)、has_target_/robomas_paused_の
         # 状態に関わらず常に最新のm1/m2をキャッシュしておく。
         self._last_robomas_m1_m2_ = (m1, m2)
-        if self.has_target_ and not self.robomas_paused_:
+        # robomas_velocity_mode中(z/r/tip_theta、manual_velブランチ)も無条件で
+        # 帰還への追従を継続する(2026-09-10追加、_on_cubemars_feedbackの
+        # cubemars_velocity_mode向け処理と同じ理由)。速度モード中のCAN指令は
+        # pos_/vel_を使わないため、位置保持モードへ戻った瞬間に「速度モード中
+        # timer_callbackがtrap_stepをスキップした間、裏で古いまま止まっていた
+        # pos_」を使ってしまう事故を防ぐ。
+        if self.has_target_ and not self.robomas_paused_ and not self.robomas_velocity_mode_:
             return
         real_zr = self._compute_real_zr()
         for name, val in real_zr.items():
@@ -904,17 +977,19 @@ class TrajectoryFollowerNode(Node):
         return response
 
     def _on_velocity_targets(self, msg: JointState):
-        """joy_teleop_nodeのjoy速度指令モード(robomas_velocity_mode)がONの間、
-        z_joint/r_jointの目標速度[m/s]をここで受け取る(位置(target_)ではなく
-        速度そのものを毎周期送ってもらう想定。_velocity_mode_target_rpm参照)。
-        送信元はtarget_callbackと同じくheader.frame_idで判別し、control_mode
-        パラメータで受け付けるかどうかを絞り込む(2026-09-09追加、
-        command_gui_nodeの投入シーケンス(R軸リトラクト、frame_id='auto')も
-        このトピックへ送るようになったため、joy_teleop_node(frame_id='manual')
-        と同じ送信元フィルタを適用しないと、control_mode='auto'のときに
-        joyからの速度指令が誤って受け付けられてしまう)。"""
-        if self.robomas_ is None:
-            return
+        """joy_teleop_nodeのjoy速度指令モードがONの間、各関節(z_joint/r_joint/
+        root_theta_joint/tip_theta_joint)の目標速度[rad/s or m/s]をここで受け
+        取る(位置(target_)ではなく速度そのものを毎周期送ってもらう想定。
+        _velocity_mode_target_rpm/_fresh_velocity_target参照)。robomas_の有無に
+        関わらず購読する(2026-09-10、manual_velブランチでcubemars(root_theta)の
+        速度目標もこのトピックへ乗せるようになったため、以前あった
+        「robomas_未設定なら何もしない」ガードを外した)。送信元はtarget_callbackと
+        同じくheader.frame_idで判別し、control_modeパラメータで受け付けるかどうか
+        を絞り込む(2026-09-09追加、command_gui_nodeの投入シーケンス(R軸
+        リトラクト、frame_id='auto')もこのトピックへ送るようになったため、
+        joy_teleop_node(frame_id='manual')と同じ送信元フィルタを適用しないと、
+        control_mode='auto'のときにjoyからの速度指令が誤って受け付けられて
+        しまう)。"""
         source = msg.header.frame_id or 'auto'
         if self.control_mode_ == 'auto' and source != 'auto':
             return
@@ -925,15 +1000,24 @@ class TrajectoryFollowerNode(Node):
                 self._velocity_targets_[name] = vel
         self._velocity_targets_stamp_ = time.monotonic()
 
+    def _fresh_velocity_target(self, name):
+        """_velocity_targets_のnameぶんの値を返す。ROBOMAS_VELOCITY_TARGET_
+        STALE_SEC超新しい速度指令を受信していなければ、joy_teleop_node異常終了
+        対策として安全側の0を返す(_velocity_mode_target_rpmと同じ考え方、
+        2026-09-10、cubemars_velocity_mode向けに切り出し)。"""
+        stale = (self._velocity_targets_stamp_ is None
+                 or time.monotonic() - self._velocity_targets_stamp_ > ROBOMAS_VELOCITY_TARGET_STALE_SEC)
+        return 0.0 if stale else self._velocity_targets_.get(name, 0.0)
+
     def _on_low_speed_active(self, msg: Bool):
         self._low_speed_active_ = msg.data
 
     def _reset_velocity_mode_slew(self):
         """速度モードのスルーレート制限状態を0へ戻す(_slew_velocity参照)。
         速度モードのON/OFF切替・pause・緊急停止など、次に速度指令を出すときは
-        必ず停止状態(0)からランプし直したい場面で呼ぶ。"""
-        if self.robomas_ is None:
-            return
+        必ず停止状態(0)からランプし直したい場面で呼ぶ。robomas_の有無に関わらず
+        全関節ぶんリセットする(2026-09-10、cubemars(root_theta)向けに
+        「robomas_未設定なら何もしない」ガードを外した)。"""
         for name in self._velocity_mode_cmd_:
             self._velocity_mode_cmd_[name] = 0.0
 
@@ -1231,6 +1315,24 @@ class TrajectoryFollowerNode(Node):
                             self.vel_[name] = 0.0
                             self.target_[name] = val
                 self.robomas_velocity_mode_ = new_value
+            elif p.name == 'cubemars_velocity_mode':
+                # cubemars(root_theta)版のrobomas_velocity_mode切替処理
+                # (2026-09-10新規、上のrobomas_velocity_mode分岐と同型)。
+                new_value = bool(p.value)
+                if bool(self.cubemars_velocity_mode_) != new_value:
+                    self._reset_velocity_mode_slew()
+                if self.cubemars_velocity_mode_ and not new_value:
+                    # 速度モード->位置モードへ戻る瞬間。_compute_real_cubemars
+                    # (絶対値エンコーダ)で実角度へ同期してからMIT位置制御を
+                    # 再開する(_on_release_estopと同じ理由)。
+                    for name, val in self._compute_real_cubemars().items():
+                        self.pos_[name] = val
+                        self.vel_[name] = 0.0
+                        self.target_[name] = val
+                    now = time.monotonic()
+                    for name in self.cubemars_:
+                        self._cubemars_kp_ramp_start_[name] = now
+                self.cubemars_velocity_mode_ = new_value
             elif (p.name in ('robomas_vel_kp', 'robomas_vel_ki', 'robomas_vel_kd',
                               'robomas_vel_max_current_a')
                   and self.robomas_ is not None):
@@ -1238,7 +1340,7 @@ class TrajectoryFollowerNode(Node):
                        'robomas_vel_kd': 'robomas_vel_kd_',
                        'robomas_vel_max_current_a': 'robomas_vel_max_current_a_'}[p.name]
                 setattr(self, key, float(p.value))
-            elif p.name == 'low_speed_multiplier' and self.robomas_ is not None:
+            elif p.name == 'low_speed_multiplier':
                 self.low_speed_multiplier_ = float(p.value)
         return SetParametersResult(successful=True)
 
@@ -1338,6 +1440,19 @@ class TrajectoryFollowerNode(Node):
         real_zr = self._compute_real_zr()
 
         for name in self.joint_names_:
+            if self._joint_in_velocity_mode(name):
+                # 速度モードで駆動中の関節(cubemars_velocity_mode/
+                # robomas_velocity_mode、manual_velブランチ)はtrap_stepを進めない
+                # (2026-09-10追加)。速度モードのCAN指令はpos_/vel_を使わず
+                # _velocity_targets_から直接組み立てるため、ここでtrap_stepを
+                # 回すとpos_/vel_が「使われないまま裏で古いtarget_へ向けて
+                # 進み続ける」だけになる。ジョグを止めて位置保持モードへ戻った
+                # 瞬間にこの「裏で進んだ古いpos_」を使ってしまうと、これまで
+                # 散々修正してきた「pos_が実位置とズレたまま送られて根本θが
+                # 暴走する」のと全く同じ事故になる。pos_/vel_/target_は
+                # _on_cubemars_feedback/_on_robomas_feedback側で速度モード中も
+                # 継続的に実機帰還へ同期しているので、ここでは何もしない。
+                continue
             target = self.target_[name]
             axis = axis_for_joint.get(name)
             if axis is not None:
@@ -1407,6 +1522,36 @@ class TrajectoryFollowerNode(Node):
                 # スロットは触れずゼロ初期値のまま送る(mode=0はfirmware側で
                 # RPM=0指令として解釈されるため、MIT位置指令として不確かな
                 # 絶対角度を送るよりも安全)。
+                continue
+
+            if self._joint_in_velocity_mode(name):
+                # 速度モード(cubemars_velocity_mode、manual_velブランチ新規)。
+                # kpを0にすることでMITのkp*(p_des-p)の項を消し、kd*(v_des-実速度)
+                # だけで駆動する。p_des自体は0にせず(kp=0なので数値は本来
+                # 効かないが)念のため現在地pos_をそのまま送っておく(firmware側の
+                # 想定外挙動を避ける保険)。これにより、pos_(開ループの
+                # シミュレーション位置)が実位置とどれだけズレていても、絶対位置
+                # 指令として使われないため悪さをしない——これまでの「pos_と実位置の
+                # ズレで根本θが暴走する」系のバグを構造的に発生させない狙い
+                # (ユーザー: 「根本θも速度制御にすれば解決か？」)。
+                target_vel = self._fresh_velocity_target(name)
+                # CUBEMARS_ACTUATOR_ANGLE_LIMIT_RAD宣言部のコメント参照。可動域を
+                # 超える方向への速度指令は自前でブロックする(z/rの_limit_blocksと
+                # 同じ考え方だが、物理スイッチではなくpos_(実機帰還で常時同期
+                # 済み)と可動域境界の比較で判定する)。
+                joint_limit = CUBEMARS_ACTUATOR_ANGLE_LIMIT_RAD / cfg['reduction']
+                if ((target_vel > 0.0 and self.pos_[name] >= joint_limit)
+                        or (target_vel < 0.0 and self.pos_[name] <= -joint_limit)):
+                    target_vel = 0.0
+                slewed_vel = self._slew_velocity(name, target_vel)
+                actuator_deg = math.degrees(self.pos_[name]) * cfg['reduction']
+                buf[m] = clamp_int16(actuator_deg * 10.0)           # target: 0.1deg/LSB(参考値、kp=0で無効)
+                buf[4 + m] = CUBEMARS_MODE_MIT
+                actuator_vel_radps = slewed_vel * cfg['reduction']
+                buf[8 + m] = clamp_int16(actuator_vel_radps * 100.0)    # mit_velocity: 0.01rad/s/LSB
+                buf[12 + m] = 0                                     # mit_kp: 0(速度モード中は位置項を無効化)
+                buf[16 + m] = clamp_int16(cfg['kd'] * 100.0)            # mit_kd: 0.01/LSB
+                buf[20 + m] = clamp_int16(cfg['torque_ff'] * 100.0)     # mit_torque_ff: 0.01N・m/LSB
                 continue
 
             ramp_start = self._cubemars_kp_ramp_start_.get(name)
@@ -1532,16 +1677,35 @@ class TrajectoryFollowerNode(Node):
         tip_cfg = cfg.get('tip_theta')
         if tip_cfg is not None:
             i3 = tip_cfg['motor_index']
-            tip_pos = self.pos_[tip_cfg['joint']]
-            tip_vel = self.vel_[tip_cfg['joint']]
-            tip_deg = tip_cfg['sign'] * math.degrees((tip_pos - tip_cfg['offset']) * tip_cfg['reduction'])
-            tip_rpm = tip_cfg['sign'] * (tip_vel * tip_cfg['reduction']) * (60.0 / (2.0 * math.pi))
-            buf[i3] = clamp_int16(tip_deg * 1.0)             # target: 1deg/LSB(アクチュエータ軸)
-            buf[4 + i3] = ROBOMAS_MODE_MIT
-            buf[8 + i3] = clamp_int16(tip_rpm * 1.0)         # mit_velocity_ff: 1rpm/LSB
-            buf[12 + i3] = clamp_int16(tip_cfg['kp'] * 1000.0)     # mit_kp: 0.001(A/deg)/LSB
-            buf[16 + i3] = clamp_int16(tip_cfg['kd'] * 10000.0)    # mit_kd: 0.0001(A/rpm)/LSB
-            buf[20 + i3] = clamp_int16(tip_cfg['current_ff'] * 1000.0)  # mit_current_ff: 0.001A/LSB
+            tip_name = tip_cfg['joint']
+            if self._joint_in_velocity_mode(tip_name):
+                # 速度モード(robomas_velocity_mode、manual_velブランチ新規、
+                # z/rと同じ単一トグルで一括制御。_joint_in_velocity_mode参照)。
+                # kp=0でMITの位置項を無効化し、mit_velocity_ffのみで駆動する
+                # (_publish_cubemars_commandsのroot_theta版と同じ考え方)。
+                # tip_thetaはcontinuous(可動域制限なし)なので範囲ガードは不要。
+                target_vel = self._fresh_velocity_target(tip_name)
+                slewed_vel = self._slew_velocity(tip_name, target_vel)
+                tip_pos = self.pos_[tip_name]
+                tip_deg = tip_cfg['sign'] * math.degrees((tip_pos - tip_cfg['offset']) * tip_cfg['reduction'])
+                tip_rpm = tip_cfg['sign'] * (slewed_vel * tip_cfg['reduction']) * (60.0 / (2.0 * math.pi))
+                buf[i3] = clamp_int16(tip_deg * 1.0)         # target: 1deg/LSB(参考値、kp=0で無効)
+                buf[4 + i3] = ROBOMAS_MODE_MIT
+                buf[8 + i3] = clamp_int16(tip_rpm * 1.0)     # mit_velocity_ff: 1rpm/LSB
+                buf[12 + i3] = 0                             # mit_kp: 0(速度モード中は位置項を無効化)
+                buf[16 + i3] = clamp_int16(tip_cfg['kd'] * 10000.0)    # mit_kd: 0.0001(A/rpm)/LSB
+                buf[20 + i3] = clamp_int16(tip_cfg['current_ff'] * 1000.0)  # mit_current_ff: 0.001A/LSB
+            else:
+                tip_pos = self.pos_[tip_name]
+                tip_vel = self.vel_[tip_name]
+                tip_deg = tip_cfg['sign'] * math.degrees((tip_pos - tip_cfg['offset']) * tip_cfg['reduction'])
+                tip_rpm = tip_cfg['sign'] * (tip_vel * tip_cfg['reduction']) * (60.0 / (2.0 * math.pi))
+                buf[i3] = clamp_int16(tip_deg * 1.0)             # target: 1deg/LSB(アクチュエータ軸)
+                buf[4 + i3] = ROBOMAS_MODE_MIT
+                buf[8 + i3] = clamp_int16(tip_rpm * 1.0)         # mit_velocity_ff: 1rpm/LSB
+                buf[12 + i3] = clamp_int16(tip_cfg['kp'] * 1000.0)     # mit_kp: 0.001(A/deg)/LSB
+                buf[16 + i3] = clamp_int16(tip_cfg['kd'] * 10000.0)    # mit_kd: 0.0001(A/rpm)/LSB
+                buf[20 + i3] = clamp_int16(tip_cfg['current_ff'] * 1000.0)  # mit_current_ff: 0.001A/LSB
 
         msg = Int16MultiArray()
         msg.data = buf

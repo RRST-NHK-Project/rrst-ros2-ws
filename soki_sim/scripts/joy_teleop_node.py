@@ -820,7 +820,18 @@ class JoyTeleopNode(Node):
         # 既存の回収/投入シーケンスによる自動位置合わせのみに任せたい場合用)。
         # current状態への同期だけは続け、joyからの手動制御が無効の間もtarget_
         # theta_が古い値のまま固定されないようにする。
-        if self.theta_jog_enabled_ and enabled and theta_in != 0.0:
+        # manual_velブランチ: velocity_mode_enabled中はz_jointと同じく速度指令
+        # モードにする(2026-09-10、ユーザー指定:「このブランチではすべての
+        # モーターを速度制御する」。trajectory_follower_node側のcubemars_
+        # velocity_modeと揃えること)。
+        theta_vel_cmd = 0.0
+        if self.theta_jog_enabled_ and self.velocity_mode_enabled_:
+            theta_vel_cmd = theta_in * self.theta_speed_ * speed_scale if enabled else 0.0
+            vel_names.append('root_theta_joint')
+            vel_values.append(theta_vel_cmd)
+            if self.has_current_state_:
+                self.target_theta_ = self._current_theta_
+        elif self.theta_jog_enabled_ and enabled and theta_in != 0.0:
             self.target_theta_ = clamp(
                 self.target_theta_ + theta_in * self.theta_speed_ * speed_scale * self.dt_,
                 ROOT_THETA_LOWER, ROOT_THETA_UPPER)
@@ -860,7 +871,26 @@ class JoyTeleopNode(Node):
         # 同期グループを分離する。
         tip_theta_names = []
         tip_theta_positions = []
-        if self._tip_theta_follow_theta_:
+        # manual_velブランチ: velocity_mode_enabled中はz_joint/root_theta_jointと
+        # 同じく速度指令モードにする(2026-09-10)。追従(follow)は「tip_theta速度
+        # = -root_theta速度」と読み替える(位置モードのtarget_tip_theta_=
+        # -target_theta_と同じ関係を速度の次元でそのまま踏襲するだけ)。速度
+        # メッセージはtarget_callbackの同時到達スケーリングを経由しない
+        # (_on_velocity_targetsは各関節の値を独立に上書きするだけ)ため、
+        # root_theta_jointと同じvel_names/vel_valuesへ混ぜてよい(位置モード版で
+        # 発生した同期スケーリングの巻き込みバグはそもそも起こらない)。
+        if self.velocity_mode_enabled_:
+            if self._tip_theta_follow_theta_:
+                tip_theta_vel_cmd = -theta_vel_cmd
+            elif enabled:
+                tip_theta_vel_cmd = tip_theta_in * self.tip_theta_speed_ * speed_scale
+            else:
+                tip_theta_vel_cmd = 0.0
+            vel_names.append('tip_theta_joint')
+            vel_values.append(tip_theta_vel_cmd)
+            if self.has_tip_theta_state_:
+                self.target_tip_theta_ = self._current_tip_theta_
+        elif self._tip_theta_follow_theta_:
             # OPTIONSボタンでON(既定ON、_update_tip_theta_follow_toggle参照)の
             # 間は、回収シーケンスと同じ追従式(tip_theta=-root_theta、ワークの
             # 行と平行を保つ)を手動ジョグ中も毎周期指令し続ける。右スティック
