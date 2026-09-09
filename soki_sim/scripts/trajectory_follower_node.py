@@ -102,6 +102,30 @@ CUBEMARS_POSITION_SCALE_DEG = 0.1  # 帰還/MIT指令とも0.1deg/LSB(cubemars.c
 CUBEMARS_MODE_SET_ORIGIN = 3  # ros2can/firmware/.../cubemars.cppのcontrol_mode enumと一致させること
 CUBEMARS_ORIGIN_MODE_PERMANENT = 1  # target流用: 0=一時原点/1=永久原点(フラッシュ保存)/2=デフォルト復元
 CUBEMARS_SLOT_COUNT = 24
+# ソフト緊急停止解除直後、MITのkpをここで指定する秒数かけて0→設定値まで
+# 線形に立ち上げる。物理緊急停止と併用する運用(モーター電源が切れている間、
+# 保持トルクが無いためroot_thetaを手で動かしたり機体ごと移動させることがある)
+# では、CAN帰還が届く周期(最大20ms)ぶんの遅れで、電源復帰の瞬間にまだ更新
+# されていない古いpos_を使って一瞬だけ指令してしまう可能性がどうしても残る
+# (_on_cubemars_feedbackのestop中常時追従化だけでは原理的に解消しきれない
+# レイテンシ)。kpをいきなり全力にせず徐々に立ち上げることで、たとえこの短い窓で
+# 多少ズレたpos_を使ってしまっても、発生するトルクを小さく抑えて「一瞬動いて
+# 止まる」ような急な動きにならないようにする。
+CUBEMARS_KP_RAMP_SEC = 1.0
+# self.pos_(開ループのシミュレーション位置)と実機帰還(絶対値エンコーダ)の
+# 差がこれを超えたら、trap_stepの進行を信用せず即座に実角度へ強制再同期する。
+# 物理緊急停止(モーター電源切断)はソフト側からは検知できないため、ソフト
+# 緊急停止を入れ忘れた/併用しなかった場合、timer_callbackは実機が物理的に
+# 動けているかを気にせずtarget_へ向けてpos_を進め続けてしまう。ただしestop
+# 状態を問わず常時この閾値だけでチェックすると、通常の高速移動中の正常な
+# 追従遅れも誤検知して動きが途中で打ち切られてしまうため、
+# CUBEMARS_HOLDING_VEL_LIMIT_RADPS未満(=静止を指令中)のときに限定して
+# この閾値をチェックする(_on_cubemars_feedback参照)。
+CUBEMARS_POS_DIVERGENCE_LIMIT_RAD = math.radians(5.0)
+# 上記の乖離チェックを「静止を指令中」とみなす、指令速度(vel_)の上限。この値
+# 未満ならtrap_stepは実質的に目標へ到達し静止しているとみなせるため、そこでの
+# 乖離は正常な追従遅れではなく実機側の異常(物理緊急停止・スタック等)を意味する。
+CUBEMARS_HOLDING_VEL_LIMIT_RADPS = 0.02
 
 # ROBOMAS(z_joint/r_joint、motor1/motor2)のMITモード。cubemarsとスケールが異なる点に
 # 注意(robomas.cpp/config.hppのROBOMAS_MIT_*参照)。
@@ -376,7 +400,16 @@ class TrajectoryFollowerNode(Node):
         # 自動シーケンスの中断と合わせて呼び出す想定(単体ではhoming_nodeの動作は
         # 止まらない、そちらはstop_homingを別途呼ぶ必要がある)。 ----
         latched_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
-        self.estop_active_ = False
+        # 起動時の既定はTrue(フェイルセーフ)。command_gui_nodeは起動直後に全ノード
+        # 起動+自動でengage_estopを呼ぶ設計だが、そのリクエストがこのノードへ届く
+        # (サービスが立ち上がり、GUI側のリトライが成功する)までには数百ms〜数秒の
+        # タイムラグがあり、その間はestop_active_=Falseのままtimer_callbackが通常
+        # 通り動作してしまう「無防備な窓」があった。この窓の間に(理由を問わず)
+        # /joint_targetsが届くと、estopの保護なしに実機が動いてしまう。ノード自身の
+        # 既定値をTrueにすることで、GUIからの明示的なengage_estop到着を待たずに、
+        # 起動直後から常に安全側で始まるようにする(release_estopが呼ばれるまで
+        # 一切出力しない)。
+        self.estop_active_ = True
         self.estop_pub_ = self.create_publisher(Bool, 'estop_active', latched_qos)
         self._publish_estop_state()
         self.create_service(Trigger, 'engage_estop', self._on_engage_estop)
@@ -459,24 +492,92 @@ class TrajectoryFollowerNode(Node):
         # /set_root_theta_originで起動した「原点設定モード保持」の残り周期数
         # (関節名 -> 残りcycle数)。0または未登録なら通常のMIT指令を送る。
         self._origin_pending_ = {}
+        # 直近のCubeMars帰還の生データ(device_id -> msg.data、絶対値エンコーダ
+        # 基準)。has_target_の前後を問わず毎回更新する(_compute_real_cubemars
+        # 参照。以前はhas_target_==True以降キャッシュ自体をしておらず、緊急停止
+        # 解除時にpos_を実角度へ再同期する手段が無かった)。
+        self._last_cubemars_raw_ = {}
+        # 関節ごとに、その関節自身が/joint_targetsで一度でも目標を受け取ったか
+        # (target_callback参照)。グローバルなself.has_target_だけで判定すると、
+        # 他の関節(例えばtip_theta_joint)の目標受信だけでhas_target_がTrueに
+        # なってしまい、root_theta_joint自身が一度も目標を受け取っていなくても
+        # 帰還同期(下記)が早期に無効化される。その結果pos_/target_が起動時の
+        # 初期値(sim専用のINITIAL_ROOT_THETA_RAD等)に凍結されたまま実機の本当の
+        # 角度に追従しなくなり、そのままtimer_callbackが動き出す(estop解除等)と
+        # 実機がその初期値へ向けて突然動く重大事故になる。関節ごとに判定することで、
+        # 自身が目標を受け取るまでは実機帰還への追従を続ける。
+        self._cubemars_joint_has_target_ = {name: False for name in self.cubemars_}
+        # ソフト緊急停止解除時のkpランプ開始時刻(name -> monotonic時刻、ランプ
+        # 中でなければNone)。CUBEMARS_KP_RAMP_SEC宣言部のコメント参照。
+        self._cubemars_kp_ramp_start_ = {name: None for name in self.cubemars_}
 
     def _on_cubemars_feedback(self, msg: Int32MultiArray, device_id: int):
-        # 最初の/joint_targets受信(has_target_=True)より前は、実機からの帰還値で
+        self._last_cubemars_raw_[device_id] = msg.data
+        # 各関節が最初の/joint_targetsで自分自身の目標を受け取る(target_callback→
+        # self._cubemars_joint_has_target_[name]=True)より前は、実機からの帰還値で
         # self.pos_を追従させておく。これをしないとノード起動直後の内部状態(0.0)と
         # 実機の実際の角度がズレたまま最初の目標へ台形プロファイルが走り、
         # 実機側に意図しない大きな位置ジャンプ(Kp*(p_des-p)のステップ入力)が
         # 発生する。目標を一度でも受け取ったら以後はプロファイル側の値を信用し、
-        # 帰還での上書きはしない。
-        if self.has_target_:
-            return
+        # 帰還での上書きはしない(緊急停止解除時の再同期は_on_release_estop/
+        # _compute_real_cubemars参照)。判定は関節ごとに独立して行う(理由は
+        # _cubemars_joint_has_target_宣言部のコメント参照、self.has_target_という
+        # グローバルフラグでは判定しない)。
+        #
+        # さらに、estop_active_中(目標を既に一度受け取った後でも)は無条件で
+        # 帰還への追従を継続する。理由: 物理緊急停止(モーター電源切断)中は
+        # kp/kdによる保持トルクが失われるため、root_thetaが自重でわずかに垂れ下がる
+        # ことがある。_on_engage_estop側で一度だけ実角度へ再同期していても、それは
+        # 「ソフト緊急停止を入れた瞬間」のスナップショットでしかなく、その後(物理
+        # 緊急停止中含む)実際に自重で動いた分は反映されない。この帰還ハンドラ自身で
+        # 常時追従させておく方が確実。estop解除後(通常動作中)は従来通り、関節が
+        # 一度目標を受け取ったらプロファイル側を信用する。
+        #
+        # 通常動作中(estop_active_でない・既に目標受信済み)も、「静止を指令して
+        # いるはずなのに実機帰還と食い違っている」場合は強制再同期する(閾値のみ版は
+        # 通常の高速移動中にも誤検知して動きが途中で打ち切られるため、静止中限定)。
+        # 理由: 物理緊急停止(モーター電源切断)自体はソフト側から検知できないため、
+        # ソフト緊急停止を入れ忘れる/併用しない場合、timer_callbackは実機が実際に
+        # 追従できているかを気にせずtarget_へ向けてpos_を進め続けてしまう。vel_
+        # (このnode内で指令中の速度)がほぼ0=「今は静止を指令している」ときに限れば、
+        # 実機も本来ほぼ同じ場所で静止しているはずなので、そこでの乖離は「動いている
+        # 最中の追従遅れ」ではなく実機が指令に追従できていないことの強いsignalに
+        # なる(移動中は誤検知を避けるためチェックしない)。
         for name, cfg in self.cubemars_.items():
             if cfg['device_id'] != device_id:
                 continue
             raw_deg = msg.data[cfg['motor_index']] * CUBEMARS_POSITION_SCALE_DEG
             joint_rad = math.radians(raw_deg) / cfg['reduction']
+            if self._cubemars_joint_has_target_.get(name, False) and not self.estop_active_:
+                holding_still = abs(self.vel_.get(name, 0.0)) < CUBEMARS_HOLDING_VEL_LIMIT_RADPS
+                if not holding_still or abs(self.pos_[name] - joint_rad) <= CUBEMARS_POS_DIVERGENCE_LIMIT_RAD:
+                    continue
+                self.get_logger().warning(
+                    f'trajectory_follower_node: {name} diverged from real feedback while '
+                    f'holding (pos_={math.degrees(self.pos_[name]):.1f}deg, '
+                    f'actual={math.degrees(joint_rad):.1f}deg). forcing resync '
+                    f'(physical e-stop or stall likely).')
             self.pos_[name] = joint_rad
             self.vel_[name] = 0.0
             self.target_[name] = joint_rad
+
+    def _compute_real_cubemars(self):
+        """直近のCubeMars帰還(self._last_cubemars_raw_、絶対値エンコーダ基準)から
+        cubemars_joint_names各関節の実角度を計算する({joint_name: rad}、対象
+        device_idの帰還を一度も受信していない関節は結果に含めない)。
+        _on_cubemars_feedbackの起動直後初期値計算と、_on_engage_estop/
+        _on_release_estop(緊急停止時のpos_/target_再同期)から使う共通ロジック。
+        CubeMars(root_theta)は絶対値エンコーダのため、has_target_後もいつでも
+        この帰還を信用してよい(相対エンコーダのロボマスz/r向け_compute_real_zrとは
+        異なり、常時この方法で実角度が取れる)。"""
+        result = {}
+        for name, cfg in self.cubemars_.items():
+            data = self._last_cubemars_raw_.get(cfg['device_id'])
+            if data is None:
+                continue
+            raw_deg = data[cfg['motor_index']] * CUBEMARS_POSITION_SCALE_DEG
+            result[name] = math.radians(raw_deg) / cfg['reduction']
+        return result
 
     def _setup_robomas_outputs(self):
         device_id = int(self.get_parameter('robomas_device_id').value)
@@ -602,6 +703,23 @@ class TrajectoryFollowerNode(Node):
 
     def _on_limit_switch_feedback(self, msg: Int32MultiArray, device_id: int):
         self._limit_switch_can_host_data_[device_id] = msg.data
+        # timer_callback(update_rate_hz、既定50Hz=最大20ms周期)の次回実行を
+        # 待たずに、CAN帰還が届いたこの瞬間に安全関連の指令を即時再評価・
+        # 再送信する(ユーザー報告「ワンテンポ遅れている」)。homing_node.pyの
+        # 原点センサ検出がポーリングに頼らず即時チェックしているのと同じパターン。
+        # timer_callback冒頭と同じガード(has_target_未受信・estop中)を通さずに
+        # _publish_robomas_commandsを呼ぶと、最初の目標受信前やestop中でも
+        # 出力してしまう(安全性の後退)ため、ここでも同じガードを再現する。
+        self._update_limit_stop_status()
+        if self.has_target_ and not self.estop_active_:
+            self._publish_robomas_commands()
+
+    # 各軸で「位置を増加させる方向への移動」をブロックするのがlower/upperどちらの
+    # スイッチかを表す。z軸は上限スイッチ(upper)が増加を、下限(lower)が減少を
+    # ブロックする素直な配線だが、r軸のリミットスイッチは中心付近に2箇所配置され
+    # R軸両端の板が外側から侵入することで反応する配線のため、この対応がz軸と
+    # 逆になる(実機報告・ユーザー確認:「逆にするのはR軸だけ」)。
+    _BLOCK_DIRECTION_FOR_INCREASE = {'z': 'upper', 'r': 'lower'}
 
     def _limit_triggered(self, axis, direction):
         """axis('z'/'r')のdirection('lower'/'upper')側リミットスイッチが現在
@@ -615,12 +733,23 @@ class TrajectoryFollowerNode(Node):
         triggered = bool(data[info['slot']] == self.limit_switch_triggered_value_)
         key = (axis, direction)
         if triggered and not self._limit_switch_prev_triggered_.get(key, False):
+            blocks_increase = direction == self._BLOCK_DIRECTION_FOR_INCREASE.get(axis, 'upper')
             self.get_logger().warning(
                 f"trajectory_follower_node: {axis}_{direction} limit switch triggered "
                 f"(device_id={info['device_id']}, slot={info['slot']}). blocking further "
-                f"{'increase' if direction == 'upper' else 'decrease'} of {info['joint']}.")
+                f"{'increase' if blocks_increase else 'decrease'} of {info['joint']}.")
         self._limit_switch_prev_triggered_[key] = triggered
         return triggered
+
+    def _limit_blocks(self, axis, increase):
+        """axisの位置を増加(increase=True)/減少(increase=False)させる方向への
+        移動を、対応するリミットスイッチのトリガーがブロックすべきかを返す。
+        _BLOCK_DIRECTION_FOR_INCREASE参照(r軸はスイッチ配置の都合でlower/upperの
+        対応がz軸と逆)。"""
+        block_direction = self._BLOCK_DIRECTION_FOR_INCREASE.get(axis, 'upper')
+        if not increase:
+            block_direction = 'lower' if block_direction == 'upper' else 'upper'
+        return self._limit_triggered(axis, block_direction)
 
     def _compute_real_zr(self):
         """直近のロボマスmotor1/motor2帰還(self._last_robomas_m1_m2_)からz/rの
@@ -757,7 +886,9 @@ class TrajectoryFollowerNode(Node):
         joint_velocity_targetsが一定時間(ROBOMAS_VELOCITY_TARGET_STALE_SEC)
         途絶していれば安全側で0とみなす(joy_teleop_node異常終了対策)。
         リミットスイッチがトリガーされている方向への速度指令は0にクランプする
-        (timer_callbackの位置モード側クランプと同じ考え方、反対方向への後退は許可)。
+        (timer_callbackの位置モード側クランプと同じ考え方、反対方向への後退は許可。
+        どちら向きをブロックするかは_limit_blocks/_BLOCK_DIRECTION_FOR_INCREASE
+        参照。r軸はスイッチ配置の都合でz軸と対応が逆)。
         さらに、位置モードと同じmax_velocity/max_acceleration/max_decelerationを
         z/r速度指令へ適用する(_slew_velocity参照、2026-09-09。以前は速度モードだけ
         これらを無視していた)。"""
@@ -765,17 +896,28 @@ class TrajectoryFollowerNode(Node):
                  or time.monotonic() - self._velocity_targets_stamp_ > ROBOMAS_VELOCITY_TARGET_STALE_SEC)
         z_vel = 0.0 if stale else self._velocity_targets_.get(cfg['z_joint'], 0.0)
         r_vel = 0.0 if stale else self._velocity_targets_.get(cfg['r_joint'], 0.0)
-        if z_vel > 0.0 and self._limit_triggered('z', 'upper'):
-            z_vel = 0.0
-        elif z_vel < 0.0 and self._limit_triggered('z', 'lower'):
-            z_vel = 0.0
-        if r_vel > 0.0 and self._limit_triggered('r', 'upper'):
-            r_vel = 0.0
-        elif r_vel < 0.0 and self._limit_triggered('r', 'lower'):
-            r_vel = 0.0
+        z_blocked = ((z_vel > 0.0 and self._limit_blocks('z', True))
+                     or (z_vel < 0.0 and self._limit_blocks('z', False)))
+        r_blocked = ((r_vel > 0.0 and self._limit_blocks('r', True))
+                     or (r_vel < 0.0 and self._limit_blocks('r', False)))
 
-        z_vel = self._slew_velocity(cfg['z_joint'], z_vel)
-        r_vel = self._slew_velocity(cfg['r_joint'], r_vel)
+        # リミットスイッチによるクランプは_slew_velocity(max_decelerationでの
+        # なだらかな減速)を経由させず、即座に0へ切る(ユーザー報告:「リミット
+        # センサの反応が遅い」。_slew_velocityは通常のジョグ操作を滑らかにする
+        # ためのものであり、安全停止用のクランプに巻き込むとmax_decelerationの
+        # 時間(例: 0.1m/s÷0.4m/s^2≒0.25秒)だけ実際の停止が遅れてしまっていた。
+        # 内部のスルーレート状態自体も0へ戻しておかないと、次にブロックが外れた
+        # 瞬間に「凍結中に貯まった速度差分」で急発進する)。
+        if z_blocked:
+            z_vel = 0.0
+            self._velocity_mode_cmd_[cfg['z_joint']] = 0.0
+        else:
+            z_vel = self._slew_velocity(cfg['z_joint'], z_vel)
+        if r_blocked:
+            r_vel = 0.0
+            self._velocity_mode_cmd_[cfg['r_joint']] = 0.0
+        else:
+            r_vel = self._slew_velocity(cfg['r_joint'], r_vel)
 
         m1_vel = (z_vel + r_vel) / (2.0 * cfg['mix_k'])
         m2_vel = (z_vel - r_vel) / (2.0 * cfg['mix_k'])
@@ -791,6 +933,31 @@ class TrajectoryFollowerNode(Node):
     def _on_engage_estop(self, request, response):
         self.estop_active_ = True
         self._reset_velocity_mode_slew()
+        # 物理緊急停止(モーター電源切断、CAN_HOST=マイコンはON)と併用された場合の
+        # 対策(ユーザー報告:「物理緊急停止したあと(マイコンはオン)にソフト緊急
+        # 停止を入れて再度物理緊急停止を解除するとソフト緊急停止がかかっている
+        # にも関わらず根本θが目標値に戻ろうとする」)。
+        # trajectory_follower_nodeは物理緊急停止の発生を検知できないため、その間も
+        # target_へ向けてtrap_stepが進行し続け、ソフト緊急停止をここで入れた瞬間
+        # には実機の物理角度から乖離した(実機は物理的に動けていないのにsoftware上
+        # だけtargetへ到達/接近してしまった)pos_になっていることがある。
+        # CAN_HOST(cubemars.cpp sendCommands())は最後に受信したMIT指令を新しい
+        # 指令を待たず200Hzで送り続ける(「送るのをやめる」だけでは実機側は止まら
+        # ない)ため、ここで実機の絶対値エンコーダへ再同期してから最後に一度だけ
+        # 送り直しておかないと、CAN_HOST側に「乖離したtargetへ向かえ」という指令が
+        # そのままキャッシュされ続け、モーター電源が物理的に戻った瞬間にそこへ
+        # 向けて動いてしまう。z/r(robomas)側も同じ理由で、凍結直前の速度指令が
+        # 非ゼロのままキャッシュされ続けないよう明示的に0へ戻す。
+        for name, val in self._compute_real_cubemars().items():
+            self.pos_[name] = val
+            self.vel_[name] = 0.0
+            self.target_[name] = val
+        if self.robomas_ is not None:
+            for name in self._velocity_targets_:
+                self._velocity_targets_[name] = 0.0
+        if self.has_target_:
+            self._publish_cubemars_commands()
+            self._publish_robomas_commands()
         self._publish_estop_state()
         self.get_logger().warning(
             'trajectory_follower_node: emergency stop engaged, cubemars/robomas output frozen')
@@ -800,6 +967,28 @@ class TrajectoryFollowerNode(Node):
 
     def _on_release_estop(self, request, response):
         self.estop_active_ = False
+        # 緊急停止中に人がroot_thetaを手で動かした場合など、実機の絶対値
+        # エンコーダ位置とself.pos_(開ループの内部シミュレーション、estop中は
+        # timer_callbackが早期returnするため凍結されたまま)がズレている可能性が
+        # ある。ズレたままtrap_stepを再開すると、MIT位置指令(kp*(pos_-実位置))が
+        # 凍結中に貯まった差分ぶん大きなステップ入力になり、root_thetaが解除直後に
+        # 突然動く(ユーザー報告:「根本θが突然動く挙動...非常に危険。絶対値
+        # エンコーダーがあるから防げるはず」)。CubeMars(root_theta)は絶対値
+        # エンコーダのため、いつでも実角度をそのまま信用してpos_/target_を現在地へ
+        # 同期できる(_compute_real_cubemars参照)。target_も現在地へ揃えるのは、
+        # 解除直後に凍結前の古い目標へ向けて再び動き出さないようにするため(続きの
+        # 移動が必要なら人やGUIが改めて指示する)。
+        for name, val in self._compute_real_cubemars().items():
+            self.pos_[name] = val
+            self.vel_[name] = 0.0
+            self.target_[name] = val
+        # kpを即座に設定値へ戻さず、CUBEMARS_KP_RAMP_SEC秒かけて0から立ち上げる
+        # (CUBEMARS_KP_RAMP_SEC宣言部のコメント参照。物理緊急停止併用時にCAN帰還の
+        # 遅延ぶんだけ古いpos_を使ってしまっても、発生するトルクを抑えて急な動きに
+        # しない)。
+        now = time.monotonic()
+        for name in self._cubemars_kp_ramp_start_:
+            self._cubemars_kp_ramp_start_[name] = now
         self._publish_estop_state()
         self.get_logger().warning('trajectory_follower_node: emergency stop released')
         response.success = True
@@ -975,6 +1164,11 @@ class TrajectoryFollowerNode(Node):
             self.eff_max_vel_[name] = self.max_vel_[name] * scale
             self.eff_max_accel_[name] = self.max_accel_[name] * (scale ** 2)
             self.eff_max_decel_[name] = self.max_decel_[name] * (scale ** 2)
+            # 関節ごとのhas_target(_on_cubemars_feedback参照)。このメッセージに
+            # 含まれていない他のcubemars関節(例: tip_theta_jointの追従目標だけが
+            # 届いた場合のroot_theta_joint)は、まだ実機帰還への追従を続ける。
+            if name in self._cubemars_joint_has_target_:
+                self._cubemars_joint_has_target_[name] = True
 
         self.has_target_ = True
 
@@ -1042,8 +1236,8 @@ class TrajectoryFollowerNode(Node):
             axis = axis_for_joint.get(name)
             if axis is not None:
                 pos = self.pos_[name]
-                blocked = ((target > pos and self._limit_triggered(axis, 'upper'))
-                           or (target < pos and self._limit_triggered(axis, 'lower')))
+                blocked = ((target > pos and self._limit_blocks(axis, True))
+                           or (target < pos and self._limit_blocks(axis, False)))
                 if blocked:
                     if real_zr is not None and name in real_zr:
                         self.pos_[name] = real_zr[name]
@@ -1073,15 +1267,55 @@ class TrajectoryFollowerNode(Node):
                 # スロットをorigin_modeとして解釈するため、通常のtarget/kp/kd等は書かない)。
                 buf[m] = CUBEMARS_ORIGIN_MODE_PERMANENT
                 buf[4 + m] = CUBEMARS_MODE_SET_ORIGIN
-                self._origin_pending_[name] = remaining - 1
+                remaining -= 1
+                self._origin_pending_[name] = remaining
+                if remaining == 0:
+                    # Set Origin完了。実機の絶対値エンコーダ基準がこの瞬間リセット
+                    # され、現在の物理角度が0radになる(_set_cubemars_originの
+                    # docstring通り、呼び出し前に真の機械原点へ物理的に合わせて
+                    # おく運用のため、それがそのまま新原点=0になる)。ソフト側の
+                    # pos_/target_は旧原点基準の古い角度のまま据え置かれていたため、
+                    # ここで0へ同期しないと、次周期から再開する通常のMIT指令が
+                    # kp*(pos_(旧角度)-実位置(0))という大きなステップ入力になり、
+                    # root_thetaが原点設定直後に突然動いてしまっていた(ユーザー
+                    # 報告:「根本θが急激に動く挙動...たまに出る」。root_theta
+                    # 原点設定ボタンを押した後に限って再現していたと考えられる)。
+                    self.pos_[name] = 0.0
+                    self.vel_[name] = 0.0
+                    self.target_[name] = 0.0
                 continue
+
+            if cfg['device_id'] not in self._last_cubemars_raw_:
+                # このdeviceからの帰還を一度も受信していない場合、self.pos_[name]は
+                # 起動時のハードコードされた仮の値(INITIAL_ROOT_THETA_RAD等)の
+                # ままの可能性がある。MITのp_desは実機側の絶対値エンコーダ基準の
+                # 絶対角度指令であり、たとえソフト側でpos_==target_(誤差0)に
+                # 見えていても、実機がその仮の値と異なる角度で静止していれば
+                # 実機はその絶対角度へ向けて実際に動いてしまう(ユーザー報告:
+                # 「起動直後に緊急停止をPSコンで解除すると...実機が動いた。ほんとに
+                # 怪我するから」)。関節ごとのhas_target判定(_on_cubemars_feedback
+                # 参照)だけでは、帰還が実際に一度も届いていない場合(CAN起動順序・
+                # 配線等)を救えないため、ここで最後の砦として明示的にガードする。
+                # このdeviceのスロットは触れずゼロ初期値のまま送る(mode=0は
+                # firmware側でRPM=0指令として解釈されるため、MIT位置指令として
+                # 不確かな絶対角度を送るよりも安全)。
+                continue
+
+            ramp_start = self._cubemars_kp_ramp_start_.get(name)
+            if ramp_start is None:
+                kp_scale = 1.0
+            else:
+                elapsed = time.monotonic() - ramp_start
+                kp_scale = min(1.0, elapsed / CUBEMARS_KP_RAMP_SEC) if CUBEMARS_KP_RAMP_SEC > 0.0 else 1.0
+                if kp_scale >= 1.0:
+                    self._cubemars_kp_ramp_start_[name] = None
 
             actuator_deg = math.degrees(self.pos_[name]) * cfg['reduction']
             buf[m] = clamp_int16(actuator_deg * 10.0)               # target: 0.1deg/LSB(アクチュエータ軸)
             buf[4 + m] = CUBEMARS_MODE_MIT
             actuator_vel_radps = self.vel_[name] * cfg['reduction']
             buf[8 + m] = clamp_int16(actuator_vel_radps * 100.0)    # mit_velocity: 0.01rad/s/LSB(アクチュエータ軸)
-            buf[12 + m] = clamp_int16(cfg['kp'] * 10.0)             # mit_kp: 0.1/LSB
+            buf[12 + m] = clamp_int16(cfg['kp'] * kp_scale * 10.0)  # mit_kp: 0.1/LSB(estop解除直後はランプ中)
             buf[16 + m] = clamp_int16(cfg['kd'] * 100.0)            # mit_kd: 0.01/LSB
             buf[20 + m] = clamp_int16(cfg['torque_ff'] * 100.0)     # mit_torque_ff: 0.01N・m/LSB
 
