@@ -14,9 +14,17 @@ pump_toggle_buttonパラメータで合わせること):
                                          z_jointを操作する)
   右スティック左右 -> tip_theta_joint  (axis_tip_theta, デフォルト3。手先θ、
                                          continuous(可動域制限なし))
-  左スティック左右 -> X(XYモード時、既定)/root_theta_joint(関節モード時)
-                                         (axis_x/axis_theta、いずれもデフォルト0。
-                                         下記SHAREボタンの項目参照)
+  左スティック左右 -> X(XYモード時)/root_theta_joint(関節モード時、既定
+                                         theta_jog_enabled=falseのため実際には
+                                         無効。2026-09-09、manualブランチでの
+                                         操作方針「根本θのみ自動で位置合わせ、
+                                         RとZは人が速度制御」によりroot_thetaの
+                                         直接ジョグは既定で無効化し、command_gui_
+                                         nodeの既存の回収/投入シーケンスによる
+                                         自動位置合わせに任せている。
+                                         theta_jog_enabled=trueで手動ジョグへ
+                                         戻せる。axis_x/axis_theta、いずれも
+                                         デフォルト0。下記SHAREボタンの項目参照)
   左スティック上下 -> Y(XYモード時、既定)/r_joint(関節モード時)
                                          (axis_y/axis_r、いずれもデフォルト1。
                                          2026-09-03、ユーザー指定:「XYは左スティック」
@@ -37,39 +45,37 @@ pump_toggle_buttonパラメータで合わせること):
                                          ハンドパネルからの操作と状態がズレない
                                          ようにするため、本ノード側ではローカルに
                                          推測しない))
-  ×(バツ)ボタン   -> 選択中ワークへ移動 (pickup_confirm_button, デフォルト0。
-                                         PS4/PS5コントローラの一般的なLinux
-                                         ドライバ割り当てを仮定した値、実機で要確認。
-                                         2026-09-03追加。立ち上がりエッジ即時で
-                                         command_gui_nodeの/pick_sequence_move
-                                         サービスを呼び、矢印キー(D-pad)で選択中の
-                                         ワークへの回収シーケンスを開始する
-                                         (GUIの「回収実行」ボタンの「移動」側と
-                                         同じ効果。他のシーケンス実行中でも即座に
-                                         中断して切り替わる)。2026-09-03、同日
-                                         一時的に「×長押し=回収実行確定」も
-                                         この同じボタンに割り当てていたが、移動
-                                         側が即座にシーケンスを中断・やり直す
-                                         仕様になったため、長押しのつもりで押した
-                                         瞬間に移動が先に発火して回収実行待ち状態を
-                                         壊してしまう不具合が起きた。ユーザー指定:
-                                         「回収ボタンをバツ長押しからPSボタンに
-                                         変更」により、確定は別ボタン(下記PSボタン)
-                                         へ分離し、×は単純な即時押下のみに戻した)
-  R2               -> 回収実行(確定)   (pick_confirm_button, デフォルト7。
-                                         PS4/PS5コントローラの一般的なLinux
-                                         ドライバ割り当てを仮定した値、実機で要確認。
-                                         2026-09-03追加、2026-09-08にPSボタンから
-                                         R2ボタンへ変更(PSボタンはソフト緊急停止
-                                         へ再割当、下記PSボタンの項目参照)。
-                                         立ち上がりエッジ即時で
-                                         command_gui_nodeの/pick_sequence_confirm
-                                         サービスを呼び、「ワーク手前で自動停止→
-                                         回収実行待ち」の状態を1回だけ進める
-                                         (GUIの「回収実行」ボタンの「確定」側と
-                                         同じ効果。誤操作でワークに接触・吸着して
-                                         しまうことを防ぐため、移動用の×ボタンとは
-                                         意図的に別ボタンにしている))
+  ×(バツ)ボタン   -> 選択中ワークへ回収シーケンス開始 (pickup_confirm_button,
+                                         デフォルト0。PS4/PS5コントローラの
+                                         一般的なLinuxドライバ割り当てを仮定した値、
+                                         実機で要確認。2026-09-03追加、2026-09-09
+                                         仕様変更(Z軸自動降下の廃止により「移動」
+                                         「確定」の2段階が不要になり1つに統合)。
+                                         立ち上がりエッジ即時でcommand_gui_nodeの
+                                         /pick_sequence_moveサービスを呼び、
+                                         矢印キー(D-pad)で選択中のワークへハンド
+                                         展開・ポンプON・theta回転のみの回収
+                                         シーケンスを開始する(GUIの「回収実行」
+                                         ボタンと同じ効果。他のシーケンス実行中
+                                         でも即座に中断して切り替わる)。R/Z軸は
+                                         人がjoyの速度指令モードで操作する)
+  十字キー(D-pad)  -> GUI上の目標ワーク選択カーソル移動 (axis_select_col/
+                                         axis_select_row, デフォルト6/7。多くの
+                                         Linuxジョイスティックドライバでは十字キーが
+                                         axes配列の末尾2要素として出てくる想定、
+                                         実機で要確認。2026-09-03追加、ユーザー指定:
+                                         「矢印キーでGUI上で目標ワークを選択し移動
+                                         バツで移動」)。左右/上下いずれも閾値0.5を
+                                         「押されている」とみなし、立ち上がりエッジ
+                                         (押しっぱなしでは連続移動しない)で
+                                         command_gui_nodeのselect_work_up・_down・
+                                         _left・_right(std_srvs/Trigger)のいずれかを
+                                         1回だけ呼ぶ。移動系のenable_button
+                                         (デッドマン)とは独立に扱う(ポンプトグル
+                                         ボタンと同じ理由)。選択カーソルの移動のみで
+                                         シーケンス開始は行わない(開始は×ボタン=
+                                         pickup_confirm_buttonが担う。上記×ボタンの
+                                         項目参照)
   PSボタン         -> ソフト緊急停止   (estop_button, デフォルト10。PS4/PS5
                                          コントローラの一般的なLinuxドライバ
                                          割り当てを仮定した値、実機で要確認。
@@ -77,8 +83,7 @@ pump_toggle_buttonパラメータで合わせること):
                                          command_gui_nodeの/emergency_stop
                                          サービスを呼ぶ(GUIの「緊急停止」ボタンと
                                          同じ効果。trajectory_follower_nodeの
-                                         cubemars/robomas出力を凍結し、homing_node
-                                         実行中ならstop_homingで停止、GUIの自動
+                                         cubemars/robomas出力を凍結し、GUIの自動
                                          シーケンスも中断する。解除はGUI側の
                                          「解除」ボタンのみ(誤操作で即再始動しない
                                          よう、ボタン一つでは解除できない設計)。
@@ -137,30 +142,15 @@ pump_toggle_buttonパラメータで合わせること):
                                          Y軸正=前方)へのジョグとして解釈し、逆変換で
                                          target_theta_・target_r_を同時に更新する。
                                          OFFなら従来通りroot_theta/rを別々に直接
-                                         ジョグする(関節モード)。2026-09-03、同日
-                                         ユーザー指定:「デフォルトの手動操作モードを
-                                         XYモードに」により既定ON(起動直後はXY
-                                         モード、SHAREを押すと関節モードへ切り替わる。
-                                         以前は既定OFF=起動直後は関節モードだった)
-  十字キー(D-pad)  -> GUI上の目標ワーク選択カーソル移動 (axis_select_col/
-                                         axis_select_row, デフォルト6/7。多くの
-                                         Linuxジョイスティックドライバでは十字キーが
-                                         axes配列の末尾2要素として出てくる想定、
-                                         実機で要確認。2026-09-03追加、ユーザー指定:
-                                         「矢印キーでGUI上で目標ワークを選択し移動
-                                         バツで移動、再度バツで回収実行」)。左右/
-                                         上下いずれも閾値0.5を「押されている」とみなし、
-                                         立ち上がりエッジ(押しっぱなしでは連続移動
-                                         しない)でcommand_gui_nodeのselect_work_up・
-                                         _down・_left・_right(std_srvs/Trigger)の
-                                         いずれかを1回だけ呼ぶ。移動系のenable_button
-                                         (デッドマン)とは独立に扱う(ポンプトグル
-                                         ボタンと同じ理由)。選択カーソルの移動のみで
-                                         シーケンス開始は行わない(開始は×ボタン=
-                                         pickup_confirm_buttonが選択中ワークへの
-                                         移動を、R2=pick_confirm_buttonが
-                                         回収実行の確定を、それぞれ別ボタンで担う。
-                                         上記×・R2ボタンの項目参照)
+                                         ジョグする(関節モード)。既定OFF(起動直後は
+                                         関節モード、SHAREを押すとXYモードへ切り替わる。
+                                         2026-09-03に一度既定ONへ変更したが、
+                                         2026-09-09、手動移動にフォーカスするmanual
+                                         ブランチでの方針変更によりデフォルトの移動
+                                         モードを速度指令(velocity_mode_enabled)に
+                                         した際、速度指令モードがXYモード中のr_joint/
+                                         thetaを対象外にしているため関節モードへ
+                                         再度デフォルトを戻した)
 
 いずれもレート方式: 倒している間、target += 入力値*speed*dt で積分し続ける。
 入力が中立/デッドマン未押下の間は目標を/mixed_joint_statesの現在値に同期する
@@ -268,26 +258,28 @@ class JoyTeleopNode(Node):
         # このモードの対象外(XY変換のみ、_timer_callback参照)。ONの間、z_speed_/
         # r_speed_はそのまま「フル入力時の速度[m/s]」としてtarget_z_/target_r_の
         # 積分ではなく直接の速度指令値に使う(既存のレート方式と単位を揃えるため
-        # 新規パラメータは追加しない)。
-        self.declare_parameter('velocity_mode_enabled', False)
+        # 新規パラメータは追加しない)。既定true(2026-09-09、手動移動にフォーカス
+        # するmanualブランチでの方針変更によりデフォルトの移動モードを速度指令へ。
+        # trajectory_follower_node側のrobomas_velocity_modeと揃えること)。
+        self.declare_parameter('velocity_mode_enabled', True)
+        # root_theta_jointの手動joyジョグ(左スティック左右、axis_theta)を許可するか
+        # (2026-09-09追加、manualブランチでの操作方針:「根本θのみ自動で位置合わせ
+        # （手先θは一旦放置）、RとZは人が速度制御で操作」。root_thetaはcommand_gui_
+        # nodeの既存の回収/投入シーケンス(pick_sequence_move等、×/R2/□/○ボタン)に
+        # よる自動位置合わせに任せ、joyからは直接動かさない方針のため既定false。
+        # 手動ジョグへ戻したい場合用にパラメータとして残してある)。
+        self.declare_parameter('theta_jog_enabled', False)
         self.declare_parameter('deadzone', 0.15)
         self.declare_parameter('update_rate_hz', 50.0)
         # ポンプON/OFFトグル用ボタン(2026-09-03追加、同日△ボタンへ再割当)。
         # -1ならボタン操作無効。
         self.declare_parameter('pump_toggle_button', 2)
-        # 選択中ワークへの移動ボタン(×ボタン、2026-09-03追加)。-1ならボタン
-        # 操作無効。立ち上がりエッジ即時でpick_sequence_moveを呼ぶだけの単純な
-        # ボタン(2026-09-03、同日一時的に「長押しで回収実行確定」もこのボタンに
-        # 統合していたが、移動が実行中シーケンスを即座に中断・やり直す仕様に
-        # なったため長押しのつもりで押した瞬間に移動が先に発火し回収実行待ち
-        # 状態を壊してしまう不具合が発生。ユーザー指定:「回収ボタンをバツ長押し
-        # からPSボタンに変更」により確定は下記pick_confirm_buttonへ分離した)。
+        # 選択中ワークへ回収シーケンスを開始するボタン(×ボタン、2026-09-03追加、
+        # 2026-09-09回収シーケンス復元にあわせて仕様変更)。-1ならボタン操作無効。
+        # 立ち上がりエッジ即時でcommand_gui_nodeの/pick_sequence_moveを呼ぶだけの
+        # 単純なボタン(以前あった「移動」「確定(回収実行)」の2段階は、Z軸自動
+        # 降下が無くなったため不要になり1つに統合した)。
         self.declare_parameter('pickup_confirm_button', 0)
-        # 回収実行(確定)ボタン(R2ボタン、2026-09-03追加、2026-09-08にPSボタンから
-        # 変更。-1ならボタン操作無効。立ち上がりエッジ即時でpick_sequence_confirmを
-        # 呼ぶだけの単純なボタン。誤操作でワークに接触・吸着してしまうことを
-        # 防ぐため、移動用のpickup_confirm_buttonとは意図的に別ボタンにしている。
-        self.declare_parameter('pick_confirm_button', 7)
         # ソフト緊急停止ボタン(PSボタン、2026-09-08追加)。-1ならボタン操作無効。
         # 立ち上がりエッジ即時でcommand_gui_nodeの/emergency_stopサービスを呼ぶ
         # (_update_estop_button参照)。
@@ -333,12 +325,12 @@ class JoyTeleopNode(Node):
         self.tip_theta_speed_ = float(self.get_parameter('tip_theta_speed').value)
         self.xy_speed_ = float(self.get_parameter('xy_speed').value)
         self.velocity_mode_enabled_ = bool(self.get_parameter('velocity_mode_enabled').value)
+        self.theta_jog_enabled_ = bool(self.get_parameter('theta_jog_enabled').value)
         self.deadzone_ = float(self.get_parameter('deadzone').value)
         update_rate_hz = float(self.get_parameter('update_rate_hz').value)
         self.dt_ = 1.0 / update_rate_hz
         self.pump_toggle_button_ = int(self.get_parameter('pump_toggle_button').value)
         self.pickup_confirm_button_ = int(self.get_parameter('pickup_confirm_button').value)
-        self.pick_confirm_button_ = int(self.get_parameter('pick_confirm_button').value)
         self.estop_button_ = int(self.get_parameter('estop_button').value)
         self.shoot_start_l4_button_ = int(self.get_parameter('shoot_start_l4_button').value)
         self.shoot_start_r4_button_ = int(self.get_parameter('shoot_start_r4_button').value)
@@ -381,19 +373,11 @@ class JoyTeleopNode(Node):
         self._pump_on_client_ = self.create_client(Trigger, 'hand_pump_on')
         self._pump_off_client_ = self.create_client(Trigger, 'hand_pump_off')
 
-        # 選択中ワークへの移動ボタン(×ボタン、2026-09-03追加)。立ち上がり
-        # エッジ即時でpick_sequence_moveを呼ぶだけの単純なボタン(同日、一時
-        # 「長押しで回収実行確定」も統合していたが不具合が出たため撤回、
-        # pickup_confirm_button宣言部のコメント参照)。
+        # 選択中ワークへの回収シーケンス開始ボタン(×ボタン、2026-09-03追加、
+        # 2026-09-09仕様変更。declare_parameter部コメント参照)。立ち上がりエッジ
+        # 即時でcommand_gui_nodeの/pick_sequence_moveを呼ぶだけの単純なボタン。
         self._prev_pickup_move_pressed_ = False
         self._pickup_move_client_ = self.create_client(Trigger, 'pick_sequence_move')
-
-        # 回収実行(確定)ボタン(PSボタン、2026-09-03追加)。立ち上がりエッジ
-        # 即時でpick_sequence_confirmを呼ぶだけの単純なボタン。
-        # command_gui_node側の回収シーケンスが「ワーク手前で自動停止→回収実行
-        # 待ち」のときに続行させる。
-        self._prev_pick_confirm_button_pressed_ = False
-        self._pickup_confirm_client_ = self.create_client(Trigger, 'pick_sequence_confirm')
 
         # ソフト緊急停止ボタン(PSボタン、2026-09-08追加)。立ち上がりエッジ即時で
         # command_gui_nodeの/emergency_stopを呼ぶ(_update_estop_button参照)。
@@ -427,21 +411,25 @@ class JoyTeleopNode(Node):
         # XY移動モード(SHAREボタン、2026-09-03追加)。ONの間はaxis_x/axis_yの
         # 入力をワールドXYのジョグとして解釈し、target_theta_・target_r_を
         # 同時に更新する(_timer_callback参照。ユーザー指定:「SHAREでX,Y移動
-        # モードに切り替え」)。既定ON(2026-09-03、同日ユーザー指定:「デフォルト
-        # の手動操作モードをXYモードに」。以前は既定OFF=起動直後はroot_theta/r
-        # を別々に直接ジョグする関節モードだった。SHAREを押すと関節モードへ
-        # 切り替わる)。
-        self._xy_move_mode_ = True
+        # モードに切り替え」)。既定OFF=起動直後はroot_theta/rを別々に直接
+        # ジョグする関節モード(2026-09-09、手動移動にフォーカスするmanual
+        # ブランチでの方針変更により関節モードへ再度デフォルトを戻した。
+        # 2026-09-03に一度既定ONへ変更していたが、速度指令モード(velocity_
+        # mode_enabled)がXY移動モード中のr_joint/thetaを対象外にしている
+        # ため、速度指令モードをデフォルトにする以上、関節モードもデフォルトに
+        # しないとr軸が速度指令の対象外のままになってしまう)。SHAREを押すと
+        # XY移動モードへ切り替わる。
+        self._xy_move_mode_ = False
         self._prev_xy_move_toggle_pressed_ = False
 
         # 十字キー(D-pad)でのGUIワーク選択カーソル移動(2026-09-03追加、
-        # ユーザー指定:「矢印キーでGUI上で目標ワークを選択し移動バツで移動、
-        # 再度バツで回収実行」)。command_gui_node側のselect_work_up・_down・
-        # _left・_rightサービス(std_srvs/Trigger)を、十字キーの立ち上がり
-        # エッジ(押しっぱなしでは連続移動しない)で1回だけ呼ぶ。
-        # _prev_select_col_pressed_/_prev_select_row_pressed_で左右/上下を
-        # 別々にエッジ検出する(十字キーが2軸で同時に効くドライバでも同時押し
-        # 斜め入力で1周期に最大2回(上下+左右)まで呼べるようにするため)。
+        # ユーザー指定:「矢印キーでGUI上で目標ワークを選択し移動」)。
+        # command_gui_node側のselect_work_up・_down・_left・_rightサービス
+        # (std_srvs/Trigger)を、十字キーの立ち上がりエッジ(押しっぱなしでは
+        # 連続移動しない)で1回だけ呼ぶ。_prev_select_col_pressed_/
+        # _prev_select_row_pressed_で左右/上下を別々にエッジ検出する(十字キーが
+        # 2軸で同時に効くドライバでも同時押し斜め入力で1周期に最大2回(上下+
+        # 左右)まで呼べるようにするため)。
         self._prev_select_col_pressed_ = False
         self._prev_select_row_pressed_ = False
         self._select_work_up_client_ = self.create_client(Trigger, 'select_work_up')
@@ -466,8 +454,9 @@ class JoyTeleopNode(Node):
             f'xy_move_toggle_button={self.xy_move_toggle_button_}, xy_speed={self.xy_speed_}m/s, '
             f'axis_select_col={self.axis_select_col_}, axis_select_row={self.axis_select_row_}, '
             f'pickup_confirm_button={self.pickup_confirm_button_}, '
-            f'pick_confirm_button={self.pick_confirm_button_}, '
             f'estop_button={self.estop_button_}, '
+            f'velocity_mode_enabled={self.velocity_mode_enabled_}, '
+            f'theta_jog_enabled={self.theta_jog_enabled_}, '
             f'rate={update_rate_hz}Hz')
 
     def _on_set_parameters(self, params):
@@ -488,6 +477,8 @@ class JoyTeleopNode(Node):
                 self.xy_speed_ = float(p.value)
             elif p.name == 'velocity_mode_enabled':
                 self.velocity_mode_enabled_ = bool(p.value)
+            elif p.name == 'theta_jog_enabled':
+                self.theta_jog_enabled_ = bool(p.value)
         return SetParametersResult(successful=True)
 
     def _on_joy(self, msg: Joy):
@@ -517,18 +508,11 @@ class JoyTeleopNode(Node):
 
     def _update_pickup_move(self, msg: Joy):
         """×ボタンの立ち上がりエッジで、command_gui_nodeの/pick_sequence_move
-        (選択中ワークへの移動のみ)を呼ぶ(std_srvs/Trigger、2026-09-03追加)。
-        他のシーケンス実行中(回収実行待ち・投入シーケンス中含む)でも、
+        (選択中ワークへの回収シーケンス開始)を呼ぶ(std_srvs/Trigger、
+        2026-09-03追加、2026-09-09仕様変更)。他のシーケンス実行中でも
         command_gui_node側が確認や中断操作なしに即座に中断して選択中ワークへ
-        切り替える(command_gui_node._start_pick_sequence参照)。
-        2026-09-03、同日一時的に「長押しで回収実行確定」もこの×ボタンに統合して
-        いたが、上記の「移動が実行中シーケンスを即座に中断・やり直す」仕様のため、
-        長押しのつもりで押した瞬間に移動が先に発火して回収実行待ち状態を壊して
-        しまう不具合(「バツ長押しで回収ができなくなった」)が発生した。ユーザー
-        指定:「回収ボタンをバツ長押しからPSボタンに変更」により、確定は
-        別ボタン(_update_pick_confirm_button、PSボタン)へ分離し、こちらは単純な
-        即時押下のみに戻した。移動系のenable_button(デッドマン)とは独立に扱う
-        (ポンプトグルボタンと同じ理由)。"""
+        切り替える(command_gui_node._start_pick_sequence参照)。移動系の
+        enable_button(デッドマン)とは独立に扱う(ポンプトグルボタンと同じ理由)。"""
         if self.pickup_confirm_button_ < 0:
             return
         buttons = msg.buttons
@@ -537,24 +521,6 @@ class JoyTeleopNode(Node):
         if pressed and not self._prev_pickup_move_pressed_:
             self._call_trigger(self._pickup_move_client_, 'ワーク移動(pick_sequence_move)')
         self._prev_pickup_move_pressed_ = pressed
-
-    def _update_pick_confirm_button(self, msg: Joy):
-        """PSボタンの立ち上がりエッジで、command_gui_nodeの/pick_sequence_confirm
-        (回収実行の確定のみ)を呼ぶ(std_srvs/Trigger、2026-09-03追加、ユーザー
-        指定:「回収ボタンをバツ長押しからPSボタンに変更」)。「ワーク手前で
-        自動停止→回収実行待ち」の状態でなければcommand_gui_node側が失敗を
-        返すだけ(安全側、意図せぬ確定=接触・吸着を防ぐためのガード)。誤操作を
-        防ぐため、移動用の×ボタン(_update_pickup_move)とは意図的に別ボタンに
-        している。移動系のenable_button(デッドマン)とは独立に扱う(ポンプ
-        トグルボタンと同じ理由)。"""
-        if self.pick_confirm_button_ < 0:
-            return
-        buttons = msg.buttons
-        pressed = (0 <= self.pick_confirm_button_ < len(buttons)
-                   and bool(buttons[self.pick_confirm_button_]))
-        if pressed and not self._prev_pick_confirm_button_pressed_:
-            self._call_trigger(self._pickup_confirm_client_, '回収実行確定(pick_sequence_confirm)')
-        self._prev_pick_confirm_button_pressed_ = pressed
 
     def _update_estop_button(self, msg: Joy):
         """PSボタンの立ち上がりエッジで、command_gui_nodeの/emergency_stop
@@ -743,7 +709,6 @@ class JoyTeleopNode(Node):
             return
         self._update_pump_toggle(msg)
         self._update_pickup_move(msg)
-        self._update_pick_confirm_button(msg)
         self._update_estop_button(msg)
         self._update_shoot_start_l4(msg)
         self._update_shoot_start_r4(msg)
@@ -787,7 +752,7 @@ class JoyTeleopNode(Node):
             self.target_z_ = self._current_z_
 
         if self._xy_move_mode_:
-            # SHAREボタンでトグル(既定ON、_update_xy_move_toggle参照)の間は、
+            # SHAREボタンでトグル(既定OFF、_update_xy_move_toggle参照)の間は、
             # axis_theta/axis_rを直接ジョグする代わりに、axis_x/axis_y(既定は
             # 同じ物理スティック)をワールドXYのジョグとして解釈する
             # (command_gui_node.xyz_to_joint/joint_to_xyzと同じ極座標変換、
@@ -807,7 +772,12 @@ class JoyTeleopNode(Node):
                 self.target_theta_ = self._current_theta_
                 self.target_r_ = self._current_r_
         else:
-            if enabled and theta_in != 0.0:
+            # theta_jog_enabled_が既定falseの間、root_theta_jointはjoyから直接
+            # ジョグしない(declare_parameter部コメント参照。command_gui_nodeの
+            # 既存の回収/投入シーケンスによる自動位置合わせに任せる)。current
+            # 状態への同期だけは続け、joyからの手動制御が無効の間もtarget_theta_が
+            # 古い値のまま固定されないようにする。
+            if self.theta_jog_enabled_ and enabled and theta_in != 0.0:
                 self.target_theta_ = clamp(
                     self.target_theta_ + theta_in * self.theta_speed_ * self.dt_,
                     ROOT_THETA_LOWER, ROOT_THETA_UPPER)

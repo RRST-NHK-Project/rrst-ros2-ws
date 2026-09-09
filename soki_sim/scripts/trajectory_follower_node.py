@@ -277,7 +277,10 @@ class TrajectoryFollowerNode(Node):
         # そのまま(リミットスイッチでクランプした上で)指令する
         # (_publish_robomas_commands/_on_velocity_targets参照)。command_gui_node
         # の「joy速度指令モード」チェックボックスから切り替える想定。
-        self.declare_parameter('robomas_velocity_mode', False)
+        # 既定true(2026-09-09、手動移動にフォーカスするmanualブランチでの方針
+        # 変更によりデフォルトの移動モードを速度指令へ。joy_teleop_node側の
+        # velocity_mode_enabledと揃えること)。
+        self.declare_parameter('robomas_velocity_mode', True)
         self.declare_parameter('robomas_vel_kp', 0.8)
         self.declare_parameter('robomas_vel_ki', 0.0)
         self.declare_parameter('robomas_vel_kd', 0.0)
@@ -560,6 +563,11 @@ class TrajectoryFollowerNode(Node):
         self._limit_switch_can_host_data_ = {}
         self._limit_switch_subs_ = {}
         self._limit_switch_prev_triggered_ = {}
+        # axis×direction個別のトリガー状態をpublishするための購読者
+        # (2026-09-09追加。集約フラグlimit_stop_active_だけでは「どの軸のどちら側か」
+        # が分からず、command_gui_node側でR軸下限リミット到達を正確に検知できない
+        # ため。シュートシーケンスのR軸リトラクト完了判定で使う想定)。
+        self._limit_switch_pubs_ = {}
         if self.robomas_ is None:
             return
 
@@ -568,6 +576,7 @@ class TrajectoryFollowerNode(Node):
             self.get_parameter('limit_switch_triggered_value').value)
         joint_for_axis = {'z': self.robomas_['z_joint'], 'r': self.robomas_['r_joint']}
 
+        latched_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         for axis, direction in (('z', 'lower'), ('z', 'upper'), ('r', 'lower'), ('r', 'upper')):
             prefix = f'{axis}_{direction}_limit_switch'
             device_id = int(self.get_parameter(f'{prefix}_device_id').value)
@@ -582,6 +591,15 @@ class TrajectoryFollowerNode(Node):
                 'joint': joint_for_axis[axis],
             }
             self._limit_switch_prev_triggered_[key] = False
+            self._limit_switch_pubs_[key] = self.create_publisher(
+                Bool, f'{axis}_{direction}_limit_triggered', latched_qos)
+            # transient_local(latched)は「最後にpublishした値」を後から購読した
+            # ノードへ配るだけなので、一度も変化していない(=一度もpublishしていない)
+            # 間は何も届かない。estop_active_/limit_stop_active_と同じく起動直後に
+            # 既知の初期値(未トリガー)を明示的に一度publishしておく。
+            init_msg = Bool()
+            init_msg.data = False
+            self._limit_switch_pubs_[key].publish(init_msg)
             if device_id not in self._limit_switch_subs_:
                 self._limit_switch_can_host_data_[device_id] = None
                 self._limit_switch_subs_[device_id] = self.create_subscription(
@@ -698,8 +716,19 @@ class TrajectoryFollowerNode(Node):
     def _on_velocity_targets(self, msg: JointState):
         """joy_teleop_nodeのjoy速度指令モード(robomas_velocity_mode)がONの間、
         z_joint/r_jointの目標速度[m/s]をここで受け取る(位置(target_)ではなく
-        速度そのものを毎周期送ってもらう想定。_velocity_mode_target_rpm参照)。"""
+        速度そのものを毎周期送ってもらう想定。_velocity_mode_target_rpm参照)。
+        送信元はtarget_callbackと同じくheader.frame_idで判別し、control_mode
+        パラメータで受け付けるかどうかを絞り込む(2026-09-09追加、
+        command_gui_nodeの投入シーケンス(R軸リトラクト、frame_id='auto')も
+        このトピックへ送るようになったため、joy_teleop_node(frame_id='manual')
+        と同じ送信元フィルタを適用しないと、control_mode='auto'のときに
+        joyからの速度指令が誤って受け付けられてしまう)。"""
         if self.robomas_ is None:
+            return
+        source = msg.header.frame_id or 'auto'
+        if self.control_mode_ == 'auto' and source != 'auto':
+            return
+        if self.control_mode_ == 'manual' and source != 'manual':
             return
         for name, vel in zip(msg.name, msg.velocity):
             if name in self._velocity_targets_:
@@ -759,8 +788,21 @@ class TrajectoryFollowerNode(Node):
         self.limit_stop_pub_.publish(msg)
 
     def _update_limit_stop_status(self):
-        active = any(self._limit_triggered(axis, direction)
-                     for axis, direction in self._limit_switches_.keys())
+        active = False
+        for axis, direction in self._limit_switches_.keys():
+            key = (axis, direction)
+            was_triggered = self._limit_switch_prev_triggered_.get(key, False)
+            # _limit_triggered呼び出しの副作用として_limit_switch_prev_triggered_[key]
+            # が最新状態(triggeredと同じ値)に更新される(ログ用エッジ検出、
+            # _limit_triggered参照)。ここではその「呼ぶ前の値」との比較で個別
+            # トピックへのpublish要否(変化時のみ)を判定する。
+            triggered = self._limit_triggered(axis, direction)
+            if triggered:
+                active = True
+            if triggered != was_triggered:
+                msg = Bool()
+                msg.data = triggered
+                self._limit_switch_pubs_[key].publish(msg)
         if active != self.limit_stop_active_:
             self.limit_stop_active_ = active
             self._publish_limit_stop_state()
