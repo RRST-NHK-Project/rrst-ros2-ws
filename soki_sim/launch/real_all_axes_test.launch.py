@@ -432,6 +432,19 @@ def generate_launch_description():
         condition=IfCondition(use_viz),
     )
 
+    # z/r上限・下限リミットスイッチの位置をrvizへ表示する(2026-09-09追加)。
+    # real_joint_bridge_yamlのlimit_switch_marker_node節から実機のCAN配線・
+    # 実測位置を読む(trajectory_follower_node節と同じ配線を指すよう値を
+    # 一致させてあること、config/real_joint_bridge.yaml参照)。turret_link/
+    # lift_linkにマーカーを置くためrviz表示と同じくuse_viz時のみ起動する。
+    limit_switch_marker_node = Node(
+        package='soki_sim',
+        executable='limit_switch_marker_node',
+        name='limit_switch_marker_node',
+        parameters=[real_joint_bridge_yaml],
+        condition=IfCondition(use_viz),
+    )
+
     rviz_node = Node(
         package='rviz2',
         executable='rviz2',
@@ -486,5 +499,6 @@ def generate_launch_description():
         joy_teleop_node,
         robot_state_publisher_node,
         joint_state_publisher_node,
+        limit_switch_marker_node,
         rviz_node,
     ])

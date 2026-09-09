@@ -27,6 +27,12 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: LimitSwitchMarkers
+      Topic:
+        Value: /limit_switch_markers
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
