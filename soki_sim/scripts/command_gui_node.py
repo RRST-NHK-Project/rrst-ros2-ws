@@ -3216,15 +3216,23 @@ class CommandGuiApp(QWidget):
         self.joy_speed_edits = {}
         # tip_theta_speedは2026-09-03追加(joy_teleop_nodeのtip_theta_joint手動
         # ジョグに合わせて、この編集欄も必要になった)。
+        # low_speed_multiplierはjoy_teleop_node(SHAREボタンでの低速モード)と
+        # trajectory_follower_node(速度モードのmax_velocityへの乗率)の両方に
+        # 同じ値を持たせる必要があるため、_on_apply_joy_speedで両ノードへ送る
+        # (_on_apply_joy_speed参照)。
         fields = (
-            ('theta_speed', 'root_theta', 'rad/s'),
-            ('z_speed', 'z', 'm/s'),
-            ('r_speed', 'r', 'm/s'),
-            ('tip_theta_speed', 'tip_theta', 'rad/s'),
+            ('theta_speed', 'root_theta', 'rad/s', 0.0),
+            ('z_speed', 'z', 'm/s', 0.0),
+            ('r_speed', 'r', 'm/s', 0.0),
+            ('tip_theta_speed', 'tip_theta', 'rad/s', 0.0),
+            # gains.json未保存の初回起動時、0.0のままだとlow_speed_multiplierの
+            # ノード側バリデーション((0.0, 1.0]必須)に弾かれてしまうため、
+            # 他のjoy速度と異なり有効な既定値を入れておく。
+            ('low_speed_multiplier', '低速モード倍率', '×', 0.3),
         )
-        for i, (name, label, unit) in enumerate(fields):
+        for i, (name, label, unit, default) in enumerate(fields):
             grid.addWidget(QLabel(f'{label} [{unit}]'), i, 0)
-            edit = make_float_edit(0.0, width=70)
+            edit = make_float_edit(default, width=70)
             self.joy_speed_edits[name] = edit
             grid.addWidget(edit, i, 1)
 
@@ -4984,6 +4992,13 @@ class CommandGuiApp(QWidget):
             return
         self._persist_gains('joy_speed', values)
         ok = self.node.set_node_params(JOY_NODE_NAME, values, self._apply_joy_speed_set_result)
+        if 'low_speed_multiplier' in values:
+            # trajectory_follower_node側も同じ倍率を使う(low_speed_multiplier
+            # フィールドのコメント参照)。joy_teleop_node宛の主リクエストとは別に
+            # best-effortで送るだけで、失敗してもjoy_speed_status_labelは主
+            # リクエスト側の結果を表示する。
+            self.node.set_node_params(
+                TRAJ_NODE_NAME, {'low_speed_multiplier': values['low_speed_multiplier']})
         _set_status(self.joy_speed_status_label,
                     '適用中...' if ok else 'joy_teleop_nodeに接続できません(use_joy:=trueで起動?)',
                     'muted' if ok else 'error')

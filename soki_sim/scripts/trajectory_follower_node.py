@@ -310,6 +310,15 @@ class TrajectoryFollowerNode(Node):
         self.declare_parameter('robomas_vel_ki', 0.0)
         self.declare_parameter('robomas_vel_kd', 0.0)
         self.declare_parameter('robomas_vel_max_current_a', 1.0)
+        # 低速モード(joy_teleop_nodeのSHAREボタン)の倍率。joy_teleop_node側の
+        # z_speed/r_speedは、この速度モードのmax_velocityクランプへ常時飽和させる
+        # 設計の大きな値になっているため、joy側だけをlow_speed_multiplier倍しても
+        # 実際の出力速度(ここでのmax_v)は変わらない。low_speed_active
+        # (joy_teleop_node発、latched)を購読し、ONの間は_slew_velocityのmax_vを
+        # この倍率で下げることで実際に速度を落とす。joy_teleop_node側の同名
+        # パラメータと値を揃えること(command_gui_nodeの「手動操作(joy)速度」
+        # パネルの適用が両ノードへ送る想定)。
+        self.declare_parameter('low_speed_multiplier', 0.3)
         self.declare_parameter('robomas_z_joint', 'z_joint')
         self.declare_parameter('robomas_r_joint', 'r_joint')
         self.declare_parameter('robomas_mix_k', 0.5)
@@ -649,6 +658,14 @@ class TrajectoryFollowerNode(Node):
         self.robomas_vel_ki_ = float(self.get_parameter('robomas_vel_ki').value)
         self.robomas_vel_kd_ = float(self.get_parameter('robomas_vel_kd').value)
         self.robomas_vel_max_current_a_ = float(self.get_parameter('robomas_vel_max_current_a').value)
+        # 低速モード(joy_teleop_nodeのSHAREボタン)の倍率とON/OFF状態
+        # (low_speed_multiplier宣言部のコメント参照)。joy_teleop_node発の
+        # low_speed_active(latched)を購読し、ONの間は_slew_velocityのmax_vへ
+        # この倍率を掛けて実際の速度モード上限を下げる。
+        self.low_speed_multiplier_ = float(self.get_parameter('low_speed_multiplier').value)
+        self._low_speed_active_ = False
+        low_speed_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self.create_subscription(Bool, 'low_speed_active', self._on_low_speed_active, low_speed_qos)
         # joy_teleop_nodeからのjoint_velocity_targets(m/s、joint空間)の最新値と
         # 受信時刻(ROBOMAS_VELOCITY_TARGET_STALE_SEC超で途絶とみなし0指令にする、
         # _velocity_mode_target_rpm参照)。
@@ -848,6 +865,9 @@ class TrajectoryFollowerNode(Node):
                 self._velocity_targets_[name] = vel
         self._velocity_targets_stamp_ = time.monotonic()
 
+    def _on_low_speed_active(self, msg: Bool):
+        self._low_speed_active_ = msg.data
+
     def _reset_velocity_mode_slew(self):
         """速度モードのスルーレート制限状態を0へ戻す(_slew_velocity参照)。
         速度モードのON/OFF切替・pause・緊急停止など、次に速度指令を出すときは
@@ -862,10 +882,16 @@ class TrajectoryFollowerNode(Node):
         max_acceleration/max_decelerationでクランプ・ランプする。
         前周期の指令値(self._velocity_mode_cmd_[name])からmax_accel(加速)または
         max_decel(減速・反転)で1ステップだけ近づける(trap_stepのaccel_nowと
-        同じ考え方)。max_*が0以下なら制限なし(従来どおりそのまま通す)。"""
+        同じ考え方)。max_*が0以下なら制限なし(従来どおりそのまま通す)。
+        低速モード(low_speed_multiplier宣言部のコメント参照)がONの間は、
+        joy_teleop_node側のz_speed/r_speedが常時このmax_vへ飽和する設計のため、
+        joy側の倍率だけでは実際の速度が変わらない。ここでmax_v自体を倍率分
+        下げることで実際に速度モードの上限を落とす。"""
         max_v = self.max_vel_.get(name, 0.0)
         max_a = self.max_accel_.get(name, 0.0)
         max_d = self.max_decel_.get(name, 0.0)
+        if self._low_speed_active_:
+            max_v *= self.low_speed_multiplier_
         if max_v > 0.0:
             target_vel = max(-max_v, min(max_v, target_vel))
         prev = self._velocity_mode_cmd_[name]
@@ -1034,6 +1060,9 @@ class TrajectoryFollowerNode(Node):
                 return SetParametersResult(
                     successful=False,
                     reason='disabled_joints entries must be in joint_names')
+            if p.name == 'low_speed_multiplier' and not (0.0 < p.value <= 1.0):
+                return SetParametersResult(
+                    successful=False, reason='low_speed_multiplier must be in (0.0, 1.0]')
         for p in params:
             if p.name == 'max_velocity':
                 self.max_vel_ = dict(zip(self.joint_names_, p.value))
@@ -1134,6 +1163,8 @@ class TrajectoryFollowerNode(Node):
                        'robomas_vel_kd': 'robomas_vel_kd_',
                        'robomas_vel_max_current_a': 'robomas_vel_max_current_a_'}[p.name]
                 setattr(self, key, float(p.value))
+            elif p.name == 'low_speed_multiplier' and self.robomas_ is not None:
+                self.low_speed_multiplier_ = float(p.value)
         return SetParametersResult(successful=True)
 
     def target_callback(self, msg: JointState):

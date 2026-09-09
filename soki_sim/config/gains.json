@@ -23,7 +23,8 @@
     "theta_speed": 0.05,
     "z_speed": 0.02,
     "r_speed": 0.02,
-    "tip_theta_speed": 0.1
+    "tip_theta_speed": 0.1,
+    "low_speed_multiplier": 0.3
   },
   "mit_gain": {
     "cubemars_kp": {
