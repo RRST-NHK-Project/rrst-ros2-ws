@@ -5,14 +5,21 @@ soki_sim: joyパッケージのjoy_node(/joy, sensor_msgs/Joy)を購読し、ス
 手動操作ノード。
 
 操作割り当て(デフォルト。実際のコントローラのaxes/buttons番号は`ros2 topic echo /joy`で
-確認し、axis_theta_l2/axis_theta_r2/axis_z/axis_r/axis_tip_theta・invert_*・
-pump_toggle_buttonパラメータで合わせること):
+確認し、axis_theta_l2/axis_theta_r2/axis_z/axis_r・button_tip_theta_l1/
+button_tip_theta_r1・invert_*・pump_toggle_buttonパラメータで合わせること):
   右スティック上下 -> z_joint (axis_z, デフォルト4。2026-09-03、ユーザー指定:
                                          「Zは右スティック上下で」により変更
                                          (以前は左スティック上下)。常にこの軸が
                                          z_jointを操作する)
-  右スティック左右 -> tip_theta_joint  (axis_tip_theta, デフォルト3。手先θ、
-                                         continuous(可動域制限なし))
+  L1/R1ボタン      -> tip_theta_joint  (button_tip_theta_l1/button_tip_theta_r1、
+                                         デフォルト4/5。手先θ、continuous
+                                         (可動域制限なし)。2026-09-10、ユーザー
+                                         指定:「手先θの手動ジョグはL1、R1で行う」
+                                         により右スティック左右(axis_tip_theta)
+                                         から変更。R1側を正方向として押下状態の
+                                         差(digital)を入力値にする、root_thetaの
+                                         L2/R2トリガー方式と同じ考え方だがこちらは
+                                         アナログトリガーではなく通常ボタン)
   L2/R2トリガー    -> root_theta_joint(axis_theta_l2/axis_theta_r2、デフォルト2/5。
                                          2026-09-09、当初はmanualブランチの操作
                                          方針「根本θのみ自動で位置合わせ、RとZは
@@ -216,7 +223,7 @@ class JoyTeleopNode(Node):
         # 以前は左スティック左右(axis_theta、axes[0])だったが、ユーザー指定:
         # 「L2、R2で根本θを操作」。PS4/PS5コントローラの標準的なLinux joy_node
         # マッピング(axes[2]=L2, axes[5]=R2、他の軸(axis_z=4/axis_r=1/
-        # axis_tip_theta=3/axis_select_col・row=6・7)もこのマッピング前提の値に
+        # axis_select_col・row=6・7)もこのマッピング前提の値に
         # なっている)を仮定した値、実機で要確認。L2/R2は多くのドライバで未使用時
         # +1.0・全押しで-1.0を返す(初回押下までは0.0のままの既知の癖がある
         # ドライバもある)。theta_trigger_rest_value参照。
@@ -235,9 +242,14 @@ class JoyTeleopNode(Node):
         # r_jointとz_jointが同時に動いてしまう。競合を避けるため十字キー上下
         # →右スティック上下→左スティック上下、と再度変更した)。
         self.declare_parameter('axis_r', 1)
-        # 手先θ(tip_theta_joint)の手動ジョグ軸(2026-09-03追加)。右スティック
-        # 左右を想定、-1で無効。
-        self.declare_parameter('axis_tip_theta', 3)
+        # 手先θ(tip_theta_joint)の手動ジョグボタン(2026-09-03追加、2026-09-10
+        # 右スティック左右(axis_tip_theta)からL1/R1ボタンへ変更、ユーザー指定:
+        # 「手先θの手動ジョグはL1、R1で行う」)。標準的なPS4/PS5コントローラの
+        # 一般的なLinuxドライバ割り当て(4=L1、5=R1)を仮定した値、実機で要確認。
+        # -1で該当ボタン無効。R1側を正方向として押下状態の差(digital)を入力値に
+        # する(_timer_callback参照)。
+        self.declare_parameter('button_tip_theta_l1', 4)
+        self.declare_parameter('button_tip_theta_r1', 5)
         # 既定true(2026-09-09、L2/R2トリガーへの操作方法変更後、ユーザー報告:
         # 「左右を反転」により回転方向を反転)。
         self.declare_parameter('invert_theta', True)
@@ -330,7 +342,8 @@ class JoyTeleopNode(Node):
         self._trigger_calibrated_ = {self.axis_theta_l2_: False, self.axis_theta_r2_: False}
         self.axis_z_ = int(self.get_parameter('axis_z').value)
         self.axis_r_ = int(self.get_parameter('axis_r').value)
-        self.axis_tip_theta_ = int(self.get_parameter('axis_tip_theta').value)
+        self.button_tip_theta_l1_ = int(self.get_parameter('button_tip_theta_l1').value)
+        self.button_tip_theta_r1_ = int(self.get_parameter('button_tip_theta_r1').value)
         self.axis_select_col_ = int(self.get_parameter('axis_select_col').value)
         self.axis_select_row_ = int(self.get_parameter('axis_select_row').value)
         self.sign_theta_ = -1.0 if self.get_parameter('invert_theta').value else 1.0
@@ -484,7 +497,9 @@ class JoyTeleopNode(Node):
         self.get_logger().info(
             f'joy_teleop_node started: axis_theta_l2={self.axis_theta_l2_}, '
             f'axis_theta_r2={self.axis_theta_r2_}, axis_z={self.axis_z_}, '
-            f'axis_r={self.axis_r_}, axis_tip_theta={self.axis_tip_theta_}, '
+            f'axis_r={self.axis_r_}, '
+            f'button_tip_theta_l1={self.button_tip_theta_l1_}, '
+            f'button_tip_theta_r1={self.button_tip_theta_r1_}, '
             f'enable_button={self.enable_button_}, '
             f'theta_speed={self.theta_speed_}rad/s, z_speed={self.z_speed_}m/s, '
             f'r_speed={self.r_speed_}m/s, tip_theta_speed={self.tip_theta_speed_}rad/s, '
@@ -756,6 +771,9 @@ class JoyTeleopNode(Node):
     def _axis(self, axes, index):
         return axes[index] if 0 <= index < len(axes) else 0.0
 
+    def _button_pressed(self, buttons, index):
+        return 0 <= index < len(buttons) and bool(buttons[index])
+
     def _trigger_pressed(self, axes, index):
         """L2/R2軸(index)の生値を、未使用時0.0・全押しで1.0となる押下量へ変換する
         (theta_trigger_rest_value宣言部のコメント参照)。標準的なPS4/PS5コントローラ
@@ -806,8 +824,13 @@ class JoyTeleopNode(Node):
             self.deadzone_) * self.sign_theta_
         z_in = apply_deadzone(self._axis(msg.axes, self.axis_z_), self.deadzone_) * self.sign_z_
         r_in = apply_deadzone(self._axis(msg.axes, self.axis_r_), self.deadzone_) * self.sign_r_
-        tip_theta_in = (apply_deadzone(self._axis(msg.axes, self.axis_tip_theta_), self.deadzone_)
-                        * self.sign_tip_theta_)
+        # 手先θ(tip_theta_joint)はL1/R1ボタンでジョグする(2026-09-10、右スティック
+        # 左右から変更。declare_parameter部コメント参照)。root_thetaのL2/R2
+        # トリガーと同じくR1側を正方向として押下状態の差を入力値にするが、こちらは
+        # digitalボタンのため押下量ではなく0.0/1.0の2値の差(-1.0/0.0/1.0)になる。
+        tip_theta_in = (float(self._button_pressed(msg.buttons, self.button_tip_theta_r1_))
+                        - float(self._button_pressed(msg.buttons, self.button_tip_theta_l1_))
+                        ) * self.sign_tip_theta_
 
         names = []
         positions = []

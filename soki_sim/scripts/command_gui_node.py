@@ -1214,7 +1214,19 @@ class CommandGuiNode(Node):
         リミットスイッチで」により、投入シーケンスがz_joint/r_jointを位置指令
         しないようにするため。robomas_velocity_mode中はどのみちz/rの位置指令は
         無視されるが、意図を明示するためNoneを渡せるようにした、
-        _start_shoot_sequence参照)。"""
+        _start_shoot_sequence参照)。
+        tip_thetaはroot_theta(・zj/r)とは別のJointStateメッセージで送る
+        (2026-09-10、ユーザー報告:「根本θの自動シーケンスで移動が遅い」で判明。
+        trajectory_follower_node.target_callbackは同じメッセージに含まれる関節
+        同士を同時到達させるため、各関節の(自分のmax_velocity/max_accelerationでの)
+        所要時間のうち最大値に他の関節を合わせてスケールダウンする。回収/投入
+        シーケンスは毎回root_thetaとtip_thetaを1つのmove stepで同時に指令する
+        ため、tip_thetaの方が移動距離が長い(=所要時間が長い)場合、tip_theta側の
+        max_velocity/max_accelerationが同じでもroot_theta側の実効速度まで
+        引きずり下げられていた。joy_teleop_node.pyの手先θ追従(OPTIONSボタン)は
+        2026-09-09に同じ理由で既にメッセージを分離済み(_timer_callbackの
+        tip_theta_out参照)だったが、command_gui_node側のsend_targetはまだ
+        1メッセージにまとめたままだったため、こちらだけ非対称に取り残されていた)。"""
         msg = JointState()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.header.frame_id = 'auto'
@@ -1226,12 +1238,16 @@ class CommandGuiNode(Node):
         if r is not None:
             names.append('r_joint')
             positions.append(r)
-        if tip_theta is not None:
-            names.append('tip_theta_joint')
-            positions.append(tip_theta)
         msg.name = names
         msg.position = positions
         self.pub_.publish(msg)
+        if tip_theta is not None:
+            tip_theta_msg = JointState()
+            tip_theta_msg.header.stamp = self.get_clock().now().to_msg()
+            tip_theta_msg.header.frame_id = 'auto'
+            tip_theta_msg.name = ['tip_theta_joint']
+            tip_theta_msg.position = [tip_theta]
+            self.pub_.publish(tip_theta_msg)
 
     def send_velocity_r(self, vel_mps):
         """R軸の速度指令(joint_velocity_targets、trajectory_follower_nodeの
