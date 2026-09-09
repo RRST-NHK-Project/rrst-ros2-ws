@@ -274,12 +274,16 @@ class TrajectoryFollowerNode(Node):
         # z/rの速度モード(joyからの直接速度指令、2026-09-09追加)。trueの間、
         # z/rはMIT位置PD制御ではなく速度モード(ROBOMAS_MODE_VELOCITY)で駆動し、
         # target_(位置)ではなくjoint_velocity_targetsトピックで受け取った速度を
-        # そのまま(リミットスイッチでクランプした上で)指令する
-        # (_publish_robomas_commands/_on_velocity_targets参照)。command_gui_node
+        # 指令する(_publish_robomas_commands/_on_velocity_targets参照)。command_gui_node
         # の「joy速度指令モード」チェックボックスから切り替える想定。
         # 既定true(2026-09-09、手動移動にフォーカスするmanualブランチでの方針
         # 変更によりデフォルトの移動モードを速度指令へ。joy_teleop_node側の
         # velocity_mode_enabledと揃えること)。
+        # 速度指令は、リミットスイッチでのクランプに加えて、位置モードと同じ
+        # max_velocity/max_acceleration/max_decelerationでクランプ・スルーレート
+        # 制限してから送る(_slew_velocity、2026-09-09。当初は速度モードだけこれらを
+        # 無視していたが、GUI/paramでmax_velocityを変えても速度モードだけ効かないのが
+        # 分かりにくいとのユーザー指摘で変更した)。
         self.declare_parameter('robomas_velocity_mode', True)
         self.declare_parameter('robomas_vel_kp', 0.8)
         self.declare_parameter('robomas_vel_ki', 0.0)
@@ -552,6 +556,14 @@ class TrajectoryFollowerNode(Node):
         # _velocity_mode_target_rpm参照)。
         self._velocity_targets_ = {z_name: 0.0, r_name: 0.0}
         self._velocity_targets_stamp_ = None
+        # 速度モードでも位置モードと同じmax_velocity/max_acceleration/
+        # max_decelerationを効かせるためのスルーレート制限状態(前周期に実際に
+        # 指令したz/r速度[m/s])。_slew_velocity/_reset_velocity_mode_slew参照。
+        # 以前は速度モード中このリミットを完全に無視してスティック速度(z_speed/
+        # r_speed)を直結していたが、GUI/paramでmax_velocityを変えても速度モードだけ
+        # 反映されない挙動が分かりにくいとのユーザー指摘により、速度モードでも
+        # クランプ・ランプするよう変更した(2026-09-09)。
+        self._velocity_mode_cmd_ = {z_name: 0.0, r_name: 0.0}
         self.create_subscription(
             JointState, 'joint_velocity_targets', self._on_velocity_targets, 10)
 
@@ -699,6 +711,7 @@ class TrajectoryFollowerNode(Node):
             response.message = 'robomas_device_id未設定のため対象外です'
             return response
         self.robomas_paused_ = True
+        self._reset_velocity_mode_slew()
         response.success = True
         response.message = 'robomas出力を一時停止しました'
         return response
@@ -735,12 +748,48 @@ class TrajectoryFollowerNode(Node):
                 self._velocity_targets_[name] = vel
         self._velocity_targets_stamp_ = time.monotonic()
 
+    def _reset_velocity_mode_slew(self):
+        """速度モードのスルーレート制限状態を0へ戻す(_slew_velocity参照)。
+        速度モードのON/OFF切替・pause・緊急停止など、次に速度指令を出すときは
+        必ず停止状態(0)からランプし直したい場面で呼ぶ。"""
+        if self.robomas_ is None:
+            return
+        for name in self._velocity_mode_cmd_:
+            self._velocity_mode_cmd_[name] = 0.0
+
+    def _slew_velocity(self, name, target_vel):
+        """速度モード中のz/r速度指令[m/s]を、位置モードと同じmax_velocity/
+        max_acceleration/max_decelerationでクランプ・ランプする。
+        前周期の指令値(self._velocity_mode_cmd_[name])からmax_accel(加速)または
+        max_decel(減速・反転)で1ステップだけ近づける(trap_stepのaccel_nowと
+        同じ考え方)。max_*が0以下なら制限なし(従来どおりそのまま通す)。"""
+        max_v = self.max_vel_.get(name, 0.0)
+        max_a = self.max_accel_.get(name, 0.0)
+        max_d = self.max_decel_.get(name, 0.0)
+        if max_v > 0.0:
+            target_vel = max(-max_v, min(max_v, target_vel))
+        prev = self._velocity_mode_cmd_[name]
+        # 加速(同符号で絶対値が増える)ならmax_accel、それ以外(減速・停止・符号
+        # 反転)ならmax_decel。
+        speeding_up = abs(target_vel) > abs(prev) and target_vel * prev >= 0.0
+        rate = max_a if speeding_up else max_d
+        if rate <= 0.0:
+            new_vel = target_vel
+        else:
+            max_dv = rate * self.dt_
+            new_vel = prev + max(-max_dv, min(max_dv, target_vel - prev))
+        self._velocity_mode_cmd_[name] = new_vel
+        return new_vel
+
     def _velocity_mode_target_rpm(self, cfg):
         """robomas_velocity_mode中のmotor1/motor2目標rpmを計算する。
         joint_velocity_targetsが一定時間(ROBOMAS_VELOCITY_TARGET_STALE_SEC)
         途絶していれば安全側で0とみなす(joy_teleop_node異常終了対策)。
         リミットスイッチがトリガーされている方向への速度指令は0にクランプする
-        (timer_callbackの位置モード側クランプと同じ考え方、反対方向への後退は許可)。"""
+        (timer_callbackの位置モード側クランプと同じ考え方、反対方向への後退は許可)。
+        さらに、位置モードと同じmax_velocity/max_acceleration/max_decelerationを
+        z/r速度指令へ適用する(_slew_velocity参照、2026-09-09。以前は速度モードだけ
+        これらを無視していた)。"""
         stale = (self._velocity_targets_stamp_ is None
                  or time.monotonic() - self._velocity_targets_stamp_ > ROBOMAS_VELOCITY_TARGET_STALE_SEC)
         z_vel = 0.0 if stale else self._velocity_targets_.get(cfg['z_joint'], 0.0)
@@ -753,6 +802,9 @@ class TrajectoryFollowerNode(Node):
             r_vel = 0.0
         elif r_vel < 0.0 and self._limit_triggered('r', 'lower'):
             r_vel = 0.0
+
+        z_vel = self._slew_velocity(cfg['z_joint'], z_vel)
+        r_vel = self._slew_velocity(cfg['r_joint'], r_vel)
 
         m1_vel = (z_vel + r_vel) / (2.0 * cfg['mix_k'])
         m2_vel = (z_vel - r_vel) / (2.0 * cfg['mix_k'])
@@ -767,6 +819,7 @@ class TrajectoryFollowerNode(Node):
 
     def _on_engage_estop(self, request, response):
         self.estop_active_ = True
+        self._reset_velocity_mode_slew()
         self._publish_estop_state()
         self.get_logger().warning(
             'trajectory_follower_node: emergency stop engaged, cubemars/robomas output frozen')
@@ -910,6 +963,10 @@ class TrajectoryFollowerNode(Node):
                     self.target_[name] = val
             elif p.name == 'robomas_velocity_mode' and self.robomas_ is not None:
                 new_value = bool(p.value)
+                # モードが切り替わるときはスルーレート制限状態を0へ戻し、次に
+                # 速度指令を出すときは必ず停止状態からランプさせる(_slew_velocity参照)。
+                if bool(self.robomas_velocity_mode_) != new_value:
+                    self._reset_velocity_mode_slew()
                 if self.robomas_velocity_mode_ and not new_value:
                     # 速度モード->位置モードへ戻る瞬間。速度モード中はpos_/target_を
                     # 更新していない(open-loopのままなので実位置とズレている)ため、
