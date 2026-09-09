@@ -315,6 +315,19 @@ class JoyTeleopNode(Node):
         self.axis_theta_l2_ = int(self.get_parameter('axis_theta_l2').value)
         self.axis_theta_r2_ = int(self.get_parameter('axis_theta_r2').value)
         self.theta_trigger_rest_value_ = float(self.get_parameter('theta_trigger_rest_value').value)
+        # L2/R2の「初回押下までraw=0.0のままの既知の癖があるドライバもある」問題
+        # (theta_trigger_rest_value宣言部のコメント参照)への対策。未較正の軸で
+        # raw==0.0が来た場合、それが「本当に半押し(rest未満)」なのか「まだ一度も
+        # 触れていないため未初期化のまま0.0が来ている」のか区別できない。前者だと
+        # 解釈すると(rest_value=1.0のとき)押下量0.5相当の値をL2/R2の一方だけが
+        # 実際には触れていないのに出し続け、theta_inがゼロにならず根本θが勝手に
+        # 動き続ける(2026-09-10、ユーザー報告:「ソフト緊急停止解除直後に根本θを
+        # PSコンで操作すると入力が入りっぱなしになる」。estopトグル操作の後、
+        # セッション中まだ一度も触れていない側のL2/R2がこの状態になっていたと
+        # 考えられる)。そのため軸ごとにraw!=0.0を一度でも観測するまでは未較正
+        # 扱いとし、未較正の間raw==0.0は「未押下(0.0)」とみなす(_trigger_pressed
+        # 参照。rest_value=0.0の構成では元々(rest-raw)/2=0になるため影響しない)。
+        self._trigger_calibrated_ = {self.axis_theta_l2_: False, self.axis_theta_r2_: False}
         self.axis_z_ = int(self.get_parameter('axis_z').value)
         self.axis_r_ = int(self.get_parameter('axis_r').value)
         self.axis_tip_theta_ = int(self.get_parameter('axis_tip_theta').value)
@@ -746,8 +759,16 @@ class JoyTeleopNode(Node):
     def _trigger_pressed(self, axes, index):
         """L2/R2軸(index)の生値を、未使用時0.0・全押しで1.0となる押下量へ変換する
         (theta_trigger_rest_value宣言部のコメント参照)。標準的なPS4/PS5コントローラ
-        では未使用時+1.0・全押しで-1.0のため、(rest - raw)/2をクランプする。"""
+        では未使用時+1.0・全押しで-1.0のため、(rest - raw)/2をクランプする。
+        ただしこの軸でまだ一度もraw!=0.0を観測していない(=一度も触れていない
+        可能性がある)間は、raw==0.0を(rest-0.0)/2という中途半端な押下量ではなく
+        0.0(未押下)として扱う(_trigger_calibrated_宣言部のコメント参照。
+        一度でも実際の値が来ればそれ以降は通常通り計算式を信用する)。"""
         raw = self._axis(axes, index)
+        if raw != 0.0:
+            self._trigger_calibrated_[index] = True
+        elif not self._trigger_calibrated_.get(index, True):
+            return 0.0
         rest = self.theta_trigger_rest_value_
         return clamp((rest - raw) / 2.0, 0.0, 1.0)
 
