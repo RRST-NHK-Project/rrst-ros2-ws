@@ -568,6 +568,23 @@ class TrajectoryFollowerNode(Node):
         self._limit_switch_prev_triggered_[key] = triggered
         return triggered
 
+    def _compute_real_zr(self):
+        """直近のロボマスmotor1/motor2帰還(self._last_robomas_m1_m2_)からz/rの
+        実位置を計算する({joint_name: 位置}、帰還未受信ならNone)。
+        _on_robomas_feedbackの初期値計算と、timer_callbackのリミットスイッチ
+        トリガー時のpos_同期(実機の追従遅れでpos_が開ループのままスイッチ位置を
+        追い越さないようにするため)の両方から使う共通ロジック。"""
+        if self.robomas_ is None or self._last_robomas_m1_m2_ is None:
+            return None
+        cfg = self.robomas_
+        m1, m2 = self._last_robomas_m1_m2_
+        z_offset = self.get_parameter('robomas_z_offset_m').value
+        r_offset = self.get_parameter('robomas_r_offset_m').value
+        return {
+            cfg['z_joint']: cfg['mix_k'] * (m1 + m2) + z_offset,
+            cfg['r_joint']: cfg['mix_k'] * (m1 - m2) + r_offset,
+        }
+
     def _on_robomas_feedback(self, msg: Int32MultiArray):
         # _on_cubemars_feedbackと同じ理由(起動直後の位置ジャンプ防止)。
         # motor1/motor2の帰還(内蔵ロータエンコーダ基準)からz/rを合成して初期値とする。
@@ -595,11 +612,8 @@ class TrajectoryFollowerNode(Node):
         self._last_robomas_m1_m2_ = (m1, m2)
         if self.has_target_ and not self.robomas_paused_:
             return
-        z_offset = self.get_parameter('robomas_z_offset_m').value
-        r_offset = self.get_parameter('robomas_r_offset_m').value
-        z = cfg['mix_k'] * (m1 + m2) + z_offset
-        r = cfg['mix_k'] * (m1 - m2) + r_offset
-        for name, val in ((cfg['z_joint'], z), (cfg['r_joint'], r)):
+        real_zr = self._compute_real_zr()
+        for name, val in real_zr.items():
             self.pos_[name] = val
             self.vel_[name] = 0.0
             self.target_[name] = val
@@ -852,15 +866,32 @@ class TrajectoryFollowerNode(Node):
             axis_for_joint[self.robomas_['z_joint']] = 'z'
             axis_for_joint[self.robomas_['r_joint']] = 'r'
 
+        # self.pos_はhas_target_後は実機帰還を一切見ない開ループの理想軌道
+        # (_on_robomas_feedback参照)のため、実機の追従が遅れている(ゲインが弱い
+        # 場合など)とpos_がスイッチの物理位置をシミュレーション上すでに通り
+        # 過ぎていることがある。その状態で単に「この周期のtargetをposへ
+        # クランプ」するだけだと、凍結先のpos_自体が実位置より先にあるままなので
+        # MIT指令(kp*(pos_-実位置))がその凍結値へ向けて実機を押し続けてしまい、
+        # スイッチがトリガーされていても止まらない(2026-09-09実機報告:
+        # 「リミットスイッチが反応しているのに止まらないときがある、joyから
+        # 操作時とか」。joyは長時間・高頻度でtarget_を押し続けるため乖離が
+        # 蓄積しやすい)。対策として、トリガーされた瞬間にpos_自体を実機帰還の
+        # z/r位置へ同期させ、MIT指令が実位置に一致する(=追加の押し込み電流が
+        # 出ない)ようにする。
+        real_zr = self._compute_real_zr()
+
         for name in self.joint_names_:
             target = self.target_[name]
             axis = axis_for_joint.get(name)
             if axis is not None:
                 pos = self.pos_[name]
-                if target > pos and self._limit_triggered(axis, 'upper'):
-                    target = pos
-                elif target < pos and self._limit_triggered(axis, 'lower'):
-                    target = pos
+                blocked = ((target > pos and self._limit_triggered(axis, 'upper'))
+                           or (target < pos and self._limit_triggered(axis, 'lower')))
+                if blocked:
+                    if real_zr is not None and name in real_zr:
+                        self.pos_[name] = real_zr[name]
+                        self.vel_[name] = 0.0
+                    target = self.pos_[name]
             self.pos_[name], self.vel_[name] = trap_step(
                 self.pos_[name], self.vel_[name], target,
                 self.eff_max_vel_[name], self.eff_max_accel_[name], self.eff_max_decel_[name], self.dt_)
