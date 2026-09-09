@@ -91,12 +91,17 @@ ROOT_THETA_REDUCTION = 112.0 / 24.0
 ROOT_THETA_LIMIT = 12.5 / ROOT_THETA_REDUCTION
 ROOT_THETA_LOWER, ROOT_THETA_UPPER = -ROOT_THETA_LIMIT, ROOT_THETA_LIMIT
 
-# tip_theta(手先θ)は機構的にはcontinuous(2026-09-08、CubeMarsからROBOMAS(M2006)へ
-# 移行し、CubeMars時代のMIT範囲制約(±511.6°相当)は無くなった。note/hardware_
-# mapping.txt「root_theta/tip_thetaはMITモードの都合上そもそも…」参照)だが、
-# 関節スライダー(_build_joint_slider_panel)のUI上の目盛り範囲としては手動ジョグ
-# 用途で十分な±180degにしておく(実機の可動域自体を制限する値ではない)。
-TIP_THETA_LOWER, TIP_THETA_UPPER = -math.pi, math.pi
+# tip_theta(手先θ)の機構的な可動域(2026-09-10、ユーザー指定:「270度以上回らない
+# ようにしたい。つまり電源投入時の位置から左右に135度」)。tip_thetaは原点センサを
+# 持たず、電源投入時のM2006内蔵エンコーダのリセット値(=0)を原点として使うため、
+# この範囲は「電源投入時の位置から±135deg」を意味する。
+# (2026-09-08にCubeMarsからROBOMAS(M2006)へ移行してCubeMars時代のMIT範囲制約
+# ±511.6°相当が無くなり一旦continuous扱いになっていたが、配線・エア配管の巻き込み
+# 防止のため機構側の制約として改めて制限する。note/hardware_mapping.txt参照)
+# trajectory_follower_node.pyのTIP_THETA_LIMIT_RAD、joy_teleop_node.pyの
+# TIP_THETA_LOWER/UPPER、soki_sim.urdf.xacroのtip_theta_limitと一致させること。
+TIP_THETA_LIMIT = math.radians(135.0)
+TIP_THETA_LOWER, TIP_THETA_UPPER = -TIP_THETA_LIMIT, TIP_THETA_LIMIT
 
 # lift_link原点(z_joint基準)の地面からの高さオフセット
 Z_OFFSET = BASE_HEIGHT + LIFT_SIZE_Z / 2.0
@@ -1285,6 +1290,12 @@ class CommandGuiNode(Node):
         msg.position = positions
         self.pub_.publish(msg)
         if tip_theta is not None:
+            # 可動域クランプ(TIP_THETA_LOWER/UPPER参照)。回収シーケンスの追従値
+            # (-root_theta)は root_thetaの可動域(±153.4deg)がtip_thetaより広いため
+            # そのままでは範囲外になりうる。投入シーケンスのshoot_tip_theta_radも
+            # GUI/gains.jsonから任意の値が入るためここで受け側クランプする
+            # (trajectory_follower_node側でも二重にクランプされる)。
+            tip_theta = clamp(tip_theta, TIP_THETA_LOWER, TIP_THETA_UPPER)
             tip_theta_msg = JointState()
             tip_theta_msg.header.stamp = self.get_clock().now().to_msg()
             tip_theta_msg.header.frame_id = 'auto'
@@ -2363,7 +2374,8 @@ class CommandGuiApp(QWidget):
         # r_lowerリミットスイッチまで自動で戻す(_advance_retract_r_step参照)。
         # OFF(既定)なら退避ステップ自体を飛ばし、R軸は常に人の操作のみで動く。
         self.retract_r_checkbox = QCheckBox('R軸を自動でしまう(theta回転前にr_lowerリミットスイッチまで retract)')
-        self.retract_r_checkbox.setChecked(False)
+        # 既定ON(2026-09-10、ユーザー指定「Rの軸の自動収納をデフォルトでオンに」)。
+        self.retract_r_checkbox.setChecked(True)
         layout.addWidget(self.retract_r_checkbox)
 
         self.sequence_status_label = QLabel()
@@ -2935,9 +2947,10 @@ class CommandGuiApp(QWidget):
         # 実機スタックの検知用)のON/OFF切替(2026-09-10追加、ユーザー報告:
         # 「根本θにキックが発生。反対方向にガクッとなるもしくは目標値に到達しない
         # まま止まる。手動、自動シーケンスのどちらでも発生」の原因切り分け用)。
-        # OFFにするとこの保護が失われるため、原因切り分けの一時的な用途以外では
-        # 基本的にONのままにすること(trajectory_follower_node.pyの
-        # cubemars_divergence_resync_enabled宣言部のコメント参照)。
+        # 既定OFF(2026-09-10、ユーザー指定「強制再同期と速度超過のリミットを
+        # デフォルトでオフに」。trajectory_follower_node側の
+        # cubemars_divergence_resync_enabledの既定値もfalseに合わせてある)。
+        # OFFの間はこの保護が無いため、必要なときだけここでONにする。
         box = QGroupBox('根本θ 静止乖離時の強制再同期')
         layout = QVBoxLayout(box)
 
@@ -2947,18 +2960,21 @@ class CommandGuiApp(QWidget):
             desc,
             '静止を指令中に実機帰還(絶対値エンコーダ)と5°以上ズレたらtarget_ごと\n'
             '実角度へ強制的に再同期する安全機構(物理緊急停止・スタック検知用)。\n'
-            'OFFにすると保護が失われるため、キック/未到達停止の原因切り分け以外\n'
-            'では基本的にONのままにすること。', 'muted')
+            '既定OFF。ONにすると保護が働くが、キック/未到達停止の原因にもなりうる\n'
+            'ため、必要なときだけONにすること。', 'muted')
         layout.addWidget(desc)
 
         self.cubemars_resync_check = QCheckBox('強制再同期を有効にする')
-        self.cubemars_resync_check.setChecked(True)
+        # 既定OFF(trajectory_follower_nodeのcubemars_divergence_resync_enabledの
+        # 既定値と一致させること)。toggled接続はこのsetChecked後に行うので、
+        # 起動時にノードへ適用リクエストは飛ばない。
+        self.cubemars_resync_check.setChecked(False)
         self.cubemars_resync_check.toggled.connect(self._on_cubemars_resync_toggled)
         layout.addWidget(self.cubemars_resync_check)
 
         self.cubemars_resync_status_label = QLabel()
         self.cubemars_resync_status_label.setWordWrap(True)
-        _set_status(self.cubemars_resync_status_label, '有効', 'muted')
+        _set_status(self.cubemars_resync_status_label, '無効 (既定)', 'muted')
         layout.addWidget(self.cubemars_resync_status_label)
 
         column.addWidget(box)
@@ -2981,8 +2997,8 @@ class CommandGuiApp(QWidget):
             checked = self.cubemars_resync_check.isChecked()
             _set_status(
                 self.cubemars_resync_status_label,
-                '有効' if checked else '無効(安全機構OFF、切り分け用途以外では戻すこと)',
-                'muted' if checked else 'error')
+                '有効' if checked else '無効 (既定)',
+                'muted')
         else:
             reasons = '; '.join(r.reason for r in results if not r.successful)
             _set_status(self.cubemars_resync_status_label, f'適用失敗: {reasons}', 'error')
@@ -3007,11 +3023,14 @@ class CommandGuiApp(QWidget):
             desc,
             '実機帰還(エンコーダ)から計算した実速度・実加速度がしきい値を超えたら\n'
             '自動でソフト緊急停止を入れる(キック等の異常な動きを静止/移動中を問わず\n'
-            '検知)。しきい値はまだ実機で検証していない仮の値。', 'muted')
+            '検知)。既定OFF(しきい値がまだ実機未検証の仮の値のため、正常動作を\n'
+            '誤検知する方が実害が大きい)。しきい値を詰めてからONにすること。', 'muted')
         layout.addWidget(desc)
 
         self.cubemars_overspeed_check = QCheckBox('自動緊急停止を有効にする')
-        self.cubemars_overspeed_check.setChecked(True)
+        # 既定OFF(2026-09-10、ユーザー指定。trajectory_follower_nodeの
+        # cubemars_overspeed_estop_enabledの既定値と一致させること)。
+        self.cubemars_overspeed_check.setChecked(False)
         layout.addWidget(self.cubemars_overspeed_check)
 
         grid = QGridLayout()
@@ -3030,8 +3049,7 @@ class CommandGuiApp(QWidget):
 
         self.cubemars_overspeed_status_label = QLabel()
         self.cubemars_overspeed_status_label.setWordWrap(True)
-        _set_status(self.cubemars_overspeed_status_label,
-                    '有効 (速度3.00rad/s, 加速度15.00rad/s^2)', 'muted')
+        _set_status(self.cubemars_overspeed_status_label, '無効 (既定)', 'muted')
         layout.addWidget(self.cubemars_overspeed_status_label)
 
         column.addWidget(box)
@@ -3070,7 +3088,7 @@ class CommandGuiApp(QWidget):
                             f'有効 (速度{vel_limit:.2f}rad/s, 加速度{accel_limit:.2f}rad/s^2)',
                             'muted')
             else:
-                _set_status(self.cubemars_overspeed_status_label, '無効', 'error')
+                _set_status(self.cubemars_overspeed_status_label, '無効 (既定)', 'muted')
         else:
             reasons = '; '.join(r.reason for r in results if not r.successful)
             _set_status(self.cubemars_overspeed_status_label, f'適用失敗: {reasons}', 'error')

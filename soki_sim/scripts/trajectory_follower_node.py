@@ -216,6 +216,24 @@ VALID_CONTROL_MODES = ('auto', 'manual', 'both')
 # が実機の帰還値で上書きするため、この値は事実上sim専用)。
 INITIAL_ROOT_THETA_RAD = -math.pi / 2.0
 
+# tip_theta_joint(手先θ)の可動域制限(2026-09-10追加、ユーザー指定:「270度以上
+# 回らないようにしたい。つまり電源投入時の位置から左右に135度」)。
+# tip_thetaは原点センサを持たず、電源投入時のM2006内蔵ロータエンコーダの
+# リセット値(=0)をそのまま原点として使う構成(note/hardware_mapping.txt参照)の
+# ため、「アクチュエータ角0 = 電源投入時の位置」であり、この範囲がそのまま
+# 「電源投入時の位置から左右に135deg」を意味する。
+# joint空間(target_callback)とアクチュエータ空間(_publish_robomas_commands)の
+# 二重でクランプする。前者はプロファイル自体が範囲外を狙わないようにするため、
+# 後者は実機へ出る最後の砦(帰還同期・外部publisher・パラメータ経路のいずれから
+# 範囲外の値が入っても実際の指令は超えない)。
+# joy_teleop_node.py/command_gui_node.pyのTIP_THETA_LOWER/UPPER、
+# soki_sim.urdf.xacroのtip_theta_limitと一致させること。
+TIP_THETA_LIMIT_RAD = math.radians(135.0)
+
+
+def clamp(value: float, lower: float, upper: float) -> float:
+    return max(lower, min(upper, value))
+
 
 def clamp_int16(value: float) -> int:
     return max(INT16_MIN, min(INT16_MAX, int(round(value))))
@@ -306,12 +324,14 @@ class TrajectoryFollowerNode(Node):
         # 再同期する」安全機構(CUBEMARS_POS_DIVERGENCE_LIMIT_RAD宣言部のコメント
         # 参照)のON/OFF切替(2026-09-10追加、ユーザー報告:「根本θにキックが発生。
         # 反対方向にガクッとなるもしくは目標値に到達しないまま止まる」の原因切り分け
-        # 用)。既定true(安全機構は既定で有効のまま)。command_gui_nodeのチェック
-        # ボックスから切り替えられる(_on_cubemars_resync_toggled参照)。OFFにする
-        # と物理緊急停止をソフト緊急停止なしで行った場合や実機スタック時の保護が
-        # 失われるため、原因切り分けの一時的な用途以外では基本的にONのままにする
-        # こと。
-        self.declare_parameter('cubemars_divergence_resync_enabled', True)
+        # 用)。**既定false**(2026-09-10、ユーザー指定「強制再同期と速度超過の
+        # リミットをデフォルトでオフに」により、当初の既定trueから変更)。
+        # command_gui_nodeのチェックボックスから切り替えられる
+        # (_on_cubemars_resync_toggled参照)。OFFの間は、物理緊急停止をソフト
+        # 緊急停止なしで行った場合や実機スタック時に、pos_/target_が実角度から
+        # 乖離したまま復帰する(=復帰時に乖離分を一気に戻そうとする)保護が無い点に
+        # 注意。必要なときだけGUIからONにする運用。
+        self.declare_parameter('cubemars_divergence_resync_enabled', False)
         # CubeMars(root_theta)の実機帰還(絶対値エンコーダ)から計算した実速度・
         # 実加速度が閾値を超えたら自動でソフト緊急停止を入れる安全機構
         # (2026-09-10追加、ユーザー提案:「実機のスタックとかってエンコーダー見て
@@ -325,7 +345,11 @@ class TrajectoryFollowerNode(Node):
         # 変更すること)。しきい値はまだ実機で検証していない仮の値のため、
         # command_gui_nodeのパネルから実機の様子を見ながら調整すること
         # (_build_cubemars_overspeed_panel参照)。
-        self.declare_parameter('cubemars_overspeed_estop_enabled', True)
+        # **既定false**(2026-09-10、ユーザー指定「強制再同期と速度超過のリミットを
+        # デフォルトでオフに」により、当初の既定trueから変更)。しきい値が実機
+        # 未検証の仮の値のままなので、正常な動作を誤検知して緊急停止に入る方が
+        # 実害が大きい、という判断。しきい値を実機で詰めたうえでGUIからONにする運用。
+        self.declare_parameter('cubemars_overspeed_estop_enabled', False)
         self.declare_parameter('cubemars_overspeed_limit_radps', 3.0)
         self.declare_parameter('cubemars_overaccel_limit_radps2', 15.0)
         # 組立中・不具合時に特定の軸を無視するためのランタイム設定(2026-09-05追加、
@@ -755,6 +779,17 @@ class TrajectoryFollowerNode(Node):
         device_id = int(self.get_parameter('robomas_device_id').value)
         self.robomas_ = None
         self.robomas_paused_ = False
+        # tip_theta_jointのjoint空間可動域(name, lower, upper)。TIP_THETA_LIMIT_RAD
+        # 参照。実機出力(robomas_tip_theta_index)が無効でも、sim側の目標が実機の
+        # 可動域を超えないようにここで確定させる(実機とsimで到達可能範囲を揃える)。
+        tip_theta_name = self.get_parameter('robomas_tip_theta_joint').value
+        if tip_theta_name in self.joint_names_:
+            tip_theta_center = float(self.get_parameter('tip_theta_offset_rad').value)
+            self._tip_theta_limit_ = (tip_theta_name,
+                                       tip_theta_center - TIP_THETA_LIMIT_RAD,
+                                       tip_theta_center + TIP_THETA_LIMIT_RAD)
+        else:
+            self._tip_theta_limit_ = None
         # 最新のm1/m2(motor1_joint/motor2_joint、pulley_radius_m換算済み)。
         # robomas_z_offset_m/r_offset_m変更時にpos_/target_を同期的に再計算する
         # 用(_on_robomas_feedback/_on_set_parameters参照)。帰還未受信ならNone。
@@ -764,6 +799,9 @@ class TrajectoryFollowerNode(Node):
         # 直近で停止->動き出しへ遷移したmonotonic時刻(未遷移ならNone)。
         self._robomas_kick_was_moving_ = {1: False, 2: False}
         self._robomas_kick_start_time_ = {1: None, 2: None}
+        # tip_thetaの可動域クランプが効いているか(ログをエッジでのみ出すため。
+        # _publish_robomas_commandsは50Hzで回るので毎周期ログは出さない)。
+        self._tip_theta_clamped_ = False
         if device_id == 0:
             return
 
@@ -796,12 +834,18 @@ class TrajectoryFollowerNode(Node):
             tip_theta_name = self.get_parameter('robomas_tip_theta_joint').value
             if tip_theta_name not in self.joint_names_:
                 raise ValueError('robomas_tip_theta_joint must be in joint_names')
+            tip_theta_offset = float(self.get_parameter('tip_theta_offset_rad').value)
             self.robomas_['tip_theta'] = {
                 'motor_index': tip_theta_index,
                 'joint': tip_theta_name,
                 'reduction': float(self.get_parameter('tip_theta_reduction').value),
                 'sign': float(self.get_parameter('tip_theta_sign').value),
-                'offset': float(self.get_parameter('tip_theta_offset_rad').value),
+                'offset': tip_theta_offset,
+                # joint空間の可動域(TIP_THETA_LIMIT_RAD参照)。アクチュエータ角0が
+                # 電源投入時の位置=joint角offsetに対応するため、offsetを中心に
+                # ±TIP_THETA_LIMIT_RADとする(offsetは既定0)。
+                'lower': tip_theta_offset - TIP_THETA_LIMIT_RAD,
+                'upper': tip_theta_offset + TIP_THETA_LIMIT_RAD,
                 'kp': float(self.get_parameter('robomas_tip_theta_kp').value),
                 'kd': float(self.get_parameter('robomas_tip_theta_kd').value),
                 'current_ff': float(self.get_parameter('robomas_tip_theta_current_ff').value),
@@ -996,7 +1040,19 @@ class TrajectoryFollowerNode(Node):
         # 再計算するため(_on_set_parameters参照)、has_target_/robomas_paused_の
         # 状態に関わらず常に最新のm1/m2をキャッシュしておく。
         self._last_robomas_m1_m2_ = (m1, m2)
-        if self.has_target_ and not self.robomas_paused_:
+        # estop_active_中(既に目標を受け取った後でも)は帰還への追従を継続する
+        # (2026-09-10追加。_on_cubemars_feedback側は2026-09-09に同じ修正が
+        # 入っていたが、robomas側だけ取り残されていた)。
+        # 理由: ソフト緊急停止中は全スロット0(=kp/kd/current_ff=0)を送るため
+        # 保持トルクが失われる。特にtip_theta(M3)は重力負荷のかかる手先関節で
+        # 常にMIT位置制御なので、脱力中に自重で垂れた分だけpos_と実角度が乖離する。
+        # pos_を凍結したまま解除すると、firmware側のMIT制御(robomas.cpp)は
+        # max_velocityを一切見ずkp*(pos_-実角度)を電流上限(ROBOMAS_MAX_CURRENT_A
+        # =5A)まで使って乖離分を一気に詰めるため、解除直後に手先θが勢いよく回る
+        # (2026-09-10、ユーザー報告:「同じゲインでもモーターが勢いよく回るときと
+        # ピクピクと少しずつ回るときがある」の「勢いよく回る」側の原因)。
+        # 脱力中は実機の角度を真値として追従しておけば乖離が溜まらない。
+        if self.has_target_ and not self.robomas_paused_ and not self.estop_active_:
             return
         real_zr = self._compute_real_zr()
         for name, val in real_zr.items():
@@ -1472,6 +1528,20 @@ class TrajectoryFollowerNode(Node):
                 self.low_speed_multiplier_ = float(p.value)
         return SetParametersResult(successful=True)
 
+    def _clamp_joint_target(self, name: str, pos: float) -> float:
+        """可動域を持つ関節の目標値をクランプする(現在はtip_theta_jointのみ)。
+
+        z/rはjoy_teleop_node側でクランプ+リミットスイッチで安全停止、root_thetaも
+        joy_teleop_node/command_gui_node側でクランプしているが、tip_thetaは
+        「電源投入時の位置から左右135deg」という機構制約(TIP_THETA_LIMIT_RAD)が
+        あり、追従(-root_theta)・自動シーケンス・GUIスライダーと指令元が多いため、
+        全ての送信元に効くこの位置でも受け側クランプを行う。
+        """
+        limit = getattr(self, '_tip_theta_limit_', None)
+        if limit is None or name != limit[0]:
+            return pos
+        return clamp(pos, limit[1], limit[2])
+
     def target_callback(self, msg: JointState):
         # 送信元はheader.frame_idで判別('auto'=command_gui_node, 'manual'=joy_teleop_node、
         # 未設定は後方互換のため'auto'扱い)。control_modeで受け付ける送信元を絞り込む。
@@ -1481,7 +1551,8 @@ class TrajectoryFollowerNode(Node):
         if self.control_mode_ == 'manual' and source != 'manual':
             return
 
-        entries = [(name, pos) for name, pos in zip(msg.name, msg.position)
+        entries = [(name, self._clamp_joint_target(name, pos))
+                   for name, pos in zip(msg.name, msg.position)
                    if name in self.target_ and name not in self.disabled_joints_]
         if not entries:
             return
@@ -1815,6 +1886,30 @@ class TrajectoryFollowerNode(Node):
             tip_vel = self.vel_[tip_cfg['joint']]
             tip_deg = tip_cfg['sign'] * math.degrees((tip_pos - tip_cfg['offset']) * tip_cfg['reduction'])
             tip_rpm = tip_cfg['sign'] * (tip_vel * tip_cfg['reduction']) * (60.0 / (2.0 * math.pi))
+            # 可動域クランプの最後の砦(TIP_THETA_LIMIT_RAD参照)。アクチュエータ角0が
+            # 電源投入時の位置なので、ここを±(135deg×減速比)で切ることが「電源投入時の
+            # 位置から左右135deg」の物理的な保証になる。target_callback側のjoint空間
+            # クランプを通らない経路(帰還同期による pos_ の上書き、tip_theta_offset_rad
+            # の実行時変更、外部ノードからの直接publish等)でも必ずここで止まる。
+            # 範囲外へ出ようとしている間は速度FFも0にして、kd項が境界の外へ
+            # 押し続けないようにする。
+            # tip_degと同じ演算順(degrees(rad * reduction))で境界値を作る。順序を変えると
+            # 1ulpの差で境界ちょうどを保持している間だけクランプ判定が揺れうる。
+            tip_deg_limit = math.degrees(TIP_THETA_LIMIT_RAD * tip_cfg['reduction'])
+            tip_deg_clamped = clamp(tip_deg, -tip_deg_limit, tip_deg_limit)
+            tip_clamped = (tip_deg_clamped != tip_deg)
+            if tip_clamped:
+                tip_deg = tip_deg_clamped
+                tip_rpm = 0.0
+            if tip_clamped != self._tip_theta_clamped_:
+                self._tip_theta_clamped_ = tip_clamped
+                if tip_clamped:
+                    self.get_logger().warning(
+                        f'{tip_cfg["joint"]}: 可動域(電源投入位置から±'
+                        f'{math.degrees(TIP_THETA_LIMIT_RAD):.0f}deg)に達したため'
+                        'これ以上の回転を制限します')
+                else:
+                    self.get_logger().info(f'{tip_cfg["joint"]}: 可動域制限から復帰しました')
             buf[i3] = clamp_int16(tip_deg * 1.0)             # target: 1deg/LSB(アクチュエータ軸)
             buf[4 + i3] = ROBOMAS_MODE_MIT
             buf[8 + i3] = clamp_int16(tip_rpm * 1.0)         # mit_velocity_ff: 1rpm/LSB

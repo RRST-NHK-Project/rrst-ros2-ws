@@ -115,6 +115,41 @@ tip_theta_offset_radパラメータは残しているが、通常は0のまま�
 z_joint/r_jointは元々毎起動homing_nodeが/zero_channelを呼ぶ設計なので、
 こちらはros2can側オフセットが非永続でも問題ない(むしろ意図通り)。
 
+## tip_theta_jointの可動域を±135deg(合計270deg)に制限 (2026-09-10、ユーザー指定:
+## 「270度以上回らないようにしたい。つまり電源投入時の位置から左右に135度」)
+tip_thetaは2026-09-08にCubeMars AK40-10からRoboMas M2006(M3)へ移行した際、
+CubeMars時代のMITプロトコル制約(±511.6°相当、下記「MITモードの都合上そもそも
+continuousではない」節参照)が無くなり一旦「無制限」になっていた。実機側の配線・
+エア配管の巻き込み防止のため、機構制約として改めて±135deg(合計270deg)へ制限する。
+
+基準は「電源投入時の位置」。tip_thetaは原点センサを持たず、電源投入前に機構原点へ
+手で合わせておき、M2006内蔵ロータエンコーダの起動時リセット値(=0)をそのまま原点
+として使う設計(上記「root_theta/tip_thetaの原点初期化」節参照)なので、
+「アクチュエータ角0 = 電源投入時の位置」であり、アクチュエータ角を
+±135deg×減速比1.4 = ±189deg で切ることが、そのまま指定どおりの制限になる。
+
+実装(4箇所。値を変える場合は全て揃えること):
+  soki_sim/scripts/trajectory_follower_node.py TIP_THETA_LIMIT_RAD
+    - target_callback(_clamp_joint_target): joint空間で目標をクランプ。
+      台形プロファイル自体が範囲外を狙わないようにするため
+    - _publish_robomas_commands: アクチュエータ空間(±189deg)でクランプ。
+      実機へ出る最後の砦で、帰還同期によるpos_上書き・外部ノードからの
+      直接publish等、target_callbackを通らない経路も必ずここで止まる。
+      クランプ中は速度FF(mit_velocity_ff)も0にしてkd項が境界の外へ
+      押し続けないようにしている。到達/復帰時にエッジでログを出す
+  soki_sim/scripts/joy_teleop_node.py TIP_THETA_LOWER/UPPER
+    - 手先θ追従ON時(-root_theta)と、L1/R1手動ジョグの積算値の両方をクランプ
+  soki_sim/scripts/command_gui_node.py TIP_THETA_LOWER/UPPER
+    - send_target()のtip_theta(回収シーケンスの追従値・投入シーケンスの
+      shoot_tip_theta_rad)をクランプ
+  soki_sim/urdf/soki_sim.urdf.xacro tip_theta_limit
+    - tip_theta_jointをcontinuous -> revolute(±135deg)へ変更。simと実機で
+      到達可能範囲を揃えるため
+
+既知の副作用: root_thetaの可動域(±153.4deg)の方が広いため、手先θ追従ONで
+root_thetaを端まで回すと追従先(-root_theta)が±135degで頭打ちになり、
+ハンドのワーク行との平行が保てなくなる(機構制約上避けられない)。
+
 ## root_theta/tip_thetaはMITモードの都合上そもそも「continuous」ではない
 ## (2026-08-27、AK Seriesマニュアル確認により判明。対応方針決定済み)
 claude.txt/soki_sim.urdf.xacroではroot_theta_joint(旋回)/tip_theta_joint

@@ -12,8 +12,9 @@ button_tip_theta_r1・invert_*・pump_toggle_buttonパラメータで合わせ�
                                          (以前は左スティック上下)。常にこの軸が
                                          z_jointを操作する)
   L1/R1ボタン      -> tip_theta_joint  (button_tip_theta_l1/button_tip_theta_r1、
-                                         デフォルト4/5。手先θ、continuous
-                                         (可動域制限なし)。2026-09-10、ユーザー
+                                         デフォルト4/5。手先θ、可動域は電源投入
+                                         位置から±135deg(TIP_THETA_LIMIT)。
+                                         2026-09-10、ユーザー
                                          指定:「手先θの手動ジョグはL1、R1で行う」
                                          により右スティック左右(axis_tip_theta)
                                          から変更。R1側を正方向として押下状態の
@@ -199,6 +200,18 @@ R_LOWER, R_UPPER = -ARM_LENGTH / 2.0, ARM_LENGTH / 2.0
 ROOT_THETA_REDUCTION = 112.0 / 24.0
 ROOT_THETA_LIMIT = 12.5 / ROOT_THETA_REDUCTION
 ROOT_THETA_LOWER, ROOT_THETA_UPPER = -ROOT_THETA_LIMIT, ROOT_THETA_LIMIT
+
+# tip_theta(手先θ)の機構的な可動域(2026-09-10追加、ユーザー指定:「270度以上
+# 回らないようにしたい。つまり電源投入時の位置から左右に135度」)。tip_thetaは
+# 原点センサを持たず、電源投入時のM2006内蔵エンコーダのリセット値(=0)を原点として
+# 使うため、この範囲は「電源投入時の位置から±135deg」を意味する。
+# trajectory_follower_node.pyのTIP_THETA_LIMIT_RAD、command_gui_node.pyの
+# TIP_THETA_LOWER/UPPER、soki_sim.urdf.xacroのtip_theta_limitと一致させること。
+# 注意: root_thetaの可動域(±153.4deg)より狭いため、手先θ追従ON時に
+# root_thetaを端まで回すと、追従先(-root_theta)がこの範囲で頭打ちになり
+# ハンドの平行が保てなくなる(機構制約上避けられない)。
+TIP_THETA_LIMIT = math.radians(135.0)
+TIP_THETA_LOWER, TIP_THETA_UPPER = -TIP_THETA_LIMIT, TIP_THETA_LIMIT
 
 # trajectory_follower_node.py/display.launch.pyのINITIAL_ROOT_THETA_RAD/zerosと
 # 一致させること(sim起動直後、フィールドに平行・ハンドが右側になる向き、
@@ -900,7 +913,8 @@ class JoyTeleopNode(Node):
         elif self.has_current_state_:
             self.target_r_ = self._current_r_
 
-        # tip_theta_jointはcontinuous(可動域制限なし)なのでclampしない。
+        # tip_theta_jointは可動域を電源投入位置から±TIP_THETA_LIMITへ制限する
+        # (2026-09-10追加。以前はcontinuous扱いでclampしていなかった)。
         # trajectory_follower_nodeがtip_theta_joint未構成の場合はpublishしても
         # target_callback側で無視されるだけなので、has_tip_theta_state_の有無に
         # 関わらず常に試みる(2026-09-03追加)。
@@ -931,11 +945,15 @@ class JoyTeleopNode(Node):
             # 間は、回収シーケンスと同じ追従式(tip_theta=-root_theta、ワークの
             # 行と平行を保つ)を手動ジョグ中も毎周期指令し続ける。右スティック
             # 左右(tip_theta_in)による独立ジョグはこの間無視する。
-            self.target_tip_theta_ = -self.target_theta_
+            self.target_tip_theta_ = clamp(
+                -self.target_theta_, TIP_THETA_LOWER, TIP_THETA_UPPER)
             tip_theta_names.append('tip_theta_joint')
             tip_theta_positions.append(self.target_tip_theta_)
         elif enabled and tip_theta_in != 0.0:
-            self.target_tip_theta_ += tip_theta_in * self.tip_theta_speed_ * speed_scale * self.dt_
+            self.target_tip_theta_ = clamp(
+                self.target_tip_theta_
+                + tip_theta_in * self.tip_theta_speed_ * speed_scale * self.dt_,
+                TIP_THETA_LOWER, TIP_THETA_UPPER)
             tip_theta_names.append('tip_theta_joint')
             tip_theta_positions.append(self.target_tip_theta_)
         elif self.has_tip_theta_state_:

@@ -8,7 +8,7 @@ RVizでの見た目確認用途のため、慣性(inertial)や衝突形状(colli
   base_link   =[root_theta_joint (revolute, z軸, ±153.5°=実機MIT可動域)]=>  turret_link (旋回台+マスト)
   turret_link =[z_joint (prismatic, z軸)]=>             lift_link (昇降キャリッジ)
   lift_link   =[r_joint (prismatic, x軸)]=>             arm_link (伸縮アーム)
-  arm_link    =[tip_theta_joint (continuous, z軸)]=>    tip_link (手先)
+  arm_link    =[tip_theta_joint (revolute ±135deg, z軸)]=> tip_link (手先)
 
 z_joint/r_joint は実機ではmotor1/motor2の2モータによる差動機構で駆動される
 (z = k(m1+m2), r = k(m1-m2))ため、URDF上にもmotor1_joint/motor2_jointを
@@ -61,6 +61,15 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
        (2026-08-27)。 -->
   <xacro:property name="root_theta_reduction" value="${112.0 / 24.0}"/>
   <xacro:property name="root_theta_limit" value="${12.5 / root_theta_reduction}"/>
+
+  <!-- tip_theta: 実機の機構的な可動域制限(2026-09-10、ユーザー指定:「270度以上
+       回らないようにしたい。つまり電源投入時の位置から左右に135度」)。原点センサが
+       無く、電源投入時のM2006内蔵エンコーダのリセット値(=0)をそのまま原点として
+       使う構成のため、この範囲は「電源投入時の位置から±135deg」を意味する
+       (note/hardware_mapping.txt「tip_theta_joint」参照)。
+       trajectory_follower_node.pyのTIP_THETA_LIMIT_RAD、joy_teleop_node.py/
+       command_gui_node.pyのTIP_THETA_LOWER/UPPERと一致させること。 -->
+  <xacro:property name="tip_theta_limit" value="${radians(135.0)}"/>
 
   <!-- マテリアル -->
   <material name="base_grey">
@@ -209,13 +218,14 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
     </visual>
   </link>
 
-  <joint name="tip_theta_joint" type="continuous">
+  <joint name="tip_theta_joint" type="revolute">
     <parent link="arm_link"/>
     <child link="tip_link"/>
     <origin xyz="${arm_length / 2} 0 0" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
     <dynamics damping="0.1"/>
-    <limit effort="${joint_effort}" velocity="${joint_velocity}"/>
+    <limit lower="${-tip_theta_limit}" upper="${tip_theta_limit}"
+           effort="${joint_effort}" velocity="${joint_velocity}"/>
   </joint>
 
   <!-- ==================== ハンド(吸着ハンド、tip_linkに取り付く簡易形状) ====================
