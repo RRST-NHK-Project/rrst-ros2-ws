@@ -202,14 +202,13 @@ _SPIN_ROS_DRAIN_COUNT = 10
 # 都度読む。スロット数はros2can/ros2can/device_profiles.pyのSLOT_COUNTと一致させること。
 CAN_HOST_RAW_SLOT_COUNT = 24
 
-# 統合操作タブの「実機セットアップ」パネルから起動する、本番でそのまま使う
-# launch構成(note/command.txt「4軸(root_theta/tip_theta/z/r)全軸の実機動作確認。
-# 本番でそのまま使う想定」のコマンドと同じ)。real_all_axes_test.launch.pyは
+# GUI起動時に自動で起動する(_check_existing_launch_nodes参照)、本番でそのまま
+# 使うlaunch構成(note/command.txt「4軸(root_theta/tip_theta/z/r)全軸の実機動作
+# 確認。本番でそのまま使う想定」のコマンドと同じ)。real_all_axes_test.launch.pyは
 # command_gui_nodeも起動するが、既にこのGUIプロセス自身が動いているため
-# launch_gui:=falseでGUIの二重起動を防ぐ。use_viz/use_ros2canは「実機セットアップ」
-# パネルのチェックボックスから起動のたびに選べる(2026-09-07追加、ユーザー指摘:
-# 「全ノード起動ボタンで起動するrvizとros2canの起動を管理できるチェックボックスを
-# 追加」。別途起動済みのrviz/ros2canと二重起動になるのを避けたい場合に使う)。
+# launch_gui:=falseでGUIの二重起動を防ぐ。use_viz/use_ros2canは固定値
+# (2026-09-09、全ノード起動ボタン廃止に伴いチェックボックスも廃止、_on_launch_
+# all_nodes参照)。
 ALL_AXES_LAUNCH_BASE_CMD = [
     'ros2', 'launch', 'soki_sim', 'real_all_axes_test.launch.py',
     'use_joy:=true', 'launch_gui:=false',
@@ -252,10 +251,12 @@ HAND_OFFSET_LIMIT = 0.3
 SEQ_MOVE_THETA_TOL = 0.02  # rad、到達判定の許容誤差
 SEQ_MOVE_LINEAR_TOL = 0.003  # m(z_joint/r_joint共通)、到達判定の許容誤差
 SEQ_MOVE_TIMEOUT_SEC = 20.0  # 1レグあたりのタイムアウト(homing_nodeの既定値に合わせる)
-# 投入シーケンスのR軸リトラクト('retract_r_to_limit'ステップ)で送る速度[m/s]
-# (2026-09-09追加、_advance_retract_r_step参照)。r_lowerリミットスイッチに
-# 当たるまで一定速度で駆動する。joy_teleop_nodeのr_speed(既定0.2m/s、フル
-# 入力時)よりやや控えめにしてある。実機で要調整。
+# 投入シーケンスのR軸リトラクト('retract_r_to_limit'ステップ)で送る速度[m/s]の
+# 既定値(2026-09-09追加、_advance_retract_r_step参照)。r_lowerリミットスイッチに
+# 当たるまで一定速度で駆動する。実際に使う値はGUIの「ピック/投入 自動シーケンス」
+# パネルのsequence_edits['retract_r_speed_mps']が優先される(gains.jsonの
+# sequence.retract_r_speed_mpsとして永続化、DEFAULT_SEQUENCE_SETTINGS参照)。
+# これはgains.json未保存時・パース失敗時のフォールバック値としてのみ使う。
 SEQ_RETRACT_R_SPEED_MPS = 0.1
 
 # 手先θ(tip_theta_joint)の自動制御(2026-09-03新規、ユーザー指摘: 「ハンドは3つ
@@ -292,6 +293,11 @@ DEFAULT_SEQUENCE_SETTINGS = {
     # までの待機時間も必要。ほぼ同時はまずい」。パッドが物理的に収納し切る前に
     # ピッチが回り始めると干渉する恐れがあるため)。
     'gather_settle_sec': 0.5,
+    # 'retract_r_to_limit'ステップ(R軸を自動でしまう)で送る速度[m/s]
+    # (2026-09-09追加。以前はSEQ_RETRACT_R_SPEED_MPS固定値だったが、
+    # ユーザー報告:「現状遅すぎて格納できない」により実機でGUIから調整できる
+    # ようにした。_advance_retract_r_step参照)。
+    'retract_r_speed_mps': SEQ_RETRACT_R_SPEED_MPS,
 }
 
 # ---- real_joint_bridge.yaml配線設定(初期化用センサID・CubeMars/RoboMasのID・
@@ -1411,6 +1417,7 @@ class CommandGuiApp(QWidget):
         self._seq_leg_target = None
         self._seq_leg_start_time = None
         self._seq_retract_start_time = None
+        self._seq_retract_speed_mps = SEQ_RETRACT_R_SPEED_MPS
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(8, 8, 8, 8)
 
@@ -1450,11 +1457,19 @@ class CommandGuiApp(QWidget):
         self.estop_status_label.setWordWrap(True)
         _set_status(self.estop_status_label, '', 'muted')
         estop_bar.addWidget(self.estop_status_label, 1)
+        # 2026-09-09、GUI起動時に自動でソフト緊急停止を掛けた状態で始まるように
+        # なったため(_auto_engage_estop参照)、「解除」が起動直後にまず押す
+        # ボタンになる。誤って見落とさないよう、両ボタンとも通常より大きく
+        # 目立たせる(ユーザー指定:「見やすい位置に緊急停止と解除ボタンを設置」)。
+        _estop_bar_btn_style = 'font-size: 14pt; font-weight: bold; padding: 8px 20px;'
         estop_btn = QPushButton('緊急停止')
         estop_btn.setProperty('variant', 'danger')
+        estop_btn.setStyleSheet(_estop_bar_btn_style)
         estop_btn.clicked.connect(self._on_emergency_stop_requested)
         estop_bar.addWidget(estop_btn)
         estop_clear_btn = QPushButton('解除')
+        estop_clear_btn.setProperty('variant', 'primary')
+        estop_clear_btn.setStyleSheet(_estop_bar_btn_style)
         estop_clear_btn.clicked.connect(self._on_clear_emergency_stop_requested)
         estop_bar.addWidget(estop_clear_btn)
         root_layout.addLayout(estop_bar)
@@ -1536,6 +1551,11 @@ class CommandGuiApp(QWidget):
         self._robomas_auto_loaded = False
         self._robomas_vel_auto_loaded = False
         self._joy_auto_loaded = False
+        # GUI起動時、trajectory_follower_nodeが使えるようになり次第自動でソフト
+        # 緊急停止を掛けた状態にする(2026-09-09追加、ユーザー指定:「起動すると
+        # 全ノード起動しソフト緊急停止の状態で起動」)。他の自動読込/適用と同じく
+        # _try_auto_setup_gainsのリトライループに乗せる(_auto_engage_estop参照)。
+        self._estop_auto_engaged = False
         # _traj_auto_loaded/_mit_auto_loadedは読込「リクエスト送信済み」を表すだけ
         # (request_node_paramsは非同期のため)。実際に_traj_joint_names/
         # _mit_joint_namesが応答で更新されたかは以下の別フラグで判定する
@@ -2027,41 +2047,20 @@ class CommandGuiApp(QWidget):
         box = QGroupBox('実機セットアップ')
         layout = QVBoxLayout(box)
 
-        warn = QLabel()
-        warn.setWordWrap(True)
-        _set_status(warn, '(事前確認) 緊急停止ボタンを押すこと', 'error')
-        layout.addWidget(warn)
-
         desc = QLabel()
         desc.setWordWrap(True)
-        _set_status(desc, '上から順に実行する想定(ノード起動→ゲイン適用→原点校正)。\n'
-                          '各操作の詳細な値編集はゲイン調整・原点校正タブで行う。\n'
+        _set_status(desc, 'GUI起動時に全ノードを自動起動し、ソフト緊急停止を掛けた\n'
+                          '状態で開始する(2026-09-09、全ノード起動ボタンは廃止)。\n'
+                          '解除は画面上部の緊急停止バーの「解除」ボタンで行う。\n'
+                          'ノード再起動が必要な場合のみ、下の「停止」で止めてから\n'
+                          'GUIを再起動すること。\n'
+                          '各ゲインの詳細な値編集はゲイン調整・原点校正タブで行う。\n'
                           '進捗は左の機体ステータスパネル(適用ゲイン・校正状態)で確認できる。', 'muted')
         layout.addWidget(desc)
 
-        # rvizは別途起動済みの場合に二重起動を避けたいことがあるため、「全ノード
-        # 起動」のたびにON/OFFできるようにする。ros2canは常に起動する(実機接続の
-        # 前提として必須)が、GUI(PyQt5ウィンドウ)か--nogui(ターミナルダッシュ
-        # ボード)かは選べるようにする(2026-09-07追加、ユーザー指摘: 「全ノード
-        # 起動ボタンで起動するrvizとros2canの起動を管理できるチェックボックスを
-        # 追加」→「ros2canは起動するよもちろん。チェックボックスで選ぶのは
-        # ros2can --noguiか否かだけ」)。既定はrviz起動ON・ros2can GUI(従来通り)。
-        launch_options_row = QHBoxLayout()
-        self.launch_use_viz_checkbox = QCheckBox('rvizを起動する')
-        self.launch_use_viz_checkbox.setChecked(True)
-        self.launch_ros2can_gui_checkbox = QCheckBox('ros2canをGUIで起動する(オフで--nogui)')
-        self.launch_ros2can_gui_checkbox.setChecked(True)
-        launch_options_row.addWidget(self.launch_use_viz_checkbox)
-        launch_options_row.addWidget(self.launch_ros2can_gui_checkbox)
-        layout.addLayout(launch_options_row)
-
         launch_row = QHBoxLayout()
-        launch_btn = QPushButton('全ノード起動')
-        launch_btn.setProperty('variant', 'primary')  # よく使う操作のため目立つ色に(2026-09-03)
         stop_launch_btn = QPushButton('停止')
-        launch_btn.clicked.connect(self._on_launch_all_nodes)
         stop_launch_btn.clicked.connect(self._on_stop_all_nodes)
-        launch_row.addWidget(launch_btn)
         launch_row.addWidget(stop_launch_btn)
         layout.addLayout(launch_row)
         self.launch_status_label = QLabel()
@@ -2095,10 +2094,10 @@ class CommandGuiApp(QWidget):
         if self._launch_process is not None and self._launch_process.poll() is None:
             QMessageBox.information(self, '起動済み', '既に起動中です(先に停止してください)')
             return
-        use_viz = 'true' if self.launch_use_viz_checkbox.isChecked() else 'false'
-        # チェックボックスは「GUIで起動する」なので、ros2can_nogui引数へは反転して渡す。
-        ros2can_nogui = 'false' if self.launch_ros2can_gui_checkbox.isChecked() else 'true'
-        cmd = ALL_AXES_LAUNCH_BASE_CMD + [f'use_viz:={use_viz}', f'ros2can_nogui:={ros2can_nogui}']
+        # 2026-09-09、全ノード起動ボタン廃止(GUI起動時に自動起動するため)に伴い、
+        # rviz起動・ros2can GUIのON/OFFを選ぶチェックボックスも廃止し、従来の既定値
+        # (両方ON)で固定する。
+        cmd = ALL_AXES_LAUNCH_BASE_CMD + ['use_viz:=true', 'ros2can_nogui:=false']
         try:
             # start_new_session=True(setsid)でこの子プロセスを独立したプロセス
             # グループのリーダーにする。ros2 launchはさらに複数のノードを自分の
@@ -2350,7 +2349,10 @@ class CommandGuiApp(QWidget):
         grid = QGridLayout()
         self.sequence_edits = {}
         for i, (key, label) in enumerate((
-                ('shoot_tip_theta_rad', '投入時手先θ[rad](暫定)'),)):
+                ('shoot_tip_theta_rad', '投入時手先θ[rad](暫定)'),
+                # R軸自動リトラクトの速度(2026-09-09追加、retract_r_checkbox ON時のみ
+                # 使う。ユーザー報告:「現状遅すぎて格納できない」)。
+                ('retract_r_speed_mps', 'R軸格納速度[m/s]'),)):
             grid.addWidget(QLabel(label), i, 0)
             edit = make_float_edit(DEFAULT_SEQUENCE_SETTINGS[key])
             self.sequence_edits[key] = edit
@@ -2574,9 +2576,19 @@ class CommandGuiApp(QWidget):
         まで一定速度を送り続ける。r_lower_limit_triggered(個別状態、
         get_r_lower_limit_triggered参照)がTrueになったら完了とする
         (集約フラグlimit_stop_activeを使わないのは、人が同時にZ軸を操作して
-        Z側のスイッチが先に反応した場合に誤ってR軸到達と判定しないため)。"""
+        Z側のスイッチが先に反応した場合に誤ってR軸到達と判定しないため)。
+        速度はGUIのsequence_edits['retract_r_speed_mps']から読む(2026-09-09、
+        ユーザー報告:「現状遅すぎて格納できない」により固定値から変更)。
+        ステップ開始時に一度だけ読んで以降は使い回す(タイムアウト判定や停止
+        処理の途中で毎周期パースし直すと、編集中の一時的な不正値で例外に
+        なりR軸が速度指令を送りっぱなしのまま止まる恐れがあるため)。"""
         if self._seq_retract_start_time is None:
             self._seq_retract_start_time = time.monotonic()
+            try:
+                speed = get_float(self.sequence_edits['retract_r_speed_mps'])
+            except ValueError:
+                speed = SEQ_RETRACT_R_SPEED_MPS
+            self._seq_retract_speed_mps = speed if speed > 0.0 else SEQ_RETRACT_R_SPEED_MPS
             _set_status(self.sequence_status_label,
                         f'{self._seq_kind}: R軸リトラクト中 (ステップ{self._seq_index + 1}/'
                         f'{len(self._seq_steps)})', 'muted')
@@ -2591,7 +2603,7 @@ class CommandGuiApp(QWidget):
                 f'{self._seq_kind}: R軸リトラクトタイムアウト(ステップ{self._seq_index + 1}、'
                 'r_lower_limit_triggeredを受信できていない可能性があります)')
             return
-        self.node.send_velocity_r(-SEQ_RETRACT_R_SPEED_MPS)
+        self.node.send_velocity_r(-self._seq_retract_speed_mps)
 
     def _advance_hand_step(self, step):
         """'call'ステップ(人間の判断を要しない自動実行分)。実際の呼び出し結果は
@@ -3785,6 +3797,8 @@ class CommandGuiApp(QWidget):
             self._robomas_vel_auto_loaded = True
         if not self._joy_auto_loaded and self._on_load_joy_speed():
             self._joy_auto_loaded = True
+        if not self._estop_auto_engaged and self._auto_engage_estop():
+            self._estop_auto_engaged = True
 
         # 軌道生成・MITは配列の並び順・要素数がjoint_names次第のため、読込の
         # 「応答」が届いてから適用する(_traj_names_known/_mit_names_known参照。
@@ -3807,8 +3821,17 @@ class CommandGuiApp(QWidget):
         if all((self._traj_auto_loaded, self._mit_auto_loaded,
                 self._robomas_auto_loaded, self._robomas_vel_auto_loaded, self._joy_auto_loaded,
                 self._traj_auto_applied, self._mit_auto_applied,
-                self._robomas_auto_applied, self._robomas_vel_auto_applied, self._joy_auto_applied)):
+                self._robomas_auto_applied, self._robomas_vel_auto_applied, self._joy_auto_applied,
+                self._estop_auto_engaged)):
             self._auto_load_timer.stop()
+
+    def _auto_engage_estop(self):
+        """GUI起動時、trajectory_follower_nodeの/engage_estopが使えるように
+        なり次第、自動でソフト緊急停止を掛ける(2026-09-09追加)。他の自動読込/
+        適用と同じく、_on_emergency_stop_requestedとは別に単独でリトライする
+        (シーケンス中断処理は起動直後は不要なため、call_trigger_serviceを
+        直接呼ぶだけでよい)。"""
+        return self.node.call_trigger_service('/engage_estop', self._on_estop_engage_done)
 
     def _auto_apply_saved_traj(self):
         """gains.jsonのtrajectory値を、読込で学習した_traj_joint_names順の配列に
@@ -3872,7 +3895,17 @@ class CommandGuiApp(QWidget):
         if not saved:
             return True
         _set_status(self.joy_speed_status_label, '自動適用中(gains.json)...', 'muted')
-        return self.node.set_node_params(JOY_NODE_NAME, saved, self._apply_joy_speed_set_result)
+        joy_ok = self.node.set_node_params(JOY_NODE_NAME, saved, self._apply_joy_speed_set_result)
+        # low_speed_multiplierはtrajectory_follower_node側にも送る必要がある
+        # (_on_apply_joy_speedのコメント参照)。両方送信できて初めて完了扱いにする
+        # (どちらかが未起動ならこの関数はFalseを返し、_try_auto_setup_gainsが
+        # 次回tickで再試行する)。
+        traj_ok = True
+        if 'low_speed_multiplier' in saved:
+            traj_ok = self.node.set_node_params(
+                TRAJ_NODE_NAME, {'low_speed_multiplier': saved['low_speed_multiplier']},
+                self._apply_joy_speed_set_result)
+        return joy_ok and traj_ok
 
     def _apply_loaded_traj_params(self, values):
         vel = values.get('max_velocity')
@@ -4383,9 +4416,19 @@ class CommandGuiApp(QWidget):
             return
         self._persist_gains('joy_speed', values)
         ok = self.node.set_node_params(JOY_NODE_NAME, values, self._apply_joy_speed_set_result)
+        # low_speed_multiplierはtrajectory_follower_node側にも同名パラメータが
+        # あり、そちらが実際の速度モード上限(_slew_velocityのmax_vクランプ)を
+        # 下げる役目を持つ(joy側のz_speed/r_speedは常時そのクランプへ飽和させる
+        # 設計のため、joy側だけ倍率を掛けても実速度が変わらない。2026-09-09、
+        # ユーザー報告:「低速モードが機能していない」)。両ノードへ同じ値を送り
+        # 揃える。
+        traj_ok = self.node.set_node_params(
+            TRAJ_NODE_NAME, {'low_speed_multiplier': values['low_speed_multiplier']},
+            self._apply_joy_speed_set_result)
         _set_status(self.joy_speed_status_label,
-                    '適用中...' if ok else 'joy_teleop_nodeに接続できません(use_joy:=trueで起動?)',
-                    'muted' if ok else 'error')
+                    '適用中...' if (ok and traj_ok) else
+                    '接続できないノードがあります(joy_teleop_node/trajectory_follower_node起動確認)',
+                    'muted' if (ok and traj_ok) else 'error')
 
     def _apply_joy_speed_set_result(self, results):
         if results is None:
@@ -4504,18 +4547,24 @@ class CommandGuiApp(QWidget):
         start_new_session=Trueで独立させたlaunchプロセスは生き残り続けるが、
         self._launch_processはこのGUIプロセスのメモリ上の変数でしかないため
         新しいGUIプロセスからはその存在が見えず、「停止」ボタンでも管理できない。
-        気づかず放置される事故を防ぐため、起動時に一度だけ警告する。"""
+        気づかず放置される事故を防ぐため、起動時に一度だけ警告する。
+
+        何も動いていなければ、2026-09-09追加分として自動で全ノードを起動する
+        (ユーザー指定:「全ノード起動ボタンは廃止し、起動すると全ノード起動」)。
+        ソフト緊急停止の自動投入は_try_auto_setup_gains/_auto_engage_estop側で、
+        trajectory_follower_nodeが使えるようになり次第リトライしながら行う。"""
         try:
             running = set(self.node.get_node_names()) & ALL_AXES_LAUNCH_NODE_NAMES
         except Exception:
             return
         if not running:
+            self._on_launch_all_nodes()
             return
         QMessageBox.warning(
             self, '起動中の実機ノードを検知',
             'このGUIが起動していないはずの実機ノードが既に動作中です:\n'
             '  ' + ', '.join(sorted(running)) + '\n\n'
-            'おそらく前回のGUIセッションで「全ノード起動」したプロセスが、\n'
+            'おそらく前回のGUIセッションで自動起動したプロセスが、\n'
             'GUI終了時に停止されずそのまま生き残っています\n'
             '(self._launch_processはGUIプロセスごとに独立した変数のため、\n'
             'このGUIの「停止」ボタンでは止められません)。\n\n'

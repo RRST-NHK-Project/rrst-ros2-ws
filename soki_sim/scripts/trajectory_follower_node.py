@@ -289,6 +289,17 @@ class TrajectoryFollowerNode(Node):
         self.declare_parameter('robomas_vel_ki', 0.0)
         self.declare_parameter('robomas_vel_kd', 0.0)
         self.declare_parameter('robomas_vel_max_current_a', 1.0)
+        # 低速モード(SHAREボタン、joy_teleop_node側、2026-09-09追加)の倍率。
+        # joy_teleop_node側のz_speed/r_speedは、この速度モードのmax_velocity
+        # クランプ(_slew_velocity)へ常時飽和させる設計の大きな値になっているため、
+        # joy側だけをlow_speed_multiplier倍しても実際の出力速度(ここでのmax_v)は
+        # 変わらない(2026-09-09、ユーザー報告:「低速モードが機能していない」)。
+        # low_speed_active(joy_teleop_node発、latched)を購読し、ONの間は
+        # _slew_velocityのmax_vをこの倍率で下げることで実際に速度を落とす。
+        # joy_teleop_node側の同名パラメータと値を揃えること(command_gui_nodeの
+        # 「手動操作(joy)速度」パネルの適用が両ノードへ送る、_on_apply_joy_speed
+        # 参照)。
+        self.declare_parameter('low_speed_multiplier', 0.3)
         self.declare_parameter('robomas_z_joint', 'z_joint')
         self.declare_parameter('robomas_r_joint', 'r_joint')
         self.declare_parameter('robomas_mix_k', 0.5)
@@ -462,14 +473,21 @@ class TrajectoryFollowerNode(Node):
         # /set_root_theta_originで起動した「原点設定モード保持」の残り周期数
         # (関節名 -> 残りcycle数)。0または未登録なら通常のMIT指令を送る。
         self._origin_pending_ = {}
+        # 直近のCubeMars帰還の生データ(device_id -> msg.data、絶対値エンコーダ
+        # 基準)。has_target_の前後を問わず毎回更新する(_compute_real_cubemars
+        # 参照。以前はhas_target_==True以降キャッシュ自体をしておらず、緊急停止
+        # 解除時にpos_を実角度へ再同期する手段が無かった)。
+        self._last_cubemars_raw_ = {}
 
     def _on_cubemars_feedback(self, msg: Int32MultiArray, device_id: int):
+        self._last_cubemars_raw_[device_id] = msg.data
         # 最初の/joint_targets受信(has_target_=True)より前は、実機からの帰還値で
         # self.pos_を追従させておく。これをしないとノード起動直後の内部状態(0.0)と
         # 実機の実際の角度がズレたまま最初の目標へ台形プロファイルが走り、
         # 実機側に意図しない大きな位置ジャンプ(Kp*(p_des-p)のステップ入力)が
         # 発生する。目標を一度でも受け取ったら以後はプロファイル側の値を信用し、
-        # 帰還での上書きはしない。
+        # 帰還での上書きはしない(緊急停止解除時の再同期は_on_release_estop/
+        # _compute_real_cubemars参照)。
         if self.has_target_:
             return
         for name, cfg in self.cubemars_.items():
@@ -480,6 +498,24 @@ class TrajectoryFollowerNode(Node):
             self.pos_[name] = joint_rad
             self.vel_[name] = 0.0
             self.target_[name] = joint_rad
+
+    def _compute_real_cubemars(self):
+        """直近のCubeMars帰還(self._last_cubemars_raw_、絶対値エンコーダ基準)から
+        cubemars_joint_names各関節の実角度を計算する({joint_name: rad}、対象
+        device_idの帰還を一度も受信していない関節は結果に含めない)。
+        _on_cubemars_feedbackの起動直後初期値計算と、_on_release_estop(緊急停止
+        解除時のpos_/target_再同期)から使う共通ロジック。CubeMars(root_theta)は
+        絶対値エンコーダのため、has_target_後もいつでもこの帰還を信用してよい
+        (相対エンコーダのロボマスz/r向け_compute_real_zrとは異なり、常時この
+        方法で実角度が取れる)。"""
+        result = {}
+        for name, cfg in self.cubemars_.items():
+            data = self._last_cubemars_raw_.get(cfg['device_id'])
+            if data is None:
+                continue
+            raw_deg = data[cfg['motor_index']] * CUBEMARS_POSITION_SCALE_DEG
+            result[name] = math.radians(raw_deg) / cfg['reduction']
+        return result
 
     def _setup_robomas_outputs(self):
         device_id = int(self.get_parameter('robomas_device_id').value)
@@ -551,6 +587,14 @@ class TrajectoryFollowerNode(Node):
         self.robomas_vel_ki_ = float(self.get_parameter('robomas_vel_ki').value)
         self.robomas_vel_kd_ = float(self.get_parameter('robomas_vel_kd').value)
         self.robomas_vel_max_current_a_ = float(self.get_parameter('robomas_vel_max_current_a').value)
+        # 低速モード(SHAREボタン、joy_teleop_node側)の倍率とON/OFF状態
+        # (low_speed_multiplier宣言部のコメント参照)。joy_teleop_node発の
+        # low_speed_active(latched)を購読し、ONの間は_slew_velocityのmax_vへ
+        # この倍率を掛けて実際の速度モード上限を下げる。
+        self.low_speed_multiplier_ = float(self.get_parameter('low_speed_multiplier').value)
+        self._low_speed_active_ = False
+        low_speed_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self.create_subscription(Bool, 'low_speed_active', self._on_low_speed_active, low_speed_qos)
         # joy_teleop_nodeからのjoint_velocity_targets(m/s、joint空間)の最新値と
         # 受信時刻(ROBOMAS_VELOCITY_TARGET_STALE_SEC超で途絶とみなし0指令にする、
         # _velocity_mode_target_rpm参照)。
@@ -633,6 +677,13 @@ class TrajectoryFollowerNode(Node):
         if self.has_target_ and not self.estop_active_:
             self._publish_robomas_commands()
 
+    # 各軸で「位置を増加させる方向への移動」をブロックするのがlower/upperどちらの
+    # スイッチかを表す。z軸は上限スイッチ(upper)が増加を、下限(lower)が減少を
+    # ブロックする素直な配線だが、r軸のリミットスイッチは中心付近に2箇所配置され
+    # R軸両端の板が外側から侵入することで反応する配線のため、この対応がz軸と
+    # 逆になる(2026-09-09、実機報告・ユーザー確認:「逆にするのはR軸だけ」)。
+    _BLOCK_DIRECTION_FOR_INCREASE = {'z': 'upper', 'r': 'lower'}
+
     def _limit_triggered(self, axis, direction):
         """axis('z'/'r')のdirection('lower'/'upper')側リミットスイッチが現在
         トリガーされているか。未配線(device_id=0)・帰還未受信ならFalse。"""
@@ -645,12 +696,23 @@ class TrajectoryFollowerNode(Node):
         triggered = bool(data[info['slot']] == self.limit_switch_triggered_value_)
         key = (axis, direction)
         if triggered and not self._limit_switch_prev_triggered_.get(key, False):
+            blocks_increase = direction == self._BLOCK_DIRECTION_FOR_INCREASE.get(axis, 'upper')
             self.get_logger().warning(
                 f"trajectory_follower_node: {axis}_{direction} limit switch triggered "
                 f"(device_id={info['device_id']}, slot={info['slot']}). blocking further "
-                f"{'increase' if direction == 'upper' else 'decrease'} of {info['joint']}.")
+                f"{'increase' if blocks_increase else 'decrease'} of {info['joint']}.")
         self._limit_switch_prev_triggered_[key] = triggered
         return triggered
+
+    def _limit_blocks(self, axis, increase):
+        """axisの位置を増加(increase=True)/減少(increase=False)させる方向への
+        移動を、対応するリミットスイッチのトリガーがブロックすべきかを返す。
+        _BLOCK_DIRECTION_FOR_INCREASE参照(r軸はスイッチ配置の都合でlower/upperの
+        対応がz軸と逆)。"""
+        block_direction = self._BLOCK_DIRECTION_FOR_INCREASE.get(axis, 'upper')
+        if not increase:
+            block_direction = 'lower' if block_direction == 'upper' else 'upper'
+        return self._limit_triggered(axis, block_direction)
 
     def _compute_real_zr(self):
         """直近のロボマスmotor1/motor2帰還(self._last_robomas_m1_m2_)からz/rの
@@ -760,6 +822,9 @@ class TrajectoryFollowerNode(Node):
                 self._velocity_targets_[name] = vel
         self._velocity_targets_stamp_ = time.monotonic()
 
+    def _on_low_speed_active(self, msg: Bool):
+        self._low_speed_active_ = msg.data
+
     def _reset_velocity_mode_slew(self):
         """速度モードのスルーレート制限状態を0へ戻す(_slew_velocity参照)。
         速度モードのON/OFF切替・pause・緊急停止など、次に速度指令を出すときは
@@ -774,10 +839,16 @@ class TrajectoryFollowerNode(Node):
         max_acceleration/max_decelerationでクランプ・ランプする。
         前周期の指令値(self._velocity_mode_cmd_[name])からmax_accel(加速)または
         max_decel(減速・反転)で1ステップだけ近づける(trap_stepのaccel_nowと
-        同じ考え方)。max_*が0以下なら制限なし(従来どおりそのまま通す)。"""
+        同じ考え方)。max_*が0以下なら制限なし(従来どおりそのまま通す)。
+        低速モード(low_speed_multiplier宣言部のコメント参照)がONの間は、
+        joy_teleop_node側のz_speed/r_speedが常時このmax_vへ飽和する設計のため、
+        joy側の倍率だけでは実際の速度が変わらない。ここでmax_v自体を倍率分
+        下げることで実際に速度モードの上限を落とす。"""
         max_v = self.max_vel_.get(name, 0.0)
         max_a = self.max_accel_.get(name, 0.0)
         max_d = self.max_decel_.get(name, 0.0)
+        if self._low_speed_active_:
+            max_v *= self.low_speed_multiplier_
         if max_v > 0.0:
             target_vel = max(-max_v, min(max_v, target_vel))
         prev = self._velocity_mode_cmd_[name]
@@ -798,7 +869,9 @@ class TrajectoryFollowerNode(Node):
         joint_velocity_targetsが一定時間(ROBOMAS_VELOCITY_TARGET_STALE_SEC)
         途絶していれば安全側で0とみなす(joy_teleop_node異常終了対策)。
         リミットスイッチがトリガーされている方向への速度指令は0にクランプする
-        (timer_callbackの位置モード側クランプと同じ考え方、反対方向への後退は許可)。
+        (timer_callbackの位置モード側クランプと同じ考え方、反対方向への後退は許可。
+        どちら向きをブロックするかは_limit_blocks/_BLOCK_DIRECTION_FOR_INCREASE
+        参照。r軸はスイッチ配置の都合でz軸と対応が逆)。
         さらに、位置モードと同じmax_velocity/max_acceleration/max_decelerationを
         z/r速度指令へ適用する(_slew_velocity参照、2026-09-09。以前は速度モードだけ
         これらを無視していた)。"""
@@ -806,10 +879,10 @@ class TrajectoryFollowerNode(Node):
                  or time.monotonic() - self._velocity_targets_stamp_ > ROBOMAS_VELOCITY_TARGET_STALE_SEC)
         z_vel = 0.0 if stale else self._velocity_targets_.get(cfg['z_joint'], 0.0)
         r_vel = 0.0 if stale else self._velocity_targets_.get(cfg['r_joint'], 0.0)
-        z_blocked = ((z_vel > 0.0 and self._limit_triggered('z', 'upper'))
-                     or (z_vel < 0.0 and self._limit_triggered('z', 'lower')))
-        r_blocked = ((r_vel > 0.0 and self._limit_triggered('r', 'upper'))
-                     or (r_vel < 0.0 and self._limit_triggered('r', 'lower')))
+        z_blocked = ((z_vel > 0.0 and self._limit_blocks('z', True))
+                     or (z_vel < 0.0 and self._limit_blocks('z', False)))
+        r_blocked = ((r_vel > 0.0 and self._limit_blocks('r', True))
+                     or (r_vel < 0.0 and self._limit_blocks('r', False)))
 
         # リミットスイッチによるクランプは_slew_velocity(max_decelerationでの
         # なだらかな減速)を経由させず、即座に0へ切る(2026-09-09、ユーザー報告:
@@ -852,6 +925,23 @@ class TrajectoryFollowerNode(Node):
 
     def _on_release_estop(self, request, response):
         self.estop_active_ = False
+        # 緊急停止中に人がroot_thetaを手で動かした場合など、実機の絶対値
+        # エンコーダ位置とself.pos_(開ループの内部シミュレーション、estop中は
+        # timer_callbackが早期returnするため凍結されたまま)がズレている
+        # 可能性がある。ズレたままtrap_stepを再開すると、MIT位置指令
+        # (kp*(pos_-実位置))が凍結中に貯まった差分ぶん大きなステップ入力になり、
+        # root_thetaが解除直後に突然動く(2026-09-09、ユーザー報告:「根本θが
+        # 突然動く挙動...非常に危険。絶対値エンコーダーがあるから防げるはず」)。
+        # CubeMars(root_theta)は絶対値エンコーダのため、いつでも実角度をそのまま
+        # 信用してpos_/target_を現在地へ同期できる(_compute_real_cubemars参照)。
+        # target_も現在地へ揃えるのは、解除直後に凍結前の古い目標へ向けて再び
+        # 動き出さないようにするため(GUI側の「緊急停止の解除...自動シーケンスは
+        # 自動で再開しない」という既存方針と同じ考え方。続きの移動が必要なら
+        # 人やGUIが改めて指示する)。
+        for name, val in self._compute_real_cubemars().items():
+            self.pos_[name] = val
+            self.vel_[name] = 0.0
+            self.target_[name] = val
         self._publish_estop_state()
         self.get_logger().warning('trajectory_follower_node: emergency stop released')
         response.success = True
@@ -910,6 +1000,9 @@ class TrajectoryFollowerNode(Node):
                 return SetParametersResult(
                     successful=False,
                     reason='disabled_joints entries must be in joint_names')
+            if p.name == 'low_speed_multiplier' and not (0.0 < p.value <= 1.0):
+                return SetParametersResult(
+                    successful=False, reason='low_speed_multiplier must be in (0.0, 1.0]')
         for p in params:
             if p.name == 'max_velocity':
                 self.max_vel_ = dict(zip(self.joint_names_, p.value))
@@ -1010,6 +1103,8 @@ class TrajectoryFollowerNode(Node):
                        'robomas_vel_kd': 'robomas_vel_kd_',
                        'robomas_vel_max_current_a': 'robomas_vel_max_current_a_'}[p.name]
                 setattr(self, key, float(p.value))
+            elif p.name == 'low_speed_multiplier' and self.robomas_ is not None:
+                self.low_speed_multiplier_ = float(p.value)
         return SetParametersResult(successful=True)
 
     def target_callback(self, msg: JointState):
@@ -1107,8 +1202,8 @@ class TrajectoryFollowerNode(Node):
             axis = axis_for_joint.get(name)
             if axis is not None:
                 pos = self.pos_[name]
-                blocked = ((target > pos and self._limit_triggered(axis, 'upper'))
-                           or (target < pos and self._limit_triggered(axis, 'lower')))
+                blocked = ((target > pos and self._limit_blocks(axis, True))
+                           or (target < pos and self._limit_blocks(axis, False)))
                 if blocked:
                     if real_zr is not None and name in real_zr:
                         self.pos_[name] = real_zr[name]
@@ -1138,7 +1233,23 @@ class TrajectoryFollowerNode(Node):
                 # スロットをorigin_modeとして解釈するため、通常のtarget/kp/kd等は書かない)。
                 buf[m] = CUBEMARS_ORIGIN_MODE_PERMANENT
                 buf[4 + m] = CUBEMARS_MODE_SET_ORIGIN
-                self._origin_pending_[name] = remaining - 1
+                remaining -= 1
+                self._origin_pending_[name] = remaining
+                if remaining == 0:
+                    # Set Origin完了。実機の絶対値エンコーダ基準がこの瞬間リセット
+                    # され、現在の物理角度が0radになる(_set_cubemars_originの
+                    # docstring通り、呼び出し前に真の機械原点へ物理的に合わせて
+                    # おく運用のため、それがそのまま新原点=0になる)。ソフト側の
+                    # pos_/target_は旧原点基準の古い角度のまま据え置かれていたため、
+                    # ここで0へ同期しないと、次周期から再開する通常のMIT指令が
+                    # kp*(pos_(旧角度)-実位置(0))という大きなステップ入力になり、
+                    # root_thetaが原点設定直後に突然動いてしまっていた
+                    # (2026-09-09、ユーザー報告:「根本θが急激に動く挙動...
+                    # たまに出る」。root_theta原点設定ボタンを押した後に限って
+                    # 再現していたと考えられる)。
+                    self.pos_[name] = 0.0
+                    self.vel_[name] = 0.0
+                    self.target_[name] = 0.0
                 continue
 
             actuator_deg = math.degrees(self.pos_[name]) * cfg['reduction']
