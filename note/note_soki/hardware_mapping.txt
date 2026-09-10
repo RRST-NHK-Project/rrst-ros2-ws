@@ -733,3 +733,59 @@ GUI経由のOFF(_on_set_tip_theta_follow_srv)ではこのフラグを立てな�
   joy速度パネル            : tip_theta_speed[rad/s] (L1/R1ジョグ速度)
 firmware側の速度PID(robomas_vel_kp/ki/kd/max_current)はz/r専用で、tip_thetaは
 常にMIT位置制御のため効かない。
+
+## 手動ジョグの速度がタイミングによって変わる (2026-09-10、ユーザー報告「手先θの
+## 速度のレンジが全然ちがうときがある。手動操作で」。切り分け: 進行方向によらず
+## タイミングで変わる、ボタンを離せば止まる)
+**原因**: joy_teleop_node._timer_callbackのジョグ積分が、経過時間としてタイマー
+周期の**公称値**(self.dt_ = 1/update_rate_hz)を使っていた。ROS2のタイマーはCPU
+負荷で遅れるため、実際には50Hzで回っていなくても「50Hzで回った前提」で目標を
+進めることになり、遅れたぶんだけ目標の進みが実時間に対して遅くなる。同じボタンを
+同じ時間押しても、そのときの負荷次第で移動量・体感速度が変わる。
+2026-09-10にros2canを--noguiからGUIありへ戻したぶんCPU負荷が増えており
+(rviz + command_gui_node + ros2can GUIの同時起動)、症状が出やすくなっていた。
+
+**対策(実装済み、joy_teleop_node.py)**:
+  - ジョグ積分をtime.monotonic()の差分(実測経過時間)で行う。root_theta/z/r/
+    tip_thetaの4軸すべて。異常に長いギャップ(取りこぼし・一時停止)で目標が
+    飛ばないよう、公称周期の5倍で頭打ちにする
+  - _check_timer_slipを追加。実測dtが公称の2倍を超えた回数と最悪値を5秒ごとに
+    まとめて1行警告する(毎周期出すとログが流れるため間引く)。積分は補正済み
+    なので目標の進みは狂わないが、操作の応答自体は粗くなるので、負荷を減らすか
+    update_rateを下げる判断材料にする
+
+**参考: 手先θの速度が変わる「仕様上の」要因**(上記とは別。混同しないこと):
+  追従ON(既定)     : L1/R1は無視され、-root_thetaとしてtheta_speed(1.0rad/s)で動く
+  追従OFF + L1/R1  : tip_theta_speed(1.0rad/s)
+  低速モードON     : 上記すべてlow_speed_multiplier(0.3)倍 = 3.3倍差
+  低速モード(SHARE)・追従(OPTIONS)はどちらもトグル時にINFOログを出すので、
+  速度が違うと感じたらまずログでどちらの状態にいるかを確認する。
+
+## 手先θ追従の回転方向が逆だった (2026-09-10、ユーザー報告「手先追従時はモーターの
+## 回転が逆、手動操作時のコントローラーとの対応づけはあっている」)
+**切り分け**: 手動ジョグ(L1/R1)は正しい向きに動いており、invert_tip_thetaは
+どのlaunch/configでも設定されていない(sign_tip_theta_=+1.0のまま)。つまり
+tip_theta_jointの関節角の向きの定義自体は合っていて、**追従の関係式だけが逆**
+だった。real_joint_bridge.yamlのtip_theta_signやfirmware側は触る必要が無い
+(触ると手動操作まで逆になる)。
+
+**原因**: 追従式 tip_theta = -root_theta の符号が、2026-09-08のtip_theta駆動系
+変更(CubeMars AK40-10の直接駆動 -> RoboMas M2006 + タイミングベルト20T/28T)に
+追随していなかった。モータが機構のどちら側に付くかが変わり、root_thetaの回転に
+対して手先が回る向きが反転したが、-1.0はCubeMars時代(2026-09-03、回収シーケンス
+実装時)の値をそのまま流用していた。
+
+**対策(実装済み)**: TIP_THETA_FOLLOW_SIGNという名前付き定数を新設して+1.0とし、
+追従式を tip_theta_joint = TIP_THETA_FOLLOW_SIGN * root_theta_joint に統一した。
+追従式は2箇所にあり、**必ず両方を同じ値に揃えること**(片方だけ直すと手動運転中の
+追従と回収シーケンスで向きが食い違う):
+  soki_sim/scripts/joy_teleop_node.py   TIP_THETA_FOLLOW_SIGN
+    - _timer_callbackの手先θ追従分岐(OPTIONSトグルON時、既定ON)
+  soki_sim/scripts/command_gui_node.py  TIP_THETA_FOLLOW_SIGN
+    - _start_pick_sequenceのtip_theta_pick(回収シーケンス)
+関連する説明コメントの「-root_theta」表記も全てTIP_THETA_FOLLOW_SIGN*root_theta
+へ更新済み。
+
+**要実機確認**: 追従ONでroot_thetaを回したとき、吸着パッド3個の展開軸がワークの行
+(ワールドX軸)と平行に保たれるか。回収シーケンス(workボタン/×ボタン)でも同様に
+平行になるか。sim(rviz)と実機で向きが一致しているかも併せて確認すること。

@@ -13,7 +13,7 @@ button_tip_theta_r1・invert_*・pump_toggle_buttonパラメータで合わせ�
                                          z_jointを操作する)
   L1/R1ボタン      -> tip_theta_joint  (button_tip_theta_l1/button_tip_theta_r1、
                                          デフォルト4/5。手先θ、可動域は電源投入
-                                         位置から±135deg(TIP_THETA_LIMIT)。
+                                         位置から±135degの制限は2026-09-10に廃止
                                          2026-09-10、ユーザー
                                          指定:「手先θの手動ジョグはL1、R1で行う」
                                          により右スティック左右(axis_tip_theta)
@@ -129,7 +129,7 @@ button_tip_theta_r1・invert_*・pump_toggle_buttonパラメータで合わせ�
                                          「OPTIONSボタンで手先θを根本θに追従させる
                                          か切り替えられるように」「デフォルトを
                                          自動シーケンスで実行に」。ONの間は
-                                         tip_theta_joint = -root_theta_jointを
+                                         tip_theta_joint = TIP_THETA_FOLLOW_SIGN*root_theta_jointを
                                          毎周期指令し続け(回収シーケンスと同じ
                                          追従式)、右スティック左右による手動ジョグは
                                          無視する。OFFにすると従来通り右スティック
@@ -139,7 +139,7 @@ button_tip_theta_r1・invert_*・pump_toggle_buttonパラメータで合わせ�
                                          投入(L4/R4)シーケンス開始時にGUI側が自動で
                                          OFFにする(投入シーケンスは手先θを固定値
                                          shoot_tip_theta_radへ制御するため、追従ONの
-                                         ままだと本ノードが毎周期-root_thetaへ上書き
+                                         ままだと本ノードが毎周期TIP_THETA_FOLLOW_SIGN*root_thetaへ上書き
                                          して競合するのを防ぐ、_on_set_tip_theta_
                                          follow_srv参照))
   SHAREボタン      -> 低速モードトグル (low_speed_toggle_button, デフォルト8。
@@ -180,6 +180,7 @@ max_velocity/max_accelerationを引き上げ済み)。本ノード自体は追�
 ためupdate_rate_hzのデフォルトを50Hzにしている。
 """
 import math
+import time
 
 import rclpy
 from rcl_interfaces.msg import SetParametersResult
@@ -201,17 +202,33 @@ ROOT_THETA_REDUCTION = 112.0 / 24.0
 ROOT_THETA_LIMIT = 12.5 / ROOT_THETA_REDUCTION
 ROOT_THETA_LOWER, ROOT_THETA_UPPER = -ROOT_THETA_LIMIT, ROOT_THETA_LIMIT
 
-# tip_theta(手先θ)の機構的な可動域(2026-09-10追加、ユーザー指定:「270度以上
-# 回らないようにしたい。つまり電源投入時の位置から左右に135度」)。tip_thetaは
-# 原点センサを持たず、電源投入時のM2006内蔵エンコーダのリセット値(=0)を原点として
-# 使うため、この範囲は「電源投入時の位置から±135deg」を意味する。
-# trajectory_follower_node.pyのTIP_THETA_LIMIT_RAD、command_gui_node.pyの
-# TIP_THETA_LOWER/UPPER、soki_sim.urdf.xacroのtip_theta_limitと一致させること。
-# 注意: root_thetaの可動域(±153.4deg)より狭いため、手先θ追従ON時に
-# root_thetaを端まで回すと、追従先(-root_theta)がこの範囲で頭打ちになり
-# ハンドの平行が保てなくなる(機構制約上避けられない)。
-TIP_THETA_LIMIT = math.radians(135.0)
-TIP_THETA_LOWER, TIP_THETA_UPPER = -TIP_THETA_LIMIT, TIP_THETA_LIMIT
+# tip_theta(手先θ)の可動域について。
+# 2026-09-10、機構側に物理リミット(当てて止めるストッパ)が付いたのに伴い、
+# それまでの固定±135deg制限は廃止した(ユーザー指定:「手先θにリミットをつけた、
+# 物理的に当てて止めるものなので電流値を見て入力を止められないか」「この角度
+# 制限はなくしていい」)。代わりにtrajectory_follower_nodeが実電流+実速度から
+# 機械端を検出して指令を止める(TIP_THETA_STALL_*、_update_tip_theta_stall参照)。
+# このノード側では角度でのクランプは行わない。
+#
+# ただしジョグ・追従の目標値が実機の現在角度より先へ無制限に走るのは別問題なので、
+# TIP_THETA_JOG_LEAD_RADで先行量を頭打ちにする。これが無いと、機械端に当たって
+# 実機が止まっている間もボタンを押し続けたぶんだけ目標だけが進み続け、
+# 離した後もその差を詰めるまで動き続ける(実機が追いつけない場合も同じ)。
+TIP_THETA_JOG_LEAD_RAD = math.radians(15.0)
+
+# 手先θ追従の符号: tip_theta_joint = TIP_THETA_FOLLOW_SIGN * root_theta_joint。
+# 吸着パッド3個の展開軸をワークの行(ワールドX軸)と平行に保つための関係式。
+# 2026-09-10、ユーザー報告「手先追従時はモーターの回転が逆、手動操作時の
+# コントローラーとの対応づけはあっている」により -1.0 から +1.0 へ修正した。
+# 手動ジョグ(L1/R1)はinvert_tip_theta未設定(sign_tip_theta_=+1)のまま正しい向きに
+# 動いているので、関節角の向きの定義自体は合っている。つまり追従の関係式だけが
+# 逆だった。原因は2026-09-08のtip_theta駆動系変更(CubeMars AK40-10の直接駆動から
+# RoboMas M2006 + タイミングベルト(20T/28T)へ)で、モータが機構のどちら側に付くかが
+# 変わり、root_thetaの回転に対して手先が回る向きが反転したため。-1.0はCubeMars
+# 時代(2026-09-03)の値をそのまま流用していた。
+# joy_teleop_node.pyとcommand_gui_node.pyの両方に同じ値を置くこと(片方だけ直すと
+# 手動運転中の追従と回収シーケンスで向きが食い違う)。
+TIP_THETA_FOLLOW_SIGN = 1.0
 
 # trajectory_follower_node.py/display.launch.pyのINITIAL_ROOT_THETA_RAD/zerosと
 # 一致させること(sim起動直後、フィールドに平行・ハンドが右側になる向き、
@@ -234,6 +251,11 @@ _BUTTON_INDEX_PARAMS = {
     'button_tip_theta_l1': 'button_tip_theta_l1_',
     'button_tip_theta_r1': 'button_tip_theta_r1_',
 }
+
+
+# タイマー遅れ警告のしきい値と間引き間隔(_check_timer_slip参照)。
+_TIMER_SLIP_WARN_RATIO = 2.0        # 実測dtが公称周期のこの倍を超えたら遅れとみなす
+_TIMER_SLIP_LOG_INTERVAL_SEC = 5.0  # まとめて警告を出す間隔
 
 
 def clamp(value, lower, upper):
@@ -393,6 +415,23 @@ class JoyTeleopNode(Node):
         self.deadzone_ = float(self.get_parameter('deadzone').value)
         update_rate_hz = float(self.get_parameter('update_rate_hz').value)
         self.dt_ = 1.0 / update_rate_hz
+        # 直前に_timer_callbackが走ったmonotonic時刻(未実行ならNone)。
+        # ジョグの積分に「タイマー周期の公称値(self.dt_)」ではなく実測経過時間を
+        # 使うため(2026-09-10追加、ユーザー報告:「手先θの速度のレンジが全然
+        # ちがうときがある。手動操作で」)。ROS2のタイマーはCPU負荷で遅れる
+        # (rviz・command_gui_node・ros2can GUIを同時に動かす本番構成では特に。
+        # 2026-09-10にros2canを--noguiからGUIありへ戻したぶん負荷が増えている)。
+        # 公称値で積分すると、タイマーが遅れたぶんだけ目標の進みが実時間に対して
+        # 遅くなり、同じボタンを同じだけ押しても速度が変わって見える。
+        self._last_timer_monotonic_ = None
+        # タイマー遅れの監視(_timer_callback参照)。実測dtが公称周期のこの倍率を
+        # 超えたら「タイマーが遅れている」とみなし、_TIMER_SLIP_LOG_INTERVAL_SEC
+        # ごとにその区間の最悪値をまとめて1行警告する。毎回出すとログが流れて
+        # 使い物にならないため間引く。積分自体は実測dtで補正済みなので、この
+        # 警告は「なぜジョグの体感速度が変わるのか」を切り分けるための情報。
+        self._timer_slip_worst_dt_ = 0.0
+        self._timer_slip_count_ = 0
+        self._timer_slip_last_log_ = None
         self.pump_toggle_button_ = int(self.get_parameter('pump_toggle_button').value)
         self.pickup_confirm_button_ = int(self.get_parameter('pickup_confirm_button').value)
         self.estop_button_ = int(self.get_parameter('estop_button').value)
@@ -474,7 +513,7 @@ class JoyTeleopNode(Node):
 
         # 手先θのroot_theta追従トグル(OPTIONSボタン、2026-09-03追加)。既定でON
         # (ユーザー指定:「デフォルトを自動シーケンスで実行に」)。ONの間は
-        # _timer_callbackがtip_theta_joint = -root_theta_jointを毎周期指令し、
+        # _timer_callbackがtip_theta_joint = TIP_THETA_FOLLOW_SIGN*root_theta_jointを毎周期指令し、
         # 右スティック左右の手動ジョグ入力は無視する(_update_tip_theta_follow_
         # toggle参照)。
         self._tip_theta_follow_theta_ = True
@@ -493,7 +532,7 @@ class JoyTeleopNode(Node):
         # 自動で無効化」)。投入(L4/R4)シーケンス開始時にGUI側がこれを呼んで
         # OFFにする(_on_set_tip_theta_follow_srv参照。投入シーケンスは手先θを
         # 固定値shoot_tip_theta_radへ制御するため、追従ONのままだと本ノードが
-        # 毎周期-root_thetaへ上書きして競合するのを防ぐ)。
+        # 毎周期TIP_THETA_FOLLOW_SIGN*root_thetaへ上書きして競合するのを防ぐ)。
         self.create_service(
             SetBool, 'set_tip_theta_follow_theta', self._on_set_tip_theta_follow_srv)
 
@@ -743,7 +782,7 @@ class JoyTeleopNode(Node):
         シーケンス開始時にGUI側がFalseを渡して自動でOFFにするために使う
         (ユーザー指定:「手先θ追従はシューティングボックスへの自動移動時には
         自動で無効化」。投入シーケンスは手先θを固定値shoot_tip_theta_radへ
-        制御するため、追従ONのままだと本ノードが毎周期-root_thetaへ上書き
+        制御するため、追従ONのままだと本ノードが毎周期TIP_THETA_FOLLOW_SIGN*root_thetaへ上書き
         して競合する)。"""
         self._tip_theta_follow_theta_ = bool(request.data)
         self.get_logger().info(
@@ -816,6 +855,16 @@ class JoyTeleopNode(Node):
                           else self._select_work_down_client_)
                 self._call_trigger(client, 'ワーク選択(上下)')
             self._prev_select_row_pressed_ = row_pressed
+
+    def _limit_tip_theta_lead(self, target):
+        """手先θの目標値が実角度より先へ走りすぎないよう頭打ちにする
+        (TIP_THETA_JOG_LEAD_RAD宣言部のコメント参照)。実角度をまだ受け取って
+        いない間は何もしない。"""
+        if not self.has_tip_theta_state_:
+            return target
+        return clamp(target,
+                     self._current_tip_theta_ - TIP_THETA_JOG_LEAD_RAD,
+                     self._current_tip_theta_ + TIP_THETA_JOG_LEAD_RAD)
 
     def _on_mixed_joint_state(self, msg: JointState):
         """/mixed_joint_statesから各関節の現在値を取り込む。
@@ -892,10 +941,43 @@ class JoyTeleopNode(Node):
         buttons = msg.buttons
         return 0 <= self.enable_button_ < len(buttons) and bool(buttons[self.enable_button_])
 
+    def _check_timer_slip(self, dt, now_monotonic):
+        """タイマーの遅れを間引いて警告する(_timer_slip_worst_dt_宣言部参照)。"""
+        if dt > self.dt_ * _TIMER_SLIP_WARN_RATIO:
+            self._timer_slip_worst_dt_ = max(self._timer_slip_worst_dt_, dt)
+            self._timer_slip_count_ += 1
+        if self._timer_slip_last_log_ is None:
+            self._timer_slip_last_log_ = now_monotonic
+            return
+        if now_monotonic - self._timer_slip_last_log_ < _TIMER_SLIP_LOG_INTERVAL_SEC:
+            return
+        self._timer_slip_last_log_ = now_monotonic
+        if self._timer_slip_count_ == 0:
+            return
+        self.get_logger().warning(
+            f'joy_teleop_node: 制御周期が遅れています(直近{_TIMER_SLIP_LOG_INTERVAL_SEC:.0f}秒で'
+            f'{self._timer_slip_count_}回、最悪{self._timer_slip_worst_dt_ * 1000.0:.0f}ms/'
+            f'公称{self.dt_ * 1000.0:.0f}ms)。ジョグの積分は実測時間で補正しているため'
+            '目標の進みは狂いませんが、操作の応答が粗くなります。rviz・GUI・ros2can GUIの'
+            '同時起動などCPU負荷を減らすか、update_rateを下げてください')
+        self._timer_slip_worst_dt_ = 0.0
+        self._timer_slip_count_ = 0
+
     def _timer_callback(self):
         msg = self.latest_joy_
         if msg is None:
             return
+        # ジョグ積分用の実測経過時間(_last_timer_monotonic_宣言部のコメント参照)。
+        # 初回と、異常に長いギャップ(スリープ・一時停止・重い処理での取りこぼし)は
+        # 公称周期の数倍で頭打ちにする。ここを青天井にすると、一瞬詰まっただけで
+        # 目標が大きく飛んで実機が急に動く。
+        now_monotonic = time.monotonic()
+        if self._last_timer_monotonic_ is None:
+            dt = self.dt_
+        else:
+            dt = min(max(now_monotonic - self._last_timer_monotonic_, 0.0), self.dt_ * 5.0)
+        self._last_timer_monotonic_ = now_monotonic
+        self._check_timer_slip(dt, now_monotonic)
         self._update_pump_toggle(msg)
         self._update_pickup_move(msg)
         self._update_estop_button(msg)
@@ -963,7 +1045,7 @@ class JoyTeleopNode(Node):
                 self.target_z_ = self._current_z_
         elif enabled and z_in != 0.0:
             self.target_z_ = clamp(
-                self.target_z_ + z_in * self.z_speed_ * speed_scale * self.dt_, Z_LOWER, Z_UPPER)
+                self.target_z_ + z_in * self.z_speed_ * speed_scale * dt, Z_LOWER, Z_UPPER)
             names.append('z_joint')
             positions.append(self.target_z_)
         elif self.has_current_state_:
@@ -976,7 +1058,7 @@ class JoyTeleopNode(Node):
         # theta_が古い値のまま固定されないようにする。
         if self.theta_jog_enabled_ and enabled and theta_in != 0.0:
             self.target_theta_ = clamp(
-                self.target_theta_ + theta_in * self.theta_speed_ * speed_scale * self.dt_,
+                self.target_theta_ + theta_in * self.theta_speed_ * speed_scale * dt,
                 ROOT_THETA_LOWER, ROOT_THETA_UPPER)
             names.append('root_theta_joint')
             positions.append(self.target_theta_)
@@ -990,14 +1072,15 @@ class JoyTeleopNode(Node):
                 self.target_r_ = self._current_r_
         elif enabled and r_in != 0.0:
             self.target_r_ = clamp(
-                self.target_r_ + r_in * self.r_speed_ * speed_scale * self.dt_, R_LOWER, R_UPPER)
+                self.target_r_ + r_in * self.r_speed_ * speed_scale * dt, R_LOWER, R_UPPER)
             names.append('r_joint')
             positions.append(self.target_r_)
         elif self.has_current_state_:
             self.target_r_ = self._current_r_
 
-        # tip_theta_jointは可動域を電源投入位置から±TIP_THETA_LIMITへ制限する
-        # (2026-09-10追加。以前はcontinuous扱いでclampしていなかった)。
+        # tip_theta_jointの角度制限は2026-09-10に廃止した(機構側に物理リミットが
+        # 付いたため。冒頭の「tip_theta(手先θ)の可動域について」参照)。目標が実角度
+        # より先へ走りすぎないようTIP_THETA_JOG_LEAD_RADで頭打ちにするだけにする。
         # trajectory_follower_nodeがtip_theta_joint未構成の場合はpublishしても
         # target_callback側で無視されるだけなので、has_tip_theta_state_の有無に
         # 関わらず常に試みる(2026-09-03追加)。
@@ -1019,13 +1102,13 @@ class JoyTeleopNode(Node):
             # estop中は手先θも指令しない(2026-09-10追加)。追従ON時のこの分岐は
             # enabled(デッドマン)と無関係に毎周期publishするため、上のenabled=False
             # だけでは止まらない。estop中に脱力したroot_thetaが重力で動くと、その
-            # 追従先(-root_theta)を指令し続けてしまい、解除直後に手先θだけが
+            # 追従先(TIP_THETA_FOLLOW_SIGN*root_theta)を指令し続けてしまい、解除直後に手先θだけが
             # 動き出す。現在値へ同期するだけにして、解除後の値から再開させる。
             if self.has_tip_theta_state_:
                 self.target_tip_theta_ = self._current_tip_theta_
         elif self._tip_theta_follow_theta_:
             # OPTIONSボタンでON(既定ON、_update_tip_theta_follow_toggle参照)の
-            # 間は、回収シーケンスと同じ追従式(tip_theta=-root_theta、ワークの
+            # 間は、回収シーケンスと同じ追従式(tip_theta=TIP_THETA_FOLLOW_SIGN*root_theta、ワークの
             # 行と平行を保つ)を手動ジョグ中も毎周期指令し続ける。右スティック
             # 左右(tip_theta_in)による独立ジョグはこの間無視する。
             #
@@ -1035,7 +1118,7 @@ class JoyTeleopNode(Node):
             # joyメッセージが1つ来た時点で、root_thetaの実値を知る前の初期値
             # (INITIAL_ROOT_THETA_RAD=-90deg)を追従先として tip_theta=+90deg を
             # 指令し始めていた(デッドマンに触れていなくても出る)。さらに
-            # root_thetaが±135degより外にいるとTIP_THETA_LOWER/UPPERで頭打ちに
+            # root_thetaが可動域の外にいると当時のTIP_THETA_LOWER/UPPERで頭打ちに
             # なり、ちょうど135degへ向かう形になっていた。
             # デッドマン(enabled)は条件に入れないこと: 追従は「root_thetaが
             # どこを向いていてもハンドをワークの行と平行に保つ」ための常時機能で、
@@ -1043,8 +1126,8 @@ class JoyTeleopNode(Node):
             # enabledを条件に加えたところ「手先θが一切追従しなくなった」と
             # なったため戻した)。
             if self._has_root_theta_state_:
-                self.target_tip_theta_ = clamp(
-                    -self.target_theta_, TIP_THETA_LOWER, TIP_THETA_UPPER)
+                self.target_tip_theta_ = self._limit_tip_theta_lead(
+                    TIP_THETA_FOLLOW_SIGN * self.target_theta_)
                 tip_theta_names.append('tip_theta_joint')
                 tip_theta_positions.append(self.target_tip_theta_)
             elif self.has_tip_theta_state_:
@@ -1060,10 +1143,9 @@ class JoyTeleopNode(Node):
             tip_theta_positions.append(self.target_tip_theta_)
             self._tip_theta_follow_just_released_ = False
         elif enabled and tip_theta_in != 0.0:
-            self.target_tip_theta_ = clamp(
+            self.target_tip_theta_ = self._limit_tip_theta_lead(
                 self.target_tip_theta_
-                + tip_theta_in * self.tip_theta_speed_ * speed_scale * self.dt_,
-                TIP_THETA_LOWER, TIP_THETA_UPPER)
+                + tip_theta_in * self.tip_theta_speed_ * speed_scale * dt)
             tip_theta_names.append('tip_theta_joint')
             tip_theta_positions.append(self.target_tip_theta_)
         elif self.has_tip_theta_state_:

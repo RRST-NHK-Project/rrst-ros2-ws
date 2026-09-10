@@ -93,15 +93,27 @@ ROOT_THETA_LOWER, ROOT_THETA_UPPER = -ROOT_THETA_LIMIT, ROOT_THETA_LIMIT
 
 # tip_theta(手先θ)の機構的な可動域(2026-09-10、ユーザー指定:「270度以上回らない
 # ようにしたい。つまり電源投入時の位置から左右に135度」)。tip_thetaは原点センサを
-# 持たず、電源投入時のM2006内蔵エンコーダのリセット値(=0)を原点として使うため、
-# この範囲は「電源投入時の位置から±135deg」を意味する。
-# (2026-09-08にCubeMarsからROBOMAS(M2006)へ移行してCubeMars時代のMIT範囲制約
-# ±511.6°相当が無くなり一旦continuous扱いになっていたが、配線・エア配管の巻き込み
-# 防止のため機構側の制約として改めて制限する。note/hardware_mapping.txt参照)
-# trajectory_follower_node.pyのTIP_THETA_LIMIT_RAD、joy_teleop_node.pyの
-# TIP_THETA_LOWER/UPPER、soki_sim.urdf.xacroのtip_theta_limitと一致させること。
-TIP_THETA_LIMIT = math.radians(135.0)
-TIP_THETA_LOWER, TIP_THETA_UPPER = -TIP_THETA_LIMIT, TIP_THETA_LIMIT
+# tip_theta(手先θ)の可動域について。
+# 2026-09-10、機構側に物理リミット(当てて止めるストッパ)が付いたのに伴い、
+# それまでの固定±135deg制限は廃止した(ユーザー指定:「手先θにリミットをつけた、
+# 物理的に当てて止めるものなので電流値を見て入力を止められないか」「この角度
+# 制限はなくしていい」)。代わりにtrajectory_follower_nodeが実電流+実速度から
+# 機械端を検出して指令を止める(TIP_THETA_STALL_*、_update_tip_theta_stall参照)。
+# このノード側では角度でのクランプは行わない。
+
+# 手先θ追従の符号: tip_theta_joint = TIP_THETA_FOLLOW_SIGN * root_theta_joint。
+# 吸着パッド3個の展開軸をワークの行(ワールドX軸)と平行に保つための関係式。
+# 2026-09-10、ユーザー報告「手先追従時はモーターの回転が逆、手動操作時の
+# コントローラーとの対応づけはあっている」により -1.0 から +1.0 へ修正した。
+# 手動ジョグ(L1/R1)はinvert_tip_theta未設定(sign_tip_theta_=+1)のまま正しい向きに
+# 動いているので、関節角の向きの定義自体は合っている。つまり追従の関係式だけが
+# 逆だった。原因は2026-09-08のtip_theta駆動系変更(CubeMars AK40-10の直接駆動から
+# RoboMas M2006 + タイミングベルト(20T/28T)へ)で、モータが機構のどちら側に付くかが
+# 変わり、root_thetaの回転に対して手先が回る向きが反転したため。-1.0はCubeMars
+# 時代(2026-09-03)の値をそのまま流用していた。
+# joy_teleop_node.pyとcommand_gui_node.pyの両方に同じ値を置くこと(片方だけ直すと
+# 手動運転中の追従と回収シーケンスで向きが食い違う)。
+TIP_THETA_FOLLOW_SIGN = 1.0
 
 # lift_link原点(z_joint基準)の地面からの高さオフセット
 Z_OFFSET = BASE_HEIGHT + LIFT_SIZE_Z / 2.0
@@ -272,7 +284,7 @@ SEQ_RETRACT_R_SPEED_MPS = 0.1
 # 旋回させると手先ごと同じ角度だけ回るため、パッド展開軸を常にワークの行(GUIの
 # ワールドX軸、WORK_POINTSは同一行内でX方向にWORK_COL_PITCH間隔で並ぶ)と平行に
 # 保つには、tip_theta_jointをroot_theta_jointと逆方向に同じ量だけ回して打ち消す
-# 必要がある(tip_theta_target = -root_theta_target)。_start_pick_sequence参照。
+# 必要がある(tip_theta_target = TIP_THETA_FOLLOW_SIGN*root_theta_target)。_start_pick_sequence参照。
 # シュート時は逆に一切打ち消さずtip_theta_joint=一定値(=常にr方向に垂直、
 # root_thetaの値によらず幾何学的に成立する)を使うが、この値はまだ実機で検証して
 # いない暫定値のため、DEFAULT_SEQUENCE_SETTINGSの'shoot_tip_theta_rad'として
@@ -1388,12 +1400,9 @@ class CommandGuiNode(Node):
         msg.position = positions
         self.pub_.publish(msg)
         if tip_theta is not None:
-            # 可動域クランプ(TIP_THETA_LOWER/UPPER参照)。回収シーケンスの追従値
-            # (-root_theta)は root_thetaの可動域(±153.4deg)がtip_thetaより広いため
-            # そのままでは範囲外になりうる。投入シーケンスのshoot_tip_theta_radも
-            # GUI/gains.jsonから任意の値が入るためここで受け側クランプする
-            # (trajectory_follower_node側でも二重にクランプされる)。
-            tip_theta = clamp(tip_theta, TIP_THETA_LOWER, TIP_THETA_UPPER)
+            # 角度でのクランプは2026-09-10に廃止した(冒頭の「tip_theta(手先θ)の
+            # 可動域について」参照)。機械端の保護はtrajectory_follower_node側の
+            # 電流によるストール検出(_update_tip_theta_stall)が受け持つ。
             tip_theta_msg = JointState()
             tip_theta_msg.header.stamp = self.get_clock().now().to_msg()
             tip_theta_msg.header.frame_id = 'auto'
@@ -2562,7 +2571,8 @@ class CommandGuiApp(QWidget):
         「回収実行」による2段階確認も、Z自動降下(＝人間が操作を代われるタイミング)
         が無くなったため不要になり、workボタン/×ボタン1回で完結する。
         吸着パッド3個の展開軸をワークの行(ワールドX軸)と平行に保つため、
-        手先θ(tip_theta_joint)をroot_thetaと逆方向に同じ量だけ回して打ち消す
+        手先θ(tip_theta_joint)をroot_thetaと同じ量だけ回して打ち消す
+        (向きはTIP_THETA_FOLLOW_SIGN、宣言部のコメント参照)
         (2026-09-03、ユーザー指摘: 「ハンドは3つ一気に回収するので手先θは
         ワークの行と平行になるように動く必要がある」)。
         既に他のシーケンス実行中でも、確認や中断操作なしに即座にこちらへ
@@ -2575,7 +2585,7 @@ class CommandGuiApp(QWidget):
             return
 
         target_theta, _target_r = _theta_r_from_xy(x, y)
-        tip_theta_pick = -target_theta
+        tip_theta_pick = TIP_THETA_FOLLOW_SIGN * target_theta
 
         steps = [
             ('call', '/hand_set_pitch_hold'),   # 回収時は保持姿勢
@@ -2635,7 +2645,7 @@ class CommandGuiApp(QWidget):
 
         # 投入シーケンスは手先θを固定値(tip_theta_shoot、下記)へ制御するため、
         # joy_teleop_node側の手先θroot_theta追従(OPTIONSボタン、既定ON)が
-        # ONのままだと毎周期-root_thetaへ上書きされて競合する。シーケンス開始時に
+        # ONのままだと毎周期TIP_THETA_FOLLOW_SIGN*root_thetaへ上書きされて競合する。シーケンス開始時に
         # 自動でOFFにする(2026-09-03、ユーザー指定:「手先θ追従はシューティング
         # ボックスへの自動移動時には自動で無効化」。joy_teleop_node未起動時は
         # set_joy_tip_theta_follow内で黙って無視されるだけで、本シーケンス自体は
