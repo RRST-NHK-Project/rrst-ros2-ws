@@ -1594,6 +1594,7 @@ class CommandGuiApp(QWidget):
         self._seq_leg_target = None
         self._seq_leg_start_time = None
         self._seq_retract_start_time = None
+        self._seq_wait_until = None
         self._seq_retract_speed_mps = SEQ_RETRACT_R_SPEED_MPS
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(8, 8, 8, 8)
@@ -2535,7 +2536,13 @@ class CommandGuiApp(QWidget):
                 ('shoot_tip_theta_rad', '投入時手先θ[rad](暫定)'),
                 # R軸自動リトラクトの速度(2026-09-09追加、retract_r_checkbox ON時のみ
                 # 使う。ユーザー報告:「現状遅すぎて格納できない」)。
-                ('retract_r_speed_mps', 'R軸格納速度[m/s]'),)):
+                ('retract_r_speed_mps', 'R軸格納速度[m/s]'),
+                # 投入シーケンスのパッド収納 -> ピッチ投入姿勢の間の待ち時間
+                # (2026-09-10、投入シーケンスが収納も行うようになったのに伴い
+                # 編集欄を追加。定数自体は2026-09-03からDEFAULT_SEQUENCE_SETTINGSに
+                # あったが、使う箇所が無くなっていたため編集欄も無かった。
+                # パッドが収納し切る前にピッチが回ると干渉するので実機で要調整)。
+                ('gather_settle_sec', '収納→ピッチ待ち[s]'),)):
             grid.addWidget(QLabel(label), i, 0)
             edit = make_float_edit(DEFAULT_SEQUENCE_SETTINGS[key])
             self.sequence_edits[key] = edit
@@ -2673,6 +2680,18 @@ class CommandGuiApp(QWidget):
             # 増え、「手先ピッチが作動したりしなかったりする」不具合として顕在化
             # した。原因は投入シーケンス自身がピッチ姿勢を一切指定していなかった
             # ことなので、シーケンス開始時に必ず投入姿勢へ揃えるようにする。
+            # 投入時はワークを中央へ集めてから姿勢を変える(2026-09-10、ユーザー
+            # 指定:「シューティングボックス移動時は収納し投入姿勢に」)。以前は
+            # ピッチ投入姿勢への切替だけを行っており、パッドが展開したまま
+            # シューティングエリアへ向かうことがあった。
+            # 収納とピッチ切替の間はgather_settle_sec待つ: パッドが物理的に
+            # 収納し切る前にピッチが回り始めると干渉する恐れがある
+            # (ユーザー指摘:「収納から姿勢変更までの待機時間も必要。ほぼ同時は
+            # まずい」。この設定値は以前から用意されていたが、回収シーケンス末尾に
+            # あった収納->投入姿勢の並びが無くなって以降どこからも使われて
+            # いなかったため、ここで使うようにした)。
+            ('call', '/hand_gather_pads'),
+            ('wait', settings['gather_settle_sec']),
             ('call', '/hand_set_pitch_insert'),
         ]
         if self.retract_r_checkbox.isChecked():
@@ -2696,6 +2715,8 @@ class CommandGuiApp(QWidget):
         self._seq_leg_target = None
         self._seq_leg_start_time = None
         self._seq_retract_start_time = None
+        # 'wait'ステップの終了時刻(待機中でなければNone、_advance_wait_step参照)。
+        self._seq_wait_until = None
         _set_status(self.sequence_status_label, f'{kind}シーケンス開始', 'muted')
 
     def _advance_sequence(self):
@@ -2716,6 +2737,26 @@ class CommandGuiApp(QWidget):
             self._advance_retract_r_step(step)
         elif step[0] == 'call':
             self._advance_hand_step(step)
+        elif step[0] == 'wait':
+            self._advance_wait_step(step)
+
+    def _advance_wait_step(self, step):
+        """('wait', 秒数)ステップ。指定秒だけ何もせずに待ってから次へ進む
+        (2026-09-10追加)。サーボが物理的に動き切るのを待つためのもので、
+        投入シーケンスのパッド収納 -> ピッチ投入姿勢の間に挟む
+        (gather_settle_sec、ユーザー指摘:「収納から姿勢変更までの待機時間も
+        必要。ほぼ同時はまずい」)。"""
+        _, duration_sec = step
+        now = time.monotonic()
+        if self._seq_wait_until is None:
+            self._seq_wait_until = now + float(duration_sec)
+            _set_status(self.sequence_status_label,
+                        f'{self._seq_kind}: 待機中({float(duration_sec):.1f}秒)...', 'muted')
+            return
+        if now < self._seq_wait_until:
+            return
+        self._seq_wait_until = None
+        self._seq_index += 1
 
     def _advance_move_step(self, step):
         # zj/r/tip_theta(2,3,5要素目)はいずれも任意。Noneならsend_target/到達
@@ -2868,6 +2909,7 @@ class CommandGuiApp(QWidget):
         self._seq_waiting_service = None
         self._seq_leg_target = None
         self._seq_retract_start_time = None
+        self._seq_wait_until = None
         _set_status(self.sequence_status_label, message, 'error')
 
     def _on_abort_sequence(self):

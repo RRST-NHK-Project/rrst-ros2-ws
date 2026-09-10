@@ -8,8 +8,8 @@ hand_node:
     # ---- 吸着パッド展開サーボ (SERVOn、角度[deg]) ----
     # device_id=0は未配線・無効を意味する。実機配線が判明したら
     # note/can_mapping.txtに記入のうえここを書き換えること。
-    deploy_servo_device_id: 31
-    deploy_servo_node_index: 0
+    deploy_servo_device_id: 101
+    deploy_servo_node_index: 2
     deploy_servo_local_index: 1   # SERVO1=0/SERVO2=1/SERVO3=2
     deploy_servo_retracted_deg: 0    # 要実測: 収納(搬送)姿勢の角度
     deploy_servo_deployed_deg: 90    # 要実測: 展開(吸着)姿勢の角度
@@ -26,8 +26,8 @@ hand_node:
     deploy_servo_deployed_can_deg: 55.0
 
     # ---- ワークピッチ変更サーボ (SERVOn、角度[deg]) ----
-    pitch_servo_device_id: 31
-    pitch_servo_node_index: 0
+    pitch_servo_device_id: 101
+    pitch_servo_node_index: 2
     pitch_servo_local_index: 2   # SERVO1=0/SERVO2=1/SERVO3=2
     pitch_servo_hold_deg: 0      # 要実測: ワーク保持(搬送)姿勢の角度
     pitch_servo_insert_deg: -90   # 要実測: シューティングボックス投入姿勢の角度

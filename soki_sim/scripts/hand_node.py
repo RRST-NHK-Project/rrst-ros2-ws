@@ -61,8 +61,11 @@ note/can_mapping.txt「## ハンド」節と、soki_sim/config/hand.yamlのパ�
 受け付けない/暴走する値を送らないよう、offset・オーバーライド値とも実機で
 安全な範囲に手動で追い込んで運用すること)。
 
-ポンプの現在ON/OFF状態は`hand_pump_state`(std_msgs/Bool)としてpublishする
-(2026-09-03追加)。GUIハンドパネルの「ポンプON/OFF」ボタンとjoy_teleop_nodeの
+ポンプの現在ON/OFF状態は`hand_pump_state`(std_msgs/Bool)、吸着パッドの展開状態は
+`hand_pads_spread`、ワークピッチの投入姿勢状態は`hand_pitch_insert`として
+publishする(ポンプは2026-09-03、残り2つは2026-09-10追加。いずれも
+transient_local(latched))。後者2つはjoy_teleop_nodeのL3/R3トグルが
+「今どちらの姿勢か」を知るために使う。GUIハンドパネルの「ポンプON/OFF」ボタンとjoy_teleop_nodeの
 PSコン丸ボタン(トグル)の両方から独立に操作できるようにするため、状態の真値は
 hand_node側に一元化し、joy_teleop_node側ではローカルに状態を推測しない。
 
@@ -242,6 +245,22 @@ class HandNode(Node):
         pump_state_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self.pump_state_pub_ = self.create_publisher(Bool, 'hand_pump_state', pump_state_qos)
 
+        # 吸着パッド展開・ワークピッチの現在状態(2026-09-10追加、ユーザー指定:
+        # 「ハンドのサーボ操作をPSコンのL3/R3へ割り当て」)。joy_teleop_nodeの
+        # L3/R3はトグルなので、押した側が「今どちらの姿勢か」を知る必要がある。
+        # ポンプ(hand_pump_state)と同じ設計で、状態の真値はhand_node側に一元化し、
+        # 購読側ではローカルに推測しないこと: これらのサービスはGUIのハンド
+        # パネル・回収/投入シーケンスからも呼ばれるため、ローカル推測だと
+        # 必ずズレる。QoSもポンプと同じtransient_local(latched)にして、
+        # hand_node起動後に立ち上がったノードでも現在状態を受け取れるようにする。
+        hand_state_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self._pads_spread = False   # 起動時は収納(gathered)姿勢
+        self._pitch_insert = False  # 起動時は保持(hold)姿勢
+        self.pads_spread_pub_ = self.create_publisher(
+            Bool, 'hand_pads_spread', hand_state_qos)
+        self.pitch_insert_pub_ = self.create_publisher(
+            Bool, 'hand_pitch_insert', hand_state_qos)
+
         self.create_service(Trigger, 'hand_spread_pads', self._on_spread_pads)
         self.create_service(Trigger, 'hand_gather_pads', self._on_gather_pads)
         self.create_service(Trigger, 'hand_pump_on', self._on_pump_on)
@@ -258,6 +277,8 @@ class HandNode(Node):
         self._publish_joint_state(
             HAND_PITCH_JOINT, int(self.get_parameter('pitch_servo_hold_deg').value))
         self._publish_pump_state()
+        self._publish_pads_spread_state()
+        self._publish_pitch_insert_state()
 
         self.get_logger().info(
             'hand_node started: '
@@ -379,6 +400,10 @@ class HandNode(Node):
         can_deg = self._resolve_can_deg(sim_deg, self._deploy_offset_deg(), override_prefix)
         response.success = self._send(self._deploy, can_deg)
         self._publish_pad_states(gathered=gathered)
+        # CAN送信の成否(device_id未配線か)に関わらず論理状態は更新する
+        # (_on_pump_onと同じ理由。配線前でもjoy_teleop_node側のトグル判定が正しく動く)。
+        self._pads_spread = not gathered
+        self._publish_pads_spread_state()
         response.message = (
             f'吸着パッド{label}(sim={sim_deg}deg, 実機送信={can_deg}deg)' if response.success
             else f'吸着パッド{label}(sim={sim_deg}deg、表示のみ): device_id未設定のためCAN送信できませんでした')
@@ -396,6 +421,16 @@ class HandNode(Node):
         msg = Bool()
         msg.data = self._pump_on
         self.pump_state_pub_.publish(msg)
+
+    def _publish_pads_spread_state(self):
+        msg = Bool()
+        msg.data = self._pads_spread
+        self.pads_spread_pub_.publish(msg)
+
+    def _publish_pitch_insert_state(self):
+        msg = Bool()
+        msg.data = self._pitch_insert
+        self.pitch_insert_pub_.publish(msg)
 
     def _set_vacuum_release(self, on):
         """真空破壊リレー(MD2 DIRピン流用)をON/OFFする。ポンプON/OFFと連動して
@@ -448,6 +483,8 @@ class HandNode(Node):
         can_deg = self._resolve_can_deg(sim_deg, self._pitch_offset_deg(), override_prefix)
         response.success = self._send(self._pitch, can_deg)
         self._publish_joint_state(HAND_PITCH_JOINT, sim_deg)
+        self._pitch_insert = (override_prefix == 'pitch_servo_insert')
+        self._publish_pitch_insert_state()
         response.message = (
             f'ピッチ: {label}(sim={sim_deg}deg, 実機送信={can_deg}deg)' if response.success
             else f'ピッチ: {label}(sim={sim_deg}deg、表示のみ): device_id未設定です')

@@ -122,6 +122,20 @@ button_tip_theta_r1・invert_*・pump_toggle_buttonパラメータで合わせ�
                                          サービスを呼び、シューティングエリアR4へ
                                          同様に向かわせる(GUIの「R4へ移動」ボタンと
                                          同じ効果))
+  L3ボタン         -> 吸着パッド展開/収納トグル (hand_deploy_toggle_button,
+                                         デフォルト11。hand_nodeの
+                                         /hand_spread_pads・/hand_gather_pads を
+                                         現在の姿勢(hand_pads_spread購読)の逆側へ
+                                         呼ぶ。2026-09-10、ユーザー指定:
+                                         「ハンドのサーボをL3、R3に割り当て」。
+                                         矢印キー(D-pad)はワーク選択のまま残す。
+                                         移動系のenable_button(デッドマン)とは
+                                         独立に扱う(ポンプトグルと同じ理由))
+  R3ボタン         -> ワークピッチ保持/投入トグル (hand_pitch_toggle_button,
+                                         デフォルト12。hand_nodeの
+                                         /hand_set_pitch_hold・/hand_set_pitch_insert
+                                         を現在の姿勢(hand_pitch_insert購読)の
+                                         逆側へ呼ぶ。L3と同じ設計)
   OPTIONSボタン    -> 手先θのroot_theta追従トグル (tip_theta_follow_theta_button,
                                          デフォルト9。PS4/PS5コントローラの
                                          一般的なLinuxドライバ割り当てを仮定した値、
@@ -250,6 +264,8 @@ _BUTTON_INDEX_PARAMS = {
     'low_speed_toggle_button': 'low_speed_toggle_button_',
     'button_tip_theta_l1': 'button_tip_theta_l1_',
     'button_tip_theta_r1': 'button_tip_theta_r1_',
+    'hand_deploy_toggle_button': 'hand_deploy_toggle_button_',
+    'hand_pitch_toggle_button': 'hand_pitch_toggle_button_',
 }
 
 
@@ -368,6 +384,14 @@ class JoyTeleopNode(Node):
         # 移動モードのトグルだった、declare_parameter('low_speed_multiplier'...)
         # のコメント参照)。-1ならボタン操作無効。
         self.declare_parameter('low_speed_toggle_button', 8)
+        # ハンドのサーボ操作(2026-09-10追加、ユーザー指定:「ハンドのサーボを
+        # PSコンのL3、R3に割り当て」)。サーボは展開/収納・保持/投入の2状態ずつ
+        # しかないので、4サービスを2ボタンのトグルに載せる。既定値11/12はPS4/PS5
+        # コントローラの一般的なLinuxドライバ(hid-playstation)割り当てを仮定した
+        # 値で、他のボタン同様に実機で要確認(ずれていたらros2 param setで
+        # その場で差し替えられる。_BUTTON_INDEX_PARAMS参照)。
+        self.declare_parameter('hand_deploy_toggle_button', 11)   # L3: 展開/収納
+        self.declare_parameter('hand_pitch_toggle_button', 12)    # R3: 保持/投入
         # GUI上のワーク選択カーソル移動軸(十字キー、2026-09-03追加)。多くの
         # Linuxジョイスティックドライバでは十字キーがaxes配列の末尾2要素として
         # 出てくる想定。-1で該当方向を無効。
@@ -440,6 +464,10 @@ class JoyTeleopNode(Node):
         self.tip_theta_follow_theta_button_ = int(
             self.get_parameter('tip_theta_follow_theta_button').value)
         self.low_speed_toggle_button_ = int(self.get_parameter('low_speed_toggle_button').value)
+        self.hand_deploy_toggle_button_ = int(
+            self.get_parameter('hand_deploy_toggle_button').value)
+        self.hand_pitch_toggle_button_ = int(
+            self.get_parameter('hand_pitch_toggle_button').value)
 
         # 現在の目標関節角度(スティック/十字キー入力をここへ積分していく)。
         # /mixed_joint_statesを受信するまでは、trajectory_follower_node起動直後の
@@ -483,6 +511,25 @@ class JoyTeleopNode(Node):
         self.create_subscription(Bool, 'hand_pump_state', self._on_pump_state, pump_state_qos)
         self._pump_on_client_ = self.create_client(Trigger, 'hand_pump_on')
         self._pump_off_client_ = self.create_client(Trigger, 'hand_pump_off')
+
+        # ハンドのサーボ操作(L3=展開/収納トグル、R3=保持/投入トグル、2026-09-10追加)。
+        # ポンプと全く同じ設計: 現在どちらの姿勢かはhand_nodeがpublishする
+        # hand_pads_spread/hand_pitch_insertを購読して判定し、ローカルには
+        # 推測しない。これらのサービスはGUIのハンドパネルと回収/投入シーケンス
+        # からも呼ばれるため、ローカル推測だと必ずズレる。
+        self._pads_spread_ = False
+        self._pitch_insert_ = False
+        self._prev_hand_deploy_pressed_ = False
+        self._prev_hand_pitch_pressed_ = False
+        hand_state_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self.create_subscription(Bool, 'hand_pads_spread', self._on_pads_spread_state,
+                                 hand_state_qos)
+        self.create_subscription(Bool, 'hand_pitch_insert', self._on_pitch_insert_state,
+                                 hand_state_qos)
+        self._spread_pads_client_ = self.create_client(Trigger, 'hand_spread_pads')
+        self._gather_pads_client_ = self.create_client(Trigger, 'hand_gather_pads')
+        self._pitch_hold_client_ = self.create_client(Trigger, 'hand_set_pitch_hold')
+        self._pitch_insert_client_ = self.create_client(Trigger, 'hand_set_pitch_insert')
 
         # 選択中ワークへの回収シーケンス開始ボタン(×ボタン、2026-09-03追加、
         # 2026-09-09仕様変更。declare_parameter部コメント参照)。立ち上がりエッジ
@@ -593,6 +640,8 @@ class JoyTeleopNode(Node):
             f'(follow={self._tip_theta_follow_theta_}), '
             f'low_speed_toggle_button={self.low_speed_toggle_button_}, '
             f'low_speed_multiplier={self.low_speed_multiplier_}, '
+            f'hand_deploy_toggle_button={self.hand_deploy_toggle_button_}, '
+            f'hand_pitch_toggle_button={self.hand_pitch_toggle_button_}, '
             f'axis_select_col={self.axis_select_col_}, axis_select_row={self.axis_select_row_}, '
             f'pickup_confirm_button={self.pickup_confirm_button_}, '
             f'estop_button={self.estop_button_}, '
@@ -663,6 +712,42 @@ class JoyTeleopNode(Node):
                 self.get_logger().warning(
                     'joy_teleop_node: hand_nodeのポンプサービスに接続できません(未起動?)')
         self._prev_pump_button_pressed_ = pressed
+
+    def _on_pads_spread_state(self, msg: Bool):
+        self._pads_spread_ = msg.data
+
+    def _on_pitch_insert_state(self, msg: Bool):
+        self._pitch_insert_ = msg.data
+
+    def _update_hand_servo_toggles(self, msg: Joy):
+        """L3で吸着パッドの展開/収納、R3でワークピッチの保持/投入をトグルする
+        (2026-09-10追加、ユーザー指定:「ハンドのサーボをL3、R3に割り当て」)。
+        サーボは2状態ずつしかないので、4サービスを2ボタンのトグルに載せている。
+        現在の姿勢はhand_nodeから購読した状態(_on_pads_spread_state/
+        _on_pitch_insert_state)で判定し、その逆のサービスを呼ぶ。移動系の
+        enable_button(デッドマン)とは独立に扱う(ポンプトグルボタンと同じ理由)。
+        """
+        buttons = msg.buttons
+        if self.hand_deploy_toggle_button_ >= 0:
+            pressed = (0 <= self.hand_deploy_toggle_button_ < len(buttons)
+                       and bool(buttons[self.hand_deploy_toggle_button_]))
+            if pressed and not self._prev_hand_deploy_pressed_:
+                client = (self._gather_pads_client_ if self._pads_spread_
+                          else self._spread_pads_client_)
+                self._call_trigger(
+                    client, f'吸着パッド{"収納" if self._pads_spread_ else "展開"}',
+                    provider='hand_node')
+            self._prev_hand_deploy_pressed_ = pressed
+        if self.hand_pitch_toggle_button_ >= 0:
+            pressed = (0 <= self.hand_pitch_toggle_button_ < len(buttons)
+                       and bool(buttons[self.hand_pitch_toggle_button_]))
+            if pressed and not self._prev_hand_pitch_pressed_:
+                client = (self._pitch_hold_client_ if self._pitch_insert_
+                          else self._pitch_insert_client_)
+                self._call_trigger(
+                    client, f'ワークピッチ{"保持" if self._pitch_insert_ else "投入"}姿勢',
+                    provider='hand_node')
+            self._prev_hand_pitch_pressed_ = pressed
 
     def _update_pickup_move(self, msg: Joy):
         """×ボタンの立ち上がりエッジで、command_gui_nodeの/pick_sequence_move
@@ -815,13 +900,16 @@ class JoyTeleopNode(Node):
                 f'{"ON" if self._low_speed_enabled_ else "OFF"}にしました')
         self._prev_low_speed_toggle_pressed_ = pressed
 
-    def _call_trigger(self, client, description):
+    def _call_trigger(self, client, description, provider='command_gui_node'):
+        """Triggerサービスを投げっぱなしで呼ぶ。未接続なら警告するだけ。
+        providerは警告文に出す提供元ノード名(2026-09-10、hand_nodeのサービスも
+        この関数から呼ぶようになったため引数化した。既定はcommand_gui_node)。"""
         if client.service_is_ready():
             client.call_async(Trigger.Request())
         else:
             self.get_logger().warning(
-                f'joy_teleop_node: command_gui_nodeの{description}サービスに接続できません'
-                '(GUI未起動?)')
+                f'joy_teleop_node: {provider}の{description}サービスに接続できません'
+                f'({provider}未起動?)')
 
     def _update_work_selection(self, msg: Joy):
         """十字キー(D-pad)の立ち上がりエッジで、GUI上のワーク選択カーソルを
@@ -986,6 +1074,7 @@ class JoyTeleopNode(Node):
         self._update_tip_theta_follow_toggle(msg)
         self._update_low_speed_toggle(msg)
         self._update_work_selection(msg)
+        self._update_hand_servo_toggles(msg)
         enabled = self._is_enabled(msg)
         # ソフト緊急停止中(estop_active購読、_on_estop_active参照)は移動系の入力を
         # 一切通さない(2026-09-10追加)。以前はestop状態を見ずにジョグ入力を積分し
