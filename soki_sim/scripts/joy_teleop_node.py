@@ -219,6 +219,23 @@ TIP_THETA_LOWER, TIP_THETA_UPPER = -TIP_THETA_LIMIT, TIP_THETA_LIMIT
 INITIAL_ROOT_THETA_RAD = -math.pi / 2.0
 
 
+# ros2 param setで実行中に差し替えられるようにするボタン/軸のindexパラメータ
+# (パラメータ名 -> コンストラクタでキャッシュしている属性名、_on_set_parameters参照)。
+# 新しくボタンを追加したらここにも登録すること。
+_BUTTON_INDEX_PARAMS = {
+    'enable_button': 'enable_button_',
+    'pump_toggle_button': 'pump_toggle_button_',
+    'pickup_confirm_button': 'pickup_confirm_button_',
+    'estop_button': 'estop_button_',
+    'shoot_start_l4_button': 'shoot_start_l4_button_',
+    'shoot_start_r4_button': 'shoot_start_r4_button_',
+    'tip_theta_follow_theta_button': 'tip_theta_follow_theta_button_',
+    'low_speed_toggle_button': 'low_speed_toggle_button_',
+    'button_tip_theta_l1': 'button_tip_theta_l1_',
+    'button_tip_theta_r1': 'button_tip_theta_r1_',
+}
+
+
 def clamp(value, lower, upper):
     return max(lower, min(upper, value))
 
@@ -394,6 +411,14 @@ class JoyTeleopNode(Node):
         self.target_z_ = 0.0
         self.target_r_ = 0.0
         self.target_tip_theta_ = 0.0
+        # 関節ごとの「実値を一度でも受け取ったか」。real_joint_bridge_nodeは
+        # CubeMars群(root_theta)とROBOMAS群(z/r/tip_theta)を別メッセージで
+        # publishするため、1メッセージに全関節が揃うとは限らない
+        # (_on_mixed_joint_state参照)。has_current_state_は従来どおり
+        # 「root_theta/z/rの3つとも一度は受け取った」を意味する。
+        self._has_root_theta_state_ = False
+        self._has_z_state_ = False
+        self._has_r_state_ = False
         self.has_current_state_ = False
         self.has_tip_theta_state_ = False
 
@@ -454,6 +479,15 @@ class JoyTeleopNode(Node):
         # toggle参照)。
         self._tip_theta_follow_theta_ = True
         self._prev_follow_toggle_pressed_ = False
+        # OPTIONSボタンで追従をONからOFFへ落とした直後に一度だけTrueになる
+        # (_update_tip_theta_follow_toggle -> _timer_callback、2026-09-10追加)。
+        # 追従OFF・L1/R1も押していない状態はどこにもpublishしない分岐なので、
+        # これが無いとtrajectory_follower_node側のtarget_[tip_theta_joint]が
+        # 追従ONだった頃の最後の目標のまま残り、OFFにしても手先θがその目標へ
+        # 向かって動き続ける(ユーザー報告:「OPTION押しても追従し続ける」)。
+        # tip_theta_jointのmax_velocityは既定0.1rad/sと遅く、135degぶんの移動に
+        # 20秒以上かかるため、「ボタンが効いていない」ようにしか見えなかった。
+        self._tip_theta_follow_just_released_ = False
         # command_gui_node側からも明示的にON/OFFできるサービス(2026-09-03追加、
         # ユーザー指定:「手先θ追従はシューティングボックスへの自動移動時には
         # 自動で無効化」)。投入(L4/R4)シーケンス開始時にGUI側がこれを呼んで
@@ -550,6 +584,17 @@ class JoyTeleopNode(Node):
                 self.velocity_mode_enabled_ = bool(p.value)
             elif p.name == 'theta_jog_enabled':
                 self.theta_jog_enabled_ = bool(p.value)
+            elif p.name in _BUTTON_INDEX_PARAMS:
+                # ボタン/軸のindexは実行中でも差し替えられるようにする
+                # (2026-09-10追加、ユーザー報告:「オプション押しても追従し続ける」)。
+                # これらのindexはどれもPS4/PS5コントローラの一般的なLinuxドライバ
+                # 割り当てを仮定した暫定値(declare_parameter部のコメント参照)で、
+                # ドライバやコントローラが違うとずれる。以前はコンストラクタで
+                # キャッシュしたきり_on_set_parametersが見ていなかったため、
+                # ros2 param setしても反映されずノードの再起動が必要だった。
+                setattr(self, _BUTTON_INDEX_PARAMS[p.name], int(p.value))
+                self.get_logger().info(
+                    f'joy_teleop_node: {p.name}を{int(p.value)}に変更しました')
         return SetParametersResult(successful=True)
 
     def _on_joy(self, msg: Joy):
@@ -678,6 +723,14 @@ class JoyTeleopNode(Node):
                    and bool(buttons[self.tip_theta_follow_theta_button_]))
         if pressed and not self._prev_follow_toggle_pressed_:
             self._tip_theta_follow_theta_ = not self._tip_theta_follow_theta_
+            if not self._tip_theta_follow_theta_:
+                # ONからOFFへ落とした瞬間は、その場で止めるために現在値を1回だけ
+                # 目標として送る(_timer_callback側、_tip_theta_follow_just_released_
+                # 宣言部のコメント参照)。GUI経由のOFF(_on_set_tip_theta_follow_srv)
+                # では立てないこと: あちらは投入シーケンスがshoot_tip_theta_radを
+                # 送る直前に呼ぶもので、ここで停止目標を割り込ませるとGUIの目標と
+                # 競合する。
+                self._tip_theta_follow_just_released_ = True
             self.get_logger().info(
                 'joy_teleop_node: 手先θのroot_theta追従を'
                 f'{"ON" if self._tip_theta_follow_theta_ else "OFF"}にしました')
@@ -765,21 +818,51 @@ class JoyTeleopNode(Node):
             self._prev_select_row_pressed_ = row_pressed
 
     def _on_mixed_joint_state(self, msg: JointState):
-        try:
-            self._current_theta_ = msg.position[msg.name.index('root_theta_joint')]
-            self._current_z_ = msg.position[msg.name.index('z_joint')]
-            self._current_r_ = msg.position[msg.name.index('r_joint')]
-        except ValueError:
-            return
-        self.has_current_state_ = True
+        """/mixed_joint_statesから各関節の現在値を取り込む。
+
+        関節ごとに独立して取り込むこと(2026-09-10修正、ユーザー報告:
+        「手先θが一切追従しなくなった。初期同じ角度を保持し続けている」)。
+        以前はroot_theta/z/rの3つが同じメッセージに揃っていることを前提に
+        msg.name.index()を並べ、1つでも欠けるとValueErrorで何も更新せず
+        returnしていた。ところがreal_joint_bridge_nodeは実機帰還を
+        CubeMars群(name=[root_theta_joint])とROBOMAS群(name=[z_joint,
+        r_joint, tip_theta_joint])の別メッセージでpublishするため、実機構成では
+        どちらのメッセージも3つ揃わない。その結果、
+        ・ROBOMAS群のメッセージが丸ごと捨てられ、z/r/tip_thetaの現在値が
+          実機帰還に一切追従しない(_current_tip_theta_/has_tip_theta_state_も
+          更新されない)
+        ・has_current_state_は、実機帰還が来る前のフォールバック(理想軌道の
+          全関節メッセージ、real_joint_bridge_nodeの_on_fallback)が届いた
+          ときにしか立たない。そのフォールバック自体、trajectory_follower_node
+          のtimer_callbackが has_target_ を待つため最初の/joint_targets受信前は
+          publishされない
+        という状態だった。
+        """
+        pos_of = {}
+        for name, pos in zip(msg.name, msg.position):
+            pos_of[name] = pos
+
+        root_theta = pos_of.get('root_theta_joint')
+        if root_theta is not None:
+            self._current_theta_ = root_theta
+            self._has_root_theta_state_ = True
+        z = pos_of.get('z_joint')
+        if z is not None:
+            self._current_z_ = z
+            self._has_z_state_ = True
+        r = pos_of.get('r_joint')
+        if r is not None:
+            self._current_r_ = r
+            self._has_r_state_ = True
+        self.has_current_state_ = (self._has_root_theta_state_ and self._has_z_state_
+                                   and self._has_r_state_)
         # tip_theta_jointはtrajectory_follower_nodeの起動構成次第で無い場合もある
         # ため(root_theta/z/rと違い)、他の3関節とは別に任意扱いにする
         # (2026-09-03追加)。
-        try:
-            self._current_tip_theta_ = msg.position[msg.name.index('tip_theta_joint')]
+        tip_theta = pos_of.get('tip_theta_joint')
+        if tip_theta is not None:
+            self._current_tip_theta_ = tip_theta
             self.has_tip_theta_state_ = True
-        except ValueError:
-            pass
 
     def _axis(self, axes, index):
         return axes[index] if 0 <= index < len(axes) else 0.0
@@ -945,10 +1028,37 @@ class JoyTeleopNode(Node):
             # 間は、回収シーケンスと同じ追従式(tip_theta=-root_theta、ワークの
             # 行と平行を保つ)を手動ジョグ中も毎周期指令し続ける。右スティック
             # 左右(tip_theta_in)による独立ジョグはこの間無視する。
-            self.target_tip_theta_ = clamp(
-                -self.target_theta_, TIP_THETA_LOWER, TIP_THETA_UPPER)
+            #
+            # ただし追従指令を出すのはroot_thetaの実値を一度でも受け取った後に
+            # 限る(2026-09-10追加、ユーザー報告:「手先θが起動直後に135度に
+            # 向かっている」への対応)。以前は無条件に毎周期publishしていたため、
+            # joyメッセージが1つ来た時点で、root_thetaの実値を知る前の初期値
+            # (INITIAL_ROOT_THETA_RAD=-90deg)を追従先として tip_theta=+90deg を
+            # 指令し始めていた(デッドマンに触れていなくても出る)。さらに
+            # root_thetaが±135degより外にいるとTIP_THETA_LOWER/UPPERで頭打ちに
+            # なり、ちょうど135degへ向かう形になっていた。
+            # デッドマン(enabled)は条件に入れないこと: 追従は「root_thetaが
+            # どこを向いていてもハンドをワークの行と平行に保つ」ための常時機能で、
+            # スティックを離している間も維持する必要がある(2026-09-10、一度
+            # enabledを条件に加えたところ「手先θが一切追従しなくなった」と
+            # なったため戻した)。
+            if self._has_root_theta_state_:
+                self.target_tip_theta_ = clamp(
+                    -self.target_theta_, TIP_THETA_LOWER, TIP_THETA_UPPER)
+                tip_theta_names.append('tip_theta_joint')
+                tip_theta_positions.append(self.target_tip_theta_)
+            elif self.has_tip_theta_state_:
+                self.target_tip_theta_ = self._current_tip_theta_
+        elif self._tip_theta_follow_just_released_:
+            # OPTIONSで追従をOFFにした直後の1周期だけ、現在値を目標として送って
+            # その場で停止させる(_tip_theta_follow_just_released_宣言部参照)。
+            # 毎周期publishはしないこと: 追従OFF中も50Hzで送り続けると、GUIの
+            # 自動シーケンス(20Hz)が同じ関節へ送る目標を数で押し負けさせてしまう。
+            if self.has_tip_theta_state_:
+                self.target_tip_theta_ = self._current_tip_theta_
             tip_theta_names.append('tip_theta_joint')
             tip_theta_positions.append(self.target_tip_theta_)
+            self._tip_theta_follow_just_released_ = False
         elif enabled and tip_theta_in != 0.0:
             self.target_tip_theta_ = clamp(
                 self.target_tip_theta_

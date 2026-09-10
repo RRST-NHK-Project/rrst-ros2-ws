@@ -844,3 +844,82 @@ R4、△(三角)でポンプトグル、×(バツ)で回収実行」(×のみ従
   _on_launch_all_nodesでチェックボックスの状態からuse_viz:=/ros2can_nogui:=
   (GUIチェックボックスは反転)を都度組み立てて追加するようにした。
 rvizの起動はデフォルトでオン、ros2canについてはデフォルトでオフ（--noguiで起動）
+
+
+## ros2canの既定を--noguiからGUIありへ戻す (2026-09-10、ユーザー指定
+## 「ros2canがデフォで--noguiなんだけど、GUIありに変更」)
+
+2026-09-10に「操作はcommand_gui_node側で完結しておりros2canのPyQt5ウィンドウは
+通常不要」としてros2can_noguiの既定をtrue(--nogui)にしていたが、ros2can GUI側の
+デバイス状態・スロット生値を直接見たい場面が多いためユーザー指定で既定をfalse
+(PyQt5ウィンドウあり)へ戻した。ros2can自体は従来どおり常に起動し、--noguiの
+有無だけが変わる。ターミナルダッシュボードで動かしたい場合は
+ros2can_nogui:=true を明示する。
+
+変更箇所(5箇所、既定値は全て揃えること):
+  soki_sim/launch/real_all_axes_test.launch.py  ros2can_nogui既定 true -> false
+  soki_sim/launch/real_axes_test.launch.py       同上
+  soki_sim/launch/real_root_theta_test.launch.py 同上
+  soki_sim/launch/real_z_r_test.launch.py        同上
+  soki_sim/scripts/command_gui_node.py _on_launch_all_nodes
+    ros2can_nogui:=true -> false (GUI起動時の自動起動コマンド)
+
+**GUIモードと--noguiモードの実質的な差**: ros2can/main.pyは--nogui時だけ
+HardwareManager.deviceClaimedにフックしてch.direct_tx=Trueを強制する
+(serial_bridge互換の「常時ブリッジ」再現)。GUIモードではdirect_txはOFFのまま
+だが、外部ノードからの指令が実機へ届くかどうかを決めるのはtopic_passthrough
+(ChannelStateの既定True、ros_backend.py参照)の方なので、trajectory_follower_
+node等からの制御は既定のまま問題なく通る。差が出るのは「新しいトピック
+メッセージが来ていない間も周期的に前回値を再送するか」だけで、実機出力ノードは
+いずれも自分のタイマー周期でpublishし続けるため実害は無い。
+なお、ros2can GUIでdirect_txのチェックを手で入れるとGUI側の相互排他により
+topic_passthroughがOFFになり、外部ノードからの指令が届かなくなる点には注意
+(device_panel.py、docs/internals.md参照)。
+
+
+## GUI保存の設定値がcolcon buildで消える問題の修正 (2026-09-10、ユーザー報告
+## 「R軸格納速度が毎回0.2になってしまう。0.1に変えて保存しても次回起動時には
+## 戻ってる？原因を調査」→「Aで」)
+
+**原因**: command_gui_nodeの保存先解決(_resolve_gains_file_path /
+_resolve_config_yaml_path)がget_package_share_directory経由のパスだけを見て
+おり、実体はinstall/soki_sim/share/soki_sim/config/以下のコピーだった。
+コード上のコメントは「symlink-installならソースツリー側を直接編集」と書いて
+あったが、ビルドログを確認すると直近の全ビルドが素の`colcon build`
+('symlink_install': False)で、install側はシンボリックリンクではなくただの
+コピー。CMakeLists.txtのinstall(DIRECTORY config ...)が使うCMakeのfile(INSTALL)
+はコピー先の方がmtimeが新しくても内容が違えば上書きするため、GUIで保存した値は
+次のcolcon buildでsrc/側の内容(コミット済みの0.2)に戻されていた。GUIスクリプト
+自体もinstall(PROGRAMS)のコピーで、コードを触れば必ずリビルドするため実質毎回
+リセットされていた。同じ経路のreal_joint_bridge.yaml(配線設定)も同じ問題を
+抱えていた。
+
+**対処(選択肢Aを採用)**: 保存先をソースツリー側(<ws>/src/soki_sim/config/)優先に
+変更した。
+  - _iter_config_path_candidates()を新設。share_dirとCOLCON_PREFIX_PATHの各
+    エントリから親方向へ辿り、src/soki_sim/config/{filename}が実在する親を
+    <ws>として採用する(install/のレイアウト差を吸収するため決め打ちの階層数に
+    しない)。見つからなければ従来どおりshare側を返す。
+  - 環境変数での明示上書き(CONFIG_PATH_ENV_VARS): gains.jsonは
+    SOKI_SIM_GAINS_FILE、real_joint_bridge.yamlは
+    SOKI_SIM_REAL_JOINT_BRIDGE_YAML。ワークスペース構成が標準から外れた場合の
+    逃げ道。
+  - _write_config_file()を新設し、保存時はソースツリー側に書いた内容を
+    install側のコピーにも書き写す。real_joint_bridge.yamlは
+    real_joint_bridge_node/homing_nodeがFindPackageShare経由(=install側)で
+    読むため、これが無いとcolcon buildするまでノードに反映されなくなり、
+    従来の「保存すれば次回launchから反映される」挙動が壊れるため。
+    書き写しの失敗は保存失敗扱いにしない(次のcolcon buildで同期されるだけ)。
+
+変更箇所:
+  soki_sim/scripts/command_gui_node.py
+    CONFIG_PATH_ENV_VARS / _config_path_env_override / _iter_config_path_candidates
+    / _share_config_path / _write_config_file を新設、_resolve_config_yaml_path
+    と_resolve_gains_file_pathを書き換え、_on_save_yaml_wiringと_persist_gains
+    の書き込みを_write_config_file経由に変更
+  soki_sim/config/gains.json
+    sequence.retract_r_speed_mps 0.2 -> 0.1 (ユーザーが毎回設定していた値。
+    コード側フォールバックSEQ_RETRACT_R_SPEED_MPSも0.1で一致)
+
+**検証**: gains.jsonを0.12にしてcolcon build後も0.12のまま(src/install両方)で
+あることを確認済み。修正前は同条件でsrc側の値に巻き戻っていた。

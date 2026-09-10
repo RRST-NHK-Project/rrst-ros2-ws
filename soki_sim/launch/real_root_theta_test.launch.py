@@ -17,7 +17,7 @@ def generate_launch_description():
     なので、実機確認時はこちらを使う(display.launch.pyと同時起動しないこと。
     trajectory_follower_nodeが二重起動になり衝突する)。
 
-    起動するもの: ros2can(既定は--nogui、PyQt5ウィンドウなし。ros2can_nogui引数参照)、
+    起動するもの: ros2can(既定はPyQt5ウィンドウあり。ros2can_nogui引数参照)、
     real_joint_bridge_node(帰還確認),
     trajectory_follower_node(実機出力あり), command_gui_node。
     use_joy:=true でjoy_node/joy_teleop_nodeも起動する
@@ -92,11 +92,11 @@ def generate_launch_description():
         'use_viz', default_value='false',
         description='trueならrobot_state_publisher/joint_state_publisher/rviz2も起動する')
     ros2can_nogui_arg = DeclareLaunchArgument(
-        'ros2can_nogui', default_value='true',
+        'ros2can_nogui', default_value='false',
         description='trueならros2canを--nogui(ターミナルダッシュボード、PyQt5ウィンドウ'
-                    'なし)で起動する。ros2can自体は常に起動する。デフォルトtrue'
-                    '(2026-09-10変更、real_all_axes_test.launch.pyと同じ既定。'
-                    'ros2can GUIを見たい場合は ros2can_nogui:=false を指定する)')
+                    'なし)で起動する。ros2can自体は常に起動する。デフォルトfalse'
+                    '(=PyQt5ウィンドウあり。real_all_axes_test.launch.pyと同じ既定。'
+                    'ターミナルダッシュボードにしたい場合は ros2can_nogui:=true を指定する)')
     use_robomas_arg = DeclareLaunchArgument(
         'use_robomas', default_value='false',
         description='trueならz_joint/r_joint(motor1/motor2、ロボマスdevice_id=21)へも'

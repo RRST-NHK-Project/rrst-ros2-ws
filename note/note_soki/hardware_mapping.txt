@@ -587,3 +587,149 @@ ROBOMAS_MAX_CURRENT_VEL_Aを参照するよう変更した。これによりhomi
 firmware/xiao-esp32-s3_can2io/・generated_firmware/soki_robomas_21/・
 soki_robomas_21_safe/の3箇所とも同期済み(config.hpp/robomas.cpp、デバイス
 固有設定(DEVICE_ID/MODE_ROBOMAS/ENC1_MD等)は各ディレクトリの値を保持)。
+
+## M2006内蔵エンコーダの「起動時角度=0」前提が成立していなかった
+## (2026-09-10、ユーザー報告「soki_simの手先θが起動時原点にいるのに勝手に回る。
+## 少しずつ回って停止する」)
+**症状**: 電源投入前に手先θ(tip_theta_joint)を機構原点へ手で合わせてあるのに、
+起動直後に実機が勝手に少しだけ回って止まる。回る量は毎起動ばらつく。
+
+**原因**: 上記「root_theta/tip_thetaの原点初期化」節でtip_thetaが前提にしている
+「M2006内蔵ロータエンコーダの起動時リセット値(=0)をそのまま原点として扱う」が、
+ファームウェア側で成立していなかった。robomas.cppのreceiveFeedback()は
+
+  total_encoder[m] = rotation_count[m] * ENCODER_MAX + encoder_count[m];
+
+としており、初回フレーム(was_stale)でrotation_count=0にはしていたものの、
+encoder_count(C610の帰還が持つ1回転内の絶対値、0-8191)がそのまま基準に残って
+いた。このためangle[]の起点は0ではなく、電源投入時のロータ位相次第で
+0-(360/ギア比)deg = M2006なら出力軸0-10degのランダム値になる。
+tip_theta_jointへ換算すると /tip_theta_reduction(1.4) で0-7.1deg。
+これがそのまま「勝手に回る量」になっていた:
+
+  1. trajectory_follower_node._on_robomas_feedback()が最初の帰還で
+     pos_/target_[tip_theta_joint]を+Δ(上記オフセット)へ同期する
+  2. joy_teleop_nodeの手先θ追従(既定ON)はデッドマン非押下でも毎周期
+     tip_theta = -root_theta をpublishし続ける。root_thetaが原点なら目標は0
+  3. 台形プロファイルが +Δ -> 0 を走り、実機がΔぶんゆっくり回って止まる
+
+帰還とjoy目標のどちらが先に届くかのレースで、joy目標(0)が先だとpos_は0のまま
+has_target_=Trueになり、firmware側MITが kp*(0-Δ) をステップ入力として一気に
+詰める。同一原因で「勢いよく回る」側にもなるため、以前のユーザー報告
+「同じゲインでもモーターが勢いよく回るときとピクピクと少しずつ回るときがある」の
+両方の見え方がこれ1つで説明できる。
+
+**対策(実装済み、robomas.cpp)**: モータごとにencoder_origin[]を持ち、初回フレーム
+および途絶からの復帰フレーム(was_stale、上の「ロボマスCAN帰還の途絶検出」節)で
+そのときのencoder_countを書き込み、total_encoderから差し引く。これでangle[]は
+起動時にちょうど0から始まり、note記載の設計前提どおりになる。
+z/rは毎起動homing_nodeで再ホーミングする設計なので基準の取り方が変わっても影響
+しない(ホーミングが吸収する)。
+firmware/xiao-esp32-s3_can2io/・generated_firmware/soki_robomas_21_safe/の2箇所を
+同期済み(pio runでビルド確認済み)。**要実機確認**: 書き込み後、起動直後に手先θが
+動かなくなるか。
+
+**残る既知の挙動**: ESC(C610)側だけ電源off/onするとwas_stale経由でencoder_origin
+が引き直されるため、tip_thetaの原点はその瞬間の物理位置へ移る(以前はランダム値へ
+飛んでいたので改善ではあるが、原点は手動で合わせ直す必要がある)。またその際
+ホスト側のpos_/target_はそのままなので、ROBOMAS_RESYNC_HOLD_MS(200ms)の
+電流0固定が明けた後に目標へ向かって動く。tip_thetaはESC電源を落としたら
+ROSノード側も再起動する運用が前提。
+
+## 手先θが起動直後に135degへ向かう (2026-09-10、ユーザー報告「起動直後に135度に
+## 向かっている。可動域を左右135度ずつと言った時があったがそれが影響している?」)
+**回答**: ±135degの可動域制限(TIP_THETA_LIMIT)自体は原因ではない。制限は
+「すでに間違っている目標値」を頭打ちにしているだけで、135という具体的な数字が
+出るのはそのため。真因はjoy_teleop_nodeの手先θ追従(既定ON)。
+
+**原因**: joy_teleop_node._timer_callbackの手先θ追従分岐は、
+enabled(デッドマン押下)も has_current_state_(root_thetaの実値受信済みか)も
+見ずに、joyメッセージが1つでも届いていれば50Hzで
+tip_theta = clamp(-root_theta, ±135deg) をpublishし続けていた。このため
+
+  1. 起動直後、mixed_joint_statesがまだ届いていない間は
+     target_theta_ = INITIAL_ROOT_THETA_RAD(-90deg)なので tip_theta=+90deg を
+     指令する(デッドマンに触れていなくても出る)
+  2. mixed_joint_statesが届くと target_theta_ = 実機のroot_theta になり、
+     tip_theta = -root_theta へ向かう。root_thetaが±135degより外にいれば
+     TIP_THETA_LOWER/UPPERで頭打ちになり、ちょうど135degへ向かう
+
+**対策(実装済み、joy_teleop_node.py)**: 追従分岐に enabled and
+has_current_state_ の条件を付け、どちらかが偽の間は現在値
+(_current_tip_theta_)へ同期するだけにした。root_theta/z/rの各軸と同じ扱いに
+なり、デッドマンに触れていない起動直後は手先θへ一切指令が出なくなる。
+
+**別途の要確認事項**: 上記2の「root_thetaが±135degより外にいる」が実際に
+起きているなら、それ自体がroot_theta側の原点較正の問題である可能性が高い。
+2026-09-08にtip_theta側のAK40-10をroot_thetaへ転用しているが、転用後に
+/set_root_theta_originでの再較正を実施したかどうかがnote上で未記録
+(「root_theta/tip_thetaの原点初期化」節の較正手順は組み立て後1回だけ実施する
+前提。アクチュエータを載せ替えたら当然やり直しが必要)。起動直後に
+  ros2 topic echo /mixed_joint_states --once
+でroot_theta_jointの値を確認し、機構が原点にいるのに0付近でなければ再較正する。
+
+## 上記対策のデグレ: 手先θが一切追従しなくなった (2026-09-10、同日のユーザー報告
+## 「今度は手先θが一切追従しなくなった。初期同じ角度を保持し続けている」)
+**原因1(直接の原因)**: 上記対策で追従条件に付けた has_current_state_ が、実機構成
+では永遠にTrueにならなかった。joy_teleop_node._on_mixed_joint_stateは
+root_theta/z/rの3つが同じメッセージに揃っている前提で msg.name.index() を並べ、
+1つでも欠けるとValueErrorで何も更新せずreturnする作りだった。ところが
+real_joint_bridge_nodeは実機帰還をCubeMars群(name=[root_theta_joint])と
+ROBOMAS群(name=[z_joint, r_joint, tip_theta_joint])の**別メッセージ**でpublishする
+ため、どちらのメッセージも3つ揃わない。3つ揃うのは実機帰還前のフォールバック
+(理想軌道の全関節メッセージ、_on_fallback)だけだが、それも
+trajectory_follower_node.timer_callbackが冒頭で has_target_ を待つため、最初の
+/joint_targets を受け取るまでpublishされない。そしてその最初の/joint_targetsは
+まさに手先θ追従が送っていたもので、循環依存になっていた。
+
+**原因2(以前から潜在していたバグ)**: 同じ早期returnにより、ROBOMAS群の
+メッセージ(z/r/tip_theta)が丸ごと捨てられていた。つまり
+_current_z_/_current_r_/_current_tip_theta_ と has_tip_theta_state_ は、実機帰還に
+一度も追従していなかった(フォールバックが流れていた起動直後の値のまま)。
+
+**対策(実装済み、joy_teleop_node.py)**:
+  - _on_mixed_joint_stateを関節ごとの独立取り込みに書き換え(欠けている関節は
+    スキップするだけで、含まれている関節は必ず更新する)。関節ごとの受信フラグ
+    _has_root_theta_state_/_has_z_state_/_has_r_state_ を持ち、has_current_state_は
+    「3つとも一度は受け取った」の意味で維持する
+  - 追従の条件を has_current_state_ から _has_root_theta_state_ へ変更。追従に
+    必要なのはroot_thetaの実値だけで、z/rの受信を待つ理由が無い
+  - デッドマン(enabled)は追従の条件に入れない。追従は「root_thetaがどこを向いて
+    いてもハンドをワークの行と平行に保つ」常時機能で、スティックを離している間も
+    維持する必要がある(このデグレの元になった条件なので、再度付けないこと)
+
+**L1/R1の手動ジョグについて(同日質問「L1、R1での手先θ操作もあったはずだが
+どうなっている?」)**: 仕様どおり残っているが、手先θ追従がON(既定ON)の間は
+無視される(_timer_callbackの分岐が estop > 追従 > L1/R1ジョグ の順で、追従ONなら
+そこで確定するため)。L1/R1で手動ジョグしたい場合はOPTIONSボタンで追従をOFFに
+する。今回のデグレ中は「追従ONなので L1/R1 は無視、しかし追従自体も
+has_current_state_ で止まっている」という状態だったため、手先θがjoyから一切
+動かせなくなっていた。
+
+## 追従をOFFにしても手先θが止まらない (2026-09-10、ユーザー報告「OPTION押しても
+## 追従し続ける」。OPTIONSのindexは9で正しいことを実機側コードで確認済み)
+**原因**: joy_teleop_node._timer_callbackの手先θ分岐は、「追従OFF・L1/R1も
+押していない」状態ではどこにもpublishしない(現在値へ変数を同期するだけ)。
+そのためtrajectory_follower_node側のtarget_[tip_theta_joint]は追従ONだった頃の
+最後の目標のまま残り、OFFにしても手先θはその目標へ向かって動き続ける。
+tip_theta_jointのmax_velocityは既定0.1rad/s(gains.json)と遅く、135degぶんの
+移動に20秒以上かかるため、「OPTIONSが効いていない/追従し続けている」ようにしか
+見えなかった。
+
+**対策(実装済み、joy_teleop_node.py)**: OPTIONSで追従をONからOFFへ落とした
+瞬間に_tip_theta_follow_just_released_を立て、次の周期で現在値を目標として
+1回だけpublishしてその場で停止させる。毎周期publishはしないこと(追従OFF中も
+50Hzで送り続けると、GUIの自動シーケンス(20Hz)が同じ関節へ送る目標を数で
+押し負けさせる。「R軸の自動格納が機能しない」と同じ競合パターン)。
+GUI経由のOFF(_on_set_tip_theta_follow_srv)ではこのフラグを立てない: あちらは
+投入シーケンスがshoot_tip_theta_radを送る直前に呼ぶもので、停止目標を
+割り込ませるとGUIの目標と競合するため。
+
+## 手先θの速度・ゲインはGUIから調整可能 (2026-09-10、ユーザー質問への回答)
+追加実装は不要。既に以下の3パネルで編集・適用・gains.jsonへの保存ができる:
+  軌道生成パラメータパネル : tip_theta_jointのmax_velocity/max_acceleration/
+                             max_deceleration (TRAJ_PANEL_JOINT_NAMES)
+  RoboMasゲインパネル      : robomas_tip_theta_kp[A/deg]/kd[A/rpm]/current_ff[A]
+  joy速度パネル            : tip_theta_speed[rad/s] (L1/R1ジョグ速度)
+firmware側の速度PID(robomas_vel_kp/ki/kd/max_current)はz/r専用で、tip_thetaは
+常にMIT位置制御のため効かない。

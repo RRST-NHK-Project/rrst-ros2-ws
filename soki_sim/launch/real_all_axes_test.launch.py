@@ -22,7 +22,7 @@ def generate_launch_description():
     同時起動しないこと(いずれもtrajectory_follower_nodeを起動するため二重起動に
     なり衝突する)。
 
-    起動するもの: ros2can(既定は--nogui、PyQt5ウィンドウなし。ros2can_nogui引数参照)、
+    起動するもの: ros2can(既定はPyQt5ウィンドウあり。ros2can_nogui引数参照)、
     real_joint_bridge_node(帰還確認、4軸とも
     ROBOMAS/CubeMarsの内蔵エンコーダ帰還を真値として使う。z/rはRoboMas内蔵
     エンコーダに統一済み、2026-08-31方針転換。note/hardware_mapping.txt参照)、
@@ -196,12 +196,13 @@ def generate_launch_description():
         'use_viz', default_value='false',
         description='trueならrobot_state_publisher/joint_state_publisher/rviz2も起動する')
     ros2can_nogui_arg = DeclareLaunchArgument(
-        'ros2can_nogui', default_value='true',
+        'ros2can_nogui', default_value='false',
         description='trueならros2canを--nogui(ターミナルダッシュボード、PyQt5ウィンドウ'
-                    'なし)で起動する。ros2can自体は常に起動する。デフォルトtrue'
-                    '(2026-09-10変更。操作はcommand_gui_node側で完結しており、'
-                    'ros2canのPyQt5ウィンドウは通常不要なため。ros2can GUIを'
-                    '見たい場合は ros2can_nogui:=false を指定する)')
+                    'なし)で起動する。ros2can自体は常に起動する。デフォルトfalse'
+                    '(=PyQt5ウィンドウあり。2026-09-10に一度trueへ変更したが、'
+                    'ros2can GUI側のデバイス状態・スロット値を直接見たい場面が'
+                    '多いためユーザー指定で戻した。ターミナルダッシュボードに'
+                    'したい場合は ros2can_nogui:=true を指定する)')
     launch_gui_arg = DeclareLaunchArgument(
         'launch_gui', default_value='true',
         description='falseならcommand_gui_nodeを起動しない。command_gui_node自身が'

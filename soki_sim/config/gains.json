@@ -2,19 +2,19 @@
   "trajectory": {
     "max_velocity": {
       "root_theta_joint": 1.0,
-      "tip_theta_joint": 0.1,
+      "tip_theta_joint": 2.0,
       "z_joint": 0.1,
       "r_joint": 0.2
     },
     "max_acceleration": {
       "root_theta_joint": 4.0,
-      "tip_theta_joint": 0.2,
+      "tip_theta_joint": 4.0,
       "z_joint": 0.2,
       "r_joint": 0.4
     },
     "max_deceleration": {
       "root_theta_joint": 4.0,
-      "tip_theta_joint": 0.4,
+      "tip_theta_joint": 4.0,
       "z_joint": 0.2,
       "r_joint": 0.4
     }
@@ -22,7 +22,7 @@
   "joy_speed": {
     "theta_speed": 1.0,
     "z_speed": 0.2,
-    "r_speed": 0.3,
+    "r_speed": 0.2,
     "tip_theta_speed": 1.0,
     "low_speed_multiplier": 0.3
   },
@@ -45,13 +45,13 @@
     "robomas_kick_current_a": 0.1,
     "robomas_kick_duration_sec": 0.05,
     "robomas_kick_vel_threshold_mps": 0.001,
-    "robomas_tip_theta_kp": 0.02,
-    "robomas_tip_theta_kd": 0.002,
+    "robomas_tip_theta_kp": 0.2,
+    "robomas_tip_theta_kd": 0.05,
     "robomas_tip_theta_current_ff": 0.0
   },
   "sequence": {
     "shoot_tip_theta_rad": 0.0,
-    "retract_r_speed_mps": 0.2
+    "retract_r_speed_mps": 0.1
   },
   "robomas_vel_gain": {
     "robomas_vel_kp": 1.0,

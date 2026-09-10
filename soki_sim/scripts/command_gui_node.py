@@ -469,15 +469,95 @@ HAND_SERVO_PREVIEW_SPECS = [
 ]
 
 
+# GUIから保存する設定ファイル(config/gains.json・config/real_joint_bridge.yaml)の
+# 保存先を明示的に上書きするための環境変数名(2026-09-10追加)。
+# _iter_config_path_candidatesがワークスペースのソースツリーを見つけられない
+# 構成(<ws>/src/soki_sim以外の場所にリポジトリがある等)のための逃げ道。
+CONFIG_PATH_ENV_VARS = {
+    'gains.json': 'SOKI_SIM_GAINS_FILE',
+    'real_joint_bridge.yaml': 'SOKI_SIM_REAL_JOINT_BRIDGE_YAML',
+}
+
+
+def _config_path_env_override(filename):
+    """CONFIG_PATH_ENV_VARSの環境変数でconfig/{filename}のパスが明示指定されて
+    いればそれを返す(未設定ならNone)。"""
+    env_key = CONFIG_PATH_ENV_VARS.get(filename)
+    value = os.environ.get(env_key) if env_key else None
+    if not value:
+        return None
+    return os.path.abspath(os.path.expanduser(value))
+
+
+def _iter_config_path_candidates(filename):
+    """soki_sim/config/{filename}の探索候補を優先度順に列挙する。
+
+    ソースツリー側(<ws>/src/soki_sim/config/{filename})をshare側より優先するのが
+    肝(2026-09-10、ユーザー報告:「R軸格納速度が毎回0.2に戻る」の原因対処)。
+    command_gui_node自体はインストール後のパスから実行される(CMakeLists.txtで
+    RENAMEインストール)ため__file__相対では解決できず、以前は
+    get_package_share_directory経由のパスだけを使っていた。しかしCMakeLists.txtの
+    install(DIRECTORY config ...)はsymlink-installを付けずにcolcon buildすると
+    ただのコピーになるため、GUIの保存はinstall/側のコピーにしか届かず、
+    次のcolcon buildでsrc/側の内容に上書きされて消えていた(CMakeのfile(INSTALL)は
+    コピー先の方が新しくても内容が違えば上書きする)。GUIスクリプトを編集すれば
+    必ずリビルドするので、実質毎回リセットされていた。
+
+    <ws>はshare_dir(<ws>/install/soki_sim/share/soki_sim)とCOLCON_PREFIX_PATHの
+    各エントリから親方向へ辿って探す(install/のレイアウト差を吸収するため、
+    決め打ちの階層数ではなくsrc/soki_sim/config/{filename}が実在する親を採用する)。
+    見つからなければ従来どおりshare側(realpath。symlink-install時はこれ自体が
+    ソースツリー側を指す)を返す。"""
+    share_path = None
+    starts = []
+    try:
+        share_dir = get_package_share_directory('soki_sim')
+    except PackageNotFoundError:
+        pass
+    else:
+        share_path = os.path.realpath(os.path.join(share_dir, 'config', filename))
+        starts.append(share_dir)
+    starts.extend(p for p in os.environ.get('COLCON_PREFIX_PATH', '').split(os.pathsep) if p)
+
+    seen = set()
+    for start in starts:
+        d = os.path.abspath(start)
+        while True:
+            if d not in seen:
+                seen.add(d)
+                candidate = os.path.join(d, 'src', 'soki_sim', 'config', filename)
+                if os.path.isfile(candidate):
+                    yield os.path.realpath(candidate)
+            parent = os.path.dirname(d)
+            if parent == d:
+                break
+            d = parent
+
+    if share_path is not None:
+        yield share_path
+
+
 def _resolve_config_yaml_path(filename):
     """soki_sim/config/{filename}の実ファイルパスを解決する。
-    command_gui_node自体がインストール後のパスから実行される(CMakeLists.txtで
-    RENAMEインストール)ため、__file__相対ではなくget_package_share_directory経由
-    で解決する(_resource_pathと同じ理由)。symlink-installならrealpath()で
-    ソースツリー側のファイルが返るため、そちらを直接編集する
-    (「コードではなくこのファイルを編集すること」というyaml内コメントの
-    運用と一致させる。colcon buildをsymlink-installで行っていない場合は
-    次回launchには反映されるがソースツリー側は更新されない)。"""
+    ソースツリー側を優先する理由は_iter_config_path_candidatesのdocstring参照
+    (「コードではなくこのファイルを編集すること」というyaml内コメントの運用とも
+    一致する)。実在するファイルが1つも無ければNone。"""
+    override = _config_path_env_override(filename)
+    if override:
+        return override if os.path.isfile(override) else None
+    for path in _iter_config_path_candidates(filename):
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+def _resolve_real_joint_bridge_yaml_path():
+    return _resolve_config_yaml_path('real_joint_bridge.yaml')
+
+
+def _share_config_path(filename):
+    """install側(share)にあるconfig/{filename}のコピーのパスを返す
+    (見つからなければNone)。"""
     try:
         share_dir = get_package_share_directory('soki_sim')
     except PackageNotFoundError:
@@ -488,26 +568,44 @@ def _resolve_config_yaml_path(filename):
     return os.path.realpath(path)
 
 
-def _resolve_real_joint_bridge_yaml_path():
-    return _resolve_config_yaml_path('real_joint_bridge.yaml')
+def _write_config_file(filename, path, text):
+    """設定ファイルをソースツリー側(path)へ書き、install側(share)に別ファイルの
+    コピーがあればそちらへも同じ内容を書き写す(書けたらそのパスを返す)。
+
+    real_joint_bridge.yamlはreal_joint_bridge_node/homing_nodeがFindPackageShare
+    経由(=install側)で読むため、ソースツリー側だけを書き換えるとcolcon buildする
+    までノードに反映されない。「保存すれば次回launchから反映される」という
+    従来の挙動を保つために両方へ書く(2026-09-10、保存先をソースツリー優先に
+    変更した際の対処。_iter_config_path_candidatesのdocstring参照)。
+    install側はcolcon buildでソースツリー側の内容に戻るだけなので、書き写しに
+    失敗しても保存自体は成功扱いにする。"""
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(text)
+    mirror = _share_config_path(filename)
+    if mirror is None or os.path.abspath(mirror) == os.path.abspath(path):
+        return None
+    try:
+        with open(mirror, 'w', encoding='utf-8') as f:
+            f.write(text)
+    except OSError:
+        return None
+    return mirror
 
 
 def _resolve_gains_file_path():
-    """軌道生成パラメータ・MIT/robomasゲイン・joy速度のGUI保持値を書き込む
-    gains.jsonの実ファイルパスを解決する。実機で有効だった値をホーム
+    """軌道生成パラメータ・MIT/robomasゲイン・joy速度・シーケンス設定のGUI保持値を
+    書き込むgains.jsonの実ファイルパスを解決する。実機で有効だった値をホーム
     ディレクトリではなくリポジトリ内(soki_sim/config/gains.json)に置き、
     git管理下でバックアップ・共有できるようにするため、
-    _resolve_real_joint_bridge_yaml_pathと同じ方式(get_package_share_directory
-    経由、symlink-installならソースツリー側を直接編集)で解決する。パッケージ/
-    ファイルが見つからない場合(colcon build未実行の単体起動等)はホーム
-    ディレクトリ側にフォールバックする。"""
-    try:
-        share_dir = get_package_share_directory('soki_sim')
-        path = os.path.join(share_dir, 'config', 'gains.json')
+    _resolve_config_yaml_pathと同じ候補(ソースツリー優先)を使う。
+    パッケージ/ファイルが見つからない場合(colcon build未実行の単体起動等)は
+    ホームディレクトリ側にフォールバックする。"""
+    override = _config_path_env_override('gains.json')
+    if override:
+        return override
+    for path in _iter_config_path_candidates('gains.json'):
         if os.path.isfile(path):
-            return os.path.realpath(path)
-    except PackageNotFoundError:
-        pass
+            return path
     return os.path.expanduser('~/.config/soki_sim/gains.json')
 
 
@@ -2168,11 +2266,11 @@ class CommandGuiApp(QWidget):
             return
         # 2026-09-09、全ノード起動ボタン廃止(GUI起動時に自動起動するため)に伴い、
         # rviz起動・ros2can GUIのON/OFFを選ぶチェックボックスも廃止し、固定値で
-        # 起動する。ros2canは--nogui(ターミナルダッシュボード)で起動する
-        # (2026-09-10変更。操作はこのcommand_gui_node側で完結しており、ros2canの
-        # PyQt5ウィンドウは通常不要なため。real_all_axes_test.launch.pyの
-        # ros2can_nogui引数の既定値と揃えること)。
-        cmd = ALL_AXES_LAUNCH_BASE_CMD + ['use_viz:=true', 'ros2can_nogui:=true']
+        # 起動する。ros2canはPyQt5ウィンドウあり(--nogui無し)で起動する
+        # (2026-09-10に一度--noguiへ変更したが、ros2can GUI側のデバイス状態・
+        # スロット値を直接見たい場面が多いためユーザー指定で戻した。
+        # real_all_axes_test.launch.pyのros2can_nogui引数の既定値と揃えること)。
+        cmd = ALL_AXES_LAUNCH_BASE_CMD + ['use_viz:=true', 'ros2can_nogui:=false']
         try:
             # start_new_session=True(setsid)でこの子プロセスを独立したプロセス
             # グループのリーダーにする。ros2 launchはさらに複数のノードを自分の
@@ -3784,12 +3882,14 @@ class CommandGuiApp(QWidget):
                 text = f.read()
             for key, value_str in updates.items():
                 text = _replace_yaml_scalar(text, key, value_str)
-            with open(path, 'w', encoding='utf-8') as f:
-                f.write(text)
+            mirror = _write_config_file(yaml_filename, path, text)
         except OSError as exc:
             _set_status(status_label, f'保存失敗: {exc}', 'error')
             return
-        _set_status(status_label, f'保存しました ({path})\ngit diffで変更内容を確認してください', 'success')
+        status = f'保存しました ({path})\ngit diffで変更内容を確認してください'
+        if mirror:
+            status += f'\ninstall側にも反映済み ({mirror})'
+        _set_status(status_label, status, 'success')
 
     def _build_field_buttons(self, layout):
         # 以前はワーク/シューティングボックスを別々のボックス(別々の座標系)で
@@ -4761,8 +4861,8 @@ class CommandGuiApp(QWidget):
         self._saved_gains[section] = data
         path = _resolve_gains_file_path()
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(self._saved_gains, f, ensure_ascii=False, indent=2)
+        text = json.dumps(self._saved_gains, ensure_ascii=False, indent=2) + '\n'
+        _write_config_file('gains.json', path, text)
 
     def _persist_traj_values(self, traj):
         names = self._traj_joint_names
