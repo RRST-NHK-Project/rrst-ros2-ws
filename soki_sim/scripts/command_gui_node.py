@@ -2167,9 +2167,12 @@ class CommandGuiApp(QWidget):
             QMessageBox.information(self, '起動済み', '既に起動中です(先に停止してください)')
             return
         # 2026-09-09、全ノード起動ボタン廃止(GUI起動時に自動起動するため)に伴い、
-        # rviz起動・ros2can GUIのON/OFFを選ぶチェックボックスも廃止し、従来の既定値
-        # (両方ON)で固定する。
-        cmd = ALL_AXES_LAUNCH_BASE_CMD + ['use_viz:=true', 'ros2can_nogui:=false']
+        # rviz起動・ros2can GUIのON/OFFを選ぶチェックボックスも廃止し、固定値で
+        # 起動する。ros2canは--nogui(ターミナルダッシュボード)で起動する
+        # (2026-09-10変更。操作はこのcommand_gui_node側で完結しており、ros2canの
+        # PyQt5ウィンドウは通常不要なため。real_all_axes_test.launch.pyの
+        # ros2can_nogui引数の既定値と揃えること)。
+        cmd = ALL_AXES_LAUNCH_BASE_CMD + ['use_viz:=true', 'ros2can_nogui:=true']
         try:
             # start_new_session=True(setsid)でこの子プロセスを独立したプロセス
             # グループのリーダーにする。ros2 launchはさらに複数のノードを自分の

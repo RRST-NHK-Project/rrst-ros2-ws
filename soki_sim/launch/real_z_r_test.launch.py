@@ -4,7 +4,7 @@ from typing import List
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.conditions import IfCondition
+from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import Command, LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
@@ -24,7 +24,8 @@ def generate_launch_description():
     同時起動しないこと(いずれもtrajectory_follower_nodeを起動するため二重起動に
     なり衝突する)。
 
-    起動するもの: ros2can GUI, real_joint_bridge_node(帰還確認。CubeMars側は
+    起動するもの: ros2can(既定は--nogui、PyQt5ウィンドウなし。ros2can_nogui引数参照)、
+    real_joint_bridge_node(帰還確認。CubeMars側は
     root_theta/tip_thetaとも動かさない前提のためcubemars_root_theta_indexは
     yaml既定値のまま)、trajectory_follower_node(z/r実機出力あり、root_thetaは
     実機出力オフのままsoki_sim表示のみ)、homing_node(z/rの起動時ホーミング。
@@ -117,6 +118,12 @@ def generate_launch_description():
     use_viz_arg = DeclareLaunchArgument(
         'use_viz', default_value='false',
         description='trueならrobot_state_publisher/joint_state_publisher/rviz2も起動する')
+    ros2can_nogui_arg = DeclareLaunchArgument(
+        'ros2can_nogui', default_value='true',
+        description='trueならros2canを--nogui(ターミナルダッシュボード、PyQt5ウィンドウ'
+                    'なし)で起動する。ros2can自体は常に起動する。デフォルトtrue'
+                    '(2026-09-10変更、real_all_axes_test.launch.pyと同じ既定。'
+                    'ros2can GUIを見たい場合は ros2can_nogui:=false を指定する)')
 
     robomas_kp = LaunchConfiguration('robomas_kp')
     robomas_kd = LaunchConfiguration('robomas_kd')
@@ -134,11 +141,25 @@ def generate_launch_description():
     # use_joy:=trueならGUI/joy両方を受け付ける。falseならGUI専用のまま
     control_mode = PythonExpression(["'both' if '", use_joy, "' == 'true' else 'auto'"])
 
-    ros2can_node = Node(
+    # ros2canは常に起動する。--noguiの有無だけをros2can_noguiで切り替える
+    # (launch_ros.Nodeのargumentsは条件付きで一部だけ足すことができないため、
+    # 同名ノードをIfCondition/UnlessConditionで排他的に2つ用意する定番パターン。
+    # real_all_axes_test.launch.pyと同じ構成)。
+    ros2can_nogui = LaunchConfiguration('ros2can_nogui')
+    ros2can_gui_node = Node(
         package='ros2can',
         executable='ros2can',
         name='ros2can_gui',
         output='screen',
+        condition=UnlessCondition(ros2can_nogui),
+    )
+    ros2can_nogui_node = Node(
+        package='ros2can',
+        executable='ros2can',
+        name='ros2can_gui',
+        output='screen',
+        arguments=['--nogui'],
+        condition=IfCondition(ros2can_nogui),
     )
 
     real_joint_bridge_node = Node(
@@ -293,8 +314,10 @@ def generate_launch_description():
         r_max_deceleration_arg,
         use_joy_arg,
         use_viz_arg,
+        ros2can_nogui_arg,
         enable_button_arg,
-        ros2can_node,
+        ros2can_gui_node,
+        ros2can_nogui_node,
         real_joint_bridge_node,
         homing_node,
         autotune_node,
