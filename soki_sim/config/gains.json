@@ -24,7 +24,8 @@
     "z_speed": 0.2,
     "r_speed": 0.2,
     "tip_theta_speed": 1.0,
-    "low_speed_multiplier": 0.3
+    "low_speed_multiplier": 0.3,
+    "xy_speed": 0.05
   },
   "mit_gain": {
     "cubemars_kp": {
@@ -58,5 +59,10 @@
     "robomas_vel_ki": 0.0,
     "robomas_vel_kd": 0.1,
     "robomas_vel_max_current_a": 1.0
+  },
+  "machine_origin": {
+    "machine_origin_x_joint": -0.02,
+    "machine_origin_y_joint": 0.0,
+    "machine_origin_z_joint": 0.0
   }
 }

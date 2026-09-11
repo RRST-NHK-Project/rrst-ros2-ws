@@ -923,3 +923,75 @@ _resolve_config_yaml_path)がget_package_share_directory経由のパスだけを
 
 **検証**: gains.jsonを0.12にしてcolcon build後も0.12のまま(src/install両方)で
 あることを確認済み。修正前は同条件でsrc側の値に巻き戻っていた。
+
+## 回収シーケンスで左側のワークだけ中心を狙って見える件 (2026-09-11)
+**症状**: 回収シーケンス(_start_pick_sequence、狙い点をワーク上面側へ
+pick_aim_y_offset_mずらす方式)で、右側の列は上面を向くのに左側の列だけ
+ワーク中心を向いているように見える(実機)。
+
+**調査**: GUI→send_target→trajectory_follower_node→CubeMars MIT指令→cubemars.cpp
+まで追ったが、x(左右)の符号で非対称になる箇所は無い。1-1/1-6のθは完全に鏡像。
+→ ソフトが左右で違う値を出しているのではなく、実機側に一定のずれが乗って
+片側だけ目立つ状況。ユーザー実測で「根本θ中心(旋回軸)が機体原点から
+フィールドに向かう向き(URDF x=前方)に20mmずれている」と判明(当初「Y軸正
+方向」と聞いて左ずれと解釈したが、前方ずれに訂正)。
+注意: 前方ずれ自体は左右対称にしか効かない(両側とも上面より20mm奥を向く)
+ので、「左だけ中心を向く」の直接原因ではない。ただし旋回軸ずれを逆運動学が
+無視していた欠陥自体は事実なので修正した。左右非対称分の残りは root_theta の
+零点バイアス(1-4で約4.6°、1-6で約6°の反時計回りずれで左側がちょうど中心を
+向く)が最有力。
+
+**原因**: WORK_POINTS等のフィールド座標は機体原点(machine_origin_link)基準で
+採寸した値だが、逆運動学(xyz_to_joint/_theta_r_from_xy、atan2(-x, y))は旋回軸
+=機体原点の前提で計算していた。機体原点オフセットパネル(machine_origin_x/y/z_
+joint)は/mixed_joint_statesへ送ってRViz表示を動かすだけで、逆運動学では
+一切使われていなかった。旋回軸が左へ20mm寄ると、左側のワークは旋回軸から
+見て中心線寄りになり、指令した光線がワーク列を手前(中心付近)で横切る。
+数値確認(参考、旋回軸が左へ0.02mの場合): 1-4(x=-0.1)は旧計算の光線がy=0.269で
+列を横切る(ワーク中心0.265、上面0.336)。旋回軸が前方へ0.02mの場合は左右とも
+y=0.356(上面より20mm奥)で対称。
+
+**対処**: command_gui_node.py
+  - field_to_axis/axis_to_field を新設し、xyz_to_joint/_theta_r_from_xy/
+    joint_to_xyz にmachine_origin引数(URDF座標のmachine_origin_x/y/z_joint値)を
+    追加。GUI座標(x=右,y=前)とURDF座標(x=前,y=左)の対応はWORK_POINTS定義部と
+    同じで、フィールド座標(x,y,z)は旋回軸基準で(x - my, y + mx, z + mz)。
+  - self._machine_origin(適用値)を回収/投入シーケンスのθ計算と現在位置XYZ
+    表示(joint_to_xyz)で使う。
+  - 「適用」でgains.jsonの'machine_origin'セクションへ保存し、起動時に
+    _restore_saved_gainsで編集欄・適用値へ復元してRVizへ送信。GUIより後に
+    joint_state_publisherが起動した場合に備え_refresh_machine_status(1秒周期)
+    から送り直す。
+  パネルの入力値は「旋回軸から機体原点までのズレ」(URDF座標: X=前方、Y=左)
+  なので、旋回軸が機体原点よりフィールド側へ20mmずれているなら X=-0.020 を
+  入れる。
+
+**未確認**: 実機での効果確認(X=-0.020適用後、左右とも上面より奥を向く分が
+消えるか)。左だけ中心寄りの残差はroot_theta零点の取り直し(θ=0を指令して
+アームがフィールド前後方向と平行か確認)で対処する。
+
+## XYモード(手先ワールドXYジョグ、低速モードと統合) (2026-09-11実装)
+ユーザー指定:「XY軸操作モードの実装は可能か? 手先の調整時のみ使う」→「SHAREの
+低速と統合、左スティックでXYどちらも出(る)」。
+  - joy_teleop_node.py: 低速モード(SHARE、_low_speed_enabled_)ON中は左スティックを
+    関節rではなく手先ワールドXY(X=右、Y=前方、GUI座標と同じ)のジョグにする。
+    手先速度(vx,vy)=入力×xy_speedを、実測の現在θ・R=r+ARM_LENGTH/2で
+      Ṙ = -vx·sinθ + vy·cosθ  → r_jointの速度指令(velocity_mode)/位置積分に加算
+      θ̇ = -(vx·cosθ + vy·sinθ)/R → root_theta目標角の積分に加算(L2/R2と加算併用)
+    に分解(冒頭docstring「XYモード」、_timer_callback参照)。θ̇はtheta_speed×
+    low_speed_multiplierで頭打ち、R<XY_MIN_RADIUS_M(0.05m)では回転成分を出さない。
+    新パラメータ: axis_xy_x(0)/axis_xy_y(1)/invert_xy_x(true)/invert_xy_y(false)/
+    xy_speed(0.05m/s、low_speed_multiplierは掛けない実速度)。
+    スティック向きの既定(左=+1のjoy_node標準を仮定してinvert_xy_x=true)は実機で要確認。
+  - command_gui_node.py: 「手動操作(joy)速度」パネルにxy_speed欄を追加。
+    gains.json joy_speedにxy_speed=0.05を追加(無いと適用時に0.0が送られ
+    「must be positive」で全体が弾かれる)。
+  - 制約: θは位置追従・rは速度指令なので速く動かすと直線からずれる(微調整用途
+    前提)。xy_speedをtrajectory_follower_nodeのr速度上限(max_velocity 0.2×
+    low_speed_multiplier 0.3=0.06m/s)より大きくするとr側だけ飽和して方向が狂う。
+  - 検証: 分解式をθ=35°,r=0.2から1秒積分するシミュレーションで(vx,vy)通りに
+    手先が動くことを確認(実機・sim未確認)。
+
+備考(同日): gains.jsonのmachine_originが y=-0.02 になっていた(前方ずれを
+「Y軸正方向」と聞いて左ずれと誤解釈した案内に従ってGUIから適用されたもの)。
+実際は前方(URDF x)ずれのため x=-0.02, y=0.0 に修正済み。

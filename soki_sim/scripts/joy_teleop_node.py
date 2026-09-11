@@ -170,7 +170,35 @@ button_tip_theta_r1・invert_*・pump_toggle_buttonパラメータで合わせ�
                                          z_speed/r_speed/tip_theta_speedをすべて
                                          low_speed_multiplier(既定0.3、command_gui_
                                          nodeの「joy速度」パネルから調整可能)倍に
-                                         落として精密操作しやすくする)
+                                         落として精密操作しやすくする。
+                                         2026-09-11追加、ユーザー指定:「XY軸操作
+                                         モード。手先の調整時のみ使う」「SHAREの
+                                         低速と統合、左スティックでXY」により、
+                                         低速モードON中は左スティックが関節r
+                                         ではなくワールドXY(X=右、Y=前方=
+                                         フィールド方向。command_gui_nodeの
+                                         GUI座標と同じ)の手先ジョグになる
+                                         (下記「XYモード」参照))
+  左スティック(低速モード中) -> 手先ワールドXYジョグ (axis_xy_x/axis_xy_y、
+                                         デフォルト0/1=左スティック左右/上下。
+                                         2026-09-11追加。手先のワールド速度
+                                         (vx, vy)=(入力×xy_speed)を、現在の
+                                         root_theta(θ)とアーム半径R=r+ARM_LENGTH/2
+                                         から
+                                           Ṙ = -vx·sinθ + vy·cosθ
+                                           θ̇ = -(vx·cosθ + vy·sinθ) / R
+                                         でr_jointの速度指令とroot_thetaの目標角
+                                         積分に分解する(_timer_callback参照)。
+                                         xy_speed[m/s]はlow_speed_multiplierを
+                                         掛けない「XYモード時の実速度」。
+                                         r側はtrajectory_follower_nodeの速度モード
+                                         クランプ(max_velocity×low_speed_multiplier)
+                                         で頭打ちになるため、xy_speedをそれより
+                                         大きくすると直線からずれる。θ側はtheta_
+                                         speed×low_speed_multiplierで頭打ち。
+                                         R≈0(特異点)付近ではθ̇を出さずR方向のみ
+                                         動かす(XY_MIN_RADIUS_M)。L2/R2の
+                                         root_thetaジョグとは加算で併用できる)
 
 いずれもレート方式: 倒している間、target += 入力値*speed*dt で積分し続ける。
 入力が中立/デッドマン未押下の間は目標を/mixed_joint_statesの現在値に同期する
@@ -207,6 +235,10 @@ from std_srvs.srv import SetBool, Trigger
 ARM_LENGTH = 1.244
 Z_LOWER, Z_UPPER = 0.0, 0.432
 R_LOWER, R_UPPER = -ARM_LENGTH / 2.0, ARM_LENGTH / 2.0
+# XYモード(低速モード中の左スティック、冒頭「XYモード」参照)で、アーム半径Rが
+# これ未満のときはroot_thetaの回転成分θ̇=接線速度/Rを出さない(R→0で発散する
+# 特異点回避。R方向の成分だけ動かす)。
+XY_MIN_RADIUS_M = 0.05
 
 # root_theta: 実機CubeMars(MITモード)の指令可能範囲(±12.5rad、アクチュエータ軸)を
 # 外部減速比(112/24)で関節角度に変換した値。command_gui_node.pyのROOT_THETA_*、
@@ -338,6 +370,21 @@ class JoyTeleopNode(Node):
         # theta_speed/z_speed/r_speed/tip_theta_speedをlow_speed_multiplier倍に
         # 落として精密操作しやすくする(_timer_callback参照)。
         self.declare_parameter('low_speed_multiplier', 0.3)
+        # XYモード(2026-09-11追加、冒頭「XYモード」参照)。低速モードON中の
+        # 左スティックを手先のワールドXYジョグに使う。axis_xy_x=左スティック
+        # 左右(axes[0])、axis_xy_y=左スティック上下(axes[1]、通常モードのaxis_r
+        # と同じ軸)。標準的なLinux joy_nodeはスティック左/上で+1.0を返すため、
+        # X+=右 にするにはinvert_xy_x=true、Y+=前方(スティック上) は
+        # invert_xy_y=falseが既定(実機で要確認)。xy_speedは[m/s]、フル入力時の
+        # 手先速度で、low_speed_multiplierは掛けない(XYモード=低速モード中に
+        # 二重に掛かるのを避け、この値そのものを実速度として調整できるようにする)。
+        # 既定0.05はtrajectory_follower_node側のr速度上限(max_velocity 0.2 ×
+        # low_speed_multiplier 0.3 = 0.06m/s、gains.json参照)を超えない値。
+        self.declare_parameter('axis_xy_x', 0)
+        self.declare_parameter('axis_xy_y', 1)
+        self.declare_parameter('invert_xy_x', True)
+        self.declare_parameter('invert_xy_y', False)
+        self.declare_parameter('xy_speed', 0.05)     # m/s (フル入力時、XYモード)
         # z/rのjoy出力を位置目標(target_z_/target_r_を積分してjoint_targetsへ)
         # ではなく、trajectory_follower_nodeの速度モード(robomas_velocity_mode)
         # 向けにスティック入力をそのまま速度指令(joint_velocity_targets)として
@@ -434,6 +481,11 @@ class JoyTeleopNode(Node):
         self.r_speed_ = float(self.get_parameter('r_speed').value)
         self.tip_theta_speed_ = float(self.get_parameter('tip_theta_speed').value)
         self.low_speed_multiplier_ = float(self.get_parameter('low_speed_multiplier').value)
+        self.axis_xy_x_ = int(self.get_parameter('axis_xy_x').value)
+        self.axis_xy_y_ = int(self.get_parameter('axis_xy_y').value)
+        self.sign_xy_x_ = -1.0 if self.get_parameter('invert_xy_x').value else 1.0
+        self.sign_xy_y_ = -1.0 if self.get_parameter('invert_xy_y').value else 1.0
+        self.xy_speed_ = float(self.get_parameter('xy_speed').value)
         self.velocity_mode_enabled_ = bool(self.get_parameter('velocity_mode_enabled').value)
         self.theta_jog_enabled_ = bool(self.get_parameter('theta_jog_enabled').value)
         self.deadzone_ = float(self.get_parameter('deadzone').value)
@@ -640,6 +692,7 @@ class JoyTeleopNode(Node):
             f'(follow={self._tip_theta_follow_theta_}), '
             f'low_speed_toggle_button={self.low_speed_toggle_button_}, '
             f'low_speed_multiplier={self.low_speed_multiplier_}, '
+            f'axis_xy_x={self.axis_xy_x_}, axis_xy_y={self.axis_xy_y_}, xy_speed={self.xy_speed_}m/s, '
             f'hand_deploy_toggle_button={self.hand_deploy_toggle_button_}, '
             f'hand_pitch_toggle_button={self.hand_pitch_toggle_button_}, '
             f'axis_select_col={self.axis_select_col_}, axis_select_row={self.axis_select_row_}, '
@@ -651,7 +704,7 @@ class JoyTeleopNode(Node):
 
     def _on_set_parameters(self, params):
         for p in params:
-            if (p.name in ('theta_speed', 'z_speed', 'r_speed', 'tip_theta_speed')
+            if (p.name in ('theta_speed', 'z_speed', 'r_speed', 'tip_theta_speed', 'xy_speed')
                     and p.value <= 0.0):
                 return SetParametersResult(successful=False, reason=f'{p.name} must be positive')
             if p.name == 'low_speed_multiplier' and not (0.0 < p.value <= 1.0):
@@ -668,6 +721,8 @@ class JoyTeleopNode(Node):
                 self.r_speed_ = float(p.value)
             elif p.name == 'low_speed_multiplier':
                 self.low_speed_multiplier_ = float(p.value)
+            elif p.name == 'xy_speed':
+                self.xy_speed_ = float(p.value)
             elif p.name == 'velocity_mode_enabled':
                 self.velocity_mode_enabled_ = bool(p.value)
             elif p.name == 'theta_jog_enabled':
@@ -897,7 +952,8 @@ class JoyTeleopNode(Node):
             self._low_speed_pub_.publish(low_speed_msg)
             self.get_logger().info(
                 'joy_teleop_node: 低速モードを'
-                f'{"ON" if self._low_speed_enabled_ else "OFF"}にしました')
+                f'{"ON" if self._low_speed_enabled_ else "OFF"}にしました'
+                f'(左スティック: {"ワールドXYジョグ" if self._low_speed_enabled_ else "関節r"})')
         self._prev_low_speed_toggle_pressed_ = pressed
 
     def _call_trigger(self, client, description, provider='command_gui_node'):
@@ -1105,6 +1161,34 @@ class JoyTeleopNode(Node):
             self.deadzone_) * self.sign_theta_
         z_in = apply_deadzone(self._axis(msg.axes, self.axis_z_), self.deadzone_) * self.sign_z_
         r_in = apply_deadzone(self._axis(msg.axes, self.axis_r_), self.deadzone_) * self.sign_r_
+
+        # XYモード(2026-09-11追加、冒頭「XYモード」参照): 低速モード(SHARE)ON中は
+        # 左スティックを関節rのジョグではなく手先のワールドXYジョグとして扱う。
+        # 手先速度(vx, vy)[m/s]を現在のθ・アーム半径Rでr方向成分(xy_r_dot、
+        # r_jointの速度[m/s])と回転成分(xy_theta_dot、root_thetaの角速度[rad/s])に
+        # 分解し、それぞれ下の既存のr/θ処理に加算する。分解には目標値ではなく
+        # 実測の現在値(_current_theta_/_current_r_)を使う(目標が実機より先行して
+        # いるときに方向がずれないようにするため)。
+        xy_r_dot = 0.0
+        xy_theta_dot = 0.0
+        if self._low_speed_enabled_:
+            r_in = 0.0  # 左スティック上下はXYモード中ワールドYに使う(関節rとしては無視)
+            if enabled and self.has_current_state_:
+                x_in = apply_deadzone(self._axis(msg.axes, self.axis_xy_x_), self.deadzone_) * self.sign_xy_x_
+                y_in = apply_deadzone(self._axis(msg.axes, self.axis_xy_y_), self.deadzone_) * self.sign_xy_y_
+                if x_in != 0.0 or y_in != 0.0:
+                    vx = x_in * self.xy_speed_
+                    vy = y_in * self.xy_speed_
+                    sin_t = math.sin(self._current_theta_)
+                    cos_t = math.cos(self._current_theta_)
+                    radius = self._current_r_ + ARM_LENGTH / 2.0
+                    # 手先位置 x=-R·sinθ, y=R·cosθ (command_gui_node.joint_to_xyzと同じ)
+                    # の時間微分を逆に解いたもの。
+                    xy_r_dot = -vx * sin_t + vy * cos_t
+                    if radius > XY_MIN_RADIUS_M:
+                        theta_limit = self.theta_speed_ * speed_scale
+                        xy_theta_dot = clamp(-(vx * cos_t + vy * sin_t) / radius,
+                                             -theta_limit, theta_limit)
         # 手先θ(tip_theta_joint)はL1/R1ボタンでジョグする(2026-09-10、右スティック
         # 左右から変更。declare_parameter部コメント参照)。root_thetaのL2/R2
         # トリガーと同じくR1側を正方向として押下状態の差を入力値にするが、こちらは
@@ -1145,23 +1229,30 @@ class JoyTeleopNode(Node):
         # 既存の回収/投入シーケンスによる自動位置合わせのみに任せたい場合用)。
         # current状態への同期だけは続け、joyからの手動制御が無効の間もtarget_
         # theta_が古い値のまま固定されないようにする。
-        if self.theta_jog_enabled_ and enabled and theta_in != 0.0:
+        # XYモードの回転成分(xy_theta_dot)はL2/R2ジョグと加算する(theta_jog_enabled
+        # の有無に関わらずXYモード側は有効)。
+        theta_rate = xy_theta_dot
+        if self.theta_jog_enabled_:
+            theta_rate += theta_in * self.theta_speed_ * speed_scale
+        if enabled and theta_rate != 0.0:
             self.target_theta_ = clamp(
-                self.target_theta_ + theta_in * self.theta_speed_ * speed_scale * dt,
+                self.target_theta_ + theta_rate * dt,
                 ROOT_THETA_LOWER, ROOT_THETA_UPPER)
             names.append('root_theta_joint')
             positions.append(self.target_theta_)
         elif self.has_current_state_:
             self.target_theta_ = self._current_theta_
 
+        # XYモードのr方向成分(xy_r_dot)は関節rジョグ(r_in、XYモード中は0)と加算する。
+        r_rate = r_in * self.r_speed_ * speed_scale + xy_r_dot
         if self.velocity_mode_enabled_:
             vel_names.append('r_joint')
-            vel_values.append(r_in * self.r_speed_ * speed_scale if enabled else 0.0)
+            vel_values.append(r_rate if enabled else 0.0)
             if self.has_current_state_:
                 self.target_r_ = self._current_r_
-        elif enabled and r_in != 0.0:
+        elif enabled and r_rate != 0.0:
             self.target_r_ = clamp(
-                self.target_r_ + r_in * self.r_speed_ * speed_scale * dt, R_LOWER, R_UPPER)
+                self.target_r_ + r_rate * dt, R_LOWER, R_UPPER)
             names.append('r_joint')
             positions.append(self.target_r_)
         elif self.has_current_state_:

@@ -305,6 +305,15 @@ DEFAULT_SEQUENCE_SETTINGS = {
     # 投入時の手先θ(tip_theta_joint)目標[rad]。r方向(アーム伸縮方向)に垂直となる
     # 値だが、実機で未検証の暫定値(2026-09-03、ユーザー指摘)。
     'shoot_tip_theta_rad': 0.0,
+    # 回収シーケンスでroot_thetaの目標角を決める際の狙い点を、ワーク中心から
+    # ワーク上面(円筒の端面のうち機体と反対側、+Y方向)側へずらす量[m]
+    # (2026-09-11追加、ユーザー指摘:「ワーク座標のXYから根本θの角度を決めて
+    # いるが、それがワーク中心をもとに決まっているので上面あたりを基準に
+    # 根本θを計算したい」)。WORK_POINTSのYはワーク(横倒し円筒、軸=Y方向、
+    # 底面=機体側)の長さ方向の中心なので、既定値WORK_LENGTH/2でちょうど上面。
+    # 実機で狙いを微調整できるようGUIの編集欄(sequence_edits)から変更可能。
+    # _start_pick_sequence参照。
+    'pick_aim_y_offset_m': WORK_LENGTH / 2.0,
     # パッド収納(/hand_gather_pads)からピッチ投入姿勢への切替(/hand_set_pitch_
     # insert)までの待ち時間[s](2026-09-03、ユーザー指摘: 「収納から姿勢変更
     # までの待機時間も必要。ほぼ同時はまずい」。パッドが物理的に収納し切る前に
@@ -673,13 +682,47 @@ def clamp(value, lower, upper):
     return max(lower, min(upper, value))
 
 
-def xyz_to_joint(x, y, z):
-    """ワールド座標(X,Y,Z) -> (theta, z_joint, r_joint)。可動域外はクランプする。
+NO_MACHINE_ORIGIN = (0.0, 0.0, 0.0)
 
-    X軸正=右向き、Y軸正=機体からワークに向かう前方。
+
+def field_to_axis(x, y, z, machine_origin=NO_MACHINE_ORIGIN):
+    """フィールド座標(machine_origin_link=機体原点基準、GUIのX=右/Y=前方/Z=高さ)
+    -> 旋回軸(base_link)基準の座標。machine_originはsoki_sim.urdf.xacroの
+    machine_origin_x/y/z_joint値(URDF座標: x=前方(奥行き)、y=左(幅)、z=上。
+    「base_link(旋回軸)から機体原点までのズレ」)のタプル。
+
+    2026-09-11追加、ユーザー報告:「左側だけワーク中心を狙っているように見える」
+    →「根本θ中心が(機体原点から)フィールド側へ20mmずれている」。WORK_POINTS等の
+    フィールド座標は全て機体原点基準で採寸した値だが、逆運動学(atan2(-x, y))は
+    旋回軸が機体原点と一致している前提で計算していたため、旋回軸が幅方向に
+    ずれていると左右で狙いが非対称になる(旋回軸が左(+y)へ寄ると、左側の
+    ワークは旋回軸から見て中心線寄り(=光線がワーク列を手前で横切り「中心を狙う」
+    ように見える)、右側は逆に奥へずれる)。機体原点オフセットパネル
+    (_build_machine_origin_offset_panel)はこれまでRViz表示のみに反映され、
+    逆運動学では無視されていたため、ここで明示的に取り込む。
+    GUI座標とURDF座標の対応はWORK_POINTS定義部のコメントと同じ(x_gui = -y_urdf,
+    y_gui = x_urdf)なので、machine_origin_link = base_link + (mx, my, mz)[URDF]
+    より、フィールド座標(x, y, z)の点は旋回軸から見て(x - my, y + mx, z + mz)。"""
+    mx, my, mz = machine_origin
+    return x - my, y + mx, z + mz
+
+
+def axis_to_field(x, y, z, machine_origin=NO_MACHINE_ORIGIN):
+    """field_to_axisの逆変換: 旋回軸(base_link)基準 -> フィールド座標(機体原点基準)。"""
+    mx, my, mz = machine_origin
+    return x + my, y - mx, z - mz
+
+
+def xyz_to_joint(x, y, z, machine_origin=NO_MACHINE_ORIGIN):
+    """フィールド座標(X,Y,Z) -> (theta, z_joint, r_joint)。可動域外はクランプする。
+
+    X軸正=右向き、Y軸正=機体からワークに向かう前方。座標はいずれも機体原点
+    (machine_origin_link)基準で、machine_origin(旋回軸から機体原点までのズレ、
+    field_to_axis参照)を通して旋回軸基準に直してから計算する。
     root_theta_joint角度は旋回軸に対して定義された内部基準(前方=Y+の時にtheta=0)
     に合わせるため、atan2の引数はatan2(-x, y)となる(X/Yをそのまま使うatan2(y,x)ではない)。
     """
+    x, y, z = field_to_axis(x, y, z, machine_origin)
     theta_raw = math.atan2(-x, y)
     theta = clamp(theta_raw, ROOT_THETA_LOWER, ROOT_THETA_UPPER)
     radius = math.hypot(x, y)
@@ -691,9 +734,11 @@ def xyz_to_joint(x, y, z):
     return theta, zj, r, clamped
 
 
-def _theta_r_from_xy(x, y):
+def _theta_r_from_xy(x, y, machine_origin=NO_MACHINE_ORIGIN):
     """xyz_to_jointのtheta/r算出部分のみを取り出したもの(z非依存)。ピック/投入
-    シーケンスで、安全高度を保ったまま先にtheta/rを決めるために使う。"""
+    シーケンスで、安全高度を保ったまま先にtheta/rを決めるために使う。
+    machine_originはxyz_to_jointと同じ(field_to_axis参照)。"""
+    x, y, _z = field_to_axis(x, y, 0.0, machine_origin)
     theta_raw = math.atan2(-x, y)
     theta = clamp(theta_raw, ROOT_THETA_LOWER, ROOT_THETA_UPPER)
     radius = math.hypot(x, y)
@@ -702,14 +747,15 @@ def _theta_r_from_xy(x, y):
     return theta, r
 
 
-def joint_to_xyz(theta, zj, r):
-    """xyz_to_jointの逆変換(順運動学): (theta, z_joint, r_joint) -> ワールド座標(X,Y,Z)。
-    現在の関節角度から手先座標をリアルタイム表示するために使う。"""
+def joint_to_xyz(theta, zj, r, machine_origin=NO_MACHINE_ORIGIN):
+    """xyz_to_jointの逆変換(順運動学): (theta, z_joint, r_joint) -> フィールド座標(X,Y,Z)
+    (機体原点基準、axis_to_field参照)。現在の関節角度から手先座標をリアルタイム
+    表示するために使う。"""
     radius = r + ARM_LENGTH / 2.0
     x = -radius * math.sin(theta)
     y = radius * math.cos(theta)
     z = zj + Z_OFFSET
-    return x, y, z
+    return axis_to_field(x, y, z, machine_origin)
 
 
 def _resource_path(filename):
@@ -1580,6 +1626,12 @@ class CommandGuiApp(QWidget):
         self._traj_loaded_extra = {}
         self._mit_joint_names = list(CUBEMARS_JOINT_NAMES)
         self._saved_gains = self._load_gains_file()
+        # 機体原点オフセット(machine_origin_x/y/z_joint、URDF座標)の現在の適用値。
+        # RViz表示だけでなく逆運動学(xyz_to_joint/_theta_r_from_xy/joint_to_xyz、
+        # field_to_axis参照)でも使う(2026-09-11)。gains.jsonの'machine_origin'
+        # セクションから起動時に復元し(_restore_saved_gains)、「適用」で更新・保存する
+        # (_on_apply_machine_origin)。
+        self._machine_origin = NO_MACHINE_ORIGIN
         self._apply_all_results = {}
         self._mode_buttons = {}
         # 実機セットアップパネルからros2 launchで起動する子プロセス(未起動ならNone)。
@@ -2188,6 +2240,12 @@ class CommandGuiApp(QWidget):
         # ままでよいが、状態表示灯だけは既にpublish済みのbool値を読むだけの
         # 軽い処理なので、1秒待たず_spin_rosの周期で反映できる)。
         self._refresh_autotune_progress()
+        # 機体原点オフセットの適用値をRViz(joint_state_publisher)へ送り直す
+        # (2026-09-11追加)。逆運動学はself._machine_originを直接使うので送信の
+        # 成否に関わらず正しいが、GUIより後にjoint_state_publisherが起動した場合
+        # (「全ノード起動」など)にRViz上のフィールド位置が0オフセットのまま
+        # 取り残され、シーケンスの狙いと表示が食い違うのを防ぐ。
+        self.node.send_machine_origin(*self._machine_origin)
         active = self.node.get_active_node_names()
         for name, label in self.node_status_labels.items():
             if name in active:
@@ -2542,7 +2600,10 @@ class CommandGuiApp(QWidget):
                 # 編集欄を追加。定数自体は2026-09-03からDEFAULT_SEQUENCE_SETTINGSに
                 # あったが、使う箇所が無くなっていたため編集欄も無かった。
                 # パッドが収納し切る前にピッチが回ると干渉するので実機で要調整)。
-                ('gather_settle_sec', '収納→ピッチ待ち[s]'),)):
+                ('gather_settle_sec', '収納→ピッチ待ち[s]'),
+                # 回収時のroot_theta狙い点をワーク中心から上面側(+Y)へずらす量
+                # (2026-09-11追加、DEFAULT_SEQUENCE_SETTINGSのコメント参照)。
+                ('pick_aim_y_offset_m', '回収θ狙い点 中心→上面[m]'),)):
             grid.addWidget(QLabel(label), i, 0)
             edit = make_float_edit(DEFAULT_SEQUENCE_SETTINGS[key])
             self.sequence_edits[key] = edit
@@ -2591,7 +2652,19 @@ class CommandGuiApp(QWidget):
             QMessageBox.information(self, '未取得', 'まだ現在位置を受信していません')
             return
 
-        target_theta, _target_r = _theta_r_from_xy(x, y)
+        # root_thetaの狙い点はワーク中心(x, y)ではなく、そこからワーク上面側(+Y)へ
+        # pick_aim_y_offset_mだけずらした点にする(2026-09-11、ユーザー指摘:
+        # 「ワーク座標のXYから根本θの角度を決めているが、それがワーク中心を
+        # もとに決まっているので上面あたりを基準に根本θを計算したい」)。
+        # 中心と上面ではatan2(-x, y)のyが変わるため、特に外側の列ほどθが変わる。
+        # 編集欄の値が数値でない場合は既定値、大きすぎる値はワーク長でクランプ
+        # (誤入力で狙い点がワークから大きく外れないようにする)。
+        try:
+            aim_y_offset = get_float(self.sequence_edits['pick_aim_y_offset_m'])
+        except (ValueError, KeyError):
+            aim_y_offset = DEFAULT_SEQUENCE_SETTINGS['pick_aim_y_offset_m']
+        aim_y_offset = clamp(aim_y_offset, -WORK_LENGTH, WORK_LENGTH)
+        target_theta, _target_r = _theta_r_from_xy(x, y + aim_y_offset, self._machine_origin)
         tip_theta_pick = TIP_THETA_FOLLOW_SIGN * target_theta
 
         steps = [
@@ -2659,7 +2732,7 @@ class CommandGuiApp(QWidget):
         # 続行する)。
         self.node.set_joy_tip_theta_follow(False)
 
-        target_theta, _target_r = _theta_r_from_xy(x, y)
+        target_theta, _target_r = _theta_r_from_xy(x, y, self._machine_origin)
         # 投入時はr方向に垂直な姿勢(root_thetaの値によらず一定のtip_theta)にする
         # (SHOOT_TIP_THETA_RAD付近のコメント参照、ユーザー指摘:「シュート時はRと
         # 垂直になるように」。値自体は未検証の暫定値)。
@@ -3027,6 +3100,10 @@ class CommandGuiApp(QWidget):
             # 低速モード(SHAREボタン、2026-09-09追加)の倍率。上記速度全てに掛かる
             # (joy_teleop_node.py _timer_callbackのspeed_scale参照)。
             ('low_speed_multiplier', '低速モード倍率', '倍'),
+            # XYモード(低速モード中の左スティックによる手先ワールドXYジョグ、
+            # 2026-09-11追加)のフル入力時の手先速度。low_speed_multiplierは
+            # 掛からない実速度(joy_teleop_node.pyのxy_speed宣言部参照)。
+            ('xy_speed', 'XYモード(低速時 左スティック)', 'm/s'),
         )
         for i, (name, label, unit) in enumerate(fields):
             grid.addWidget(QLabel(f'{label} [{unit}]'), i, 0)
@@ -3252,9 +3329,13 @@ class CommandGuiApp(QWidget):
 
         desc = QLabel()
         desc.setWordWrap(True)
-        _set_status(desc, f'base_link(旋回軸)から実機の機体原点までのズレ[m]。\n'
-                          f'ワーク・シューティングボックスもこのオフセットに\n'
-                          f'追従して動く(可動範囲: 各軸±{MACHINE_ORIGIN_OFFSET_LIMIT:.2f}m)。', 'muted')
+        _set_status(desc, f'base_link(旋回軸)から実機の機体原点までのズレ[m]\n'
+                          f'(URDF座標: X=前方(奥行き), Y=左(幅), Z=上)。\n'
+                          f'ワーク・シューティングボックスのRViz表示と、回収/投入\n'
+                          f'シーケンスのθ計算・現在位置XYZ表示の両方に反映される\n'
+                          f'(可動範囲: 各軸±{MACHINE_ORIGIN_OFFSET_LIMIT:.2f}m)。\n'
+                          f'「適用」でgains.jsonに保存し、次回起動時に自動で復元・送信する。\n'
+                          f'例: 旋回軸が機体原点よりフィールド側(前方)へ20mmずれているなら X=-0.020', 'muted')
         layout.addWidget(desc)
 
         self.machine_origin_edits = {name: make_float_edit(0.0, width=70) for name in MACHINE_ORIGIN_JOINT_NAMES}
@@ -3305,7 +3386,11 @@ class CommandGuiApp(QWidget):
             set_float(self.machine_origin_edits[name], round(v, 4))
         self.node.send_machine_origin(*(clamped[name] for name in MACHINE_ORIGIN_JOINT_NAMES))
         x, y, z = (clamped[name] for name in MACHINE_ORIGIN_JOINT_NAMES)
-        text = f'送信しました (x={x:.3f}, y={y:.3f}, z={z:.3f})'
+        # 逆運動学用の適用値を更新し、gains.jsonへ保存する(2026-09-11。以前は
+        # RVizへ送るだけで保存されず、逆運動学にも使われていなかった)。
+        self._machine_origin = (x, y, z)
+        self._persist_gains('machine_origin', {name: clamped[name] for name in MACHINE_ORIGIN_JOINT_NAMES})
+        text = f'送信・保存しました (x={x:.3f}, y={y:.3f}, z={z:.3f})'
         if any(abs(raw[name] - clamped[name]) > 1e-9 for name in MACHINE_ORIGIN_JOINT_NAMES):
             text += '\n(可動範囲外のためクランプされました)'
         _set_status(self.machine_origin_status_label, text, 'success')
@@ -4159,7 +4244,7 @@ class CommandGuiApp(QWidget):
         theta = pos['root_theta_joint']
         zj = pos['z_joint']
         r = pos['r_joint']
-        x, y, z = joint_to_xyz(theta, zj, r)
+        x, y, z = joint_to_xyz(theta, zj, r, self._machine_origin)
         self.current_label.setText(
             f'theta={math.degrees(theta):.1f}deg  z_joint={zj:.3f}  r_joint={r:.3f}\n'
             f'X={x:.3f}  Y={y:.3f}  Z={z:.3f}')
@@ -4975,6 +5060,22 @@ class CommandGuiApp(QWidget):
         for name, edit in self.sequence_edits.items():
             if name in sequence:
                 set_float(edit, sequence[name])
+
+        # 機体原点オフセット(2026-09-11追加): 編集欄へ復元するだけでなく、逆運動学用の
+        # 適用値(self._machine_origin)にも即座に反映し、RVizへも送る(送信は
+        # joint_state_publisherがまだ起動していなければ届かないため、
+        # _refresh_machine_statusから1秒周期で送り直す)。
+        origin = self._saved_gains.get('machine_origin', {})
+        if origin:
+            values = []
+            for name in MACHINE_ORIGIN_JOINT_NAMES:
+                v = clamp(float(origin.get(name, 0.0)), -MACHINE_ORIGIN_OFFSET_LIMIT, MACHINE_ORIGIN_OFFSET_LIMIT)
+                set_float(self.machine_origin_edits[name], round(v, 4))
+                values.append(v)
+            self._machine_origin = tuple(values)
+            self.node.send_machine_origin(*values)
+            _set_status(self.machine_origin_status_label,
+                        f'保存値を復元しました (x={values[0]:.3f}, y={values[1]:.3f}, z={values[2]:.3f})', 'info')
 
     def _check_existing_launch_nodes(self):
         """GUI起動時に、自分が把握していない(self._launch_process=Noneのままの)
