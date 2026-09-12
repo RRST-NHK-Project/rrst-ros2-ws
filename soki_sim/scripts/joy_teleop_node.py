@@ -143,19 +143,25 @@ button_tip_theta_r1・invert_*・pump_toggle_buttonパラメータで合わせ�
                                          「OPTIONSボタンで手先θを根本θに追従させる
                                          か切り替えられるように」「デフォルトを
                                          自動シーケンスで実行に」。ONの間は
-                                         tip_theta_joint = TIP_THETA_FOLLOW_SIGN*root_theta_jointを
-                                         毎周期指令し続け(回収シーケンスと同じ
-                                         追従式)、右スティック左右による手動ジョグは
-                                         無視する。OFFにすると従来通り右スティック
+                                         root_thetaの向きからワークエリア/シューティング
+                                         エリアを自動判別し(2026-09-12、ユーザー指定:
+                                         「根本θの角度からワークエリアなのかシューティング
+                                         エリアなのか判断して追従モードを自動切り替え」、
+                                         TIP_THETA_SHOOT_AREA_*参照)、ワークエリアなら
+                                         tip_theta_joint = TIP_THETA_FOLLOW_SIGN*root_theta_joint
+                                         (回収シーケンスと同じ追従式、パッド列∥ワールドX)、
+                                         シューティングエリアならそこから0側へ90deg戻した
+                                         値(投入シーケンスと同じ、パッド列∥ワールドY)を
+                                         毎周期指令し続け、右スティック左右による手動
+                                         ジョグは無視する。OFFにすると従来通り右スティック
                                          左右で独立にジョグできる。既定でON。
                                          command_gui_nodeのset_tip_theta_follow_theta
                                          サービス(std_srvs/SetBool)経由でも切替可能で、
                                          投入(L4/R4)シーケンス開始時にGUI側が自動で
-                                         OFFにする(投入シーケンスは手先θを固定値
-                                         shoot_tip_theta_radへ制御するため、追従ONの
-                                         ままだと本ノードが毎周期TIP_THETA_FOLLOW_SIGN*root_thetaへ上書き
-                                         して競合するのを防ぐ、_on_set_tip_theta_
-                                         follow_srv参照))
+                                         OFFにする(投入シーケンスは手先θを自前で
+                                         制御するため、追従ONのままだと本ノードが
+                                         毎周期上書きして競合するのを防ぐ、
+                                         _on_set_tip_theta_follow_srv参照))
   SHAREボタン      -> 低速モードトグル (low_speed_toggle_button, デフォルト8。
                                          PS4/PS5コントローラの一般的なLinux
                                          ドライバ割り当てを仮定した値、実機で要確認。
@@ -275,6 +281,25 @@ TIP_THETA_JOG_LEAD_RAD = math.radians(15.0)
 # joy_teleop_node.pyとcommand_gui_node.pyの両方に同じ値を置くこと(片方だけ直すと
 # 手動運転中の追従と回収シーケンスで向きが食い違う)。
 TIP_THETA_FOLLOW_SIGN = 1.0
+
+# 手先θ追従のワークエリア/シューティングエリア自動判別(2026-09-12、ユーザー指定:
+# 「根本θの角度からワークエリアなのかシューティングエリアなのか判断して追従モードを
+# 自動切り替え。OPTIONを押すたびに手動操作か手先追従か切り替え、追従モードは
+# 根本θから判断」)。
+#   ワークエリア      : tip = TIP_THETA_FOLLOW_SIGN*root_theta
+#                       (パッド列∥ワールドX=ワークの行)
+#   シューティングエリア: tip = 上の値 - copysign(90deg, 上の値)
+#                       (パッド列∥ワールドY。0側へ90deg戻すのは手先θの物理ストッパ
+#                       ±135degを避けるためで、L4/R4で回す向きが自動的に逆になる。
+#                       command_gui_node._shoot_tip_thetaと同じ式。変える場合は
+#                       両方揃えること)
+# 判別は|root_theta|のしきい値。フィールド座標(command_gui_node.py WORK_POINTS/
+# SHOOT_POINTS)から、ワークは最大でも|θ|≈62deg(1行目の外側の列)、シューティング
+# ボックスは最小でも|θ|≈99deg(L4/R4、L1は≈135deg)なので、その中間80degを境に
+# ±5degのヒステリシスを持たせる(境界付近でroot_thetaが揺れたとき手先θが90deg
+# 往復し続けないようにする)。フィールド寸法を変えたらここも見直すこと。
+TIP_THETA_SHOOT_AREA_ENTER_RAD = math.radians(85.0)  # |θ|がこれ以上でシューティングエリア
+TIP_THETA_SHOOT_AREA_EXIT_RAD = math.radians(75.0)   # |θ|がこれ以下でワークエリアへ戻る
 
 # trajectory_follower_node.py/display.launch.pyのINITIAL_ROOT_THETA_RAD/zerosと
 # 一致させること(sim起動直後、フィールドに平行・ハンドが右側になる向き、
@@ -617,6 +642,9 @@ class JoyTeleopNode(Node):
         # toggle参照)。
         self._tip_theta_follow_theta_ = True
         self._prev_follow_toggle_pressed_ = False
+        # 追従中の現在のエリア判定(True=シューティングエリア、2026-09-12追加、
+        # TIP_THETA_SHOOT_AREA_*宣言部参照)。ヒステリシス付きなので状態として持つ。
+        self._tip_theta_follow_shoot_area_ = False
         # OPTIONSボタンで追従をONからOFFへ落とした直後に一度だけTrueになる
         # (_update_tip_theta_follow_toggle -> _timer_callback、2026-09-10追加)。
         # 追従OFF・L1/R1も押していない状態はどこにもpublishしない分岐なので、
@@ -630,8 +658,8 @@ class JoyTeleopNode(Node):
         # ユーザー指定:「手先θ追従はシューティングボックスへの自動移動時には
         # 自動で無効化」)。投入(L4/R4)シーケンス開始時にGUI側がこれを呼んで
         # OFFにする(_on_set_tip_theta_follow_srv参照。投入シーケンスは手先θを
-        # 固定値shoot_tip_theta_radへ制御するため、追従ONのままだと本ノードが
-        # 毎周期TIP_THETA_FOLLOW_SIGN*root_thetaへ上書きして競合するのを防ぐ)。
+        # 自前で制御するため、追従ONのままだと本ノードが毎周期上書きして
+        # 競合するのを防ぐ)。
         self.create_service(
             SetBool, 'set_tip_theta_follow_theta', self._on_set_tip_theta_follow_srv)
 
@@ -906,7 +934,7 @@ class JoyTeleopNode(Node):
                 # ONからOFFへ落とした瞬間は、その場で止めるために現在値を1回だけ
                 # 目標として送る(_timer_callback側、_tip_theta_follow_just_released_
                 # 宣言部のコメント参照)。GUI経由のOFF(_on_set_tip_theta_follow_srv)
-                # では立てないこと: あちらは投入シーケンスがshoot_tip_theta_radを
+                # では立てないこと: あちらは投入シーケンスが投入時の手先θ目標を
                 # 送る直前に呼ぶもので、ここで停止目標を割り込ませるとGUIの目標と
                 # 競合する。
                 self._tip_theta_follow_just_released_ = True
@@ -921,9 +949,11 @@ class JoyTeleopNode(Node):
         self._tip_theta_follow_theta_を直接書き換えるだけ。投入(L4/R4)
         シーケンス開始時にGUI側がFalseを渡して自動でOFFにするために使う
         (ユーザー指定:「手先θ追従はシューティングボックスへの自動移動時には
-        自動で無効化」。投入シーケンスは手先θを固定値shoot_tip_theta_radへ
-        制御するため、追従ONのままだと本ノードが毎周期TIP_THETA_FOLLOW_SIGN*root_thetaへ上書き
-        して競合する)。"""
+        自動で無効化」。投入シーケンスは手先θを自前で目標へ制御するため、
+        追従ONのままだと本ノードが毎周期50Hzで追従先を上書きし、GUI(20Hz)の
+        目標と競合する。2026-09-12以降は本ノードの追従先もシューティング
+        エリアでは同じ式になるが、旋回の途中で本ノード側だけエリア判定が
+        切り替わるタイミングが異なるため、シーケンス中はOFFのままにする)。"""
         self._tip_theta_follow_theta_ = bool(request.data)
         self.get_logger().info(
             'joy_teleop_node: 手先θのroot_theta追従を'
@@ -999,6 +1029,29 @@ class JoyTeleopNode(Node):
                           else self._select_work_down_client_)
                 self._call_trigger(client, 'ワーク選択(上下)')
             self._prev_select_row_pressed_ = row_pressed
+
+    def _tip_theta_follow_target(self, theta):
+        """手先θ追従の目標[rad]をroot_theta(theta)から求める(2026-09-12、
+        TIP_THETA_SHOOT_AREA_*宣言部のコメント参照)。|theta|でワークエリア/
+        シューティングエリアをヒステリシス付きで判別し、ワークエリアなら
+        TIP_THETA_FOLLOW_SIGN*theta、シューティングエリアならそこから0側へ
+        90deg戻した値を返す。"""
+        abs_theta = abs(theta)
+        if self._tip_theta_follow_shoot_area_:
+            if abs_theta <= TIP_THETA_SHOOT_AREA_EXIT_RAD:
+                self._tip_theta_follow_shoot_area_ = False
+                self.get_logger().info(
+                    'joy_teleop_node: 手先θ追従をワークエリアモードへ切り替え'
+                    f'(root_theta={math.degrees(theta):.1f}deg)')
+        elif abs_theta >= TIP_THETA_SHOOT_AREA_ENTER_RAD:
+            self._tip_theta_follow_shoot_area_ = True
+            self.get_logger().info(
+                'joy_teleop_node: 手先θ追従をシューティングエリアモードへ切り替え'
+                f'(root_theta={math.degrees(theta):.1f}deg)')
+        tip_follow = TIP_THETA_FOLLOW_SIGN * theta
+        if self._tip_theta_follow_shoot_area_:
+            return tip_follow - math.copysign(math.pi / 2.0, tip_follow)
+        return tip_follow
 
     def _limit_tip_theta_lead(self, target):
         """手先θの目標値が実角度より先へ走りすぎないよう頭打ちにする
@@ -1289,8 +1342,9 @@ class JoyTeleopNode(Node):
         elif self._tip_theta_follow_theta_:
             # OPTIONSボタンでON(既定ON、_update_tip_theta_follow_toggle参照)の
             # 間は、回収シーケンスと同じ追従式(tip_theta=TIP_THETA_FOLLOW_SIGN*root_theta、ワークの
-            # 行と平行を保つ)を手動ジョグ中も毎周期指令し続ける。右スティック
-            # 左右(tip_theta_in)による独立ジョグはこの間無視する。
+            # 行と平行を保つ。シューティングエリアではそこから90deg戻した値)を
+            # 手動ジョグ中も毎周期指令し続ける。右スティック左右(tip_theta_in)
+            # による独立ジョグはこの間無視する。
             #
             # ただし追従指令を出すのはroot_thetaの実値を一度でも受け取った後に
             # 限る(2026-09-10追加、ユーザー報告:「手先θが起動直後に135度に
@@ -1305,9 +1359,13 @@ class JoyTeleopNode(Node):
             # スティックを離している間も維持する必要がある(2026-09-10、一度
             # enabledを条件に加えたところ「手先θが一切追従しなくなった」と
             # なったため戻した)。
+            # 追従先はroot_thetaの向きでワークエリア/シューティングエリアを
+            # 自動判別する(_tip_theta_follow_target、2026-09-12追加)。エリアが
+            # 切り替わる瞬間は目標が90deg飛ぶが、_limit_tip_theta_leadが実角度
+            # ±TIP_THETA_JOG_LEAD_RADに頭打ちにするので実機は連続的に回る。
             if self._has_root_theta_state_:
                 self.target_tip_theta_ = self._limit_tip_theta_lead(
-                    TIP_THETA_FOLLOW_SIGN * self.target_theta_)
+                    self._tip_theta_follow_target(self.target_theta_))
                 tip_theta_names.append('tip_theta_joint')
                 tip_theta_positions.append(self.target_tip_theta_)
             elif self.has_tip_theta_state_:

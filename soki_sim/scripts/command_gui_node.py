@@ -297,10 +297,24 @@ SEQ_RETRACT_R_SPEED_MPS = 0.1
 # ワールドX軸、WORK_POINTSは同一行内でX方向にWORK_COL_PITCH間隔で並ぶ)と平行に
 # 保つには、tip_theta_jointをroot_theta_jointと逆方向に同じ量だけ回して打ち消す
 # 必要がある(tip_theta_target = TIP_THETA_FOLLOW_SIGN*root_theta_target)。_start_pick_sequence参照。
-# シュート時は逆に一切打ち消さずtip_theta_joint=一定値(=常にr方向に垂直、
-# root_thetaの値によらず幾何学的に成立する)を使うが、この値はまだ実機で検証して
-# いない暫定値のため、DEFAULT_SEQUENCE_SETTINGSの'shoot_tip_theta_rad'として
-# GUIから調整可能にする(ユーザー指摘: 「シュート時の角度は暫定値である」)。
+# シュート時(投入シーケンスでL4/R4へ向かうとき)も追従はするが、基準線が90度
+# 違う: パッド展開軸を回収時の追従直線(ワールドX)と直交する向き(ワールドY=
+# フィールド前方)と平行に保つ(2026-09-12、ユーザー指定:「手先θのシュート時の
+# 角度は手先追従+90度。左右のシューティングボックスで90度回す向きが異なる」
+# 「現在実装している手先追従のパッドを結んだ直線と直交する向きの直線と平行に
+# なるように追従させたい。これはシューティング時のみ」)。
+#   tip_theta_shoot = tip_follow - copysign(90deg, tip_follow)
+#   (tip_follow = TIP_THETA_FOLLOW_SIGN*root_theta、トリム前の幾何角)
+# +90度でも-90度でも幾何学的には同じ向きになるが(パッド3個は一直線)、手先θには
+# 物理ストッパ(電源投入位置から±135deg)があるため、追従値から0側へ90度戻す
+# 向きを選ぶ。L4(root_theta≈+99deg)なら-90度で≈+9deg、R4(≈-99deg)なら+90度で
+# ≈-9degとなり、これが「左右で90度回す向きが異なる」の正体。逆向きだと
+# ≈±189degでストッパ範囲外。_shoot_tip_theta / _start_shoot_sequence参照。
+# joy_teleop_node側の手先θ追従(OPTIONS)も同日から|root_theta|でワーク/シューティング
+# エリアを自動判別して同じ式を使う(joy_teleop_node.py TIP_THETA_SHOOT_AREA_*、
+# _tip_theta_follow_target)。式を変える場合は両方揃えること。
+# 以前(2026-09-03〜)は追従せず固定値'shoot_tip_theta_rad'(暫定0)を送っていた。
+# 実機微調整用に'shoot_tip_theta_trim_deg'(既定0)を上式に足す。
 
 # GUIのQLineEditへ復元できない場合(gains.json未保存の初回起動時)に使う既定値。
 # safe_transit_z_mは安全側(可動範囲上限)に倒しておき、実機確認後に低い値へ調整する想定。
@@ -308,6 +322,9 @@ SEQ_RETRACT_R_SPEED_MPS = 0.1
 # root_theta_trim_ak_degの許容範囲[AK軸deg](±30度=関節角±6.4度。原点のずれの
 # 補正にはこれで十分で、桁間違い等で大きく回さないための上限)。
 ROOT_THETA_TRIM_AK_DEG_LIMIT = 30.0
+# shoot_tip_theta_trim_degの許容範囲[関節deg](微調整用。±45度あれば取付誤差の
+# 補正には十分で、桁間違い等で手先θをストッパまで回さないための上限)。
+SHOOT_TIP_THETA_TRIM_DEG_LIMIT = 45.0
 
 DEFAULT_SEQUENCE_SETTINGS = {
     'safe_transit_z_m': WORLD_Z_UPPER,
@@ -318,9 +335,13 @@ DEFAULT_SEQUENCE_SETTINGS = {
     # 指示を待つ(2026-09-03、ユーザー指摘: 「移動とZをある程度下げる動作は自動、
     # 次にPSコンまたはGUIのボタンで回収を指示、これでワークに当たる高さまで下げる」)。
     'pickup_approach_clearance_m': 0.15,
-    # 投入時の手先θ(tip_theta_joint)目標[rad]。r方向(アーム伸縮方向)に垂直となる
-    # 値だが、実機で未検証の暫定値(2026-09-03、ユーザー指摘)。
-    'shoot_tip_theta_rad': 0.0,
+    # 投入時の手先θ(tip_theta_joint)トリム[deg]。_shoot_tip_theta(追従値∓90deg)の
+    # 結果にこの分を足す。実機の取付誤差の微調整用で通常0(2026-09-12、旧
+    # 'shoot_tip_theta_rad'(固定目標値[rad]、暫定)を廃止して置き換え。キー名を
+    # 変えたのは、gains.jsonに残っている旧キーの値(rad、絶対角)をトリム[deg]と
+    # して誤って読み込まないため)。誤入力で大きく回らないよう
+    # SHOOT_TIP_THETA_TRIM_DEG_LIMITでクランプする。
+    'shoot_tip_theta_trim_deg': 0.0,
     # 回収シーケンスでroot_thetaの目標角を決める際の狙い点を、ワーク中心から
     # ワーク上面(円筒の端面のうち機体と反対側、+Y方向)側へずらす量[m]
     # (2026-09-11追加、ユーザー指摘:「ワーク座標のXYから根本θの角度を決めて
@@ -2663,6 +2684,35 @@ class CommandGuiApp(QWidget):
         self.retract_r_checkbox.setChecked(False)
         layout.addWidget(self.retract_r_checkbox)
 
+        # ハンド姿勢の自動操作(2026-09-12追加、ユーザー指定:「自動シーケンスで
+        # ピッチと収納が作動するのを無効化。有効化もチェックボックスで選べる
+        # ように」)。ONの間だけ、回収シーケンス冒頭のピッチ保持姿勢・パッド展開と、
+        # 投入シーケンス冒頭のパッド収納・(gather_settle_sec待ち)・ピッチ投入姿勢を
+        # 自動で行う。OFF(既定)ならこれらのステップ自体を飛ばし、ハンド姿勢は
+        # 常に人の操作(GUIのハンド操作パネル/PSコンのL3・R3)のみで変わる。
+        # 回収シーケンスのポンプONは姿勢操作ではないので対象外(従来どおり自動)。
+        # retract_r_checkboxと同様、gains.jsonには保存しない(起動時は常にOFF)。
+        self.hand_pose_auto_checkbox = QCheckBox(
+            'ハンド姿勢を自動で切り替える(回収: ピッチ保持+パッド展開 / 投入: パッド収納+ピッチ投入)')
+        self.hand_pose_auto_checkbox.setChecked(False)
+        layout.addWidget(self.hand_pose_auto_checkbox)
+
+        # 投入シーケンス開始時にjoy側の手先θ追従(OPTIONS)を自動OFFするか
+        # (2026-09-12追加、ユーザー指定:「自動シーケンスで手先追従を自動オフする
+        # 設定もデフォルトをオフに」)。2026-09-03の「手先θ追従はシューティング
+        # ボックスへの自動移動時には自動で無効化」は、投入シーケンスの手先θ目標
+        # (当時は固定値)と追従の上書きが競合するのを防ぐためだったが、同日から
+        # joy側の追従もシューティングエリアでは投入シーケンスと同じ式になった
+        # (joy_teleop_node.py TIP_THETA_SHOOT_AREA_*)ため、追従ONのままでも最終的に
+        # 同じ角度に落ち着く。OFF(既定)なら追従状態には触らず、シュート後も
+        # OPTIONSを押し直さずに追従が続く。ONなら従来どおりシーケンス開始時に
+        # 追従をOFFにする(旋回途中の追従上書きも完全に避けたい場合用)。
+        # 他のチェックボックスと同様gains.jsonには保存しない。
+        self.follow_auto_off_checkbox = QCheckBox(
+            '投入シーケンス開始時に手先θ追従(OPTIONS)を自動でOFFにする')
+        self.follow_auto_off_checkbox.setChecked(False)
+        layout.addWidget(self.follow_auto_off_checkbox)
+
         self.sequence_status_label = QLabel()
         self.sequence_status_label.setWordWrap(True)
         _set_status(self.sequence_status_label, '待機中', 'muted')
@@ -2707,7 +2757,9 @@ class CommandGuiApp(QWidget):
         grid = QGridLayout()
         self.sequence_edits = {}
         for i, (key, label) in enumerate((
-                ('shoot_tip_theta_rad', '投入時手先θ[rad](暫定)'),
+                # 投入時手先θ(追従値∓90deg、_shoot_tip_theta参照)への微調整トリム
+                # (2026-09-12、旧「投入時手先θ[rad](暫定)」固定値を置き換え)。
+                ('shoot_tip_theta_trim_deg', '投入時手先θトリム[deg]'),
                 # R軸自動リトラクトの速度(2026-09-09追加、retract_r_checkbox ON時のみ
                 # 使う。ユーザー報告:「現状遅すぎて格納できない」)。
                 ('retract_r_speed_mps', 'R軸格納速度[m/s]'),
@@ -2763,6 +2815,23 @@ class CommandGuiApp(QWidget):
         クランプして返す(_root_theta_trim_rad参照)。"""
         return clamp(theta + self._root_theta_trim_rad(), ROOT_THETA_LOWER, ROOT_THETA_UPPER)
 
+    def _shoot_tip_theta(self, theta):
+        """投入シーケンスの手先θ目標[rad]。thetaはトリム前の幾何学的なroot_theta。
+        回収時の追従値(TIP_THETA_FOLLOW_SIGN*theta、パッド列∥ワールドX)から
+        0側へ90deg戻し、パッド列を回収時の追従直線と直交する向き(ワールドY)に
+        する(2026-09-12、冒頭「手先θ(tip_theta_joint)の自動制御」のコメント参照。
+        0側へ戻すのは手先θの物理ストッパ±135degを避けるためで、L4/R4で回す向きが
+        自動的に逆になる)。シーケンス設定パネルのトリム[deg]を足して返す
+        (数値でない入力は0、範囲外はSHOOT_TIP_THETA_TRIM_DEG_LIMITでクランプ)。"""
+        tip_follow = TIP_THETA_FOLLOW_SIGN * theta
+        tip_shoot = tip_follow - math.copysign(math.pi / 2.0, tip_follow)
+        try:
+            trim_deg = get_float(self.sequence_edits['shoot_tip_theta_trim_deg'])
+        except (ValueError, KeyError):
+            trim_deg = DEFAULT_SEQUENCE_SETTINGS['shoot_tip_theta_trim_deg']
+        trim_deg = clamp(trim_deg, -SHOOT_TIP_THETA_TRIM_DEG_LIMIT, SHOOT_TIP_THETA_TRIM_DEG_LIMIT)
+        return tip_shoot + math.radians(trim_deg)
+
     def _start_pick_sequence(self, x, y, z):
         """workボタン用の回収シーケンス(2026-09-09、manualブランチでの操作方針
         「根本θのみ自動で位置合わせ、RとZは人が速度制御で操作」に合わせて
@@ -2770,6 +2839,9 @@ class CommandGuiApp(QWidget):
         回収実行待ち→接触→上昇)まで全て自動で行っていたが、Z軸自動制御を
         廃止したことで「Z軸を下げて接触・吸着する」区間がまるごと不要になった。
         自動区間はハンド準備(保持姿勢・パッド展開・ポンプON)とtheta回転のみで、
+        このうち保持姿勢・パッド展開はhand_pose_auto_checkbox ON時のみ(2026-09-12、
+        既定OFF。ユーザー指定:「自動シーケンスでピッチと収納が作動するのを
+        無効化。有効化もチェックボックスで選べるように」)。
         R/Zは人がjoyの速度指令モードで操作してワークへ実際に近づき回収する。
         「回収実行」による2段階確認も、Z自動降下(＝人間が操作を代われるタイミング)
         が無くなったため不要になり、workボタン/×ボタン1回で完結する。
@@ -2806,9 +2878,15 @@ class CommandGuiApp(QWidget):
         tip_theta_pick = TIP_THETA_FOLLOW_SIGN * target_theta
         target_theta = self._apply_root_theta_trim(target_theta)
 
-        steps = [
-            ('call', '/hand_set_pitch_hold'),   # 回収時は保持姿勢
-            ('call', '/hand_spread_pads'),      # パッド展開
+        steps = []
+        if self.hand_pose_auto_checkbox.isChecked():
+            # ハンド姿勢の自動操作はチェックボックスON時のみ(2026-09-12、
+            # 既定OFF。hand_pose_auto_checkbox宣言部のコメント参照)。
+            steps += [
+                ('call', '/hand_set_pitch_hold'),   # 回収時は保持姿勢
+                ('call', '/hand_spread_pads'),      # パッド展開
+            ]
+        steps += [
             ('call', '/hand_pump_on'),          # 吸着ON(接触したらすぐ吸着できるように)
             ('move', target_theta, None, None, tip_theta_pick),  # theta回転のみ
         ]
@@ -2825,7 +2903,10 @@ class CommandGuiApp(QWidget):
         以前からZ軸の降下・ポンプOFFは人間が行う方針だったが、Rも同様に人へ
         委ねる)。自動区間はtheta回転とR軸のリトラクト(r_lowerリミットスイッチ
         まで)のみ。手先ピッチを投入姿勢へ揃えることだけは例外で、シーケンス
-        開始時に自動で行う(下記steps先頭のhand_set_pitch_insert呼び出し、
+        開始時に自動で行う(下記steps先頭のhand_set_pitch_insert呼び出し。
+        ただし2026-09-12以降はhand_pose_auto_checkbox ON時のみで既定OFF、
+        ユーザー指定:「自動シーケンスでピッチと収納が作動するのを無効化。
+        有効化もチェックボックスで選べるように」。
         2026-09-04追加。当初は回収シーケンス末尾での自動切替に任せて投入
         シーケンス側では何もしていなかったが、「回収実行を押さなくても
         シューティング位置へ移動できるように」により回収シーケンスをいつでも
@@ -2833,9 +2914,12 @@ class CommandGuiApp(QWidget):
         ことがあり「手先ピッチが作動したりしなかったりする」不具合として
         顕在化したため、投入シーケンス自身が保証するように変更した。
         ユーザー指摘: 「シュート時は手先ピッチ投入姿勢でなくてはならない」)。
-        theta回転以降は手先θ(tip_theta_joint)もr方向に垂直な一定値
-        (shoot_tip_theta_rad)へ制御する(2026-09-03、ユーザー指摘: 「シュート時は
-        Rと垂直になるように」。この値自体は実機未検証の暫定値)。
+        theta回転と同時に手先θ(tip_theta_joint)も、回収時の追従直線(ワールドX)
+        と直交する向き(ワールドY)へ追従させる(_shoot_tip_theta参照。2026-09-12、
+        ユーザー指定:「手先θのシュート時の角度は手先追従+90度。左右のシューティング
+        ボックスで90度回す向きが異なる」「これはシューティング時のみ」。以前は
+        2026-09-03の「シュート時はRと垂直になるように」により固定値
+        shoot_tip_theta_rad(暫定0)を送っていた)。
         実運用ではx, y, zはSHOOT_FIXED_TARGETS(L4/R4)固定で、「L4へ移動」
         「R4へ移動」ボタン(_on_shoot_start_requested、GUIボタンまたはPSコンの
         割当ボタン)経由で呼ばれる想定(2026-09-03、ユーザー指摘: 「シューティング
@@ -2862,51 +2946,64 @@ class CommandGuiApp(QWidget):
             QMessageBox.critical(self, '入力エラー', 'シーケンス設定パネルの数値を確認してください')
             return
 
-        # 投入シーケンスは手先θを固定値(tip_theta_shoot、下記)へ制御するため、
+        # 投入シーケンスは手先θを自前の目標(tip_theta_shoot、下記)へ制御するため、
         # joy_teleop_node側の手先θroot_theta追従(OPTIONSボタン、既定ON)が
-        # ONのままだと毎周期TIP_THETA_FOLLOW_SIGN*root_thetaへ上書きされて競合する。シーケンス開始時に
-        # 自動でOFFにする(2026-09-03、ユーザー指定:「手先θ追従はシューティング
+        # ONのままだと毎周期追従先へ上書きされて競合しうる。follow_auto_off_
+        # checkbox ON時のみシーケンス開始時に自動でOFFにする(2026-09-12から
+        # 既定OFF、ユーザー指定:「自動シーケンスで手先追従を自動オフする設定も
+        # デフォルトをオフに」。joy側の追従もシューティングエリアでは同じ式に
+        # なったため、追従ONのままでも同じ角度に収束する)。
+        # 元の経緯(2026-09-03、ユーザー指定:「手先θ追従はシューティング
         # ボックスへの自動移動時には自動で無効化」。joy_teleop_node未起動時は
         # set_joy_tip_theta_follow内で黙って無視されるだけで、本シーケンス自体は
         # 続行する)。
-        self.node.set_joy_tip_theta_follow(False)
+        if self.follow_auto_off_checkbox.isChecked():
+            self.node.set_joy_tip_theta_follow(False)
 
         target_theta, _target_r = _theta_r_from_xy(x, y, self._machine_origin)
+        # 手先θは回収シーケンスと同様、トリム前の幾何学的なθから決める
+        # (トリムはroot_thetaのエンコーダ原点のずれの補正なので、アームが実際に
+        # 向く物理角度はトリム前のθ)。追従値∓90deg、_shoot_tip_theta参照。
+        tip_theta_shoot = self._shoot_tip_theta(target_theta)
         target_theta = self._apply_root_theta_trim(target_theta)
-        # 投入時はr方向に垂直な姿勢(root_thetaの値によらず一定のtip_theta)にする
-        # (SHOOT_TIP_THETA_RAD付近のコメント参照、ユーザー指摘:「シュート時はRと
-        # 垂直になるように」。値自体は未検証の暫定値)。
-        tip_theta_shoot = settings['shoot_tip_theta_rad']
 
-        steps = [
-            # シュート時は手先ピッチが投入姿勢でなければならない(2026-09-04、
-            # ユーザー指摘: 「手先ピッチが作動したりしなかったりする理由。
-            # シュート時は手先ピッチ投入姿勢でなくてはならない」)。以前はこの
-            # 呼び出しが無く、回収シーケンス末尾の(call, '/hand_set_pitch_insert')
-            # (パッド収納後に投入姿勢へ切り替える箇所)が完了した場合のみ結果的に
-            # 投入姿勢になっていた。2026-09-03の「回収実行を押さなくても
-            # シューティング位置へ移動できるように」「ユーザーの動きを制限したく
-            # ない」により、回収シーケンスを最後まで待たずいつでも即座に投入
-            # シーケンスへ中断・切り替えられるようになったため、回収シーケンスが
-            # 保持姿勢(hand_set_pitch_hold、シーケンス冒頭)のまま・あるいは
-            # ピッチ未設定のまま中断された状態で投入シーケンスが始まるケースが
-            # 増え、「手先ピッチが作動したりしなかったりする」不具合として顕在化
-            # した。原因は投入シーケンス自身がピッチ姿勢を一切指定していなかった
-            # ことなので、シーケンス開始時に必ず投入姿勢へ揃えるようにする。
-            # 投入時はワークを中央へ集めてから姿勢を変える(2026-09-10、ユーザー
-            # 指定:「シューティングボックス移動時は収納し投入姿勢に」)。以前は
-            # ピッチ投入姿勢への切替だけを行っており、パッドが展開したまま
-            # シューティングエリアへ向かうことがあった。
-            # 収納とピッチ切替の間はgather_settle_sec待つ: パッドが物理的に
-            # 収納し切る前にピッチが回り始めると干渉する恐れがある
-            # (ユーザー指摘:「収納から姿勢変更までの待機時間も必要。ほぼ同時は
-            # まずい」。この設定値は以前から用意されていたが、回収シーケンス末尾に
-            # あった収納->投入姿勢の並びが無くなって以降どこからも使われて
-            # いなかったため、ここで使うようにした)。
-            ('call', '/hand_gather_pads'),
-            ('wait', settings['gather_settle_sec']),
-            ('call', '/hand_set_pitch_insert'),
-        ]
+        steps = []
+        if self.hand_pose_auto_checkbox.isChecked():
+            # 以下のハンド姿勢の自動操作(収納→待ち→ピッチ投入姿勢)はチェック
+            # ボックスON時のみ(2026-09-12、ユーザー指定:「自動シーケンスで
+            # ピッチと収納が作動するのを無効化。有効化もチェックボックスで
+            # 選べるように」。既定OFF。hand_pose_auto_checkbox宣言部参照)。
+            # OFFのときはピッチ・パッドとも人が操作する(下記の経緯にある
+            # 「投入シーケンス自身がピッチ姿勢を保証する」動作は無効になる)。
+            steps += [
+                # シュート時は手先ピッチが投入姿勢でなければならない(2026-09-04、
+                # ユーザー指摘: 「手先ピッチが作動したりしなかったりする理由。
+                # シュート時は手先ピッチ投入姿勢でなくてはならない」)。以前はこの
+                # 呼び出しが無く、回収シーケンス末尾の(call, '/hand_set_pitch_insert')
+                # (パッド収納後に投入姿勢へ切り替える箇所)が完了した場合のみ結果的に
+                # 投入姿勢になっていた。2026-09-03の「回収実行を押さなくても
+                # シューティング位置へ移動できるように」「ユーザーの動きを制限したく
+                # ない」により、回収シーケンスを最後まで待たずいつでも即座に投入
+                # シーケンスへ中断・切り替えられるようになったため、回収シーケンスが
+                # 保持姿勢(hand_set_pitch_hold、シーケンス冒頭)のまま・あるいは
+                # ピッチ未設定のまま中断された状態で投入シーケンスが始まるケースが
+                # 増え、「手先ピッチが作動したりしなかったりする」不具合として顕在化
+                # した。原因は投入シーケンス自身がピッチ姿勢を一切指定していなかった
+                # ことなので、シーケンス開始時に必ず投入姿勢へ揃えるようにする。
+                # 投入時はワークを中央へ集めてから姿勢を変える(2026-09-10、ユーザー
+                # 指定:「シューティングボックス移動時は収納し投入姿勢に」)。以前は
+                # ピッチ投入姿勢への切替だけを行っており、パッドが展開したまま
+                # シューティングエリアへ向かうことがあった。
+                # 収納とピッチ切替の間はgather_settle_sec待つ: パッドが物理的に
+                # 収納し切る前にピッチが回り始めると干渉する恐れがある
+                # (ユーザー指摘:「収納から姿勢変更までの待機時間も必要。ほぼ同時は
+                # まずい」。この設定値は以前から用意されていたが、回収シーケンス末尾に
+                # あった収納->投入姿勢の並びが無くなって以降どこからも使われて
+                # いなかったため、ここで使うようにした)。
+                ('call', '/hand_gather_pads'),
+                ('wait', settings['gather_settle_sec']),
+                ('call', '/hand_set_pitch_insert'),
+            ]
         if self.retract_r_checkbox.isChecked():
             # R軸をr_lowerリミットスイッチまでリトラクト(旋回時にワークや周囲へ
             # 引っかからないようにする安全動作、2026-09-09変更:

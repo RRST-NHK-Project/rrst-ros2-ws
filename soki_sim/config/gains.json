@@ -51,7 +51,7 @@
     "robomas_tip_theta_current_ff": 0.0
   },
   "sequence": {
-    "shoot_tip_theta_rad": 0.0,
+    "shoot_tip_theta_trim_deg": 0.0,
     "retract_r_speed_mps": 0.1,
     "gather_settle_sec": 0.5,
     "pick_aim_y_offset_m": 0.0,

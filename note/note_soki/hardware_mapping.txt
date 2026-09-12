@@ -141,7 +141,8 @@ continuousではない」節参照)が無くなり一旦「無制限」になっ
     - 手先θ追従ON時(-root_theta)と、L1/R1手動ジョグの積算値の両方をクランプ
   soki_sim/scripts/command_gui_node.py TIP_THETA_LOWER/UPPER
     - send_target()のtip_theta(回収シーケンスの追従値・投入シーケンスの
-      shoot_tip_theta_rad)をクランプ
+      shoot_tip_theta_rad(2026-09-12に廃止、下記「投入シーケンスの手先θは
+      追従値∓90deg」節参照))をクランプ
   soki_sim/urdf/soki_sim.urdf.xacro tip_theta_limit
     - tip_theta_jointをcontinuous -> revolute(±135deg)へ変更。simと実機で
       到達可能範囲を揃えるため
@@ -722,8 +723,9 @@ tip_theta_jointのmax_velocityは既定0.1rad/s(gains.json)と遅く、135degぶ
 50Hzで送り続けると、GUIの自動シーケンス(20Hz)が同じ関節へ送る目標を数で
 押し負けさせる。「R軸の自動格納が機能しない」と同じ競合パターン)。
 GUI経由のOFF(_on_set_tip_theta_follow_srv)ではこのフラグを立てない: あちらは
-投入シーケンスがshoot_tip_theta_radを送る直前に呼ぶもので、停止目標を
-割り込ませるとGUIの目標と競合するため。
+投入シーケンスが投入時の手先θ目標(_shoot_tip_theta、2026-09-12までは固定値
+shoot_tip_theta_rad)を送る直前に呼ぶもので、停止目標を割り込ませるとGUIの目標と
+競合するため。
 
 ## 手先θの速度・ゲインはGUIから調整可能 (2026-09-10、ユーザー質問への回答)
 追加実装は不要。既に以下の3パネルで編集・適用・gains.jsonへの保存ができる:
@@ -789,3 +791,117 @@ tip_theta_jointの関節角の向きの定義自体は合っていて、**追従
 **要実機確認**: 追従ONでroot_thetaを回したとき、吸着パッド3個の展開軸がワークの行
 (ワールドX軸)と平行に保たれるか。回収シーケンス(workボタン/×ボタン)でも同様に
 平行になるか。sim(rviz)と実機で向きが一致しているかも併せて確認すること。
+
+## 投入シーケンスの手先θは追従値∓90deg (2026-09-12、ユーザー指定「手先θのシュート時の
+## 角度は手先追従+90度。左右のシューティングボックスで90度回す向きが異なる」
+## 「現在実装している手先追従のパッドを結んだ直線と直交する向きの直線と平行になる
+## ように追従させたい。これはシューティング時のみ」)
+それまで投入シーケンス(L4へ移動/R4へ移動)は手先θを固定値shoot_tip_theta_rad
+(暫定0、「Rと垂直」のつもり)へ送っていたが、シュート時も追従はしつつ基準線を
+90deg変える方式に変更した。
+  回収時  : tip_follow = TIP_THETA_FOLLOW_SIGN * root_theta
+            (パッド展開軸 ∥ ワールドX = ワークの行)
+  シュート時: tip_shoot = tip_follow - copysign(90deg, tip_follow) + トリム
+            (パッド展開軸 ∥ ワールドY = 回収時の追従直線と直交する向き)
+root_thetaはトリム前の幾何角(atan2(-x, y))を使う(回収シーケンスと同じ理由:
+root_theta_trim_ak_degはエンコーダ原点ずれの補正なので、アームが物理的に向く
+角度はトリム前のθ)。
+
+**「左右で90度回す向きが異なる」の正体**: パッド3個は一直線なので幾何学的には
++90degでも-90degでも同じ向きになるが、手先θには物理ストッパ(電源投入位置から
+±135deg、上記節参照)がある。L4はroot_theta≈+99deg(atan2(0.525, -0.08))、R4は
+≈-99degなので、
+  L4: +99 - 90 = +9deg  (+90だと+189degでストッパ範囲外)
+  R4: -99 + 90 = -9deg  (-90だと-189degでストッパ範囲外)
+「追従値から0側へ90deg戻す」の1式で左右とも自動的に正しい向きになる。
+L4/R4ごとに符号を持つ必要は無い。
+
+**設定値の置き換え**: gains.json sequence.shoot_tip_theta_rad(固定目標[rad])を
+廃止し、sequence.shoot_tip_theta_trim_deg(上式に足す微調整[関節deg]、既定0、
+SHOOT_TIP_THETA_TRIM_DEG_LIMIT=±45degでクランプ)に置き換えた。キー名を変えたのは、
+gains.jsonに残った旧キーの値(実機調整中に55.0=rad単位のまま「55度」のつもりで
+入力されたと思われる値があった)をトリム[deg]として誤読しないため。旧キーは
+sequence_editsに無いので読み込み時に単に無視される。GUIラベルは
+「投入時手先θトリム[deg]」。
+
+実装: soki_sim/scripts/command_gui_node.py
+  _shoot_tip_theta(theta)         上式+トリム(クランプ込み)
+  _start_shoot_sequence           tip_theta_shoot = self._shoot_tip_theta(幾何θ)
+  DEFAULT_SEQUENCE_SETTINGS       'shoot_tip_theta_trim_deg'
+  SHOOT_TIP_THETA_TRIM_DEG_LIMIT  トリム上限
+
+**要実機確認**: L4/R4へ移動したとき手先θが≈±9deg(ほぼ電源投入位置)で止まり、
+パッド展開軸がフィールド前方(Y)と平行になるか。ずれていればトリム[deg]で微調整。
+joy側の手先θ追従(OPTIONS)のシーケンス開始時自動OFFは、同日中に
+follow_auto_off_checkbox(既定OFF)へ変更した(下記「投入シーケンス開始時の
+手先θ追従自動OFFを既定OFFに」節参照)。
+
+## 手先θ追従(OPTIONS)のワーク/シューティングエリア自動判別 (2026-09-12、ユーザー指定
+## 「根本θの角度からワークエリアなのかシューティングエリアなのか判断して追従モードを
+## 自動切り替え。OPTIONを押すたびに手動操作か手先追従か切り替え、追従モードは
+## 根本θから判断」)
+OPTIONSボタンの役割は従来どおり「手動ジョグ(右スティック左右) ⇔ 手先θ追従」の
+トグルのまま。追従ONの間の追従先だけを、root_thetaの向きで自動的に切り替える:
+  |root_theta| が小さい(ワークエリア)      : tip = TIP_THETA_FOLLOW_SIGN*root_theta
+  |root_theta| が大きい(シューティングエリア): tip = 上の値 - copysign(90deg, 上の値)
+                                           (上記「投入シーケンスの手先θは追従値∓90deg」
+                                           節と同じ式)
+しきい値はフィールド座標から決めた: ワークは最大でも|θ|≈62deg(1行目の外側の列)、
+シューティングボックスは最小でも|θ|≈99deg(L4/R4。L1/R1は≈135deg)。中間の80degを
+境に±5degのヒステリシス(85degで入り、75degで戻る)を持たせ、境界付近でroot_thetaが
+揺れても手先θが90deg往復し続けないようにした。**フィールド寸法を変えたら
+しきい値も見直すこと。**
+
+エリア切替の瞬間は追従目標が90deg飛ぶが、既存の_limit_tip_theta_lead(実角度
+±15degで頭打ち)がそのまま効くので、実機は連続的に回る(max_velocityで律速)。
+切替時はINFOログを出す。
+
+実装: soki_sim/scripts/joy_teleop_node.py
+  TIP_THETA_SHOOT_AREA_ENTER_RAD / EXIT_RAD  しきい値(85deg / 75deg)
+  _tip_theta_follow_shoot_area_              現在のエリア判定(ヒステリシス用状態)
+  _tip_theta_follow_target(theta)            追従先の計算(判定込み)
+  _timer_callback 追従分岐                   上を呼ぶよう変更
+
+GUIの投入シーケンス開始時に追従を自動OFFする動作は、同日中にチェックボックス
+(follow_auto_off_checkbox、既定OFF)化した(下記節参照)。既定では追従ONのまま
+投入シーケンスが走り、joy(50Hz)の追従先とGUI(20Hz)のtip_theta目標が並走するが、
+どちらもシューティングエリアでは同じ式なので最終的に同じ角度へ収束する。
+
+**要実機確認**: 手動でroot_thetaを回して85deg/75degをまたいだとき、手先θが90deg
+分だけ滑らかに回り、往復振動しないこと。L4/R4付近で手先θ≈±9deg付近に落ち着くこと。
+
+## 自動シーケンスのハンド姿勢操作(ピッチ・パッド収納/展開)を既定OFFに (2026-09-12、
+## ユーザー指定「自動シーケンスでピッチと収納が作動するのを無効化。有効化も
+## チェックボックスで選べるように」)
+GUIの「投入エリアへ移動」パネルにチェックボックス「ハンド姿勢を自動で切り替える」
+(hand_pose_auto_checkbox)を追加、既定OFF。R軸自動格納のチェックボックスと同じく
+gains.jsonには保存しない(起動時は常にOFF)。
+  ON のとき: 回収シーケンス冒頭の /hand_set_pitch_hold・/hand_spread_pads、
+            投入シーケンス冒頭の /hand_gather_pads・gather_settle_sec待ち・
+            /hand_set_pitch_insert を従来どおり自動で行う
+  OFFのとき: 上記ステップを全て飛ばす。ハンド姿勢はGUIのハンド操作パネル/
+            PSコン(L3・R3)で人が操作する。回収シーケンスのポンプONは姿勢操作では
+            ないので従来どおり自動(ステップは残る)
+2026-09-04の「投入シーケンス自身がピッチ投入姿勢を保証する」動作はOFFの間は
+効かないので、シュート前のピッチ切替は人が忘れずに行うこと。
+実装: soki_sim/scripts/command_gui_node.py hand_pose_auto_checkbox、
+_start_pick_sequence / _start_shoot_sequence のsteps組み立て。
+
+## 投入シーケンス開始時の手先θ追従自動OFFを既定OFFに (2026-09-12、ユーザー指定
+## 「自動シーケンスで手先追従を自動オフする設定もデフォルトをオフに」)
+2026-09-03以降、投入シーケンス(L4/R4へ移動)開始時にGUIがjoy_teleop_nodeの
+set_tip_theta_follow_thetaサービスでOPTIONS追従を自動OFFしていた(当時は投入時の
+手先θが固定値で、追従の毎周期上書きと競合したため)。「投入エリアへ移動」パネルに
+チェックボックス「投入シーケンス開始時に手先θ追従(OPTIONS)を自動でOFFにする」
+(follow_auto_off_checkbox)を追加し既定OFF。他のチェックボックス同様gains.jsonには
+保存しない。
+  OFF(既定): 追従状態に触らない。シュート後もOPTIONSを押し直さず追従が続く。
+            旋回中はjoy側(50Hz、エリア判定は85degをまたいだ時点で切替)とGUI側
+            (20Hz、最初から∓90deg)の目標が並走するが、trajectory_follower側の
+            目標はどちらも同じ最終角度に落ち着く(joy側が数で勝つので、旋回中の
+            手先θの動き方はjoy側の判定タイミングに従う)。
+  ON      : 従来どおりシーケンス開始時に追従OFF。旋回中の並走を完全に避けたい
+            場合用。
+実装: soki_sim/scripts/command_gui_node.py follow_auto_off_checkbox、
+_start_shoot_sequence冒頭のset_joy_tip_theta_follow(False)呼び出しを条件付きに。
+joy_teleop_node側のサービス自体は残している。
