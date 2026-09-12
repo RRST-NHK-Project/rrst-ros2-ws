@@ -3,19 +3,19 @@
     "max_velocity": {
       "root_theta_joint": 1.0,
       "tip_theta_joint": 2.0,
-      "z_joint": 0.1,
+      "z_joint": 0.2,
       "r_joint": 0.2
     },
     "max_acceleration": {
       "root_theta_joint": 4.0,
       "tip_theta_joint": 4.0,
-      "z_joint": 0.2,
+      "z_joint": 0.4,
       "r_joint": 0.4
     },
     "max_deceleration": {
       "root_theta_joint": 4.0,
       "tip_theta_joint": 4.0,
-      "z_joint": 0.2,
+      "z_joint": 0.4,
       "r_joint": 0.4
     }
   },
@@ -61,7 +61,8 @@
     "robomas_vel_kp": 1.0,
     "robomas_vel_ki": 0.0,
     "robomas_vel_kd": 0.1,
-    "robomas_vel_max_current_a": 1.0
+    "robomas_vel_max_current_a": 1.5,
+    "robomas_z_up_velocity_bias_mps": 0.1
   },
   "machine_origin": {
     "machine_origin_x_joint": -0.02,

@@ -187,6 +187,7 @@ NON_NEGATIVE_GAIN_SCALAR_PARAMS = (
     'robomas_kp', 'robomas_kd',
     'robomas_tip_theta_kp', 'robomas_tip_theta_kd',
     'robomas_vel_kp', 'robomas_vel_ki', 'robomas_vel_kd', 'robomas_vel_max_current_a',
+    'robomas_z_up_velocity_bias_mps',
 )
 
 ROBOMAS_VELOCITY_TARGET_STALE_SEC = 0.3
@@ -435,6 +436,23 @@ class TrajectoryFollowerNode(Node):
         self.declare_parameter('robomas_vel_ki', 0.0)
         self.declare_parameter('robomas_vel_kd', 0.0)
         self.declare_parameter('robomas_vel_max_current_a', 1.0)
+        # z軸の上昇時だけ加える速度バイアス[m/s](2026-09-12追加、ユーザー報告:
+        # 「Z軸について、上方向に動く時が遅い」)。速度モードのfirmware側PIDは
+        # gains.jsonの実機調整値がKi=0のP制御のため、重力に逆らう上昇時は
+        # 「重力分の電流 ÷ Kp」だけ定常的に速度が目減りする(下降時は逆に重力が
+        # 助ける)。速度モードのRxスロットは24個全てtarget/mode/Kp/Ki/Kd/電流上限で
+        # 埋まっており、MITモードのcurrent_ffのような電流FFスロットが無いため
+        # (robomas.cpp先頭コメント参照)、firmwareを変えずにROS側で目標速度へ
+        # 上乗せする形で補償する。P制御の定常偏差は指令速度によらず一定なので、
+        # 倍率ではなく加算(m/s)にしてある。上昇(z_vel>0)のときだけ加え、下降・
+        # 停止(0)には一切加えない(停止指令に加えると上へ這い上がる)。
+        # _slew_velocityのmax_velocityクランプ・リミットスイッチによる0クランプの
+        # 後段で加えるので、max_velocityを超えた分が指令され得るが上限スイッチ側の
+        # ブロック(z_vel=0)には影響しない(_velocity_mode_target_rpm参照)。
+        # 負値はz上昇指令で下降させてしまい上限側リミットスイッチのブロック判定
+        # (z_vel>0で判定)をすり抜けるため、NON_NEGATIVE_GAIN_SCALAR_PARAMSで
+        # 拒否し、指令生成時もnonneg_gainでクランプする。既定0.0=無効。
+        self.declare_parameter('robomas_z_up_velocity_bias_mps', 0.0)
         # 低速モード(SHAREボタン、joy_teleop_node側、2026-09-09追加)の倍率。
         # joy_teleop_node側のz_speed/r_speedは、この速度モードのmax_velocity
         # クランプ(_slew_velocity)へ常時飽和させる設計の大きな値になっているため、
@@ -876,6 +894,8 @@ class TrajectoryFollowerNode(Node):
         self.robomas_vel_ki_ = float(self.get_parameter('robomas_vel_ki').value)
         self.robomas_vel_kd_ = float(self.get_parameter('robomas_vel_kd').value)
         self.robomas_vel_max_current_a_ = float(self.get_parameter('robomas_vel_max_current_a').value)
+        self.robomas_z_up_velocity_bias_mps_ = float(
+            self.get_parameter('robomas_z_up_velocity_bias_mps').value)
         # 低速モード(SHAREボタン、joy_teleop_node側)の倍率とON/OFF状態
         # (low_speed_multiplier宣言部のコメント参照)。joy_teleop_node発の
         # low_speed_active(latched)を購読し、ONの間は_slew_velocityのmax_vへ
@@ -1258,6 +1278,13 @@ class TrajectoryFollowerNode(Node):
         else:
             r_vel = self._slew_velocity(cfg['r_joint'], r_vel)
 
+        # z上昇時のみの速度バイアス(robomas_z_up_velocity_bias_mps宣言部の
+        # コメント参照)。クランプ・スルー後のz_velで向きを判定し、上昇中だけ
+        # 加算する。_velocity_mode_cmd_(スルーレート状態)には含めないので、
+        # 停止・反転時のランプはバイアス無しの値から始まる。
+        if z_vel > 0.0:
+            z_vel += nonneg_gain(self.robomas_z_up_velocity_bias_mps_)
+
         m1_vel = (z_vel + r_vel) / (2.0 * cfg['mix_k'])
         m2_vel = (z_vel - r_vel) / (2.0 * cfg['mix_k'])
         m1_rpm = cfg['motor1_sign'] * (m1_vel / cfg['pulley_radius_m']) * (60.0 / (2.0 * math.pi))
@@ -1543,11 +1570,12 @@ class TrajectoryFollowerNode(Node):
                             self.target_[name] = val
                 self.robomas_velocity_mode_ = new_value
             elif (p.name in ('robomas_vel_kp', 'robomas_vel_ki', 'robomas_vel_kd',
-                              'robomas_vel_max_current_a')
+                              'robomas_vel_max_current_a', 'robomas_z_up_velocity_bias_mps')
                   and self.robomas_ is not None):
                 key = {'robomas_vel_kp': 'robomas_vel_kp_', 'robomas_vel_ki': 'robomas_vel_ki_',
                        'robomas_vel_kd': 'robomas_vel_kd_',
-                       'robomas_vel_max_current_a': 'robomas_vel_max_current_a_'}[p.name]
+                       'robomas_vel_max_current_a': 'robomas_vel_max_current_a_',
+                       'robomas_z_up_velocity_bias_mps': 'robomas_z_up_velocity_bias_mps_'}[p.name]
                 setattr(self, key, float(p.value))
             elif p.name == 'low_speed_multiplier' and self.robomas_ is not None:
                 self.low_speed_multiplier_ = float(p.value)

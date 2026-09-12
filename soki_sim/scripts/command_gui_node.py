@@ -3678,11 +3678,17 @@ class CommandGuiApp(QWidget):
         self.robomas_vel_ki_edit = make_gain_edit(0.0, width=70)
         self.robomas_vel_kd_edit = make_gain_edit(0.0, width=70)
         self.robomas_vel_max_current_a_edit = make_gain_edit(1.0, width=70)
+        # z上昇時のみ目標速度へ上乗せするバイアス(2026-09-12追加、ユーザー報告:
+        # 「Z軸の上方向に動く時が遅い」。P制御の重力分の定常偏差を補う。
+        # trajectory_follower_node.pyのrobomas_z_up_velocity_bias_mps宣言部参照)。
+        # 負値はz上昇指令で下降させてしまうためmake_gain_editで下限0にする。
+        self.robomas_z_up_velocity_bias_mps_edit = make_gain_edit(0.0, width=70)
         for i, (label, edit) in enumerate((
                 ('Kp', self.robomas_vel_kp_edit),
                 ('Ki', self.robomas_vel_ki_edit),
                 ('Kd', self.robomas_vel_kd_edit),
-                ('電流上限 [A]', self.robomas_vel_max_current_a_edit))):
+                ('電流上限 [A]', self.robomas_vel_max_current_a_edit),
+                ('Z上昇バイアス [m/s]', self.robomas_z_up_velocity_bias_mps_edit))):
             grid.addWidget(QLabel(label), i, 0)
             grid.addWidget(edit, i, 1)
         layout.addLayout(grid)
@@ -3707,7 +3713,8 @@ class CommandGuiApp(QWidget):
     def _on_load_robomas_vel_gains(self):
         ok = self.node.request_node_params(
             TRAJ_NODE_NAME,
-            ['robomas_vel_kp', 'robomas_vel_ki', 'robomas_vel_kd', 'robomas_vel_max_current_a'],
+            ['robomas_vel_kp', 'robomas_vel_ki', 'robomas_vel_kd', 'robomas_vel_max_current_a',
+             'robomas_z_up_velocity_bias_mps'],
             self._apply_loaded_robomas_vel_gains,
             lambda reason: _set_status(self.robomas_vel_gain_status_label, f'読込失敗: {reason}', 'error'))
         _set_status(self.robomas_vel_gain_status_label,
@@ -3725,6 +3732,9 @@ class CommandGuiApp(QWidget):
         if 'robomas_vel_max_current_a' in values:
             set_float(self.robomas_vel_max_current_a_edit,
                       round(values['robomas_vel_max_current_a'], 6))
+        if 'robomas_z_up_velocity_bias_mps' in values:
+            set_float(self.robomas_z_up_velocity_bias_mps_edit,
+                      round(values['robomas_z_up_velocity_bias_mps'], 6))
         # 「読込」はノードの現在値をGUIに表示するだけに留め、gains.jsonへは
         # 「適用」時のみ永続化する(他のゲインパネルと同じ方針)。
         _set_status(self.robomas_vel_gain_status_label, '読込完了', 'info')
@@ -3735,13 +3745,15 @@ class CommandGuiApp(QWidget):
             'robomas_vel_ki': get_float(self.robomas_vel_ki_edit),
             'robomas_vel_kd': get_float(self.robomas_vel_kd_edit),
             'robomas_vel_max_current_a': get_float(self.robomas_vel_max_current_a_edit),
+            'robomas_z_up_velocity_bias_mps': get_float(self.robomas_z_up_velocity_bias_mps_edit),
         }
 
     def _on_apply_robomas_vel_gains(self):
         try:
             values = self._collect_robomas_vel_values()
         except ValueError:
-            QMessageBox.critical(self, '入力エラー', 'Kp/Ki/Kd/電流上限に数値を入力してください')
+            QMessageBox.critical(self, '入力エラー',
+                                 'Kp/Ki/Kd/電流上限/Z上昇バイアスに数値を入力してください')
             return
         reply = QMessageBox.question(
             self, '速度モードゲイン適用の確認',
@@ -5191,6 +5203,19 @@ class CommandGuiApp(QWidget):
             set_float(self.robomas_kick_duration_sec_edit, robomas['robomas_kick_duration_sec'])
         if 'robomas_kick_vel_threshold_mps' in robomas:
             set_float(self.robomas_kick_vel_threshold_mps_edit, robomas['robomas_kick_vel_threshold_mps'])
+
+        # 速度モードゲイン(robomas_vel_gain節)は、以前は起動時の復元対象から漏れて
+        # おり、GUI表示がノードの「読込」応答(起動直後はノード既定値)頼みだった。
+        # Z上昇バイアス追加(2026-09-12)に合わせて他の節と同様に復元する
+        # (_apply_loaded_robomas_vel_gainsと同じ対応表)。
+        robomas_vel = self._saved_gains.get('robomas_vel_gain', {})
+        for name, edit in (('robomas_vel_kp', self.robomas_vel_kp_edit),
+                           ('robomas_vel_ki', self.robomas_vel_ki_edit),
+                           ('robomas_vel_kd', self.robomas_vel_kd_edit),
+                           ('robomas_vel_max_current_a', self.robomas_vel_max_current_a_edit),
+                           ('robomas_z_up_velocity_bias_mps', self.robomas_z_up_velocity_bias_mps_edit)):
+            if name in robomas_vel:
+                set_float(edit, robomas_vel[name])
 
         joy = self._saved_gains.get('joy_speed', {})
         for name, edit in self.joy_speed_edits.items():

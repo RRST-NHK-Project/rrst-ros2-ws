@@ -995,3 +995,32 @@ y=0.356(上面より20mm奥)で対称。
 備考(同日): gains.jsonのmachine_originが y=-0.02 になっていた(前方ずれを
 「Y軸正方向」と聞いて左ずれと誤解釈した案内に従ってGUIから適用されたもの)。
 実際は前方(URDF x)ずれのため x=-0.02, y=0.0 に修正済み。
+
+## Z軸上昇時のみの速度バイアス (2026-09-12、ユーザー報告「Z軸について、上方向に
+## 動く時が遅いので上のときだけバイアスかけれないか」)
+原因の見立て: 速度モード(既定)のfirmware速度PIDはgains.jsonの実機調整値が
+Ki=0のP制御。重力に逆らう上昇では「重力分の電流÷Kp」だけ定常的に速度が
+目減りし、下降では逆に重力が助けるため上下で速度差が出る。
+速度モードのRxスロットは24個全部(target/mode/Kp/Ki/Kd/電流上限)で埋まって
+おり、MITモードのcurrent_ffに当たる電流FFスロットが無い(robomas.cpp先頭
+コメント)。firmwareを変えずにROS側で目標速度へ上乗せする形にした。
+  - trajectory_follower_node.py: 新パラメータrobomas_z_up_velocity_bias_mps
+    (既定0.0=無効)。_velocity_mode_target_rpmで、max_velocityクランプ・
+    スルーレート・リミットスイッチ0クランプの後、z_vel>0(上昇)のときだけ
+    加算する。停止(0)・下降には加えない。P制御の定常偏差は指令速度によらず
+    一定なので倍率ではなく加算[m/s]。負値はz上昇指令で下降させ上限側
+    リミットのブロック判定(z_vel>0)をすり抜けるため、
+    NON_NEGATIVE_GAIN_SCALAR_PARAMSで拒否+指令生成時nonneg_gainでクランプ。
+  - command_gui_node.py: 「速度モードゲイン」パネルに「Z上昇バイアス [m/s]」
+    欄(make_gain_edit、下限0)。読込/適用/gains.json永続化/起動時自動適用は
+    既存のrobomas_vel_gain節の経路をそのまま通る。ついでに、robomas_vel_gain節が
+    起動時のGUI復元(_restore_saved_gains)から漏れていたのを他の節と同様に
+    復元するよう修正。
+  - gains.json: robomas_vel_gainにrobomas_z_up_velocity_bias_mps=0.0を追加。
+  - 検証: ROS_DOMAIN_ID=77で単体実行し、上昇0.1→0.15/下降-0.1→-0.1/
+    停止0→0/上限ブロック中→0、負値のSetParameters拒否、GUI(offscreen)の
+    収集→保存→再起動復元を確認。実機未確認。
+  - 調整目安: 上昇/下降を同じスティック量で動かし、実速度(ros2can帰還rpm)の
+    差の半分程度から始める。上げすぎると上昇だけmax_velocityを超える。
+    位置モード(MIT)側には未適用(速度モードのみ)。根本対策としてはKi>0で
+    定常偏差自体を消す手もある(その場合このバイアスは0に戻す)。
