@@ -72,7 +72,7 @@ from PyQt5.QtGui import (
     QColor, QDoubleValidator, QFont, QFontMetrics, QIcon, QIntValidator, QPainter, QPen, QPixmap,
 )
 from PyQt5.QtWidgets import (
-    QApplication, QButtonGroup, QCheckBox, QGridLayout, QGroupBox, QHBoxLayout,
+    QApplication, QButtonGroup, QCheckBox, QComboBox, QGridLayout, QGroupBox, QHBoxLayout,
     QLabel, QLineEdit, QMessageBox, QPushButton,
     QRadioButton, QScrollArea, QTabWidget, QVBoxLayout, QWidget,
 )
@@ -166,10 +166,26 @@ SHOOT_POINTS = {
     'L': [(f'L{i + 1}', -SHOOT_OFFSET_Y, SHOOT_CENTER_X + SHOOT_BOX_X[i], SHOOT_BOX_Z) for i in range(4)],
     'R': [(f'R{i + 1}', SHOOT_OFFSET_Y, SHOOT_CENTER_X + SHOOT_BOX_X[i], SHOOT_BOX_Z) for i in range(4)],
 }
-# 実運用で実際に使うシューティングエリアはL4/R4の2箇所のみ(2026-09-03、
-# ユーザー指摘: 「シューティングエリアはL4もしくはR4で、ボタンを2つおいておいて」)。
-# 「投入エリアへ移動」パネルの固定ボタン2つ(_on_shoot_start_requested)から使う。
-SHOOT_FIXED_TARGETS = {'L4': SHOOT_POINTS['L'][3], 'R4': SHOOT_POINTS['R'][3]}
+# 実運用で使うシューティングボックスは左右1箇所ずつ(2026-09-03、ユーザー指摘:
+# 「シューティングエリアはL4もしくはR4で、ボタンを2つおいておいて」)。どの箱を
+# 使うかはGUIの「ピック/投入 自動シーケンス」パネルのシューティング位置選択
+# (shoot_box_combo、_build_sequence_settings_panel)で切り替えられる(2026-09-13、
+# ユーザー指摘:「シューティング位置は一番フィールドに近い位置だと思う。GUIで
+# 切り替えられるように、デフォルトはフィールド側から2番目」)。
+# SHOOT_POINTS[side]の添字は機体側(フィールドから遠い)から順で、index 3(L4/R4)が
+# 最もフィールド寄り。選択肢は「フィールド側から何番目か」で提示する
+# (フィールド側からn番目 = index 4-n)。
+SHOOT_BOX_CHOICES = [
+    (f'フィールド側から{n}番目 (L{4 - n + 1}/R{4 - n + 1})', 4 - n) for n in range(1, 5)
+]
+# 既定はフィールド側から3番目(L2/R2、index 1。2026-09-13当初は2番目(L3/R3)
+# だったが同日ユーザー指定「デフォルトをフィールドから3番めに変更」)。
+DEFAULT_SHOOT_BOX_INDEX = 1
+
+
+def shoot_target(side, index):
+    """side('L'/'R')とSHOOT_POINTS添字から(ラベル, x, y, z)を返す。"""
+    return SHOOT_POINTS[side][index]
 
 JOINT_NAMES = ['root_theta_joint', 'z_joint', 'r_joint']
 # MITゲインパネル(CubeMars)対象関節。JOINT_NAMESとは別物: root_thetaのみが
@@ -996,9 +1012,18 @@ class FieldMinimapWidget(QWidget):
         self.setFixedSize(width, height)
         self.setStyleSheet('background-color: #f5f5f5; border: 1px solid #555;')
         self._current = None
+        # 強調表示するシューティングボックスのラベル集合(set_shoot_labels参照)。
+        self._shoot_labels = set()
 
     def set_current(self, x: float, y: float):
         self._current = (x, y)
+        self.update()
+
+    def set_shoot_labels(self, labels):
+        """実運用で使う(投入シーケンスの目標となる)シューティングボックスの
+        ラベル(例: {'L3', 'R3'})を登録し、それ以外より目立たせて描く。GUIの
+        シューティング位置選択(CommandGuiApp.shoot_box_combo)に追従する。"""
+        self._shoot_labels = set(labels)
         self.update()
 
     def _to_widget(self, x, y):
@@ -1022,9 +1047,9 @@ class FieldMinimapWidget(QWidget):
         for side in ('L', 'R'):
             for label, x, y, _z in SHOOT_POINTS[side]:
                 px, py = self._to_widget(x, y)
-                # 実運用ではL4/R4のみ使う(SHOOT_FIXED_TARGETS参照)ので、
-                # それ以外より枠を太く・塗りつぶして目立たせる。
-                is_fixed = label in SHOOT_FIXED_TARGETS
+                # 実運用で使う箱(set_shoot_labels、GUIのシューティング位置選択に
+                # 追従)はそれ以外より枠を太く・塗りつぶして目立たせる。
+                is_fixed = label in self._shoot_labels
                 painter.setPen(QPen(QColor('#e07b00'), 2 if is_fixed else 1))
                 painter.setBrush(QColor('#ffcc80') if is_fixed else Qt.NoBrush)
                 painter.drawRect(int(px) - 4, int(py) - 4, 8, 8)
@@ -1150,20 +1175,23 @@ class CommandGuiNode(Node):
         self._current_received = False
         self.create_subscription(JointState, 'mixed_joint_states', self._on_mixed_joint_state, 10)
 
-        # 「L4へ移動」「R4へ移動」ボタン(投入シーケンス、theta回転+手先ピッチ設定。
+        # 「左箱へ移動」「右箱へ移動」ボタン(投入シーケンス、theta回転+手先ピッチ設定。
         # 2026-09-09、Z軸位置指令とR軸の最終延伸は削除しR自動リトラクトは任意)を、
         # GUIボタンだけでなくPSコン(joy_teleop_node)の割当ボタンからも呼べるように
         # するTriggerサービス(2026-09-03、ユーザー指摘: 「シューティングエリアは
         # L4もしくはR4で、ボタンを2つおいておいて」)。実際の処理は
         # set_shoot_start_handlerで登録されたコールバック
-        # (CommandGuiApp._on_shoot_start_requested、対象ラベル引数付き)に委譲する。
+        # (CommandGuiApp._on_shoot_start_requested、側'L'/'R'引数付き)に委譲する。
+        # どの箱(L1..L4/R1..R4)へ向かうかはGUIのシューティング位置選択で決まる
+        # (2026-09-13、SHOOT_BOX_CHOICES参照)。サービス名の_l4/_r4は当時L4/R4固定
+        # だった名残で、joy_teleop_node側との互換のためそのまま(左右の意味のみ)。
         self._shoot_start_handler = None
         self.create_service(
             Trigger, 'shoot_sequence_start_l4',
-            functools.partial(self._on_shoot_sequence_start_srv, 'L4'))
+            functools.partial(self._on_shoot_sequence_start_srv, 'L'))
         self.create_service(
             Trigger, 'shoot_sequence_start_r4',
-            functools.partial(self._on_shoot_sequence_start_srv, 'R4'))
+            functools.partial(self._on_shoot_sequence_start_srv, 'R'))
 
         # 選択中のワークへ回収シーケンスを開始するTriggerサービス(2026-09-09、
         # 回収シーケンス復元。ハンド展開・ポンプON・theta回転のみ、R/Zは人が
@@ -1402,16 +1430,19 @@ class CommandGuiNode(Node):
         return response
 
     def set_shoot_start_handler(self, handler):
-        """CommandGuiApp._on_shoot_start_requested(label: str、bool返却)を登録する。"""
+        """CommandGuiApp._on_shoot_start_requested(side: 'L'/'R'、実際に向かう
+        箱のラベル(str)を返す。失敗時None)を登録する。"""
         self._shoot_start_handler = handler
 
-    def _on_shoot_sequence_start_srv(self, label, request, response):
+    def _on_shoot_sequence_start_srv(self, side, request, response):
         if self._shoot_start_handler is None:
             response.success = False
             response.message = 'GUI未初期化です'
             return response
-        response.success = self._shoot_start_handler(label)
-        response.message = f'{label}へ移動します' if response.success else f'{label}への移動に失敗しました'
+        label = self._shoot_start_handler(side)
+        response.success = label is not None
+        response.message = (f'{label}へ移動します' if response.success
+                            else f'{side}側シューティングボックスへの移動に失敗しました')
         return response
 
     def set_pick_move_handler(self, handler):
@@ -1790,7 +1821,7 @@ class CommandGuiApp(QWidget):
         self._build_status_display_tab(status_display_tab)
         self._restore_saved_gains()
         # PSコン(joy_teleop_node)の割当ボタンから/shoot_sequence_start_l4・_r4
-        # サービス経由で呼ばれた際、GUIの「L4へ移動」「R4へ移動」ボタンと同じ
+        # サービス経由で呼ばれた際、GUIの「左箱へ移動」「右箱へ移動」ボタンと同じ
         # 処理を行わせる(2026-09-03)。
         self.node.set_shoot_start_handler(self._on_shoot_start_requested)
         # PSコン(joy_teleop_node)から、×ボタン=/pick_sequence_move(選択中ワークへ
@@ -2460,6 +2491,8 @@ class CommandGuiApp(QWidget):
         # から更新するのみ、クリック操作は無い)。
         visual_row = QHBoxLayout()
         self.field_minimap = FieldMinimapWidget()
+        # 投入シーケンスの目標となる箱(シューティング位置選択に追従)を強調表示。
+        self.field_minimap.set_shoot_labels(self._current_shoot_labels())
         visual_row.addWidget(self.field_minimap)
         self.z_gauge = ZGaugeWidget(height=self.field_minimap.height())
         visual_row.addWidget(self.z_gauge)
@@ -2668,9 +2701,10 @@ class CommandGuiApp(QWidget):
             desc,
             'ワークボタン(または×ボタン)を押すと、ハンドを保持姿勢・パッド展開・\n'
             'ポンプONにしてroot_thetaを選択中ワークの方向へ自動で回転させる。\n'
-            '「L4へ移動」「R4へ移動」ボタン(またはPSコンの割当ボタン、シューティング\n'
+            '「左箱へ移動」「右箱へ移動」ボタン(またはPSコンの割当ボタン、シューティング\n'
             'ボックスのボタンでも同じ)を押すと、手先ピッチを投入姿勢にし、\n'
             'root_thetaをシューティングエリアの方向へ自動で回転させる。\n'
+            '向かう箱は下の「シューティング位置」で選ぶ(既定: フィールド側から3番目)。\n'
             'Z軸・R軸はいずれもコントローラーで手動操作する(joy速度指令モード)。', 'muted')
         layout.addWidget(desc)
 
@@ -2723,17 +2757,41 @@ class CommandGuiApp(QWidget):
         pick_move_btn.setProperty('variant', 'primary')
         pick_move_btn.clicked.connect(self._on_pick_move_button_clicked)
         btn_row.addWidget(pick_move_btn)
-        shoot_l4_btn = QPushButton('L4へ移動')
-        shoot_l4_btn.clicked.connect(lambda: self._on_shoot_start_requested('L4'))
-        btn_row.addWidget(shoot_l4_btn)
-        shoot_r4_btn = QPushButton('R4へ移動')
-        shoot_r4_btn.clicked.connect(lambda: self._on_shoot_start_requested('R4'))
-        btn_row.addWidget(shoot_r4_btn)
+        # 左右のシューティングボックスへ向かうボタン。ボタン文字列は選択中の箱
+        # (shoot_box_combo)に合わせて「L3へ移動」のように更新する
+        # (_on_shoot_box_changed参照)。
+        self.shoot_l_btn = QPushButton()
+        self.shoot_l_btn.clicked.connect(lambda: self._on_shoot_start_requested('L'))
+        btn_row.addWidget(self.shoot_l_btn)
+        self.shoot_r_btn = QPushButton()
+        self.shoot_r_btn.clicked.connect(lambda: self._on_shoot_start_requested('R'))
+        btn_row.addWidget(self.shoot_r_btn)
         abort_btn = QPushButton('中断')
         abort_btn.setProperty('variant', 'danger')
         abort_btn.clicked.connect(self._on_abort_sequence)
         btn_row.addWidget(abort_btn)
         layout.addLayout(btn_row)
+
+        # シューティング位置の選択(2026-09-13追加、ユーザー指摘:「シューティング
+        # 位置は一番フィールドに近い位置だと思う。GUIで切り替えられるように、
+        # デフォルトはフィールド側から2番目」)。以前はL4/R4(最もフィールド寄り)
+        # 固定だった。左右共通で「フィールド側から何番目の箱か」を選ぶ
+        # (SHOOT_BOX_CHOICES)。「左箱へ移動」「右箱へ移動」ボタン、PSコンの
+        # 割当ボタン(/shoot_sequence_start_l4・_r4)、ミニマップの強調表示が
+        # これに追従する。他のチェックボックスと同様gains.jsonには保存せず、
+        # 起動時は常に既定(DEFAULT_SHOOT_BOX_INDEX、L2/R2)に戻る。
+        shoot_box_row = QHBoxLayout()
+        shoot_box_row.addWidget(QLabel('シューティング位置'))
+        self.shoot_box_combo = QComboBox()
+        for text, index in SHOOT_BOX_CHOICES:
+            self.shoot_box_combo.addItem(text, index)
+        self.shoot_box_combo.setCurrentIndex(
+            [index for _text, index in SHOOT_BOX_CHOICES].index(DEFAULT_SHOOT_BOX_INDEX))
+        self.shoot_box_combo.currentIndexChanged.connect(self._on_shoot_box_changed)
+        shoot_box_row.addWidget(self.shoot_box_combo)
+        shoot_box_row.addStretch(1)
+        layout.addLayout(shoot_box_row)
+        self._on_shoot_box_changed()
 
         # ポンプON/OFFはハンドパネルと重複するが、シーケンス操作中にタブを
         # 切り替えずに吸着のON/OFFができるよう、ここにも同じ操作を置く
@@ -2786,6 +2844,30 @@ class CommandGuiApp(QWidget):
         layout.addWidget(apply_btn)
 
         column.addWidget(box)
+
+    def _shoot_box_index(self):
+        """シューティング位置選択(shoot_box_combo)が指すSHOOT_POINTS添字(0..3)。
+        未構築時や不正値は既定(DEFAULT_SHOOT_BOX_INDEX)。"""
+        combo = getattr(self, 'shoot_box_combo', None)
+        index = combo.currentData() if combo is not None else None
+        if not isinstance(index, int) or not 0 <= index < len(SHOOT_POINTS['L']):
+            return DEFAULT_SHOOT_BOX_INDEX
+        return index
+
+    def _current_shoot_labels(self):
+        index = self._shoot_box_index()
+        return [shoot_target(side, index)[0] for side in ('L', 'R')]
+
+    def _on_shoot_box_changed(self, *_args):
+        """シューティング位置選択の変更を、左右移動ボタンの文字列とミニマップの
+        強調表示へ反映する。ミニマップは構築順の都合でこのパネルより後に作られる
+        ため、未構築なら_build_current_state_panel側で初期値を取りにくる。"""
+        l_label, r_label = self._current_shoot_labels()
+        self.shoot_l_btn.setText(f'{l_label}へ移動')
+        self.shoot_r_btn.setText(f'{r_label}へ移動')
+        minimap = getattr(self, 'field_minimap', None)
+        if minimap is not None:
+            minimap.set_shoot_labels((l_label, r_label))
 
     def _collect_sequence_values(self):
         return {key: get_float(edit) for key, edit in self.sequence_edits.items()}
@@ -2920,11 +3002,12 @@ class CommandGuiApp(QWidget):
         ボックスで90度回す向きが異なる」「これはシューティング時のみ」。以前は
         2026-09-03の「シュート時はRと垂直になるように」により固定値
         shoot_tip_theta_rad(暫定0)を送っていた)。
-        実運用ではx, y, zはSHOOT_FIXED_TARGETS(L4/R4)固定で、「L4へ移動」
-        「R4へ移動」ボタン(_on_shoot_start_requested、GUIボタンまたはPSコンの
-        割当ボタン)経由で呼ばれる想定(2026-09-03、ユーザー指摘: 「シューティング
-        エリアはL4もしくはR4で、ボタンを2つおいておいて」)。zはSHOOT_FIXED_
-        TARGETSの互換のため引数として残しているが、Z軸を自動制御しなくなった
+        実運用ではx, y, zはシューティング位置選択(shoot_box_combo、既定L2/R2)
+        の左右いずれかの箱で、「左箱へ移動」「右箱へ移動」ボタン
+        (_on_shoot_start_requested、GUIボタンまたはPSコンの割当ボタン)経由で
+        呼ばれる想定(2026-09-03、ユーザー指摘: 「シューティングエリアはL4もしくは
+        R4で、ボタンを2つおいておいて」。2026-09-13から箱の位置は選択式)。zは
+        SHOOT_POINTSの互換のため引数として残しているが、Z軸を自動制御しなくなった
         ため実際には使わない。
         他のシーケンス(回収シーケンス含む、回収実行待ちの状態でも)実行中でも、
         確認や中断操作なしに即座にこちらへ切り替える(2026-09-03、ユーザー指摘:
@@ -3170,24 +3253,28 @@ class CommandGuiApp(QWidget):
                     f'{self._seq_kind}: {service_name} 呼び出し中...', 'muted')
         self._on_hand_trigger(service_name)
 
-    def _on_shoot_start_requested(self, label):
-        """GUIの「L4へ移動」「R4へ移動」ボタン、またはCommandGuiNodeの
+    def _on_shoot_start_requested(self, side):
+        """GUIの「左箱へ移動」「右箱へ移動」ボタン、またはCommandGuiNodeの
         /shoot_sequence_start_l4・_r4サービス経由(PSコンの割当ボタン、
-        joy_teleop_node)から呼ばれる。SHOOT_FIXED_TARGETS[label]の固定
-        シューティングエリアへ、安全高度を維持したまま向かうだけの投入シーケンスを
-        実行する(2026-09-03、ユーザー指摘: 「シューティングエリアはL4もしくは
+        joy_teleop_node)から呼ばれる。side('L'/'R')側の、シューティング位置
+        選択(shoot_box_combo、_shoot_box_index)で選ばれている箱へ、安全高度を
+        維持したまま向かうだけの投入シーケンスを実行し、向かった箱のラベル
+        (例 'L3')を返す(失敗時None)。
+        (2026-09-03、ユーザー指摘: 「シューティングエリアはL4もしくは
         R4で、ボタンを2つおいておいて」。以前は直前にシーケンスで向かった対象を
         覚えておいて再送信する方式だったが、実運用の対象がL4/R4の2箇所固定と
-        分かったため、対象を記憶せず直接その場で指定する方式に変更した)。
+        分かったため、対象を記憶せず直接その場で指定する方式に変更した。
+        2026-09-13、箱の位置をGUIで選べるようにし既定をL2/R2へ変更、
+        SHOOT_BOX_CHOICES参照)。
         既に別のシーケンスが実行中でも、_start_shoot_sequence側が確認や中断
         操作なしに即座に中断して切り替える(2026-09-03、ユーザー指摘:「回収実行
         を押さなくてもシューティング位置へ移動できるように。ユーザーの動きを
         制限したくない」。以前はここで1件だけ予約し完了後に自動開始する
         キュー機構があったが、即座に切り替えられるようになったため不要になり
         削除した)。"""
-        _, x, y, z = SHOOT_FIXED_TARGETS[label]
+        label, x, y, z = shoot_target(side, self._shoot_box_index())
         self._start_shoot_sequence(x, y, z)
-        return True
+        return label
 
     def _on_pick_move_requested(self):
         """CommandGuiNode.set_pick_move_handler経由、PSコン×ボタン(立ち上がり

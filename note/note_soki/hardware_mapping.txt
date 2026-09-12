@@ -815,6 +815,9 @@ root_theta_trim_ak_degはエンコーダ原点ずれの補正なので、アー�
   R4: -99 + 90 = -9deg  (-90だと-189degでストッパ範囲外)
 「追従値から0側へ90deg戻す」の1式で左右とも自動的に正しい向きになる。
 L4/R4ごとに符号を持つ必要は無い。
+2026-09-13からシューティング位置はGUIで選択式(既定L2/R2=フィールド側から
+3番目、root_theta≈±126deg → 手先θ≈±36deg)。L1/R1(≈±135deg → ≈±45deg)まで
+どの箱でもストッパ範囲内、かつjoy側のエリア判別(|θ|≥85deg)にも入る。
 
 **設定値の置き換え**: gains.json sequence.shoot_tip_theta_rad(固定目標[rad])を
 廃止し、sequence.shoot_tip_theta_trim_deg(上式に足す微調整[関節deg]、既定0、

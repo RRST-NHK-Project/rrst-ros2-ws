@@ -105,23 +105,27 @@ button_tip_theta_r1・invert_*・pump_toggle_buttonパラメータで合わせ�
                                          できる操作性を優先しトグルにする)。移動系の
                                          enable_button(デッドマン)とは独立に扱う
                                          (安全機能のため常に効くようにする))
-  □(四角)ボタン   -> L4へ移動          (shoot_start_l4_button, デフォルト3。
+  □(四角)ボタン   -> 左シューティング箱へ移動 (shoot_start_l4_button, デフォルト3。
                                          PS4/PS5コントローラの一般的なLinux
                                          ドライバ割り当てを仮定した値、実機で要確認。
                                          2026-09-03追加、同日ボタン再割当。
                                          command_gui_nodeの/shoot_sequence_start_l4
-                                         サービスを呼び、シューティングエリアL4へ、
+                                         サービスを呼び、左側シューティング箱へ、
                                          安全高度を維持したまま向かうだけの投入
-                                         シーケンスを実行させる(GUIの「L4へ移動」
-                                         ボタンと同じ効果))
-  ○(丸)ボタン     -> R4へ移動          (shoot_start_r4_button, デフォルト1。
+                                         シーケンスを実行させる(GUIの「左箱へ移動」
+                                         ボタンと同じ効果)。どの箱(L1..L4)かは
+                                         GUIの「シューティング位置」選択で決まる
+                                         (既定L2=フィールド側から3番目、2026-09-13。
+                                         パラメータ名・サービス名の_l4はL4固定
+                                         だった当時の名残))
+  ○(丸)ボタン     -> 右シューティング箱へ移動 (shoot_start_r4_button, デフォルト1。
                                          PS4/PS5コントローラの一般的なLinux
                                          ドライバ割り当てを仮定した値、実機で要確認。
                                          2026-09-03追加、同日ボタン再割当。
                                          command_gui_nodeの/shoot_sequence_start_r4
-                                         サービスを呼び、シューティングエリアR4へ
-                                         同様に向かわせる(GUIの「R4へ移動」ボタンと
-                                         同じ効果))
+                                         サービスを呼び、右側シューティング箱へ
+                                         同様に向かわせる(GUIの「右箱へ移動」ボタンと
+                                         同じ効果。箱の位置はL側と同じ選択に従う))
   L3ボタン         -> 吸着パッド展開/収納トグル (hand_deploy_toggle_button,
                                          デフォルト11。hand_nodeの
                                          /hand_spread_pads・/hand_gather_pads を
@@ -295,7 +299,8 @@ TIP_THETA_FOLLOW_SIGN = 1.0
 #                       両方揃えること)
 # 判別は|root_theta|のしきい値。フィールド座標(command_gui_node.py WORK_POINTS/
 # SHOOT_POINTS)から、ワークは最大でも|θ|≈62deg(1行目の外側の列)、シューティング
-# ボックスは最小でも|θ|≈99deg(L4/R4、L1は≈135deg)なので、その中間80degを境に
+# ボックスは最小でも|θ|≈99deg(L4/R4、既定のL2/R2は≈126deg、L1は≈135deg)なので、
+# その中間80degを境に
 # ±5degのヒステリシスを持たせる(境界付近でroot_thetaが揺れたとき手先θが90deg
 # 往復し続けないようにする)。フィールド寸法を変えたらここも見直すこと。
 TIP_THETA_SHOOT_AREA_ENTER_RAD = math.radians(85.0)  # |θ|がこれ以上でシューティングエリア
@@ -874,8 +879,8 @@ class JoyTeleopNode(Node):
 
     def _update_shoot_start_l4(self, msg: Joy):
         """□ボタンの立ち上がりエッジで、command_gui_nodeの
-        /shoot_sequence_start_l4(std_srvs/Trigger)を呼び、シューティングエリア
-        L4へ向かわせる(2026-09-03追加)。移動系のenable_button(デッドマン)とは
+        /shoot_sequence_start_l4(std_srvs/Trigger)を呼び、左側シューティング箱
+        (GUIのシューティング位置選択で決まる、既定L2)へ向かわせる(2026-09-03追加)。移動系のenable_button(デッドマン)とは
         独立に扱う(ポンプトグルボタンと同じ理由)。他のシーケンスが実行中でも
         command_gui_node側が確認や中断操作なしに即座に中断してこちらへ切り替える
         (2026-09-03、ユーザー指摘:「回収実行を押さなくてもシューティング位置へ
@@ -897,8 +902,8 @@ class JoyTeleopNode(Node):
 
     def _update_shoot_start_r4(self, msg: Joy):
         """○ボタンの立ち上がりエッジで、command_gui_nodeの
-        /shoot_sequence_start_r4(std_srvs/Trigger)を呼び、シューティングエリア
-        R4へ向かわせる(2026-09-03追加)。移動系のenable_button(デッドマン)とは
+        /shoot_sequence_start_r4(std_srvs/Trigger)を呼び、右側シューティング箱
+        (GUIのシューティング位置選択で決まる、既定R2)へ向かわせる(2026-09-03追加)。移動系のenable_button(デッドマン)とは
         独立に扱う(ポンプトグルボタンと同じ理由)。他のシーケンスが実行中でも
         command_gui_node側が確認や中断操作なしに即座に中断してこちらへ切り替える
         (L4の項目と同じ理由、_on_shoot_start_requested参照)。"""

@@ -1024,3 +1024,27 @@ Ki=0のP制御。重力に逆らう上昇では「重力分の電流÷Kp」だ�
     差の半分程度から始める。上げすぎると上昇だけmax_velocityを超える。
     位置モード(MIT)側には未適用(速度モードのみ)。根本対策としてはKi>0で
     定常偏差自体を消す手もある(その場合このバイアスは0に戻す)。
+
+## シューティング位置をGUIで選択可能に、既定をフィールド側から2番目(L3/R3)へ (2026-09-13、
+## ユーザー指摘「シューティング位置は一番フィールドに近い位置だと思う。これをGUIで
+## 切り替えられるように、デフォルトはフィールド側から2番め」)
+これまで投入シーケンスの目標はSHOOT_FIXED_TARGETS={'L4','R4'}(SHOOT_POINTSの
+index 3=最もフィールド寄り)固定だった。
+  - command_gui_node.py: SHOOT_FIXED_TARGETSを廃止し、SHOOT_BOX_CHOICES
+    (「フィールド側からn番目 (Lk/Rk)」, index=4-n)とDEFAULT_SHOOT_BOX_INDEX
+    (当初2=L3/R3)、shoot_target(side, index)を追加。「ピック/投入 自動シーケンス」
+    パネルに「シューティング位置」QComboBox(shoot_box_combo)を置き、左右の
+    移動ボタン(shoot_l_btn/shoot_r_btn、文字列は「L3へ移動」のように選択に
+    追従)、PSコン経由の/shoot_sequence_start_l4・_r4(ハンドラ引数はラベルから
+    側'L'/'R'へ変更、応答messageに実際の箱ラベル)、ミニマップの強調表示
+    (FieldMinimapWidget.set_shoot_labels)がすべてこの選択に従う。
+    他のチェックボックス同様gains.jsonには保存せず、起動時は常に既定。
+    既定は同日中にユーザー指定で「フィールド側から3番目(L2/R2、index 1)」へ
+    変更(DEFAULT_SHOOT_BOX_INDEX=1、|θ|≈126deg → 手先θ≈±36deg)。
+    サービス名・joyパラメータ名の_l4/_r4は互換のためそのまま(左右の意味のみ)。
+  - joy_teleop_node.py: docstring/コメントのみ更新(挙動変更なし)。
+  - 手先θ追従のシューティングエリア判別(|θ|≥85deg)は、L3/R3で|θ|≈114deg、
+    L1/R1でも≈135deg、L4/R4で≈99degなので4箱いずれを選んでも変更不要。
+  - 検証: offscreen GUIで既定「L3へ移動/R3へ移動」・ミニマップ{L3,R3}、
+    選択を1番目に変えると「L4へ移動」・{L4,R4}、ハンドラ('R')が'R4'を返すこと
+    を確認。実機未確認。
