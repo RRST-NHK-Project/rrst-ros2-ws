@@ -1048,3 +1048,11 @@ index 3=最もフィールド寄り)固定だった。
   - 検証: offscreen GUIで既定「L3へ移動/R3へ移動」・ミニマップ{L3,R3}、
     選択を1番目に変えると「L4へ移動」・{L4,R4}、ハンドラ('R')が'R4'を返すこと
     を確認。実機未確認。
+
+## 手動操作XY速度(xy_speed)の既定を0.1へ (2026-09-13、ユーザー指定「手動操作のXY速度の
+## デフォルトを0.1に」)
+  - joy_teleop_node.py: declare_parameter('xy_speed')の既定0.05→0.1。gains.json
+    joy_speed.xy_speedは既に本番値0.1(コミット67ff92c)なのでそちらは変更なし。
+    GUI「手動操作(joy)速度」パネルからの適用値・gains.json復元は従来どおり優先。
+  - 0.1はr側の速度クランプ(max_velocity 0.2×low_speed_multiplier 0.3=0.06m/s)を
+    超えるため、r成分が支配的な向きでは頭打ちで直線から少しずれる(既知)。

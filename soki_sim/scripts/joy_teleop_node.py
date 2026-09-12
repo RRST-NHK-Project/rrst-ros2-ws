@@ -408,13 +408,17 @@ class JoyTeleopNode(Node):
         # invert_xy_y=falseが既定(実機で要確認)。xy_speedは[m/s]、フル入力時の
         # 手先速度で、low_speed_multiplierは掛けない(XYモード=低速モード中に
         # 二重に掛かるのを避け、この値そのものを実速度として調整できるようにする)。
-        # 既定0.05はtrajectory_follower_node側のr速度上限(max_velocity 0.2 ×
-        # low_speed_multiplier 0.3 = 0.06m/s、gains.json参照)を超えない値。
+        # 既定は0.1(2026-09-13、ユーザー指定「手動操作のXY速度のデフォルトを
+        # 0.1に」。gains.json joy_speed.xy_speedの本番値と揃えた。当初0.05は
+        # trajectory_follower_node側のr速度上限(max_velocity 0.2 ×
+        # low_speed_multiplier 0.3 = 0.06m/s、gains.json参照)を超えない値だった。
+        # 0.1はこの上限を超えるため、r方向成分が頭打ちになる向きでは直線から
+        # 少しずれる(冒頭「XYモード」参照))。
         self.declare_parameter('axis_xy_x', 0)
         self.declare_parameter('axis_xy_y', 1)
         self.declare_parameter('invert_xy_x', True)
         self.declare_parameter('invert_xy_y', False)
-        self.declare_parameter('xy_speed', 0.05)     # m/s (フル入力時、XYモード)
+        self.declare_parameter('xy_speed', 0.1)      # m/s (フル入力時、XYモード)
         # z/rのjoy出力を位置目標(target_z_/target_r_を積分してjoint_targetsへ)
         # ではなく、trajectory_follower_nodeの速度モード(robomas_velocity_mode)
         # 向けにスティック入力をそのまま速度指令(joint_velocity_targets)として
