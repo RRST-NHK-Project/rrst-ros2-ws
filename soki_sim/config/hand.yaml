@@ -21,9 +21,9 @@ hand_node:
     # 直接固定したい場合はtrueにしてXXX_can_degを設定する(2026-09-03新規、
     # 実機との相違を手動補正する用途)。
     deploy_servo_retracted_can_deg_override: true
-    deploy_servo_retracted_can_deg: 1.0
+    deploy_servo_retracted_can_deg: 10.0
     deploy_servo_deployed_can_deg_override: true
-    deploy_servo_deployed_can_deg: 63.0
+    deploy_servo_deployed_can_deg: 84.0
     # 展開/収納の移動速度[deg/s](2026-09-12追加)。ファームウェアには速度指定が
     # 無いためhand_node側で送信角度を小刻みに更新して速度を作る(hand_node.py
     # モジュールdocstring参照)。0で従来通り即時送信(サーボ最速)。起動後最初の

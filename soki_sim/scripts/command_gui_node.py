@@ -2658,8 +2658,9 @@ class CommandGuiApp(QWidget):
         # r_lowerリミットスイッチまで自動で戻す(_advance_retract_r_step参照)。
         # OFF(既定)なら退避ステップ自体を飛ばし、R軸は常に人の操作のみで動く。
         self.retract_r_checkbox = QCheckBox('R軸を自動でしまう(theta回転前にr_lowerリミットスイッチまで retract)')
-        # 既定ON(2026-09-10、ユーザー指定「Rの軸の自動収納をデフォルトでオンに」)。
-        self.retract_r_checkbox.setChecked(True)
+        # 既定OFF(2026-09-10に一度「デフォルトでオンに」で既定ONへ変更したが、
+        # 2026-09-12にユーザー指定「デフォルト無効に」で既定OFFへ戻した)。
+        self.retract_r_checkbox.setChecked(False)
         layout.addWidget(self.retract_r_checkbox)
 
         self.sequence_status_label = QLabel()
