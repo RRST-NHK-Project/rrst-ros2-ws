@@ -24,6 +24,12 @@ hand_node:
     deploy_servo_retracted_can_deg: 1.0
     deploy_servo_deployed_can_deg_override: true
     deploy_servo_deployed_can_deg: 63.0
+    # 展開/収納の移動速度[deg/s](2026-09-12追加)。ファームウェアには速度指定が
+    # 無いためhand_node側で送信角度を小刻みに更新して速度を作る(hand_node.py
+    # モジュールdocstring参照)。0で従来通り即時送信(サーボ最速)。起動後最初の
+    # 指令はランプ元が不明なので常に即時。実行中の変更は
+    # `ros2 param set /hand_node deploy_servo_speed_deg_per_s <値>`。
+    deploy_servo_speed_deg_per_s: 0.0
 
     # ---- ワークピッチ変更サーボ (SERVOn、角度[deg]) ----
     pitch_servo_device_id: 101
@@ -41,6 +47,8 @@ hand_node:
     pitch_servo_hold_can_deg: 8.0
     pitch_servo_insert_can_deg_override: true
     pitch_servo_insert_can_deg: 70.0
+    # 保持/投入の移動速度[deg/s](deploy_servo_speed_deg_per_sと同じ、0で即時)。
+    pitch_servo_speed_deg_per_s: 0.0
 
     # ---- ダイヤフラムポンプ (CAN_HOST device_id=101のMD1、符号=方向・絶対値=PWM
     # デューティ。汎用IOノード1台分は SERVO1-3=local0-2, MD1=local3, MD2=local4

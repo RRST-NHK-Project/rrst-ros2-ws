@@ -190,6 +190,18 @@ CUBEMARS_JOINT_NAMES = ['root_theta_joint']
 TRAJ_PANEL_JOINT_NAMES = JOINT_NAMES + ['tip_theta_joint']
 TRAJ_NODE_NAME = 'trajectory_follower_node'
 JOY_NODE_NAME = 'joy_teleop_node'
+HAND_NODE_NAME = 'hand_node'
+# ハンドパネルから実行中に変更できるhand_nodeのパラメータ(2026-09-12追加、
+# ユーザー要望:「手先サーボの速度をGUIで調整できるように」)。hand_node側は
+# サービス呼び出しのたびにパラメータを読み直すのでSetParametersで即反映される
+# (hand_node.pyモジュールdocstring参照)。gains.jsonのhand_servo_speed節に永続化し、
+# GUI起動時にhand_nodeへ自動適用する(_auto_apply_saved_hand_servo_speed参照)。
+# hand.yamlの同名パラメータはhand_node起動時の初期値で、GUIの自動適用はそれを
+# 上書きする(robomasゲイン等と同じ運用)。
+HAND_SERVO_SPEED_FIELDS = (
+    ('deploy_servo_speed_deg_per_s', '展開/収納'),
+    ('pitch_servo_speed_deg_per_s', 'ピッチ'),
+)
 REAL_JOINT_BRIDGE_NODE_NAME = 'real_joint_bridge_node'
 AUTOTUNE_NODE_NAME = 'autotune_node'
 # 統合操作タブの「機体ステータス」パネルで起動状況を表示するノード
@@ -293,6 +305,10 @@ SEQ_RETRACT_R_SPEED_MPS = 0.1
 # GUIのQLineEditへ復元できない場合(gains.json未保存の初回起動時)に使う既定値。
 # safe_transit_z_mは安全側(可動範囲上限)に倒しておき、実機確認後に低い値へ調整する想定。
 # r_retract_mはradius=0(旋回軸に最も近い位置)。
+# root_theta_trim_ak_degの許容範囲[AK軸deg](±30度=関節角±6.4度。原点のずれの
+# 補正にはこれで十分で、桁間違い等で大きく回さないための上限)。
+ROOT_THETA_TRIM_AK_DEG_LIMIT = 30.0
+
 DEFAULT_SEQUENCE_SETTINGS = {
     'safe_transit_z_m': WORLD_Z_UPPER,
     'r_retract_m': R_LOWER,
@@ -314,6 +330,18 @@ DEFAULT_SEQUENCE_SETTINGS = {
     # 実機で狙いを微調整できるようGUIの編集欄(sequence_edits)から変更可能。
     # _start_pick_sequence参照。
     'pick_aim_y_offset_m': WORK_LENGTH / 2.0,
+    # root_theta原点トリム[AK(CubeMars)アクチュエータ軸のdeg]。回収/投入シーケンスが
+    # 送るroot_theta目標にこの分を足す(関節角へはROOT_THETA_REDUCTIONで換算)。
+    # root_thetaの原点はSet Origin方式(目視で前方に合わせて/set_root_theta_originを
+    # 呼ぶ、note/hardware_mapping.txt参照)のため、原点が真の前方から少しずれると
+    # 左右対称なワークに対して必要な角度の絶対値が左右で食い違う(2026-09-12、
+    # ユーザー報告:「1列目、右側がAK角度180度のとき左側は200度」。左=θ正なので
+    # 真の前方はAK軸で+10度側、トリム=(200-180)/2=+10)。Set Originをやり直さずに
+    # ソフト側で補正するための値で、原点を取り直したら0に戻すこと。
+    # 単位をAK軸のdegにしているのは、ユーザーが実機確認でAKの角度表示を読んで
+    # いるため(関節角radより直感的に入力できる)。誤入力で大きく回らないよう
+    # ROOT_THETA_TRIM_AK_DEG_LIMITでクランプする。_root_theta_trim_rad参照。
+    'root_theta_trim_ak_deg': 0.0,
     # パッド収納(/hand_gather_pads)からピッチ投入姿勢への切替(/hand_set_pitch_
     # insert)までの待ち時間[s](2026-09-03、ユーザー指摘: 「収納から姿勢変更
     # までの待機時間も必要。ほぼ同時はまずい」。パッドが物理的に収納し切る前に
@@ -432,6 +460,12 @@ HAND_WIRING_FIELDS = [
         ('deploy_servo_deployed_can_deg_override', '固定する', 'bool'),
         ('deploy_servo_deployed_can_deg', '角度[deg]', 'float'),
     ]),
+    # サーボの移動速度(2026-09-12追加、ユーザー要望:「手先サーボの速度を変更
+    # できるように」)。hand_node側の角度ランプで実現する(hand_node.py参照)。
+    # 0で即時送信(サーボ最速)。
+    (None, [
+        ('deploy_servo_speed_deg_per_s', '移動速度[deg/s](0=即時)', 'float'),
+    ]),
     ('ワークピッチ変更サーボ', [
         ('pitch_servo_device_id', 'ID', 'int'),
         ('pitch_servo_node_index', 'ノード', 'int'),
@@ -451,6 +485,9 @@ HAND_WIRING_FIELDS = [
     ('投入 実機送信角度 手動固定', [
         ('pitch_servo_insert_can_deg_override', '固定する', 'bool'),
         ('pitch_servo_insert_can_deg', '角度[deg]', 'float'),
+    ]),
+    (None, [
+        ('pitch_servo_speed_deg_per_s', '移動速度[deg/s](0=即時)', 'float'),
     ]),
     ('ダイヤフラムポンプ(MD)', [
         ('pump_device_id', 'ID', 'int'),
@@ -1197,7 +1234,7 @@ class CommandGuiNode(Node):
                 self.create_client(GetParameters, f'/{node_name}/get_parameters'),
                 self.create_client(SetParameters, f'/{node_name}/set_parameters'),
             )
-            for node_name in (TRAJ_NODE_NAME, JOY_NODE_NAME)
+            for node_name in (TRAJ_NODE_NAME, JOY_NODE_NAME, HAND_NODE_NAME)
         }
         # std_srvs/Triggerサービス(/set_root_theta_origin等)呼び出し用クライアント。
         # サービス名ごとに遅延生成してキャッシュする。
@@ -1797,6 +1834,7 @@ class CommandGuiApp(QWidget):
         self._robomas_auto_applied = False
         self._robomas_vel_auto_applied = False
         self._joy_auto_applied = False
+        self._hand_servo_auto_applied = False
         self._auto_load_timer = QTimer(self)
         self._auto_load_timer.timeout.connect(self._try_auto_setup_gains)
         self._auto_load_timer.start(500)
@@ -2482,7 +2520,84 @@ class CommandGuiApp(QWidget):
         pitch_row.addWidget(insert_btn)
         layout.addLayout(pitch_row)
 
+        # サーボ移動速度[deg/s](HAND_SERVO_SPEED_FIELDSのコメント参照)。0=即時
+        # (サーボ最速)。負値は意味を持たない(hand_node側で0扱い)ので
+        # make_gain_editで入力できないようにする。
+        speed_row = QHBoxLayout()
+        speed_row.addWidget(QLabel('サーボ速度[deg/s] (0=即時)'))
+        self.hand_servo_speed_edits = {}
+        for key, label in HAND_SERVO_SPEED_FIELDS:
+            speed_row.addWidget(QLabel(label))
+            edit = make_gain_edit(0.0, width=56)
+            self.hand_servo_speed_edits[key] = edit
+            speed_row.addWidget(edit)
+        speed_load_btn = QPushButton('読込')
+        speed_apply_btn = QPushButton('適用')
+        speed_load_btn.clicked.connect(self._on_load_hand_servo_speed)
+        speed_apply_btn.clicked.connect(self._on_apply_hand_servo_speed)
+        speed_row.addWidget(speed_load_btn)
+        speed_row.addWidget(speed_apply_btn)
+        speed_row.addStretch(1)
+        layout.addLayout(speed_row)
+        self.hand_servo_speed_status_label = QLabel()
+        self.hand_servo_speed_status_label.setWordWrap(True)
+        _set_status(self.hand_servo_speed_status_label, '未読込', 'muted')
+        layout.addWidget(self.hand_servo_speed_status_label)
+
         column.addWidget(box)
+
+    def _on_load_hand_servo_speed(self):
+        ok = self.node.request_node_params(
+            HAND_NODE_NAME, list(self.hand_servo_speed_edits.keys()),
+            self._apply_loaded_hand_servo_speed,
+            lambda reason: _set_status(self.hand_servo_speed_status_label, f'読込失敗: {reason}', 'error'))
+        _set_status(self.hand_servo_speed_status_label,
+                    '読込中...' if ok else 'hand_nodeに接続できません(未起動?)',
+                    'muted' if ok else 'error')
+        return ok
+
+    def _apply_loaded_hand_servo_speed(self, values):
+        for name, edit in self.hand_servo_speed_edits.items():
+            if name in values:
+                set_float(edit, round(values[name], 2))
+        # 「読込」は表示のみ、gains.jsonへは「適用」時のみ永続化する
+        # (_apply_loaded_joy_speedと同じ)。
+        _set_status(self.hand_servo_speed_status_label, '読込完了', 'info')
+
+    def _collect_hand_servo_speed_values(self):
+        return {name: max(0.0, get_float(edit)) for name, edit in self.hand_servo_speed_edits.items()}
+
+    def _on_apply_hand_servo_speed(self):
+        try:
+            values = self._collect_hand_servo_speed_values()
+        except ValueError:
+            QMessageBox.critical(self, '入力エラー', 'サーボ速度に数値を入力してください')
+            return
+        self._persist_gains('hand_servo_speed', values)
+        ok = self.node.set_node_params(HAND_NODE_NAME, values, self._apply_hand_servo_speed_set_result)
+        _set_status(self.hand_servo_speed_status_label,
+                    '適用中...' if ok else 'hand_nodeに接続できません(未起動?)',
+                    'muted' if ok else 'error')
+
+    def _apply_hand_servo_speed_set_result(self, results):
+        if results is None:
+            _set_status(self.hand_servo_speed_status_label, '適用に失敗しました(応答なし)', 'error')
+            return
+        if all(r.successful for r in results):
+            _set_status(self.hand_servo_speed_status_label, '適用しました(次の展開/収納・ピッチ切替から有効)', 'success')
+        else:
+            reasons = '; '.join(r.reason for r in results if not r.successful)
+            _set_status(self.hand_servo_speed_status_label, f'適用失敗: {reasons}', 'error')
+
+    def _auto_apply_saved_hand_servo_speed(self):
+        """GUI起動時、hand_nodeが使えるようになり次第gains.jsonのサーボ速度を
+        一度だけ自動適用する(_auto_apply_saved_joyと同じ設計、
+        _try_auto_setup_gainsから呼ばれる)。保存値が無ければ何もせず完了扱い。"""
+        saved = self._saved_gains.get('hand_servo_speed')
+        if not saved:
+            return True
+        _set_status(self.hand_servo_speed_status_label, '自動適用中(gains.json)...', 'muted')
+        return self.node.set_node_params(HAND_NODE_NAME, saved, self._apply_hand_servo_speed_set_result)
 
     def _on_hand_trigger(self, service_name):
         _set_status(self.hand_status_label, f'{service_name} 呼び出し中...', 'muted')
@@ -2603,7 +2718,10 @@ class CommandGuiApp(QWidget):
                 ('gather_settle_sec', '収納→ピッチ待ち[s]'),
                 # 回収時のroot_theta狙い点をワーク中心から上面側(+Y)へずらす量
                 # (2026-09-11追加、DEFAULT_SEQUENCE_SETTINGSのコメント参照)。
-                ('pick_aim_y_offset_m', '回収θ狙い点 中心→上面[m]'),)):
+                ('pick_aim_y_offset_m', '回収θ狙い点 中心→上面[m]'),
+                # root_theta原点のずれをソフト側で補正するトリム(2026-09-12追加、
+                # DEFAULT_SEQUENCE_SETTINGSのコメント参照)。回収・投入の両方に効く。
+                ('root_theta_trim_ak_deg', '根本θ原点トリム[AK deg]'),)):
             grid.addWidget(QLabel(label), i, 0)
             edit = make_float_edit(DEFAULT_SEQUENCE_SETTINGS[key])
             self.sequence_edits[key] = edit
@@ -2627,6 +2745,22 @@ class CommandGuiApp(QWidget):
             return
         self._persist_gains('sequence', values)
         _set_status(self.sequence_status_label, '設定を保存しました', 'success')
+
+    def _root_theta_trim_rad(self):
+        """シーケンス設定パネルのroot_theta原点トリム[AK軸deg]を関節角[rad]で返す
+        (2026-09-12追加、DEFAULT_SEQUENCE_SETTINGSのコメント参照)。数値でない
+        入力は0、範囲外はROOT_THETA_TRIM_AK_DEG_LIMITでクランプする。"""
+        try:
+            trim_ak_deg = get_float(self.sequence_edits['root_theta_trim_ak_deg'])
+        except (ValueError, KeyError):
+            trim_ak_deg = DEFAULT_SEQUENCE_SETTINGS['root_theta_trim_ak_deg']
+        trim_ak_deg = clamp(trim_ak_deg, -ROOT_THETA_TRIM_AK_DEG_LIMIT, ROOT_THETA_TRIM_AK_DEG_LIMIT)
+        return math.radians(trim_ak_deg) / ROOT_THETA_REDUCTION
+
+    def _apply_root_theta_trim(self, theta):
+        """回収/投入シーケンスのroot_theta目標に原点トリムを足し、可動域で
+        クランプして返す(_root_theta_trim_rad参照)。"""
+        return clamp(theta + self._root_theta_trim_rad(), ROOT_THETA_LOWER, ROOT_THETA_UPPER)
 
     def _start_pick_sequence(self, x, y, z):
         """workボタン用の回収シーケンス(2026-09-09、manualブランチでの操作方針
@@ -2665,7 +2799,11 @@ class CommandGuiApp(QWidget):
             aim_y_offset = DEFAULT_SEQUENCE_SETTINGS['pick_aim_y_offset_m']
         aim_y_offset = clamp(aim_y_offset, -WORK_LENGTH, WORK_LENGTH)
         target_theta, _target_r = _theta_r_from_xy(x, y + aim_y_offset, self._machine_origin)
+        # 手先θの追従値はトリム前の幾何学的なθから決める(トリムはroot_thetaの
+        # エンコーダ原点のずれを補正するものなので、実際にアームが向く物理角度は
+        # トリム前のθ。tip_thetaの原点は別途手動で合わせている)。
         tip_theta_pick = TIP_THETA_FOLLOW_SIGN * target_theta
+        target_theta = self._apply_root_theta_trim(target_theta)
 
         steps = [
             ('call', '/hand_set_pitch_hold'),   # 回収時は保持姿勢
@@ -2733,6 +2871,7 @@ class CommandGuiApp(QWidget):
         self.node.set_joy_tip_theta_follow(False)
 
         target_theta, _target_r = _theta_r_from_xy(x, y, self._machine_origin)
+        target_theta = self._apply_root_theta_trim(target_theta)
         # 投入時はr方向に垂直な姿勢(root_thetaの値によらず一定のtip_theta)にする
         # (SHOOT_TIP_THETA_RAD付近のコメント参照、ユーザー指摘:「シュート時はRと
         # 垂直になるように」。値自体は未検証の暫定値)。
@@ -4310,12 +4449,14 @@ class CommandGuiApp(QWidget):
             self._robomas_vel_auto_applied = True
         if not self._joy_auto_applied and self._auto_apply_saved_joy():
             self._joy_auto_applied = True
+        if not self._hand_servo_auto_applied and self._auto_apply_saved_hand_servo_speed():
+            self._hand_servo_auto_applied = True
 
         if all((self._traj_auto_loaded, self._mit_auto_loaded,
                 self._robomas_auto_loaded, self._robomas_vel_auto_loaded, self._joy_auto_loaded,
                 self._traj_auto_applied, self._mit_auto_applied,
                 self._robomas_auto_applied, self._robomas_vel_auto_applied, self._joy_auto_applied,
-                self._estop_auto_engaged)):
+                self._hand_servo_auto_applied, self._estop_auto_engaged)):
             self._auto_load_timer.stop()
 
     def _auto_engage_estop(self):
@@ -5060,6 +5201,11 @@ class CommandGuiApp(QWidget):
         for name, edit in self.sequence_edits.items():
             if name in sequence:
                 set_float(edit, sequence[name])
+
+        hand_servo = self._saved_gains.get('hand_servo_speed', {})
+        for name, edit in self.hand_servo_speed_edits.items():
+            if name in hand_servo:
+                set_float(edit, hand_servo[name])
 
         # 機体原点オフセット(2026-09-11追加): 編集欄へ復元するだけでなく、逆運動学用の
         # 適用値(self._machine_origin)にも即座に反映し、RVizへも送る(送信は

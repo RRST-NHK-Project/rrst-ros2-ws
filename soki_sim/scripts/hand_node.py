@@ -35,6 +35,20 @@ MDは符号=方向・絶対値=PWMデューティの生値をセットして送�
 バッファを保持し、対象スロットのみ更新して送信する(trajectory_follower_nodeの
 CubeMars/RoboMas実装と同じパターン)。
 
+サーボの移動速度はソフト側の角度ランプで制御する(2026-09-12追加、ユーザー要望:
+「手先サーボの速度を変更できるように」)。ファームウェア(xiao-esp32-s3_can2io
+pin_ctrl_task.cpp IO_Servo_Outout)は受け取った角度をそのままPWM幅へ変換するだけで
+速度指定の手段が無く、ホビーサーボ自体も目標角へ最速で動くため、hand_node側で
+現在の送信角度から目標角度へ<prefix>_speed_deg_per_s[deg/s]の速さで小刻みに
+角度を更新して送る(SERVO_RAMP_PERIOD_SEC周期、_ramp_step参照)。0以下なら従来
+通り目標角度を即時送信する。起動後最初の指令はランプ元の角度が不明(サーボの
+実位置は分からない)なので即時送信し、2回目以降のみランプする。サービスの応答は
+ランプ完了を待たずに即時返す(応答メッセージに所要時間の目安を含める)ため、
+上位シーケンス(command_gui_node.pyのgather_settle_sec等)の待ち時間は
+ランプ所要時間を見込んで設定すること。速度パラメータはサービス呼び出し
+のたびに読み直すので`ros2 param set /hand_node pitch_servo_speed_deg_per_s 60`
+で実行中にも変更できる。
+
 device_id=0(既定)はその出力が未配線・無効であることを意味する(他ノードの
 limit_switch_device_id等と同じ規約)。実機配線が判明したら
 note/can_mapping.txt「## ハンド」節と、soki_sim/config/hand.yamlのパラメータを
@@ -101,6 +115,9 @@ SLOT_COUNT = 24
 # 一致させること(sim表示と実機LEDの見た目を揃えるため、2026-09-08追加)。
 LED_BLINK_FAST_PERIOD_MS = 150
 LED_BLINK_SLOW_PERIOD_MS = 500
+# サーボ角度ランプ(速度制御)の更新周期[s]。ホビーサーボのPWM周期(50Hz=20ms)
+# より細かくしても意味が無いので20msにする(モジュールdocstring参照)。
+SERVO_RAMP_PERIOD_SEC = 0.02
 HAND_PITCH_JOINT = 'hand_pitch_joint'
 # soki_sim.urdf.xacroのhand_pad_side_travelと一致させること。
 # joint値0=spread(展開)、joint値=この上限値=gathered(収納、正三角形)。
@@ -111,6 +128,11 @@ HAND_PAD_TRAVEL = {
     'suction_pad_2_joint': 0.0,
     'suction_pad_3_joint': 0.174356,
 }
+
+
+def _ramp_note(duration_sec):
+    """サービス応答メッセージに付けるランプ所要時間の注記。即時送信なら空文字。"""
+    return f', 約{duration_sec:.1f}sかけて移動' if duration_sec > 0.0 else ''
 
 
 class HandNode(Node):
@@ -143,6 +165,9 @@ class HandNode(Node):
         self.declare_parameter('deploy_servo_retracted_can_deg', 0.0)
         self.declare_parameter('deploy_servo_deployed_can_deg_override', False)
         self.declare_parameter('deploy_servo_deployed_can_deg', 0.0)
+        # 展開/収納の移動速度[deg/s](2026-09-12追加、モジュールdocstring参照)。
+        # 0以下で即時送信(従来動作)。
+        self.declare_parameter('deploy_servo_speed_deg_per_s', 0.0)
 
         # ---- ワークピッチ変更サーボ (SERVOn、角度[deg]) ----
         self.declare_parameter('pitch_servo_device_id', 0)
@@ -164,6 +189,8 @@ class HandNode(Node):
         self.declare_parameter('pitch_servo_hold_can_deg', 0.0)
         self.declare_parameter('pitch_servo_insert_can_deg_override', False)
         self.declare_parameter('pitch_servo_insert_can_deg', 0.0)
+        # 保持/投入の移動速度[deg/s](deploy_servo_speed_deg_per_sと同じ設計)。
+        self.declare_parameter('pitch_servo_speed_deg_per_s', 0.0)
 
         # ---- ダイヤフラムポンプ (MDn、符号=方向・絶対値=PWMデューティ。SERVO1-3=
         # local0-2なので、汎用IOノード1台分ではMD1=local3/MD2=local4になる) ----
@@ -213,6 +240,18 @@ class HandNode(Node):
             'yellow_local_index': int(self.get_parameter('led_yellow_local_index').value),
             'red_local_index': int(self.get_parameter('led_red_local_index').value),
         }
+
+        # サーボ角度ランプの状態(モジュールdocstring参照)。キーはチャンネル
+        # cfgのid()ではなくprefix文字列('deploy_servo'/'pitch_servo')。
+        #   current: 最後にCANへ送った角度[deg](float、未送信ならNone)
+        #   target : ランプ中の目標角度[deg](int、ランプ中でなければNone)
+        #   speed  : ランプ中の速度[deg/s]
+        self._ramps = {
+            'deploy_servo': {'cfg': self._deploy, 'current': None, 'target': None, 'speed': 0.0},
+            'pitch_servo': {'cfg': self._pitch, 'current': None, 'target': None, 'speed': 0.0},
+        }
+        self._ramp_timer_ = self.create_timer(SERVO_RAMP_PERIOD_SEC, self._ramp_step)
+        self._ramp_timer_.cancel()  # ランプ中のみ動かす(_start_servo_move参照)
 
         self.device_buffers_ = {}
         self.device_publishers_ = {}
@@ -284,6 +323,8 @@ class HandNode(Node):
             'hand_node started: '
             f'deploy_servo(device_id={self._deploy["device_id"]}), '
             f'pitch_servo(device_id={self._pitch["device_id"]}), '
+            f'servo_speed(deploy={self.get_parameter("deploy_servo_speed_deg_per_s").value}, '
+            f'pitch={self.get_parameter("pitch_servo_speed_deg_per_s").value} deg/s, 0=即時), '
             f'pump(device_id={self._pump["device_id"]}, '
             f'duty={self.get_parameter("pump_duty_percent").value}%), '
             f'vacuum_release(device_id={self._vacuum_release["device_id"]}), '
@@ -389,6 +430,59 @@ class HandNode(Node):
             return round(float(self.get_parameter(f'{override_prefix}_can_deg').value))
         return round(sim_deg + offset_deg)
 
+    def _servo_speed_deg_per_s(self, prefix):
+        try:
+            return float(self.get_parameter(f'{prefix}_speed_deg_per_s').value)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _start_servo_move(self, prefix, can_deg):
+        """prefix('deploy_servo'/'pitch_servo')のサーボをcan_deg[deg]へ動かす。
+        速度パラメータが正で、かつ前回の送信角度が分かっている場合はランプを
+        開始し(実際の送信は_ramp_stepのタイマで行う)、そうでなければ即時送信する
+        (モジュールdocstring参照)。戻り値は(送信できたか, 所要時間[s]の目安)。
+        device_id=0(未配線)なら_sendと同様に何もせずFalseを返す。"""
+        ramp = self._ramps[prefix]
+        speed = self._servo_speed_deg_per_s(prefix)
+        if ramp['cfg']['device_id'] == 0:
+            self._send(ramp['cfg'], can_deg)  # 警告ログのみ
+            return False, 0.0
+        if speed <= 0.0 or ramp['current'] is None:
+            # 即時送信。進行中のランプがあれば破棄する。
+            ramp['target'] = None
+            ramp['current'] = float(can_deg)
+            return self._send(ramp['cfg'], can_deg), 0.0
+        ramp['target'] = int(can_deg)
+        ramp['speed'] = speed
+        duration = abs(ramp['target'] - ramp['current']) / speed
+        if self._ramp_timer_.is_canceled():
+            self._ramp_timer_.reset()
+        return True, duration
+
+    def _ramp_step(self):
+        """SERVO_RAMP_PERIOD_SEC周期で呼ばれ、ランプ中の各サーボの送信角度を
+        speed*周期ぶんだけ目標へ近づけて送る。CANへは整数[deg]で送るため、
+        丸めた値が前回から変わったときだけ送信する(device_id=101のバッファは
+        LED点滅タイマからも10Hzで再送されるので、無駄な送信は避ける)。
+        全チャンネルが目標に到達したらタイマを止める。"""
+        any_active = False
+        for ramp in self._ramps.values():
+            if ramp['target'] is None:
+                continue
+            step = ramp['speed'] * SERVO_RAMP_PERIOD_SEC
+            prev = ramp['current']
+            delta = ramp['target'] - prev
+            if abs(delta) <= step:
+                ramp['current'] = float(ramp['target'])
+                ramp['target'] = None
+            else:
+                ramp['current'] = prev + math.copysign(step, delta)
+                any_active = True
+            if round(ramp['current']) != round(prev) or ramp['target'] is None:
+                self._send(ramp['cfg'], round(ramp['current']))
+        if not any_active:
+            self._ramp_timer_.cancel()
+
     def _deploy_offset_deg(self):
         return float(self.get_parameter('deploy_servo_offset_deg').value)
 
@@ -398,14 +492,14 @@ class HandNode(Node):
         (_set_pitchと同じ設計、2026-09-03追加。「収納・展開サーボにも同様の
         機能を」との要望に対応)。"""
         can_deg = self._resolve_can_deg(sim_deg, self._deploy_offset_deg(), override_prefix)
-        response.success = self._send(self._deploy, can_deg)
+        response.success, duration = self._start_servo_move('deploy_servo', can_deg)
         self._publish_pad_states(gathered=gathered)
         # CAN送信の成否(device_id未配線か)に関わらず論理状態は更新する
         # (_on_pump_onと同じ理由。配線前でもjoy_teleop_node側のトグル判定が正しく動く)。
         self._pads_spread = not gathered
         self._publish_pads_spread_state()
         response.message = (
-            f'吸着パッド{label}(sim={sim_deg}deg, 実機送信={can_deg}deg)' if response.success
+            f'吸着パッド{label}(sim={sim_deg}deg, 実機送信={can_deg}deg{_ramp_note(duration)})' if response.success
             else f'吸着パッド{label}(sim={sim_deg}deg、表示のみ): device_id未設定のためCAN送信できませんでした')
         return response
 
@@ -481,12 +575,12 @@ class HandNode(Node):
         イメージとリンクしていた表示が崩れる」問題があった。sim表示は常に
         オフセット・オーバーライドの影響を受けない論理角度のままにする)。"""
         can_deg = self._resolve_can_deg(sim_deg, self._pitch_offset_deg(), override_prefix)
-        response.success = self._send(self._pitch, can_deg)
+        response.success, duration = self._start_servo_move('pitch_servo', can_deg)
         self._publish_joint_state(HAND_PITCH_JOINT, sim_deg)
         self._pitch_insert = (override_prefix == 'pitch_servo_insert')
         self._publish_pitch_insert_state()
         response.message = (
-            f'ピッチ: {label}(sim={sim_deg}deg, 実機送信={can_deg}deg)' if response.success
+            f'ピッチ: {label}(sim={sim_deg}deg, 実機送信={can_deg}deg{_ramp_note(duration)})' if response.success
             else f'ピッチ: {label}(sim={sim_deg}deg、表示のみ): device_id未設定です')
         return response
 
