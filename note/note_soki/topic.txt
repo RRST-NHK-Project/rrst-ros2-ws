@@ -50,15 +50,16 @@ soki関連トピック一覧(soki_sim + joy連携。全てsensor_msgs/JointState
 /serial_rx_[device_id]_unwrapped (std_msgs/Int32MultiArray, 24スロット)
   pub: ros2can (ラップアラウンド解決済みの生の絶対値、/zero_channelには依存しない)
   sub: real_joint_bridge_node, homing_node
-  real_joint_bridge_nodeはdevice_id=11(MODE_CUBEMARS、root_theta/tip_thetaの
-  M{n} position)とdevice_id=21(MODE_ROBOMAS、motor1/motor2のM{n} angle。
-  2026-08-31方針転換でCAN_HOST外付けENC1/ENC2から変更)の2本を購読する。
-  homing_nodeはさらにdevice_id=101(CAN_HOST、SW1/SW2=z/r原点センサ)も購読する
-  (motor1/motor2の位置はhoming_nodeもdevice_id=21のM{n} angleを使う。ENC1/ENC2は
-  不使用)。減速比・プーリ半径・差動ミキシングを適用して/mixed_joint_statesへ
-  変換するのはreal_joint_bridge_node(root_theta/tip_thetaはyaml保存の
-  offsetパラメータ、z/rはhoming_node実行時にSetParametersで書き込む
-  offsetパラメータで真の原点に補正)。詳細は
+  real_joint_bridge_nodeはdevice_id=11(MODE_CUBEMARS、root_thetaのM{n} position)
+  とdevice_id=21(MODE_ROBOMAS、motor1/motor2のM{n} angleに加え、2026-09-08方針
+  変更でtip_theta(M3)のM{n} angleも。2026-08-31方針転換でCAN_HOST外付けENC1/ENC2
+  から変更)の2本を購読する。homing_nodeはさらにdevice_id=101(CAN_HOST、
+  SW1/SW2=z/r原点センサ)も購読する(motor1/motor2の位置はhoming_nodeもdevice_id=21
+  のM{n} angleを使う。ENC1/ENC2は不使用)。減速比・プーリ半径・差動ミキシングを
+  適用して/mixed_joint_statesへ変換するのはreal_joint_bridge_node(root_thetaは
+  CubeMars本体のSet Origin機構、tip_thetaは電源投入前の手動ゼロ合わせ+
+  tip_theta_offset_rad(yaml保存、微調整用)、z/rはhoming_node実行時に
+  SetParametersで書き込むoffsetパラメータで真の原点に補正)。詳細は
   note/hardware_mapping.txt、note/can_mapping.txt参照。
 
 ■ 実機出力(homing_node → ros2can、2026-08-27新規)
@@ -69,9 +70,10 @@ soki関連トピック一覧(soki_sim + joy連携。全てsensor_msgs/JointState
   z軸/r軸の原点センサ検出まで低速駆動するための速度指令。通常運転時は
   trajectory_follower_nodeの/serial_tx_[cubemars_device_id]とは別device。
 
-/start_homing, /stop_homing (std_srvs/Trigger, サービス)
+/start_homing_z, /start_homing_r, /stop_homing (std_srvs/Trigger, サービス)
   提供: homing_node
-  ホーミング開始/中断(安全のため自動起動はせず、明示的にサービス呼び出しが必要)。
+  z軸/r軸ホーミング開始(2026-09-05より軸ごとに別サービス、独立に実行可能)・
+  中断(安全のため自動起動はせず、明示的にサービス呼び出しが必要)。
 
 /{real_joint_bridge_node,homing_node}/set_parameters, get_parameters
   (rcl_interfaces、サービス)

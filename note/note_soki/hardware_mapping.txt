@@ -1,0 +1,910 @@
+#soki 実機ハードウェア 減速比・伝達機構メモ (2026-08-27作成)
+関節角度の実機/sim校正(note/claude_task.txt参照)のための基礎データ。
+
+## root_theta_joint (旋回)
+CubeMars AK40-10 (Servo/MITモードで直接駆動、アクチュエータ内蔵クローズドループ)
++ 外部減速ギア追加あり。減速比 = 112/24 (= 14/3 ≒ 4.666667)
+  root_theta_joint角度 = AK40-10側のエンコーダ角度 / (112/24)
+  (AK40-10自体の内蔵ギア比は別途アクチュエータ仕様通り。ここでの112/24は
+   さらに外側に付いている減速ギアの比。2026-08-27、13と5/7(96/7)から変更)
+
+tip_theta_jointは root_theta_joint とは別方式: タイミングベルト+プーリで
+モーター側20T・手先側28T(減速比 = 28/20 = 1.4 = 7/5)。
+  tip_theta_joint角度 = アクチュエータ側エンコーダ角度 / 1.4 ( = * 5/7 )
+
+**方針変更(2026-09-08、ユーザー報告)**: root_theta側のAK40-10が電源逆接続で
+焼損した。無事だったtip_theta側のAK40-10をroot_thetaへ転用し(CubeMars駆動・
+Set Origin方式は変わらず)、tip_theta側には新規にRoboMas M2006+C610(z/rと
+同一device_id=21のバスに3台目、M3=motor index 2)を導入した。tip_thetaは
+z/rのような差動ミックスではなく単独直接駆動(joint_deg = actuator_deg /
+tip_theta_reduction、reduction値=1.4は変更無し)。原点センサが無いため、
+電源投入前に機構原点(0deg)へ手で合わせておく前提とし、M2006内蔵ロータ
+エンコーダの起動時リセット値(=0)をそのまま原点として使う(ホーミング処理は
+無し。real_joint_bridge.yaml/real_joint_bridge_node.py/trajectory_follower_node.py
+のtip_theta_offset_radは微調整用にのみ残す)。詳細はcommand_gui_node.py側の
+「原点センサ・ホーミング配線設定」注記、および下記「ros2can CAN_ID・スロット
+割当」「root_theta/tip_thetaの原点初期化」の各節も参照。
+
+## z_joint / r_joint (motor1/motor2差動、M2006+C610)
+**方針変更(2026-08-31、ユーザー判断)**: 位置の真値はC610/M2006内蔵ロータ
+エンコーダのCAN帰還(ROBOMASのM{n} angle)を使う。以前は外付けAMTエンコーダ
+(ENC1/ENC2、CAN_HOST配下ノードのローカルチャンネル)を真値としていたが、
+ロボマス内蔵エンコーダに統一したため不使用になった(ENC1/ENC2自体の配線情報は
+note/can_mapping.txt「外付けAMTエンコーダ」に不使用の注記付きで残してある)。
+これにより「MIT位置フィードバックは内蔵エンコーダ、較正の真値は外付けENC」という
+2系統だった構成が、内蔵エンコーダ1本に統一された。
+ロボマス(M2006)モーター軸 → プーリ(ピッチ円直径22.92mm、確認済み) →
+タイミングベルトで機構に接続。
+  pulley_radius = 22.92 / 2 = 11.46mm (ピッチ円直径なのでこれを直径として半分にする)
+  motor1_joint/motor2_joint(線形変位、m) = motor_angle[rad] * pulley_radius[m]
+    motor_angle[rad] = M{n} angle帰還(0.1deg/LSB、cubemarsの帰還と同じ
+    スケール。robomas.cpp参照) をradへ変換したもの
+この線形変位に対して、既存の差動ミキシング(soki_sim/scripts/motor_mixer_node.py)が
+そのまま適用される:
+  z = k*(m1+m2), r = k*(m1-m2), k = 0.5
+上下限の原点センサは合成後のz/r軸それぞれに付いている(motor1/motor2の
+個別軸ではない、確認済み)。相対エンコーダのため毎起動ホーミング必須
+(詳細はnote/claude_task.txt「実機とsimの関節角度校正」参照)。
+実装: soki_sim/scripts/real_joint_bridge_node.py、homing_node.py両方とも
+robomas_device_id(21)のserial_rx_*_unwrappedを購読してM{n} angleを読む方式に
+書き換え済み(2026-08-31)。CAN_HOST(device_id=101)はz/r原点センサ
+(SW1/SW2のリミットスイッチ)の読み取りにのみ、引き続きhoming_nodeが使う。
+
+## ros2can CAN_ID・スロット割当 (note/can_mapping.txt記入済み、2026-08-27。
+## デバイスIDは実機再確認により修正済み。2026-09-08方針変更でtip_thetaは
+## CubeMars(M2)からROBOMAS(M3)へ移動、下表反映済み)
+MODE_CUBEMARSデバイス (device_id=11):
+  M1 → 未使用(焼損・撤去)
+  M2 (CAN_ID=102) → root_theta_joint (絶対値エンコーダ、M{n} position帰還を使用。
+                     旧tip_theta側のAK40-10を転用。R-LinkのCAN IDは据え置き
+                     (102=M2のまま、101への設定変更はしていない)なので、
+                     cubemars_root_theta_index/root_theta_motor_indexも
+                     1(M2)に変更済み)
+  M3/M4 → 未使用
+MODE_ROBOMASデバイス (device_id=21):
+  M1 (CAN_ID=0x201) → motor1_joint (速度指令・位置の真値(M{n} angle帰還)の両方に使用)
+  M2 (CAN_ID=0x202) → motor2_joint (同上)
+  M3 (CAN_ID=0x203) → tip_theta_joint (2026-09-08新規。z/rと違いミックス無しの
+                       単独直接駆動、M{n} angle帰還を位置の真値として使用)
+  M4 → 未使用
+CAN_HOSTデバイス (device_id=101、xiao_esp32_s3_smd_serial_bridge):
+  z/r原点センサ(SW1/SW2)のみ使用。ENC1/ENC2は不使用(上記方針変更参照)。
+  グローバルスロット = node_index*5 + local_index
+
+## root_theta/tip_thetaの原点初期化(θの「毎起動ホーミング」は不要な設計)
+z/rと違い、CubeMars AK40-10は絶対値エンコーダなので機構の原点自体は
+電源off/onを跨いで保持される。ただしros2canの/zero_channelはオフセットが
+GUIプロセスのメモリ上限りで永続化されない(ros2canプロセスの再起動だけで
+消える)ため、これに頼ると絶対値エンコーダの利点が活きない。
+
+**方針変更(2026-08-27、ユーザー判断)**: root_thetaはソフトウェアオフセット
+(root_theta_offset_rad)方式を廃止し、CubeMars AK40-10本体へ「Set Origin」CAN
+コマンド(Servo(CAN)モードcontrol_mode_id=5、永久原点=フラッシュ保存)を直接
+送信することで、実機エンコーダ自体の原点を較正する方式に変更した。
+  実装:
+  - ros2can/firmware/xiao-esp32-s3_can2io/src/cubemars.cpp:
+    control_mode=3(CUBEMARS_MODE_SET_ORIGIN)を新設。target[m]スロットを
+    origin_mode(0=一時原点/1=永久原点/2=デフォルト復元)として流用し、
+    CUBEMARS_CMD_SET_ORIGIN(=5)でCANへ送信する。フラッシュ書き込みを伴う
+    ため、mode=3が複数周期継続してもエッジ検出で1回だけ送信する。
+    ※ control_mode_id=5がAK Series Module Product Manual V3.2.0 4.1節の
+    実際の記載と一致するかは2026-08-27時点で未検証(RPM=3/POS=4の続き番号
+    として採用)。実機投入前にR-Link/マニュアルで要確認。
+  - soki_sim/scripts/trajectory_follower_node.py: /set_root_theta_origin
+    (std_srvs/Trigger)サービスを新設。呼び出すとroot_theta_jointについて
+    数周期だけ通常のMIT指令を止め、CUBEMARS_MODE_SET_ORIGIN+永久原点を送信する。
+  - soki_sim/scripts/real_joint_bridge_node.py: root_theta_offset_rad
+    (ソフトウェアオフセット補正)を削除。root_theta = raw_angle / reduction
+    のみとなった(motor側の原点が真の機械原点と一致している前提)。
+  較正手順(実機組み立て後に1回だけ): 関節を原点センサの位置(真の機械原点)へ
+  物理的に合わせ、/set_root_theta_originを呼び出す。以後はros2can・
+  real_joint_bridge_nodeの再起動、電源off/onを跨いでも再較正不要
+  (エンコーダ自体がズレない限り。フラッシュ保存のためros2can側の
+  プロセス再起動にも依存しない)。
+
+tip_thetaは2026-09-08方針変更でCubeMars(絶対値エンコーダ)からROBOMAS M2006
+(相対エンコーダ)へ移行したため、root_thetaのSet Origin方式・旧来のyaml
+オフセット較正方式のどちらとも異なる第三の方式になった: 原点センサが無いため、
+電源投入前に機構原点(0deg)へ手で合わせておき、M2006内蔵ロータエンコーダの
+起動時リセット値(=0)をそのまま原点として扱う(ホーミング処理は無し)。
+real_joint_bridge.yaml/real_joint_bridge_node.py/trajectory_follower_node.pyの
+tip_theta_offset_radパラメータは残しているが、通常は0のままでよく、実機の
+微小な取付誤差を補正したい場合にのみ使う(root_thetaのSet Originのような
+「一度較正すれば恒久的に有効」という永続化ではない点に注意。電源off/onの
+たびに手動ゼロ合わせをやり直す運用が前提)。
+z_joint/r_jointは元々毎起動homing_nodeが/zero_channelを呼ぶ設計なので、
+こちらはros2can側オフセットが非永続でも問題ない(むしろ意図通り)。
+
+## tip_theta_jointの可動域を±135deg(合計270deg)に制限 (2026-09-10、ユーザー指定:
+## 「270度以上回らないようにしたい。つまり電源投入時の位置から左右に135度」)
+tip_thetaは2026-09-08にCubeMars AK40-10からRoboMas M2006(M3)へ移行した際、
+CubeMars時代のMITプロトコル制約(±511.6°相当、下記「MITモードの都合上そもそも
+continuousではない」節参照)が無くなり一旦「無制限」になっていた。実機側の配線・
+エア配管の巻き込み防止のため、機構制約として改めて±135deg(合計270deg)へ制限する。
+
+基準は「電源投入時の位置」。tip_thetaは原点センサを持たず、電源投入前に機構原点へ
+手で合わせておき、M2006内蔵ロータエンコーダの起動時リセット値(=0)をそのまま原点
+として使う設計(上記「root_theta/tip_thetaの原点初期化」節参照)なので、
+「アクチュエータ角0 = 電源投入時の位置」であり、アクチュエータ角を
+±135deg×減速比1.4 = ±189deg で切ることが、そのまま指定どおりの制限になる。
+
+実装(4箇所。値を変える場合は全て揃えること):
+  soki_sim/scripts/trajectory_follower_node.py TIP_THETA_LIMIT_RAD
+    - target_callback(_clamp_joint_target): joint空間で目標をクランプ。
+      台形プロファイル自体が範囲外を狙わないようにするため
+    - _publish_robomas_commands: アクチュエータ空間(±189deg)でクランプ。
+      実機へ出る最後の砦で、帰還同期によるpos_上書き・外部ノードからの
+      直接publish等、target_callbackを通らない経路も必ずここで止まる。
+      クランプ中は速度FF(mit_velocity_ff)も0にしてkd項が境界の外へ
+      押し続けないようにしている。到達/復帰時にエッジでログを出す
+  soki_sim/scripts/joy_teleop_node.py TIP_THETA_LOWER/UPPER
+    - 手先θ追従ON時(-root_theta)と、L1/R1手動ジョグの積算値の両方をクランプ
+  soki_sim/scripts/command_gui_node.py TIP_THETA_LOWER/UPPER
+    - send_target()のtip_theta(回収シーケンスの追従値・投入シーケンスの
+      shoot_tip_theta_rad(2026-09-12に廃止、下記「投入シーケンスの手先θは
+      追従値∓90deg」節参照))をクランプ
+  soki_sim/urdf/soki_sim.urdf.xacro tip_theta_limit
+    - tip_theta_jointをcontinuous -> revolute(±135deg)へ変更。simと実機で
+      到達可能範囲を揃えるため
+
+既知の副作用: root_thetaの可動域(±153.4deg)の方が広いため、手先θ追従ONで
+root_thetaを端まで回すと追従先(-root_theta)が±135degで頭打ちになり、
+ハンドのワーク行との平行が保てなくなる(機構制約上避けられない)。
+
+## root_theta/tip_thetaはMITモードの都合上そもそも「continuous」ではない
+## (2026-08-27、AK Seriesマニュアル確認により判明。対応方針決定済み)
+claude.txt/soki_sim.urdf.xacroではroot_theta_joint(旋回)/tip_theta_joint
+(手先回転)を無制限回転可能なcontinuous関節として扱っているが、実際には
+MITモードのプロトコル仕様そのものにより可動域が制限される。
+
+CubeMars AK SeriesのMITモード位置指令(pos_des)は、ros2can側の実装
+(firmware/xiao-esp32-s3_can2io/src/config.hpp、CUBEMARS_MIT_P_MIN_RAD/
+MAX_RAD = ±12.5f)、およびマニュアル記載のParameter range表(AK40-10含む
+全モデル共通)の両方で ±12.5rad(=±716.2°)固定と確認済み。これはMIT
+Cheetah系アクチュエータ共通のプロトコル制約(16bit固定小数点で8byteに
+position/velocity/Kp/Kd/torqueを詰め込む都合)で、ros2can側の設定ミスでは
+ない。範囲外を指令してもcubemars.cppのfloatToUint()内でクランプされる
+(x = std::min(std::max(x, x_min), x_max))。
+外部減速比を通すと指令できる範囲は
+  root_theta_joint: ±716.2°/4.6667(=112/24) ≒ ±153.5°
+  tip_theta_joint : ±716.2°/1.4    ≒ ±511.6°(約1.4回転)
+と、いずれも1回転に満たない(root_theta)か1回転強(tip_theta)程度しかない。
+
+CubeMarsのServo(CAN)帰還フレームのposition値(int16・0.1deg/LSB)も
+AK Series Module Driver Manual V1.0.18 5.2.1節により有効範囲が
+-32000~32000(=±3200°、AK40-10出力軸換算で±8.89回転)止まりと判明して
+いたが、上記の指令側の制約(±52.2°/±511.6°)のほうがずっと狭いため、
+実際の可動域では帰還側の境界には到達しない(指令できる範囲の方が先に
+尽きるため)。よってposition帰還のクランプ/ラップ挙動そのものは実運用上
+問題にならない。
+
+**方針決定(2026-08-27、ユーザー判断)**: 上記の通りMITモードのままでは
+真の意味でのcontinuous回転は不可能。デッドレコニング(速度積算による
+連続絶対位置推定)やServo(CAN)モードへの制御方式変更は行わず、
+「一旦制限つきでよい、MITモードの可動域(root_theta:±153.5°、
+tip_theta:±511.6°)の中だけで動作すればよい」という前提で運用する。
+ros2can/real_joint_bridge_node.py側のコード変更は不要(既存のposition
+帰還ベースの実装のまま)。
+  将来もし真のcontinuous回転が必要になった場合の選択肢(未着手):
+  (a) Servo(CAN) Velocity Loop Mode(mode 3、指令範囲の制約なし)+
+      ホスト側(real_joint_bridge_node.py等)での位置制御ループを新規実装
+  (b) Servo(CAN) Position-Velocity Loop Mode(mode 6、指令範囲±36000°=
+      ±100回転)へ切替。MIT特有のKp/Kdによる柔らかい制御は失う。
+  いずれもMITモードからServo(CAN)モードへの制御方式変更が必要で、
+  現状は選択していない。
+
+**2026-09-08追記**: 上記のtip_theta可動域(±511.6°)はCubeMars駆動時代の
+制約(CUBEMARS_MIT_P_MIN/MAX_RAD=±12.5rad)に基づくもの。tip_thetaが
+ROBOMAS(M2006、M3)へ移行した後は、robomas.cpp側のMIT位置指令に
+CubeMarsのような明示的なmin/maxクランプが無く、int16(1deg/LSB、
+ROBOMAS_MIT_POSITION_LSB_DEG)の範囲=アクチュエータ軸±32767°(±91回転、
+tip_theta_reduction=1.4を通すと関節側±23383°=約65回転相当)まで指令できる
+ため、実質的にCubeMars時代より大幅に広い(このAK Series特有のMIT範囲制約
+自体がtip_thetaには適用されなくなった)。ただし依然としてcontinuous関節
+ではなく有限範囲である点は変わらないため、上記(a)(b)のようなServo(CAN)
+モードへの変更を行わない限り、ソフトウェア側(trajectory_follower_node.py
+のtarget_callback等)で想定外の大回転指令が来ないよう運用上の注意は必要。
+
+## z_joint/r_jointのホーミング (homing_node、2026-08-27実装)
+z=k(m1+m2)/r=k(m1-m2)という合成後の量は、ros2canの/zero_channel(ENC単体を
+ゼロ化するだけ)では正しく較正できないため、root_theta/tip_thetaと同様に
+real_joint_bridge_node側のランタイムパラメータ(z_offset_m/r_offset_m、
+ただしこちらはyaml初期値ではなく毎起動homing_nodeが計算してSetParameters
+で書き込む値)で補正する方式にした。
+  手順(2026-09-05よりz軸/r軸は別サービスに分離、任意の順序・タイミングで
+  独立に実行できる。ただし差動機構のためどちらの軸でもmotor1/motor2両方が
+  回転する):
+    start_homing_z: motor1/motor2を同方向に駆動しz軸原点センサ検出→z_offset_m算出
+    start_homing_r: motor1/motor2を差動方向に駆動しr軸原点センサ検出→r_offset_m算出
+    (いずれも検出したoffsetをreal_joint_bridge_nodeへSetParametersで反映)
+  実装: soki_sim/scripts/homing_node.py。安全のため自動起動はせず、
+  start_homing_z/start_homing_r/stop_homing(std_srvs/Trigger)サービスで
+  明示的に起動・中断する。パラメータはreal_joint_bridge.yamlのhoming_node以下。
+
+  skip_homing(std_srvs/Trigger、2026-08-29追加): 原点センサ配線・検出値が
+  未検証(下記「未確認事項」参照)なうちの代替手段。motor1/motor2を一切駆動せず、
+  呼び出し時点のエンコーダ値をそのままz_ref_value_m/r_ref_value_mの位置と
+  みなしてoffsetを即座に反映する(z/r両方まとめて、軸ごとの分離はない)。
+  呼び出し前に機体を(joy等で手動操作して)原点センサ位置相当へ物理的に
+  合わせておく必要がある点はstart_homing_z/start_homing_rの実際の較正結果と
+  変わらない(センサでの自動検出をスキップするだけ)。
+
+## z_joint/r_jointの実機出力(RoboMas MITモード) (2026-08-29追加)
+ros2canのMODE_ROBOMASにMITモード(位置PD制御、firmware/xiao-esp32-s3_can2io/src/
+robomas.cpp)が実装されたことを受け、root_theta/tip_theta(CubeMars MIT)と対称的に
+z_joint/r_jointもtrajectory_follower_nodeからMIT指令を送れるようにした
+(robomas_device_id等のパラメータで有効化。未設定時は従来通り実機出力無効)。
+
+  実装: soki_sim/scripts/trajectory_follower_node.py
+  - z/rは引き続きjoint単位で台形プロファイルし、送信直前にmotor_mixer_node.pyと
+    同じ式(m1=(z+r)/(2*mix_k), m2=(z-r)/(2*mix_k))でmotor1/motor2側
+    (アクチュエータ軸、プーリ半径換算)へ変換してから送信する。
+  - スケールはcubemarsと異なるので注意: 指令(target)は1deg/LSB(cubemarsの
+    0.1deg/LSBより粗い。範囲確保のため、robomas.cppのコメント参照)、帰還(angle)は
+    0.1deg/LSB(cubemarsと同じ)。mit_kp=0.001(A/deg)/LSB、mit_kd=0.0001(A/rpm)/LSB、
+    mit_current_ff=0.001A/LSB(config.hppのROBOMAS_MIT_*と一致させること)。
+  - 位置フィードバック基準はロボマス内蔵ロータエンコーダ(root_theta/tip_thetaと
+    同じ設計判断)。2026-08-31の方針変更でreal_joint_bridge_node/homing_node側の
+    z/r真値も同じロボマス内蔵エンコーダに統一されたため、以前あった「MIT側は
+    内蔵エンコーダ、較正側は外付けENC1/ENC2」という基準のズレ(バックラッシュ差分)
+    は解消された。
+
+**2026-09-08追記**: 同じdevice_id=21のM3(motor index=2)にtip_theta_jointも
+同居させた(root_theta側AK40-10焼損に伴う駆動系変更、上記「root_theta_joint
+(旋回)」節の方針変更参照)。z/rのようなmotor1/motor2の差動ミックスではなく、
+tip_theta_joint単独の直接駆動(joint_deg = actuator_deg / tip_theta_reduction)。
+ゲインはz/rの共有スカラー(robomas_kp/kd/current_ff)とは別に
+robomas_tip_theta_kp/kd/current_ffを持つ(動特性が異なるため)。
+
+**homing_nodeとの排他制御**: homing_nodeは起動時ホーミング中、同じ
+robomas_device_idへ独立に速度指令をpublishするため、trajectory_follower_nodeの
+MIT指令と衝突する。これを避けるため、trajectory_follower_nodeに
+pause_robomas_output/resume_robomas_output(std_srvs/Trigger)を新設し、
+homing_nodeがstart_homing_z/start_homing_r時にpause、stop_homing・各軸の
+完了・タイムアウト失敗時にresumeを呼ぶ「一時停止パターン」(root_theta
+origin設定の_origin_pending_と同種)で解決した。
+
+**offsetの二重管理**: z_offset_m/r_offset_m(homing_nodeが算出する原点補正値)は
+これまでreal_joint_bridge_node(sim表示用)のみに反映していたが、
+trajectory_follower_node(実機MIT指令用)も独自にz/rの内部状態を持つため、
+robomas_z_offset_m/robomas_r_offset_mという別パラメータ名でこちらにも
+SetParametersするようhoming_node._apply_offsets()を拡張した。値・符号規約
+(z = mix_k*(m1+m2) + offset)はreal_joint_bridge_nodeと揃えてある。
+
+## mixed_joint_statesの真値ソース(2026-09-07方針変更)
+実機テスト用launch(real_root_theta_test/real_axes_test/real_z_r_test/
+real_all_axes_test.launch.py)では、trajectory_follower_nodeの内部軌道(pos_、
+MIT指令生成用の理想値、実機の追従が遅れても即座には反映されない)と
+real_joint_bridge_nodeの実測値(CAN帰還ベース)が、どちらも同じ
+mixed_joint_statesトピックへ別々にpublishしており、joint_state_publisher/GUI/
+RVizの表示がどちらが後に届いたか次第でブレる(simが実機より先行して見える)
+問題があった。
+
+**方針(ユーザー判断)**: simは実機が無い時のデバッグ用途であり、実機接続時は
+simが実機の実測値に追従して表示すべき(逆に実機がsimの理想軌道に追従させられる
+ように見えるのはおかしい)。そのため:
+  - 上記4つのlaunchでtrajectory_follower_nodeのoutput_topicを
+    'trajectory_target_joint_states'に分離し、mixed_joint_states(joint_state_
+    publisherのsource、command_gui_node/joy_teleop_nodeが現在値として購読する
+    トピック)にはpublishしないようにした。MIT指令自体はこれまで通りpos_を
+    元に生成する(この変更の影響を受けない)。
+  - real_joint_bridge_node.pyは、以前はCubeMars/ROBOMAS両方の帰還が揃うまで
+    mixed_joint_statesへのpublishを待っていたが、これだと部分実機構成
+    (例: real_root_theta_test.launch.pyでROBOMAS未接続)ではmixed_joint_states
+    自体が永久に出ずsim表示が固まる問題があった。CubeMars側/ROBOMAS側それぞれの
+    帰還が届いた時点で、その軸群だけを含むJointStateを独立にpublishするよう
+    変更した(joint_state_publisherは受信メッセージに含まれる関節名だけを更新し
+    他は保持するため、部分的なpublishでも問題ない)。
+
+**フォールバック(2026-09-07、同日追記)**: 上記だけだと実機を繋がない/一部軸
+しか実機接続していない構成でsim表示自体が固まってしまう(ユーザー指摘)。
+そのためreal_joint_bridge_nodeにfallback_topicパラメータを追加し、実機テスト用
+launch4本では'trajectory_target_joint_states'(trajectory_follower_nodeの
+理想軌道)を指定した。real_joint_bridge_nodeはこれを購読し、まだ実機帰還を
+一度も受信していない関節群(root_theta、tip_theta/z/rの2グループ単位。
+2026-09-08方針変更でtip_thetaはCubeMars側からROBOMAS側グループへ移動)に
+ついてのみ、理想軌道の値をそのままmixed_joint_statesへ転送する
+(_on_fallback参照)。一度でも実機帰還を受信したグループは以後この転送を
+無視し実測値のみを使う(実測 -> 理想軌道への逆行はしない)。
+これにより、実機が繋がっていない/繋がっていない間は従来通りsimの理想軌道で
+動き、実機が繋がった軸から順に実測値表示へ切り替わる。display.launch.py
+(sim単体、real_joint_bridge_node未起動)は影響を受けず、trajectory_follower_
+nodeが従来通りmixed_joint_statesへ直接publishする。
+
+## 未確認事項 (2026-08-27時点)
+- root_theta/tip_thetaの原点センサの物理位置(真の機械原点との対応)
+  → 上記較正手順を実施する際に確定させる
+- homing_nodeが仮定しているz/r原点センサのSWチャンネル配線、センサ検出時の
+  真のz/r値、モータ回転符号とz/r移動方向の対応(note/can_mapping.txt
+  「z/r原点センサ(ホーミング用)」に記入欄あり、実機で要検証)
+- (2026-08-31追加) motor1_sign/motor2_sign(real_joint_bridge_node/homing_node
+  共通)は、以前は外付けENC1/ENC2カウント値の符号として較正されていた前提の値
+  (real_joint_bridge.yaml)をそのままロボマス内蔵エンコーダ帰還向けに転用している。
+  2つのエンコーダで回転方向の符号が同じとは限らないため、実機でmotor1/motor2を
+  それぞれ単体で少し回して符号が合っているか要再確認。
+
+## ロボマスCAN帰還の途絶検出 (2026-09-08、ユーザー報告の不具合対応)
+**症状**: マイコン(ros2can xiao-esp32-s3_can2io、MODE_ROBOMAS)の電源は入れた
+まま、C610/M2006側(モータ駆動)の電源だけを落として入れ直すと、電源投入の
+瞬間にロボマスが勝手に動き出す。
+
+**原因**: robomas.cppのreceiveFeedback()は、C610からのCAN帰還フレームが実際に
+届いたときだけangle[]/vel[]/current_a[]を更新する作りだった。C610側の電源を
+落とすと帰還フレーム自体が来なくなるが、マイコン自身は動き続けるため、
+angle[]等は電源断直前の値で凍結されたまま、robomasTask()は毎周期(200Hz)
+その凍結値を「現在値」としてMIT位置PD制御の誤差計算(pos_error = target -
+angle[i])に使い続け、かつTx_16Data経由でホストへも凍結値をそのまま送信し
+続けていた(ホスト側はメッセージ自体は正常な頻度で届くため途絶に気付けない)。
+C610の電源が復帰すると、その瞬間の実際のロータ角度(1回転内のraw値)と、
+凍結されたままのangle[]・ホストが送り続けている現在の目標値との間に大きな
+差分が生じ、MIT PD制御がその差分を電流指令に変換してモータが唐突に動き出す。
+さらに、周回検出(rotation_count、diffベース)が電源断中の物理的なズレを
+「1周した」と誤検出し、angle[]をさらに狂わせる場合もある。
+
+**対策(実装済み、robomas.cpp/config.hpp)**: モータごとにCAN帰還の最終受信
+時刻を記録し、ROBOMAS_FEEDBACK_STALE_MS(既定100ms)以上帰還が無ければ
+「途絶」とみなして電流指令を0に固定する(MIT/速度どちらのモードでも計算自体を
+スキップ)。途絶から復帰した最初のフレームでは周回カウントをその場でリセット
+(diffによる周回誤検出を防ぐ)し、復帰後ROBOMAS_RESYNC_HOLD_MS(既定200ms)は
+引き続き電流指令を0に固定してangle[]の飛びがそのままモータへ出力されるのを
+防ぐ。z/r側は元々毎起動homing_nodeでの再ホーミングが前提の設計なので、この
+対策を入れても「電源復帰後は再ホーミングが必要」という運用自体は変わらない
+(このケースはあくまで復帰の瞬間の唐突な動き出しを防ぐための安全対策)。
+**要実機確認**: ROBOMAS_FEEDBACK_STALE_MS/ROBOMAS_RESYNC_HOLD_MSの値は暫定
+(通常のCAN帰還間隔・電源off/onの時間スケールから逆算した値で、実機での
+挙動未検証)。ファームウェアの再ビルド・書き込みが必要。
+
+## homing_nodeのpause_robomas_output競合 (2026-09-08、ユーザー報告の不具合対応)
+**症状**: z軸ホーミングでリミットスイッチに当たった瞬間に暴走する。ただし
+毎回ではなく、時々しか起きない。
+
+**原因**: homing_node._start_homing_axis()が、trajectory_follower_nodeの
+pause_robomas_output(std_srvs/Trigger)を呼ぶのと同時に(応答を待たずに)
+state_をHOMING_Z/HOMING_Rへ変えていた。次のcontrol_period_sec(既定50ms)後の
+_on_tickはstate_だけを見てmotor1/motor2への速度指令送信を始めるため、
+pause_robomas_outputの応答(trajectory_follower_node側でrobomas_paused_=True
+になるタイミング)がそれより遅れて届くと、trajectory_follower_nodeがホーミング
+開始前の位置を保持しようとするMIT位置指令と、homing_nodeの速度指令が同じ
+serial_tx_{robomas_device_id}へ競合して送られる期間ができる。この間実機は
+「元の位置を維持しようとするMIT指令」と「原点センサへ向かう速度指令」の
+綱引き状態になり、原点センサ到達までに蓄積したMIT側の位置誤差が、どちらの
+指令がESP32側の周期(200Hz)により遅く届くかという非決定的なタイミングに
+応じて電流指令に反映される。pauseが実際に効くタイミング(ROS2のサービス
+呼び出し・実行順序)に依存するレースコンディションのため、再現したりしな
+かったりする。
+
+**対策(実装済み、homing_node.py)**: pause_robomas_outputの応答が届く(または
+サービス未提供と判明する)まではSTATE_PAUSING_Z/STATE_PAUSING_R状態に留まり、
+_on_tickはこの間モータに一切指令を送らない。応答確認後に初めてSTATE_HOMING_Z/
+STATE_HOMING_Rへ遷移してモータを動かし始める(ホーミング完了時にoffset適用を
+待ってからresume_robomas_outputを呼ぶ、という以前の修正と対称の構造。z_offset_m
+反映後のジャンプ対策と合わせて、「pause確認 → ホーミング駆動 → offset確認 →
+resume」の順序をコード上で保証するようにした)。
+
+**追加報告(2026-09-08、同日)**: 上記の順序保証だけでは直らず、依然として
+ホーミング終了直後に目標値へ向かって動く(暴走のように見える)症状が残って
+いた。ユーザー要望: 「ホーミング終了後に目標値に向かっているならやめて
+ほしい。その位置で停止してもらって構わない」。
+
+**根本原因**: trajectory_follower_node._on_robomas_feedback()は、
+robomas_paused_中(=ホーミング中)は帰還のたびにpos_/target_をその場の実位置へ
+追従させ続けるが、robomas_paused_がFalseに戻った(resume_robomas_output後)
+瞬間からこの追従を止める(has_target_かつnot paused、で即return)。一方
+homing_nodeがhoming完了時に送るrobomas_z_offset_m/r_offset_mのSetParameters
+は、_apply_offsetの完了を待ってからresume_robomas_outputを呼ぶよう順序は
+保証していても、「trajectory_follower_node側でoffsetパラメータの値が実際に
+更新されてから、_on_robomas_feedbackが少なくとも1回はその新しいoffsetで
+pos_/target_を再計算する」ことまでは保証していなかった。offset更新とresume
+の2つのサービス要求はtrajectory_follower_node自身のexecutor上で処理される
+ため、その間に_on_robomas_feedbackの呼び出しが挟まるかどうかはトピック到着と
+executorのスケジューリング順序次第の非決定的な事象で、挟まらなかった場合は
+pos_/target_が古いoffset基準のまま凍結され、resume後のMIT指令がその古い値
+(=現在位置から見て新旧offsetの差分だけ離れた「目標」)へ向けて動いてしまう。
+
+**対策(実装済み、trajectory_follower_node.py)**: _on_robomas_feedback()で
+毎回(has_target_/robomas_paused_の状態に関わらず)最新のm1/m2を
+self._last_robomas_m1_m2_へキャッシュしておき、_on_set_parameters()の
+robomas_z_offset_m/robomas_r_offset_m変更ハンドラの中で、そのキャッシュ済み
+m1/m2と新しいoffset値を使って同期的にpos_/target_/vel_を再計算・確定する
+(z/rは差動ミックスなので、片方のoffsetだけが変わってももう片方も一緒に
+再計算する)。これによりoffsetパラメータが変わった、まさにそのコールバックの
+中でpos_==target_(その場で静止)が確定するため、_on_robomas_feedbackの次回
+呼び出しタイミングやexecutorのスケジューリング順序に一切依存しなくなった。
+
+## homing_nodeの原点センサ検出遅延 (2026-09-08、ユーザー報告の不具合対応)
+**症状**: R軸の原点取りで、原点センサが反応していないような挙動(そのまま
+突っ込む)をする。ただし毎回ではなく、しっかり止まることもある。
+
+**原因**: 原点センサの検出は従来homing_node._on_tick()(control_period_sec
+既定50msのタイマー)でのみポーリングしていた。IO_SW_Input()(ros2can
+firmware pin_ctrl_task.cpp)はSWの生値をデバウンス無しでそのまま送っており、
+homing_node._switch_triggered()もその時点の値をそのまま見るだけの単純な
+レベル判定(エッジ検出・ラッチ無し)だった。センサが実際に検出されてから
+_on_tickが停止指令を送るまでには、CAN/シリアル中継の遅延に加え最大
+control_period_secぶんのポーリング遅延が上乗せされる。原点センサの検出範囲
+(停止指令が効くまでに機構が進める余裕)がこの合計遅延より狭いと、センサの
+検出範囲を通り過ぎてから停止指令が届くことになり「センサ無反応で突っ込む」
+ように見える。この遅延量はCAN/シリアル中継やexecutorのスケジューリングに
+依存する非決定的な量のため、状況によって間に合ったり間に合わなかったりする
+(再現したりしなかったりする)。
+
+**対策(実装済み、homing_node.py)**: 原点センサのチェックロジックを
+_check_homing_switch()として切り出し、_on_tick(タイムアウト監視用のポーリング、
+保険として引き続き呼ぶ)に加えて_on_can_host(CAN_HOSTの帰還を受信した
+まさにそのコールバック)からも即座に呼ぶようにした。これによりポーリング周期
+(最大50ms)ぶんの遅延が無くなり、CAN/シリアル中継の遅延だけが残る(こちらは
+ハードウェア/通信経路側の遅延なのでソフトウェア側では詰め切れない)。
+**要実機確認**: この対策後もまだ発生する場合は、原点センサの検出範囲(スイッチの
+機構的な動作ストローク)自体が狭すぎるか、homing_velocity_rpm(既定30rpm)が
+残った遅延に対して速すぎる可能性がある。後者はhoming_velocity_rpmを下げることで
+軽減できる(real_joint_bridge.yamlのhoming_node節)。
+
+## z/rのMIT既定ゲイン・最大速度をホーミング速度基準に統一 (2026-09-09、
+## ユーザー指定「r,zのゲインを最高速度がホーミングのときと同じくらいになるように」)
+実機用launch(real_all_axes_test/real_axes_test/real_z_r_test/real_root_theta_
+test.launch.py)のrobomas_kp/robomas_kd既定値が、低ゲインから開始する初期値
+(Kp=0.02, Kd=0.002)のままになっており、soki_sim/config/gains.json経由でGUIの
+「ゲイン調整」タブから自動適用される実機調整済みの値(Kp=0.5, Kd=0.1)と食い違って
+いた(launchを単体で使う場合とGUI経由で使う場合とで実際に効くゲインが変わって
+しまっていた)。上記4つのlaunchファイルのrobomas_kp/robomas_kd既定値をgains.json
+に合わせてKp=0.5, Kd=0.1に更新した。
+
+あわせて、z_max_velocity/r_max_velocity(z/rの台形速度プロファイルの上限、
+real_all_axes_test/real_axes_test/real_z_r_test.launch.py)を、homing_nodeの
+実際のホーミング速度と揃えた:
+  homing_velocity_rpm=30rpm、pulley_pitch_diameter_mm=22.92(半径11.46mm)、
+  mix_k=0.5から、z軸ホーミング時の実速度 z_dot = mix_k*(v1+v2)
+  (v1=v2=30rpm*pulley_radius) ≒ 0.036 m/s(36mm/s)。r軸ホーミング(差動駆動)も
+  motor1/motor2の速さは同じ30rpmなので同じ0.036m/sになる。
+z_max_velocity/r_max_velocityを0.05→0.036、z_max_acceleration/r_max_
+accelerationを0.1→0.072(速度の2倍を維持)、z_max_deceleration/r_max_
+decelerationを0.2→0.144(速度の4倍/加速度の2倍を維持)にそれぞれ変更した。
+以前の0.05はこの0.036よりむしろ高い値だったが、低ゲイン(Kp=0.02)のせいで
+実際にはそこまで速度が出ておらず「もっさりしている」体感の一因になっていた
+可能性がある(ゲインを上げたことで到達できる速度も併せて明示的にホーミング
+速度基準へ揃えた)。
+**要実機確認**: Kp=0.5, Kd=0.1はgains.json記載の既存値をそのまま転記したもので、
+新規の実機測定に基づく値ではない。実機で振動・オーバーシュートが出ないか
+低速から確認すること。z_max_velocity等も同様に、実際にこの速度で動かして
+問題ないか確認すること。
+
+## z/rの動き出しキック(静止摩擦補償) (2026-09-09、ユーザー報告「差動のロボマスが
+## 片方だけ周りはじめのトルクが足りない」への対応)
+**症状**: 差動駆動(motor1/motor2)のうち片方だけ、動き出しのトルクが足りず
+すぐには動かない(位置誤差が溜まってから急に動き出す)。
+
+**検討した原因**: MIT位置PD制御(kp*位置誤差 + kd*速度誤差 + current_ff)は
+動き出し直後は位置誤差が小さいため電流も小さく、静止摩擦(ストライクション)の
+大きい側のモータだけ動き出しが遅れる。kp/kd/current_ffはmotor1/motor2で共通の
+値(_publish_robomas_commands確認済み、非対称の原因ではない)なので、根本原因は
+2台のモータ間の機械的な差(摩擦・プリロード等)と判断。current_ffは単純な
+固定符号の加算値なので、これを上げると一方向は改善するが逆方向は悪化する
+(current_ffは移動方向を見ずに常に同じ符号で加算されるため)、という制約がある。
+
+**対策(実装済み、trajectory_follower_node.py/command_gui_node.py)**: current_ffの
+代わりに、方向依存の「動き出しキック」を追加した。motor1/motor2それぞれ独立に
+台形プロファイル速度(m1_vel/m2_vel、motor1_sign/motor2_sign適用後)が
+robomas_kick_vel_threshold_mps(既定0.001m/s)を超えた瞬間(=停止から動き出した
+瞬間)を検出し、そこからrobomas_kick_duration_sec(既定0.05s)の間だけ
+robomas_kick_current_a(既定0.1A)を、その速度と同じ符号(方向)でcurrent_ffに
+上乗せする。robomas_kick_enabled(既定false)がfalseなら常に0で、既存動作(current_ff
+のみ)と完全に同じ。GUI(command_gui_node.py、「ゲイン調整」タブ→「MITゲイン」
+パネル内「動き出しキック」)から有効化・数値調整・gains.json永続化ができる
+(既存のrobomas_kp/kd等と同じ「読込/適用」パターン)。
+  実装のポイント:
+  - キックの符号はmotor1_sign/motor2_sign適用後の速度の符号を使うため、
+    m1_rpm/m2_rpmの符号(=実際にESCへ送る電流の符号)と一致する
+    (_publish_robomas_commandsのm1_signed_vel/m2_signed_vel参照)。
+  - robomas_kick_enabledはbool型パラメータのため、command_gui_node.pyの
+    set_node_params/request_node_paramsがPARAMETER_BOOLに未対応だったのを
+    今回あわせて対応した(boolはPythonのintサブクラスのため、float変換分岐より
+    先にbool判定する必要がある点に注意)。
+**要実機確認**: robomas_kick_current_a=0.1A、robomas_kick_duration_sec=0.05sは
+初期値の目安であり実機未検証。0.05Aから始めて動き出しが改善するか確認しながら
+0.02~0.05A刻みで調整すること(ユーザーとの会話で合意した進め方)。
+実機用launch(real_*_test.launch.py)にはLaunchArgumentとして未公開(GUIでの
+調整を主な操作経路として想定したため)。CLIから初期値を渡したい場合は
+LaunchArgument化が別途必要。
+
+## ロボマス電流上限(ROBOMAS_MAX_CURRENT_A)がC610の実仕様(10A)より
+## 大幅に低かった (2026-09-09、ユーザー指摘「M2006は10Aいけるはずだが」)
+**発見**: config.hpp(MODE_ROBOMAS、M2006セクション)のROBOMAS_MAX_CURRENT_Aが
+1.0Aになっていたが、これはC610の実仕様(10A、robomas.cppのsendCurC620()が
+M2006向けにMAX_CUR=10.0f/MAX_CUR_VAL=10000でCAN送信をクランプしているのが
+根拠)の1/10でしかなかった。M3508側は20.0Aに「C620仕様上限」という根拠コメントが
+付いているのに対し、M2006側の1.0AにはKP_VELチューニング議論のついでに決められた
+だけで仕様根拠の記載が無く、暫定値のまま放置されていたと見られる。
+ROBOMAS_MAX_CURRENT_AはMIT/速度PID制御ループ側のソフトウェア飽和値で、
+sendCurC620()より手前でconstrainFloat()により先に頭打ちにするため、これまでの
+セッションで議論・調整したKp/Kd/current_ff/動き出しキングは全て実際にはこの1.0A
+の天井の中で動いていたことになる。「差動z/rの動き出しトルク不足」の主因は
+ゲイン不足よりこの制限自体だった可能性が高い。
+**対策**: ユーザー判断で段階的に5.0Aへ引き上げ(config.hpp M2006セクション)。
+仕様上限の10Aまで一気に上げず、まず5Aで発熱・振動・機構への負荷を確認する
+運用とした。
+
+**重要: generated_firmware/はfirmware/xiao-esp32-s3_can2io/の一回限りのコピーで
+自動同期されない**(ros2can/ros2can/firmware_config.pyのgenerate_project()が
+shutil.copytreeで生成するだけで、以後テンプレート側を編集しても自動反映されない)。
+今回の修正前、実際にz/rを駆動する生成済み実機ファームウェア
+generated_firmware/soki_robomas_21/・soki_robomas_21_safe/ は、2026-09-08に
+robomas.cppへ実装したCAN帰還途絶検出(電源投入時の暴走対策)を一切含んでおらず、
+ROBOMAS_MAX_CURRENT_Aも今回の修正が反映されていない1.0Aのままだった(=このセッション
+で行ったrobomas.cpp/config.hppへのファームウェア修正が、実機へは全く反映されて
+いなかった)。両ディレクトリのconfig.hpp/robomas.cppをテンプレートの内容に合わせて
+手動で同期済み(DEVICE_ID/MODE_ROBOMAS/ENC1_MD等のデバイス固有差分は保持)。
+**今後firmware/xiao-esp32-s3_can2io/側を修正した場合は、generated_firmware/
+soki_robomas_21/・soki_robomas_21_safe/(他にMODE_ROBOMASを有効にした生成済み
+ディレクトリがあれば同様に)へも手動で反映すること。書き込み(flash)は
+generated_firmware/側のプロジェクトから行っているとみられるため、テンプレートを
+直すだけでは実機に反映されない。**
+
+## ROBOMAS_MAX_CURRENT_A引き上げの副作用: ホーミングがガクガクする
+## (2026-09-09、ユーザー報告)
+**症状**: 上記のROBOMAS_MAX_CURRENT_A(1.0A→5.0A)引き上げ後、ホーミング動作が
+ガクガクするようになった。
+
+**原因**: ホーミングはhoming_nodeが速度モード(control_mode=0)でmotor1/motor2を
+直接駆動する。robomas.cppの速度PIDはP制御のみ(ROBOMAS_KP_VEL=0.8f、Ki=Kd=0)で、
+「誤差1.25rpm(=電流上限/Kp)を超えると電流上限に張り付く」設計だった。
+  - 1.0A時代: 1.25rpm以上の誤差は常に1.0Aで頭打ち(飽和が事実上のダンピングとして
+    働き、なだらかに加速していた)
+  - 5.0A時代: 誤差1.25~6.25rpmの範囲で以前の最大5倍の電流が出るようになり、
+    Kd=0(微分ダンピング無し)のP制御がこの領域で強く効きすぎてオーバーシュート
+    →揺り戻しを繰り返す「ガクガク」した動きになった
+電流上限を上げたことで速度ループがより強い力を出せるようになった一方、それを
+抑えるダンピング(Kd)が元々0のままだったため、速度モード(ホーミング)で
+顕在化した。MIT位置制御側(通常操作)でも同じ電流上限拡大の影響を受けている
+はずだが、ユーザー報告は今のところホーミング(速度モード)のみ。
+
+**対策(暫定、試したが効果無し)**: ファームウェアの速度PID再チューニング(要再
+ビルド・書き込み)より先に、real_joint_bridge.yamlのhoming_node.homing_
+velocity_rpmを30→15rpmへ下げて試したが、ユーザー報告「だめ。もとのほうが
+良かった」により改善せず。homing_velocity_rpmは30へ戻した(2026-09-09)。
+rpmを下げても電流上限(ROBOMAS_MAX_CURRENT_A)自体は変わらないため、速度誤差が
+ダンピング不足の顕在化する範囲(1.25~6.25rpm)に入ること自体は避けられず、
+症状の根本解消にはならなかったと考えられる。
+**根本対策には再ビルド・書き込みが必要**: robomas.cppのROBOMAS_KP_VEL(M2006、
+現在0.8)を下げるか、ROBOMAS_KD_VELに適切にスケールしたダンピングを入れ直す
+(config.hppのM2006セクションのコメント参照、dt換算に注意)ファームウェア側の
+再チューニングが必要。次にこの症状に対応する際は、rpmを下げる案は既に試して
+効果が無かったことを踏まえ、最初からファームウェア側の再チューニングに進むこと。
+
+**最終対策(実装済み、2026-09-09)**: ユーザー指定「速度制御モードのときのみ
+1.0Aに制限」を受け、MITモードと速度モードで電流上限を分離した。
+config.hpp(M3508/M2006/GM6020各セクション)にROBOMAS_MAX_CURRENT_A(MITモード用)
+とは別にROBOMAS_MAX_CURRENT_VEL_A(速度モード用)を新設し、M2006は
+ROBOMAS_MAX_CURRENT_A=5.0f(動き出しトルク不足対策、そのまま維持)、
+ROBOMAS_MAX_CURRENT_VEL_A=1.0f(ホーミングが安定していた元の値へ復元)とした
+(M3508/GM6020はROBOMAS_MAX_CURRENT_VEL_Aを既存のROBOMAS_MAX_CURRENT_Aと同じ値
+にして挙動を変えていない)。robomas.cpp robomasTask()の速度モード分岐
+(else節、vel_out算出後のconstrainFloat)がROBOMAS_MAX_CURRENT_Aではなく
+ROBOMAS_MAX_CURRENT_VEL_Aを参照するよう変更した。これによりhoming_velocity_rpm
+は30rpmのまま(rpmを下げる暫定対策は不要になったため撤回)、MITモード側の
+動き出しトルク不足対策(5.0A)とホーミング(速度モード、1.0A、安定していた
+元の挙動)を両立できる。
+**要実機確認**: 実装後未検証。ホーミングのガクガクが収まるか、MITモード側の
+動き出しトルク不足改善が引き続き効いているか、両方確認すること。
+firmware/xiao-esp32-s3_can2io/・generated_firmware/soki_robomas_21/・
+soki_robomas_21_safe/の3箇所とも同期済み(config.hpp/robomas.cpp、デバイス
+固有設定(DEVICE_ID/MODE_ROBOMAS/ENC1_MD等)は各ディレクトリの値を保持)。
+
+## M2006内蔵エンコーダの「起動時角度=0」前提が成立していなかった
+## (2026-09-10、ユーザー報告「soki_simの手先θが起動時原点にいるのに勝手に回る。
+## 少しずつ回って停止する」)
+**症状**: 電源投入前に手先θ(tip_theta_joint)を機構原点へ手で合わせてあるのに、
+起動直後に実機が勝手に少しだけ回って止まる。回る量は毎起動ばらつく。
+
+**原因**: 上記「root_theta/tip_thetaの原点初期化」節でtip_thetaが前提にしている
+「M2006内蔵ロータエンコーダの起動時リセット値(=0)をそのまま原点として扱う」が、
+ファームウェア側で成立していなかった。robomas.cppのreceiveFeedback()は
+
+  total_encoder[m] = rotation_count[m] * ENCODER_MAX + encoder_count[m];
+
+としており、初回フレーム(was_stale)でrotation_count=0にはしていたものの、
+encoder_count(C610の帰還が持つ1回転内の絶対値、0-8191)がそのまま基準に残って
+いた。このためangle[]の起点は0ではなく、電源投入時のロータ位相次第で
+0-(360/ギア比)deg = M2006なら出力軸0-10degのランダム値になる。
+tip_theta_jointへ換算すると /tip_theta_reduction(1.4) で0-7.1deg。
+これがそのまま「勝手に回る量」になっていた:
+
+  1. trajectory_follower_node._on_robomas_feedback()が最初の帰還で
+     pos_/target_[tip_theta_joint]を+Δ(上記オフセット)へ同期する
+  2. joy_teleop_nodeの手先θ追従(既定ON)はデッドマン非押下でも毎周期
+     tip_theta = -root_theta をpublishし続ける。root_thetaが原点なら目標は0
+  3. 台形プロファイルが +Δ -> 0 を走り、実機がΔぶんゆっくり回って止まる
+
+帰還とjoy目標のどちらが先に届くかのレースで、joy目標(0)が先だとpos_は0のまま
+has_target_=Trueになり、firmware側MITが kp*(0-Δ) をステップ入力として一気に
+詰める。同一原因で「勢いよく回る」側にもなるため、以前のユーザー報告
+「同じゲインでもモーターが勢いよく回るときとピクピクと少しずつ回るときがある」の
+両方の見え方がこれ1つで説明できる。
+
+**対策(実装済み、robomas.cpp)**: モータごとにencoder_origin[]を持ち、初回フレーム
+および途絶からの復帰フレーム(was_stale、上の「ロボマスCAN帰還の途絶検出」節)で
+そのときのencoder_countを書き込み、total_encoderから差し引く。これでangle[]は
+起動時にちょうど0から始まり、note記載の設計前提どおりになる。
+z/rは毎起動homing_nodeで再ホーミングする設計なので基準の取り方が変わっても影響
+しない(ホーミングが吸収する)。
+firmware/xiao-esp32-s3_can2io/・generated_firmware/soki_robomas_21_safe/の2箇所を
+同期済み(pio runでビルド確認済み)。**要実機確認**: 書き込み後、起動直後に手先θが
+動かなくなるか。
+
+**残る既知の挙動**: ESC(C610)側だけ電源off/onするとwas_stale経由でencoder_origin
+が引き直されるため、tip_thetaの原点はその瞬間の物理位置へ移る(以前はランダム値へ
+飛んでいたので改善ではあるが、原点は手動で合わせ直す必要がある)。またその際
+ホスト側のpos_/target_はそのままなので、ROBOMAS_RESYNC_HOLD_MS(200ms)の
+電流0固定が明けた後に目標へ向かって動く。tip_thetaはESC電源を落としたら
+ROSノード側も再起動する運用が前提。
+
+## 手先θが起動直後に135degへ向かう (2026-09-10、ユーザー報告「起動直後に135度に
+## 向かっている。可動域を左右135度ずつと言った時があったがそれが影響している?」)
+**回答**: ±135degの可動域制限(TIP_THETA_LIMIT)自体は原因ではない。制限は
+「すでに間違っている目標値」を頭打ちにしているだけで、135という具体的な数字が
+出るのはそのため。真因はjoy_teleop_nodeの手先θ追従(既定ON)。
+
+**原因**: joy_teleop_node._timer_callbackの手先θ追従分岐は、
+enabled(デッドマン押下)も has_current_state_(root_thetaの実値受信済みか)も
+見ずに、joyメッセージが1つでも届いていれば50Hzで
+tip_theta = clamp(-root_theta, ±135deg) をpublishし続けていた。このため
+
+  1. 起動直後、mixed_joint_statesがまだ届いていない間は
+     target_theta_ = INITIAL_ROOT_THETA_RAD(-90deg)なので tip_theta=+90deg を
+     指令する(デッドマンに触れていなくても出る)
+  2. mixed_joint_statesが届くと target_theta_ = 実機のroot_theta になり、
+     tip_theta = -root_theta へ向かう。root_thetaが±135degより外にいれば
+     TIP_THETA_LOWER/UPPERで頭打ちになり、ちょうど135degへ向かう
+
+**対策(実装済み、joy_teleop_node.py)**: 追従分岐に enabled and
+has_current_state_ の条件を付け、どちらかが偽の間は現在値
+(_current_tip_theta_)へ同期するだけにした。root_theta/z/rの各軸と同じ扱いに
+なり、デッドマンに触れていない起動直後は手先θへ一切指令が出なくなる。
+
+**別途の要確認事項**: 上記2の「root_thetaが±135degより外にいる」が実際に
+起きているなら、それ自体がroot_theta側の原点較正の問題である可能性が高い。
+2026-09-08にtip_theta側のAK40-10をroot_thetaへ転用しているが、転用後に
+/set_root_theta_originでの再較正を実施したかどうかがnote上で未記録
+(「root_theta/tip_thetaの原点初期化」節の較正手順は組み立て後1回だけ実施する
+前提。アクチュエータを載せ替えたら当然やり直しが必要)。起動直後に
+  ros2 topic echo /mixed_joint_states --once
+でroot_theta_jointの値を確認し、機構が原点にいるのに0付近でなければ再較正する。
+
+## 上記対策のデグレ: 手先θが一切追従しなくなった (2026-09-10、同日のユーザー報告
+## 「今度は手先θが一切追従しなくなった。初期同じ角度を保持し続けている」)
+**原因1(直接の原因)**: 上記対策で追従条件に付けた has_current_state_ が、実機構成
+では永遠にTrueにならなかった。joy_teleop_node._on_mixed_joint_stateは
+root_theta/z/rの3つが同じメッセージに揃っている前提で msg.name.index() を並べ、
+1つでも欠けるとValueErrorで何も更新せずreturnする作りだった。ところが
+real_joint_bridge_nodeは実機帰還をCubeMars群(name=[root_theta_joint])と
+ROBOMAS群(name=[z_joint, r_joint, tip_theta_joint])の**別メッセージ**でpublishする
+ため、どちらのメッセージも3つ揃わない。3つ揃うのは実機帰還前のフォールバック
+(理想軌道の全関節メッセージ、_on_fallback)だけだが、それも
+trajectory_follower_node.timer_callbackが冒頭で has_target_ を待つため、最初の
+/joint_targets を受け取るまでpublishされない。そしてその最初の/joint_targetsは
+まさに手先θ追従が送っていたもので、循環依存になっていた。
+
+**原因2(以前から潜在していたバグ)**: 同じ早期returnにより、ROBOMAS群の
+メッセージ(z/r/tip_theta)が丸ごと捨てられていた。つまり
+_current_z_/_current_r_/_current_tip_theta_ と has_tip_theta_state_ は、実機帰還に
+一度も追従していなかった(フォールバックが流れていた起動直後の値のまま)。
+
+**対策(実装済み、joy_teleop_node.py)**:
+  - _on_mixed_joint_stateを関節ごとの独立取り込みに書き換え(欠けている関節は
+    スキップするだけで、含まれている関節は必ず更新する)。関節ごとの受信フラグ
+    _has_root_theta_state_/_has_z_state_/_has_r_state_ を持ち、has_current_state_は
+    「3つとも一度は受け取った」の意味で維持する
+  - 追従の条件を has_current_state_ から _has_root_theta_state_ へ変更。追従に
+    必要なのはroot_thetaの実値だけで、z/rの受信を待つ理由が無い
+  - デッドマン(enabled)は追従の条件に入れない。追従は「root_thetaがどこを向いて
+    いてもハンドをワークの行と平行に保つ」常時機能で、スティックを離している間も
+    維持する必要がある(このデグレの元になった条件なので、再度付けないこと)
+
+**L1/R1の手動ジョグについて(同日質問「L1、R1での手先θ操作もあったはずだが
+どうなっている?」)**: 仕様どおり残っているが、手先θ追従がON(既定ON)の間は
+無視される(_timer_callbackの分岐が estop > 追従 > L1/R1ジョグ の順で、追従ONなら
+そこで確定するため)。L1/R1で手動ジョグしたい場合はOPTIONSボタンで追従をOFFに
+する。今回のデグレ中は「追従ONなので L1/R1 は無視、しかし追従自体も
+has_current_state_ で止まっている」という状態だったため、手先θがjoyから一切
+動かせなくなっていた。
+
+## 追従をOFFにしても手先θが止まらない (2026-09-10、ユーザー報告「OPTION押しても
+## 追従し続ける」。OPTIONSのindexは9で正しいことを実機側コードで確認済み)
+**原因**: joy_teleop_node._timer_callbackの手先θ分岐は、「追従OFF・L1/R1も
+押していない」状態ではどこにもpublishしない(現在値へ変数を同期するだけ)。
+そのためtrajectory_follower_node側のtarget_[tip_theta_joint]は追従ONだった頃の
+最後の目標のまま残り、OFFにしても手先θはその目標へ向かって動き続ける。
+tip_theta_jointのmax_velocityは既定0.1rad/s(gains.json)と遅く、135degぶんの
+移動に20秒以上かかるため、「OPTIONSが効いていない/追従し続けている」ようにしか
+見えなかった。
+
+**対策(実装済み、joy_teleop_node.py)**: OPTIONSで追従をONからOFFへ落とした
+瞬間に_tip_theta_follow_just_released_を立て、次の周期で現在値を目標として
+1回だけpublishしてその場で停止させる。毎周期publishはしないこと(追従OFF中も
+50Hzで送り続けると、GUIの自動シーケンス(20Hz)が同じ関節へ送る目標を数で
+押し負けさせる。「R軸の自動格納が機能しない」と同じ競合パターン)。
+GUI経由のOFF(_on_set_tip_theta_follow_srv)ではこのフラグを立てない: あちらは
+投入シーケンスが投入時の手先θ目標(_shoot_tip_theta、2026-09-12までは固定値
+shoot_tip_theta_rad)を送る直前に呼ぶもので、停止目標を割り込ませるとGUIの目標と
+競合するため。
+
+## 手先θの速度・ゲインはGUIから調整可能 (2026-09-10、ユーザー質問への回答)
+追加実装は不要。既に以下の3パネルで編集・適用・gains.jsonへの保存ができる:
+  軌道生成パラメータパネル : tip_theta_jointのmax_velocity/max_acceleration/
+                             max_deceleration (TRAJ_PANEL_JOINT_NAMES)
+  RoboMasゲインパネル      : robomas_tip_theta_kp[A/deg]/kd[A/rpm]/current_ff[A]
+  joy速度パネル            : tip_theta_speed[rad/s] (L1/R1ジョグ速度)
+firmware側の速度PID(robomas_vel_kp/ki/kd/max_current)はz/r専用で、tip_thetaは
+常にMIT位置制御のため効かない。
+
+## 手動ジョグの速度がタイミングによって変わる (2026-09-10、ユーザー報告「手先θの
+## 速度のレンジが全然ちがうときがある。手動操作で」。切り分け: 進行方向によらず
+## タイミングで変わる、ボタンを離せば止まる)
+**原因**: joy_teleop_node._timer_callbackのジョグ積分が、経過時間としてタイマー
+周期の**公称値**(self.dt_ = 1/update_rate_hz)を使っていた。ROS2のタイマーはCPU
+負荷で遅れるため、実際には50Hzで回っていなくても「50Hzで回った前提」で目標を
+進めることになり、遅れたぶんだけ目標の進みが実時間に対して遅くなる。同じボタンを
+同じ時間押しても、そのときの負荷次第で移動量・体感速度が変わる。
+2026-09-10にros2canを--noguiからGUIありへ戻したぶんCPU負荷が増えており
+(rviz + command_gui_node + ros2can GUIの同時起動)、症状が出やすくなっていた。
+
+**対策(実装済み、joy_teleop_node.py)**:
+  - ジョグ積分をtime.monotonic()の差分(実測経過時間)で行う。root_theta/z/r/
+    tip_thetaの4軸すべて。異常に長いギャップ(取りこぼし・一時停止)で目標が
+    飛ばないよう、公称周期の5倍で頭打ちにする
+  - _check_timer_slipを追加。実測dtが公称の2倍を超えた回数と最悪値を5秒ごとに
+    まとめて1行警告する(毎周期出すとログが流れるため間引く)。積分は補正済み
+    なので目標の進みは狂わないが、操作の応答自体は粗くなるので、負荷を減らすか
+    update_rateを下げる判断材料にする
+
+**参考: 手先θの速度が変わる「仕様上の」要因**(上記とは別。混同しないこと):
+  追従ON(既定)     : L1/R1は無視され、-root_thetaとしてtheta_speed(1.0rad/s)で動く
+  追従OFF + L1/R1  : tip_theta_speed(1.0rad/s)
+  低速モードON     : 上記すべてlow_speed_multiplier(0.3)倍 = 3.3倍差
+  低速モード(SHARE)・追従(OPTIONS)はどちらもトグル時にINFOログを出すので、
+  速度が違うと感じたらまずログでどちらの状態にいるかを確認する。
+
+## 手先θ追従の回転方向が逆だった (2026-09-10、ユーザー報告「手先追従時はモーターの
+## 回転が逆、手動操作時のコントローラーとの対応づけはあっている」)
+**切り分け**: 手動ジョグ(L1/R1)は正しい向きに動いており、invert_tip_thetaは
+どのlaunch/configでも設定されていない(sign_tip_theta_=+1.0のまま)。つまり
+tip_theta_jointの関節角の向きの定義自体は合っていて、**追従の関係式だけが逆**
+だった。real_joint_bridge.yamlのtip_theta_signやfirmware側は触る必要が無い
+(触ると手動操作まで逆になる)。
+
+**原因**: 追従式 tip_theta = -root_theta の符号が、2026-09-08のtip_theta駆動系
+変更(CubeMars AK40-10の直接駆動 -> RoboMas M2006 + タイミングベルト20T/28T)に
+追随していなかった。モータが機構のどちら側に付くかが変わり、root_thetaの回転に
+対して手先が回る向きが反転したが、-1.0はCubeMars時代(2026-09-03、回収シーケンス
+実装時)の値をそのまま流用していた。
+
+**対策(実装済み)**: TIP_THETA_FOLLOW_SIGNという名前付き定数を新設して+1.0とし、
+追従式を tip_theta_joint = TIP_THETA_FOLLOW_SIGN * root_theta_joint に統一した。
+追従式は2箇所にあり、**必ず両方を同じ値に揃えること**(片方だけ直すと手動運転中の
+追従と回収シーケンスで向きが食い違う):
+  soki_sim/scripts/joy_teleop_node.py   TIP_THETA_FOLLOW_SIGN
+    - _timer_callbackの手先θ追従分岐(OPTIONSトグルON時、既定ON)
+  soki_sim/scripts/command_gui_node.py  TIP_THETA_FOLLOW_SIGN
+    - _start_pick_sequenceのtip_theta_pick(回収シーケンス)
+関連する説明コメントの「-root_theta」表記も全てTIP_THETA_FOLLOW_SIGN*root_theta
+へ更新済み。
+
+**要実機確認**: 追従ONでroot_thetaを回したとき、吸着パッド3個の展開軸がワークの行
+(ワールドX軸)と平行に保たれるか。回収シーケンス(workボタン/×ボタン)でも同様に
+平行になるか。sim(rviz)と実機で向きが一致しているかも併せて確認すること。
+
+## 投入シーケンスの手先θは追従値∓90deg (2026-09-12、ユーザー指定「手先θのシュート時の
+## 角度は手先追従+90度。左右のシューティングボックスで90度回す向きが異なる」
+## 「現在実装している手先追従のパッドを結んだ直線と直交する向きの直線と平行になる
+## ように追従させたい。これはシューティング時のみ」)
+それまで投入シーケンス(L4へ移動/R4へ移動)は手先θを固定値shoot_tip_theta_rad
+(暫定0、「Rと垂直」のつもり)へ送っていたが、シュート時も追従はしつつ基準線を
+90deg変える方式に変更した。
+  回収時  : tip_follow = TIP_THETA_FOLLOW_SIGN * root_theta
+            (パッド展開軸 ∥ ワールドX = ワークの行)
+  シュート時: tip_shoot = tip_follow - copysign(90deg, tip_follow) + トリム
+            (パッド展開軸 ∥ ワールドY = 回収時の追従直線と直交する向き)
+root_thetaはトリム前の幾何角(atan2(-x, y))を使う(回収シーケンスと同じ理由:
+root_theta_trim_ak_degはエンコーダ原点ずれの補正なので、アームが物理的に向く
+角度はトリム前のθ)。
+
+**「左右で90度回す向きが異なる」の正体**: パッド3個は一直線なので幾何学的には
++90degでも-90degでも同じ向きになるが、手先θには物理ストッパ(電源投入位置から
+±135deg、上記節参照)がある。L4はroot_theta≈+99deg(atan2(0.525, -0.08))、R4は
+≈-99degなので、
+  L4: +99 - 90 = +9deg  (+90だと+189degでストッパ範囲外)
+  R4: -99 + 90 = -9deg  (-90だと-189degでストッパ範囲外)
+「追従値から0側へ90deg戻す」の1式で左右とも自動的に正しい向きになる。
+L4/R4ごとに符号を持つ必要は無い。
+2026-09-13からシューティング位置はGUIで選択式(既定L2/R2=フィールド側から
+3番目、root_theta≈±126deg → 手先θ≈±36deg)。L1/R1(≈±135deg → ≈±45deg)まで
+どの箱でもストッパ範囲内、かつjoy側のエリア判別(|θ|≥85deg)にも入る。
+
+**設定値の置き換え**: gains.json sequence.shoot_tip_theta_rad(固定目標[rad])を
+廃止し、sequence.shoot_tip_theta_trim_deg(上式に足す微調整[関節deg]、既定0、
+SHOOT_TIP_THETA_TRIM_DEG_LIMIT=±45degでクランプ)に置き換えた。キー名を変えたのは、
+gains.jsonに残った旧キーの値(実機調整中に55.0=rad単位のまま「55度」のつもりで
+入力されたと思われる値があった)をトリム[deg]として誤読しないため。旧キーは
+sequence_editsに無いので読み込み時に単に無視される。GUIラベルは
+「投入時手先θトリム[deg]」。
+
+実装: soki_sim/scripts/command_gui_node.py
+  _shoot_tip_theta(theta)         上式+トリム(クランプ込み)
+  _start_shoot_sequence           tip_theta_shoot = self._shoot_tip_theta(幾何θ)
+  DEFAULT_SEQUENCE_SETTINGS       'shoot_tip_theta_trim_deg'
+  SHOOT_TIP_THETA_TRIM_DEG_LIMIT  トリム上限
+
+**要実機確認**: L4/R4へ移動したとき手先θが≈±9deg(ほぼ電源投入位置)で止まり、
+パッド展開軸がフィールド前方(Y)と平行になるか。ずれていればトリム[deg]で微調整。
+joy側の手先θ追従(OPTIONS)のシーケンス開始時自動OFFは、同日中に
+follow_auto_off_checkbox(既定OFF)へ変更した(下記「投入シーケンス開始時の
+手先θ追従自動OFFを既定OFFに」節参照)。
+
+## 手先θ追従(OPTIONS)のワーク/シューティングエリア自動判別 (2026-09-12、ユーザー指定
+## 「根本θの角度からワークエリアなのかシューティングエリアなのか判断して追従モードを
+## 自動切り替え。OPTIONを押すたびに手動操作か手先追従か切り替え、追従モードは
+## 根本θから判断」)
+OPTIONSボタンの役割は従来どおり「手動ジョグ(右スティック左右) ⇔ 手先θ追従」の
+トグルのまま。追従ONの間の追従先だけを、root_thetaの向きで自動的に切り替える:
+  |root_theta| が小さい(ワークエリア)      : tip = TIP_THETA_FOLLOW_SIGN*root_theta
+  |root_theta| が大きい(シューティングエリア): tip = 上の値 - copysign(90deg, 上の値)
+                                           (上記「投入シーケンスの手先θは追従値∓90deg」
+                                           節と同じ式)
+しきい値はフィールド座標から決めた: ワークは最大でも|θ|≈62deg(1行目の外側の列)、
+シューティングボックスは最小でも|θ|≈99deg(L4/R4。L1/R1は≈135deg)。中間の80degを
+境に±5degのヒステリシス(85degで入り、75degで戻る)を持たせ、境界付近でroot_thetaが
+揺れても手先θが90deg往復し続けないようにした。**フィールド寸法を変えたら
+しきい値も見直すこと。**
+
+エリア切替の瞬間は追従目標が90deg飛ぶが、既存の_limit_tip_theta_lead(実角度
+±15degで頭打ち)がそのまま効くので、実機は連続的に回る(max_velocityで律速)。
+切替時はINFOログを出す。
+
+実装: soki_sim/scripts/joy_teleop_node.py
+  TIP_THETA_SHOOT_AREA_ENTER_RAD / EXIT_RAD  しきい値(85deg / 75deg)
+  _tip_theta_follow_shoot_area_              現在のエリア判定(ヒステリシス用状態)
+  _tip_theta_follow_target(theta)            追従先の計算(判定込み)
+  _timer_callback 追従分岐                   上を呼ぶよう変更
+
+GUIの投入シーケンス開始時に追従を自動OFFする動作は、同日中にチェックボックス
+(follow_auto_off_checkbox、既定OFF)化した(下記節参照)。既定では追従ONのまま
+投入シーケンスが走り、joy(50Hz)の追従先とGUI(20Hz)のtip_theta目標が並走するが、
+どちらもシューティングエリアでは同じ式なので最終的に同じ角度へ収束する。
+
+**要実機確認**: 手動でroot_thetaを回して85deg/75degをまたいだとき、手先θが90deg
+分だけ滑らかに回り、往復振動しないこと。L4/R4付近で手先θ≈±9deg付近に落ち着くこと。
+
+## 自動シーケンスのハンド姿勢操作(ピッチ・パッド収納/展開)を既定OFFに (2026-09-12、
+## ユーザー指定「自動シーケンスでピッチと収納が作動するのを無効化。有効化も
+## チェックボックスで選べるように」)
+GUIの「投入エリアへ移動」パネルにチェックボックス「ハンド姿勢を自動で切り替える」
+(hand_pose_auto_checkbox)を追加、既定OFF。R軸自動格納のチェックボックスと同じく
+gains.jsonには保存しない(起動時は常にOFF)。
+  ON のとき: 回収シーケンス冒頭の /hand_set_pitch_hold・/hand_spread_pads、
+            投入シーケンス冒頭の /hand_gather_pads・gather_settle_sec待ち・
+            /hand_set_pitch_insert を従来どおり自動で行う
+  OFFのとき: 上記ステップを全て飛ばす。ハンド姿勢はGUIのハンド操作パネル/
+            PSコン(L3・R3)で人が操作する。回収シーケンスのポンプONは姿勢操作では
+            ないので従来どおり自動(ステップは残る)
+2026-09-04の「投入シーケンス自身がピッチ投入姿勢を保証する」動作はOFFの間は
+効かないので、シュート前のピッチ切替は人が忘れずに行うこと。
+実装: soki_sim/scripts/command_gui_node.py hand_pose_auto_checkbox、
+_start_pick_sequence / _start_shoot_sequence のsteps組み立て。
+
+## 投入シーケンス開始時の手先θ追従自動OFFを既定OFFに (2026-09-12、ユーザー指定
+## 「自動シーケンスで手先追従を自動オフする設定もデフォルトをオフに」)
+2026-09-03以降、投入シーケンス(L4/R4へ移動)開始時にGUIがjoy_teleop_nodeの
+set_tip_theta_follow_thetaサービスでOPTIONS追従を自動OFFしていた(当時は投入時の
+手先θが固定値で、追従の毎周期上書きと競合したため)。「投入エリアへ移動」パネルに
+チェックボックス「投入シーケンス開始時に手先θ追従(OPTIONS)を自動でOFFにする」
+(follow_auto_off_checkbox)を追加し既定OFF。他のチェックボックス同様gains.jsonには
+保存しない。
+  OFF(既定): 追従状態に触らない。シュート後もOPTIONSを押し直さず追従が続く。
+            旋回中はjoy側(50Hz、エリア判定は85degをまたいだ時点で切替)とGUI側
+            (20Hz、最初から∓90deg)の目標が並走するが、trajectory_follower側の
+            目標はどちらも同じ最終角度に落ち着く(joy側が数で勝つので、旋回中の
+            手先θの動き方はjoy側の判定タイミングに従う)。
+  ON      : 従来どおりシーケンス開始時に追従OFF。旋回中の並走を完全に避けたい
+            場合用。
+実装: soki_sim/scripts/command_gui_node.py follow_auto_off_checkbox、
+_start_shoot_sequence冒頭のset_joy_tip_theta_follow(False)呼び出しを条件付きに。
+joy_teleop_node側のサービス自体は残している。

@@ -3,19 +3,19 @@
 # 各値の根拠はnote/hardware_mapping.txt・note/can_mapping.txt参照。
 real_joint_bridge_node:
   ros__parameters:
-    # ---- CubeMars (root_theta_joint / tip_theta_joint) ----
+    # ---- CubeMars (root_theta_joint のみ。2026-09-08方針変更: root_theta側の
+    # AK40-10が電源逆接続で焼損したため、無事だったtip_theta側のAK40-10を
+    # root_theta へ転用。tip_thetaはRoboMas M2006+C610(ROBOMASブロックのM3)へ
+    # 移行した。転用時にR-LinkのCAN IDは変更せず据え置き(旧tip_theta側のまま
+    # CAN_ID=102=M2)なので、root_theta_indexも1(M2)のまま) ----
     cubemars_device_id: 11
-    cubemars_root_theta_index: 0   # M1
-    cubemars_tip_theta_index: 1    # M2
+    cubemars_root_theta_index: 1   # M2 (旧tip_theta側のAK40-10をCAN ID据え置きで転用)
     cubemars_position_scale_deg: 0.1
     root_theta_reduction: 4.666666666666667   # 112/24 (= 14/3)
-    tip_theta_reduction: 1.4                  # 28T/20T
     root_theta_sign: 1.0
-    tip_theta_sign: 1.0
     # root_theta_offset_radは廃止(2026-08-27)。CubeMars本体へSet Originコマンドを
     # 送ることで実機エンコーダ自体の原点を永続化する方式に変更した
     # (trajectory_follower_nodeの/set_root_theta_originサービス、note/hardware_mapping.txt参照)。
-    tip_theta_offset_rad: 0.0   # 要初回較正: 原点センサ位置での_unwrapped値から逆算して設定
 
     # ---- ROBOMAS (motor1_joint / motor2_joint、内蔵ロータエンコーダのCAN帰還を
     # 位置の真値として使う。2026-08-31方針転換で外付けAMTエンコーダ(ENC1/ENC2、
@@ -27,6 +27,15 @@ real_joint_bridge_node:
     mix_k: 0.5
     motor1_sign: 1.0
     motor2_sign: 1.0
+
+    # ---- ROBOMAS M3 (tip_theta_joint、2026-09-08新規。旧CubeMars M2のAK40-10から
+    # 移行。M1/M2(z/r)のような差動ミックスではなく単独直接駆動。原点センサ無しの
+    # ため、電源投入前に機構原点(0deg)へ手で合わせておく前提で、M2006内蔵エンコーダの
+    # 起動時リセット値(=0)をそのまま原点として扱う(ホーミング処理は無し)) ----
+    robomas_tip_theta_index: 2   # M3 angle帰還スロット
+    tip_theta_reduction: 1.4     # 28T/20T (旧CubeMars構成から流用)
+    tip_theta_sign: 1.0
+    tip_theta_offset_rad: 0.0    # 通常0(手動ゼロ合わせ前提)。微調整が必要な場合のみ設定
 
     # z_offset_m/r_offset_mはhoming_nodeが起動時にSetParametersで書き込む
     # ランタイム専用値。ここでの初期値(0.0)はホーミング未実施時の値。
@@ -50,13 +59,13 @@ homing_node:
     can_host_device_id: 101
     can_host_slots_per_node: 5
 
-    # 確認済み(note/can_mapping.txt「z/r原点センサ(ホーミング用)」): z軸=SW1、
-    # r軸=SW2、どちらも同じノード(node_index=0)に載っている。
-    z_limit_switch_node_index: 0
-    z_limit_switch_local_index: 0   # SW1
-    r_limit_switch_node_index: 0
-    r_limit_switch_local_index: 1   # SW2
-    switch_triggered_value: 1        # firmwareの!digitalRead()相当(要確認)
+    # 実機確認済み(2026-09-05): z軸原点センサ=CAN_HOSTのスロット5、r軸原点センサ=
+    # スロット6(can_host_slots_per_node=5なので node_index=1, local_index=0/1)。
+    z_limit_switch_node_index: 3
+    z_limit_switch_local_index: 1   # slot 5 (z軸SW)
+    r_limit_switch_node_index: 1
+    r_limit_switch_local_index: 1   # slot 6 (r軸SW)
+    switch_triggered_value: 1        # firmwareの!digitalRead()相当(実機確認済み: 押すと1)
 
     robomas_device_id: 21
     robomas_motor1_index: 0   # M1 target_velocity/angle
@@ -67,16 +76,24 @@ homing_node:
     motor2_sign: 1.0
 
     # 要実機調整。低速・短めのタイムアウトから試すこと。
+    # 2026-09-09、ROBOMAS_MAX_CURRENT_Aを1.0A→5.0Aへ引き上げた際、速度PID
+    # (robomas.cpp、Kp=0.8のみでKd=0)がダンピング不足でホーミングがガクガクする
+    # 症状が出た(note/hardware_mapping.txt参照)。homing_velocity_rpmを30→15へ
+    # 下げて試したが改善せず(ユーザー報告: 「だめ。もとのほうが良かった」)、
+    # 30へ戻した。ガクガクの根本原因は電流上限引き上げ自体(rpmを下げても
+    # 電流上限は変わらないため症状が残る)なので、対策するならファームウェア側の
+    # 速度PID再チューニング(ROBOMAS_KP_VELを下げる/ROBOMAS_KD_VELにダンピングを
+    # 入れ直す、要再ビルド・書き込み)が必要。
     homing_velocity_rpm: 30.0
     homing_timeout_sec: 20.0
     # 要実機調整: どちらの符号で回すとz/rのどちら向きに動くか
-    z_home_motor1_vel_sign: -1.0
-    z_home_motor2_vel_sign: -1.0
-    r_home_motor1_vel_sign: 1.0
-    r_home_motor2_vel_sign: -1.0
+    z_home_motor1_vel_sign: 1.0
+    z_home_motor2_vel_sign: 1.0
+    r_home_motor1_vel_sign: -1.0
+    r_home_motor2_vel_sign: 1.0
     # 要実測: 原点センサトリガー位置での真のz/r値(z_joint/r_jointの単位、m)
-    z_ref_value_m: 0.0
-    r_ref_value_m: 0.0
+    z_ref_value_m: 0.33
+    r_ref_value_m: 0.135  # 実測(2026-09-09、+135mm)
 
     bridge_node_name: real_joint_bridge_node
     control_period_sec: 0.05
@@ -94,15 +111,47 @@ trajectory_follower_node:
     limit_switch_triggered_value: 1        # firmwareの!digitalRead()相当(要確認)
 
     # 要実測(note/can_mapping.txt「z/r上限リミットスイッチ」参照)。0=未配線・無効。
-    z_lower_limit_switch_device_id: 0
-    z_lower_limit_switch_node_index: 0
+    z_lower_limit_switch_device_id: 101
+    z_lower_limit_switch_node_index: 3
     z_lower_limit_switch_local_index: 0
-    z_upper_limit_switch_device_id: 0
-    z_upper_limit_switch_node_index: 0
-    z_upper_limit_switch_local_index: 0
-    r_lower_limit_switch_device_id: 0
-    r_lower_limit_switch_node_index: 0
+    z_upper_limit_switch_device_id: 101
+    z_upper_limit_switch_node_index: 3
+    z_upper_limit_switch_local_index: 1
+    r_lower_limit_switch_device_id: 101
+    r_lower_limit_switch_node_index: 1
     r_lower_limit_switch_local_index: 0
-    r_upper_limit_switch_device_id: 0
-    r_upper_limit_switch_node_index: 0
-    r_upper_limit_switch_local_index: 0
+    r_upper_limit_switch_device_id: 101
+    r_upper_limit_switch_node_index: 1
+    r_upper_limit_switch_local_index: 1
+
+# limit_switch_marker_node のパラメータ(2026-09-09追加、rvizへのz/rリミット
+# スイッチ位置表示用)。device_id/node_index/local_indexは上のtrajectory_follower_node
+# 節と同じ配線を指すよう値を一致させること(重複管理、limit_switch_marker_node.py
+# 冒頭docstring参照)。lower側のposition_mはhoming_node節のz_ref_value_m/
+# r_ref_value_mと同じ値(原点センサ検出位置での実測z/r値)を入れること。
+# upper側は実測値が無いため、soki_sim.urdf.xacroのz_upper/r_upper(ソフトリミット
+# の見積り値)のままにしてある(要実測)。
+limit_switch_marker_node:
+  ros__parameters:
+    can_host_slots_per_node: 5
+    switch_triggered_value: 1
+
+    z_lower_limit_switch_device_id: 101
+    z_lower_limit_switch_node_index: 3
+    z_lower_limit_switch_local_index: 0
+    z_lower_limit_switch_position_m: 0.33   # homing_node節のz_ref_value_mと一致させる
+
+    z_upper_limit_switch_device_id: 101
+    z_upper_limit_switch_node_index: 3
+    z_upper_limit_switch_local_index: 1
+    z_upper_limit_switch_position_m: 0.508  # 要実測。soki_sim.urdf.xacroのz_upper流用
+
+    r_lower_limit_switch_device_id: 101
+    r_lower_limit_switch_node_index: 1
+    r_lower_limit_switch_local_index: 0
+    r_lower_limit_switch_position_m: 0.135  # homing_node節のr_ref_value_mと一致させる
+
+    r_upper_limit_switch_device_id: 101
+    r_upper_limit_switch_node_index: 1
+    r_upper_limit_switch_local_index: 1
+    r_upper_limit_switch_position_m: 0.50975  # 要実測。soki_sim.urdf.xacroのr_upper流用

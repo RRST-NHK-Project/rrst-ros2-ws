@@ -54,6 +54,18 @@ install(PROGRAMS
   RENAME hand_node
 )
 
+install(PROGRAMS
+  scripts/autotune_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME autotune_node
+)
+
+install(PROGRAMS
+  scripts/limit_switch_marker_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME limit_switch_marker_node
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)

@@ -18,11 +18,16 @@ INITIAL_ROOT_THETA_RAD(self.pos_/target_初期値)、joy_teleop_node.pyの同名
 実機ではz_joint/r_jointはmotor1/motor2の2モータ差動機構で駆動
   z = k(m1+m2), r = k(m1-m2), k=0.5
 
-各関節の使用モーター
+各関節の使用モーター(2026-09-08方針変更: root_theta側のAK40-10が電源逆接続で
+焼損したため、無事だったtip_theta側のAK40-10をroot_thetaへ転用し、tip_theta側は
+新規にm2006+c610(z/rと同一device_id=21のM3)を導入した。詳細はnote/hardware_
+mapping.txt「root_theta_joint (旋回)」節の方針変更を参照)
   root_theta_joint : AK40-10 KV170 V3.0 with MIT mode
-  z_joint          : m2006 with c610 driver マイコンで速度制御、位置ループはROS側で回す      
-  r_joint          : m2006 with c610 driver マイコンで速度制御、位置ループはROS側で回す       
-  tip_theta_joint  : AK40-10 KV170 V3.0 with MIT mode
+  z_joint          : m2006 with c610 driver マイコンで速度制御、位置ループはROS側で回す
+  r_joint          : m2006 with c610 driver マイコンで速度制御、位置ループはROS側で回す
+  tip_theta_joint  : m2006 with c610 driver、MIT mode(単独直接駆動、z/rのような
+                      差動ミックス無し。原点センサ無しのため電源投入前に手で
+                      0degへ合わせておく前提)
 
 motor_mixer_nodeが/joint_statesを監視し、motor1/2側とz/r側どちらが
 動いたかを判定して双方向にミキシング計算し/mixed_joint_statesへpublish
@@ -44,7 +49,8 @@ machine_origin_*と同じ方式のXYZ prismatic、既定範囲±0.1m。command_g
 2026-09-03追加) -> hand_pitch_link(ピッチサーボ) ->
 hand_deploy_link(展開/収集サーボの取付ブラケット、固定) ->
 suction_pad_1/2/3(吸着パッド、各々独立関節)。構成:
-  - 手先θ回転: 既存のtip_theta_joint(CubeMars AK40-10)がハンド全体を回転させる
+  - 手先θ回転: 既存のtip_theta_joint(2026-09-08よりRoboMas M2006、上記参照)が
+    ハンド全体を回転させる
   - 吸着パッド3個: 同一行のワーク3個(間隔0.200m=WORK_COL_PITCH)を同時に
     吸着する展開(spread)位置と、吸着後に中央へ集める収納(gathered、3パッド
     上面中心が正三角形、一辺0.08m仮値)位置の2状態。中央パッド(suction_pad_2)
@@ -67,18 +73,30 @@ suction_pad_1/2/3(吸着パッド、各々独立関節)。構成:
     ドライバ、PWM+DIR出力)チャンネル経由で50%デューティ固定で駆動する想定。
     展開/収集サーボとは独立した別サービスで制御する(収納=ワーク保持したまま
     集約する動作のため、収納時に自動でポンプを切ってはいけない、2026-09-03
-    ユーザー指摘で分離)
+    ユーザー指摘で分離)。2026-09-07ユーザー確認: CAN_HOST device_id=101の
+    MD1に接続されている(z/r原点センサSW1/SW2と同じCAN_HOSTボード。ただし
+    SW1/SW2はnode_index=1の別ノード(STM32 b-g431-esc1_can2io)、MD1/MD2は
+    node_index=0のホスト自身なので物理的には別ノード、混同注意)
+  - 真空破壊リレー x1 (2026-09-07新規): ワークを離す際に真空破壊が必要で、
+    そのリレーをMD2のDIRピンで代用する。DIRピンはduty量と無関係に符号だけで
+    HIGH/LOWが決まる(PWM出力自体はリレーに配線しないので無視される)ため、
+    デジタル信号として使える。独立サービスにはせず、ポンプON中はリレーOFF
+    (閉、真空保持)・ポンプOFF時はリレーON(開、真空破壊)と連動させる
+    (hand_node.py _on_pump_on/_on_pump_off/_set_vacuum_release参照)
 
-実装方式の想定(ros2can/ros2can/device_profiles.py参照): xiao-esp32-s3_can2io
-のMODE_CAN_HOST配下「汎用IOノード」がSERVOx3/MDx2/SWx3/ENCx2チャンネルを
-持つ。SERVOnとSWnはピン共有(ファームウェアのMULTIn設定で0=スイッチ入力/
-1=サーボ出力を切替)、ENCnとMDnもピン共有(0=エンコーダ入力/1=MD出力)。
-2026-08-31の方針転換でz/r外付けAMTエンコーダ(ENC1/ENC2、node_index=1)は
-不使用になっているため、そのENC1(またはENC2)のピンをMD出力へ切り替えて
-ダイヤフラムポンプに使う、という再利用が候補になる(要実機配線確認)。
-サーボ2個は、z/r原点センサ(SW1/SW2、node_index=0)が使っていないSW3/SERVO3、
-または別ノードのSERVO1-3を使う想定。詳細な device_id/node_index/local_index
-はnote/can_mapping.txt「## ハンド」節に記入すること(未記入、実機確認待ち)。
+実装方式(ros2can/ros2can/device_profiles.py参照): xiao-esp32-s3_can2ioの
+MODE_CAN_HOST配下「汎用IOノード」がSERVOx3/MDx2/SWx3/ENCx2チャンネルを持つ。
+SERVOnとSWnはピン共有(ファームウェアのMULTIn設定で0=スイッチ入力/1=サーボ
+出力を切替)、ENCnとMDnもピン共有(0=エンコーダ入力/1=MD出力)。ノード1台分
+(can_host_slots_per_node=5)のローカルスロット並びはlocal0-2=SERVO1-3、
+local3=MD1、local4=MD2(MD1/MD2はlocal_index 0/1ではない、2026-09-07訂正。
+can_mapping.txt「## ハンド」参照)。2026-08-31の方針転換でz/r外付けAMT
+エンコーダ(ENC1/ENC2)は不使用になっているため、両方ともMD出力へ転用済み
+(config.hpp ENC1_MD=1/ENC2_MD=1)。ENC1→MD1をポンプ、ENC2→MD2を真空破壊
+リレーに使う。サーボ2個は、z/r原点センサ(SW1/SW2、別ノード node_index=1)が
+使っていないSW3/SERVO3、または別ノードのSERVO1-3を使う想定(未確定)。
+詳細な device_id/node_index/local_indexはnote/can_mapping.txt「## ハンド」節
+参照(ポンプ/リレーは記入済み、サーボ2個は実機確認待ち)。
 
 ##soki_simフィールド(ワーク配置環境)反映 (2026-08-27新規追加)
 実機のワーク配置環境をURDF(soki_sim.urdf.xacro)に静的モデルとして追加(衝突/慣性なし、視覚のみ)。
@@ -107,13 +125,15 @@ base_link原点、+X=奥行き(ワーク側)、Y=幅方向(ワーク群中心線
 ##実機モータ制御 (ros2can経由。soki本体はこちらを使用、serial_bridge/robomas.cppは不使用)
 soki 4関節はすべて `ros2can` パッケージ (xiao-esp32-s3_can2io ファームウェア) 配下。
 1マイコン=1モードで、以下2系統の独立デバイスに分かれている。
-  MODE_CUBEMARS (root_theta_joint / tip_theta_joint 用):
+  MODE_CUBEMARS (root_theta_joint 用。2026-09-08方針変更でtip_theta_jointは
+  下記MODE_ROBOMAS側(M3)へ移動、note/hardware_mapping.txt参照):
     CubeMars AKシリーズ(AK40-10)をServo(CAN)モード or Force Control(MIT)モードで
     直接駆動。アクチュエータ内蔵クローズドループに指令、ホスト側PIDなし。CAN 1Mbps固定。
     ファームウェア: ros2can/firmware/xiao-esp32-s3_can2io/src/cubemars.cpp/.hpp
-  MODE_ROBOMAS (z_joint / r_joint 用、motor1/motor2 = M2006 x2):
+  MODE_ROBOMAS (z_joint / r_joint / tip_theta_joint 用、motor1/motor2 = M2006 x2の
+  差動でz/r、M3 = M2006単独でtip_theta):
     C610ドライバでM2006を速度制御(マイコン側)、位置ループはROS側(motor_mixer_node
-    経由でz/rとの相互変換)。
+    経由でz/rとの相互変換)。tip_thetaはMITモードで単独直接駆動(ミックス無し)。
     ファームウェア: ros2can/firmware/xiao-esp32-s3_can2io/src/robomas.cpp/.hpp
     (serial_bridge/firmware/esp32_serial_bridge/src/robomas.cpp とは別物、混同注意)
 どちらもUSBシリアルで `ros2can` GUI/ノードとやり取りする(24 x int16スロット、
@@ -214,8 +234,9 @@ command_gui_node/trajectory_follower_nodeはsim/実機を区別せず同じ
     値が変わってもコード変更不要でyaml編集のみで反映できる。
   - 変換の内訳・根拠数値はnote/hardware_mapping.txt、CAN_ID/スロット割当の
     実測値はnote/can_mapping.txtにまとめてある。
-  - root_theta/tip_theta(CubeMars AK40-10、絶対値エンコーダ)はMODE_CUBEMARS
-    (device_id=11)のM{n} position帰還を使用。z/r(motor1/2差動、M2006+C610)は
+  - root_theta(CubeMars AK40-10、絶対値エンコーダ)はMODE_CUBEMARS
+    (device_id=11)のM{n} position帰還を使用。z/r(motor1/2差動)・tip_theta
+    (単独直接駆動、2026-09-08方針変更でCubeMarsから移行)は、いずれもM2006+C610の
     ROBOMAS(device_id=21)内蔵ロータエンコーダのCAN帰還(M{n} angle)を位置の
     真値として使う設計(2026-08-31方針転換。以前はCAN_HOST(device_id=101)配下
     ノードの外付けAMTエンコーダ(ENC1/ENC2)を真値としていたが不使用に変更した。
@@ -223,9 +244,11 @@ command_gui_node/trajectory_follower_nodeはsim/実機を区別せず同じ
   - z/r起動時ホーミングノード(homing_node)も実装済み(soki_sim/scripts/
     homing_node.py)。motor1/2を同方向/差動方向に低速駆動して原点センサを
     検出し、z_offset_m/r_offset_mをreal_joint_bridge_nodeへSetParametersで
-    反映する。安全のためstart_homing/stop_homing(Trigger)サービス呼び出しで
-    のみ起動(自動起動なし)。センサ配線・回転符号・基準値は仮定のままなので
-    実機検証が必要(note/can_mapping.txt「z/r原点センサ」参照)。
+    反映する。2026-09-05よりz軸/r軸は別サービス(start_homing_z/
+    start_homing_r)に分離し、軸ごとに独立して起動できる(stop_homingは共通)。
+    安全のためこれらのTriggerサービス呼び出しでのみ起動(自動起動なし)。
+    センサ配線・回転符号・基準値は仮定のままなので実機検証が必要
+    (note/can_mapping.txt「z/r原点センサ」参照)。
   - 未着手: 実機での疎通確認・homing_nodeの調整全般。
 
 ## 実機セッションとの混線事故 (2026-09-03、Claudeの動作確認手順に関する教訓)
@@ -244,6 +267,87 @@ gains.json(git管理下)を、テスト用の簡易構成(tip_theta_joint無し)
 `ROS_DOMAIN_ID`をテスト専用の値(実機セッションと異なる値)に設定してから行うこと。
 また、テスト前に`ps aux`で同名ノードが既に稼働していないか確認し、動作確認後は
 自分が起動したプロセスを確実に終了(process groupごとkillするなど)すること。
+
+## 状態表示灯 (黄色/赤色LED、2026-09-08追加)
+CAN_HOST(device_id=101、実機の状態表示等)のMULTI1/MULTI2に、黄色LED・赤色LED
+をそれぞれ接続済み(ユーザー確認、マイコンのファームウェアも書き込み済み)。
+  MULTI1 → 黄色LED (注意系)
+  MULTI2 → 赤色LED (異常系)
+消灯/点灯/点滅(速)/点滅(遅)の4パターンで状態表現する(status_led.cpp、
+pin21の既存LEDの3状態点滅パターンを参考に拡張)。2026-09-08確定の対応:
+  黄(注意系): 点滅速=自動シーケンス実行中/点滅遅=ホーミング中/
+    点灯=未ホーミング/消灯=通常
+  赤(異常系): 点滅速=ソフト緊急停止押下中/点滅遅=ノード未起動/
+    点灯=リミットスイッチ安全停止中/消灯=異常なし
+(2026-09-08訂正: 赤の点滅速は当初CAN Bus-Offを想定していたが、実装可否の
+検討中にユーザー判断でソフト緊急停止押下中に差し替えた。Bus-Off検知は
+ファームウェアのテレメトリ拡張が必要なため今回はスコープ外)。
+本リポジトリのconfig.hpp(MULTI1=0/MULTI2=0のまま)は未反映、詳細は
+note/can_mapping.txt「## 状態表示灯」節参照。
+
+## soki_simのGUI実装 (状態表示灯シミュレート・ソフト緊急停止、2026-09-08追加)
+上記の状態表示灯・ソフト緊急停止をsoki_sim側にも実装した(表示のシミュレートだけ
+でなく、緊急停止は実機/simどちらに対しても実際に出力を止める機能)。
+
+  - command_gui_node.py: 新規LedIndicatorWidget(丸ランプ、消灯/点灯/点滅速/
+    点滅遅を内蔵QTimerで自己アニメーション)を追加し、どのタブを開いていても
+    見える位置(root_layout、タブの直上)に黄・赤2灯と「緊急停止」「解除」
+    ボタンを常設。表示ロジック(_update_status_leds、優先度は上記の表と一致)は
+    1秒周期の_refresh_machine_statusから呼ぶ。
+  - 黄(注意系)の判定: self._seq_active(ピック/投入自動シーケンス、GUI内部の
+    既存フラグ)、homing_node.pyが新規publishするhoming_state(std_msgs/String、
+    TRANSIENT_LOCAL)のSTATE_*文字列。
+  - 赤(異常系)の判定: trajectory_follower_node.pyが新規publishするestop_active・
+    limit_stop_active(いずれもstd_msgs/Bool、TRANSIENT_LOCAL)、および
+    serial_rx_{11,21,101}_unwrapped(CubeMars/ROBOMAS/CAN_HOST)の受信タイムスタンプ
+    (STATUS_DEVICE_STALE_TIMEOUT_SEC=2.0秒、command_gui_node.py)による
+    「ノード未起動」判定。
+  - ソフト緊急停止の実処理: trajectory_follower_node.pyに新規Trigger
+    engage_estop/release_estopを追加し、estop_active_フラグがTrueの間は
+    timer_callbackが早期returnしてcubemars/robomas双方への指令publish自体を
+    止める(pause_robomas_output/resume_robomas_outputと同じ「送らない」方式、
+    実機側は最後の指令のまま位置保持する)。command_gui_node.pyの/emergency_stop
+    サービス(GUIの「緊急停止」ボタン・joy_teleop_nodeのPSボタン両方から呼べる)
+    が、自動シーケンス中断(_abort_sequence)・homing_node停止(/stop_homing、
+    ベストエフォート)・trajectory_follower_nodeの/engage_estopをまとめて呼ぶ。
+    解除は/clear_emergency_stopのみ(緊急停止ボタン自体はトグルにせず、誤操作で
+    即再始動しない設計)。ホーミング・自動シーケンスの自動再開はしない。
+  - joy_teleop_node.py: 回収実行確定(pick_confirm_button)をPSボタン(10)から
+    R2ボタン(7、標準的なPS4/PS5 Linuxドライバ割当想定)へ変更し、空いたPSボタンを
+    新規estop_buttonとして緊急停止(/emergency_stop)に割り当てた
+    (2026-09-08、ユーザー指定)。
+
+  - 実機LEDへの送信(2026-09-08追加。ユーザーから「マイコンへの送信処理は?」と
+    指摘があり、GUI表示だけで実機CAN送信が抜けていたのを追加): 書き込み済みの
+    ファームウェア soki_host_led_101 を確認したところ、MULTI1/MULTI2=2
+    (デジタル出力モード、通常のsoki_host_101には無いソキ_host_led_101独自の
+    拡張)で、SERVOnピンをCanIoRxData[local_index]の非ゼロ/ゼロでHIGH/LOW
+    出力するよう既に改造されていた(pin_ctrl_init.cpp/pin_ctrl_task.cpp diff
+    で確認済み、R-Link等の追加設定は不要)。CAN_HOST device_id=101・node_index=0
+    (ホスト自身)のSERVO1=local0(MULTI1)/SERVO2=local1(MULTI2)は、
+    serial_tx_101(Int16MultiArray、24スロット)のslot0/1に対応する。
+    問題: この同じdevice_id=101・node_index=0のバッファ(MD1=slot3をポンプ、
+    MD2=slot4を真空破壊リレーに)は既にhand_node.pyが単独の送信元として
+    保持・送信している(「同じdevice_idを複数チャンネルで共有する場合に備え、
+    device_idごとに24スロットのバッファを保持し、対象スロットのみ更新して
+    送信する」という既存パターン、hand_node.pyモジュールdocstring参照)。
+    ここへ別ノード(command_gui_node.py等)から独立にInt16MultiArrayを
+    publishすると、同じトピックへ2つの発行元が競合し、互いに自分が知らない
+    スロットを0で上書きし合ってポンプ/リレーとLEDの両方が壊れる
+    (ROSトピックは複数publisherがあっても本文をマージしない)。
+    対応: LED点灯/点滅の論理判定(_update_status_leds)は従来通り
+    command_gui_node.pyに一元化したまま、その結果(led_yellow_state/
+    led_red_state、std_msgs/String、TRANSIENT_LOCAL、値はLedIndicatorWidget.
+    STATE_*と同じ'off'/'on'/'blink_fast'/'blink_slow')をpublishするだけに
+    留め、実際のCAN送信(=serial_tx_101への書き込み)はhand_node.py側に
+    実装した(_on_led_yellow_state/_on_led_red_state で購読し、0.1秒周期の
+    _led_blink_timer_→_update_led_outputで点滅の位相を自前計算してpump/
+    vacuum_releaseと同じdevice_buffers_[101]へ書き込み、他スロットを保持した
+    まま送信する)。point設定はsoki_sim/config/hand.yamlに追加
+    (led_device_id: 101, led_node_index: 0, led_yellow_local_index: 0,
+    led_red_local_index: 1)。command_gui_node.py単体(hand_node未起動)でも
+    GUIのシミュレート表示自体は従来通り動く(led_*_state購読はhand_node側の
+    仕事なので、GUI側の表示は影響されない)。
 
 ##未確認・要確認事項
 - soki_simのURDF寸法(base_height/lift_size_z/arm_length等)と実機寸法の対応

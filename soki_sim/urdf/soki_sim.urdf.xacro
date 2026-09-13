@@ -8,7 +8,7 @@ RVizでの見た目確認用途のため、慣性(inertial)や衝突形状(colli
   base_link   =[root_theta_joint (revolute, z軸, ±153.5°=実機MIT可動域)]=>  turret_link (旋回台+マスト)
   turret_link =[z_joint (prismatic, z軸)]=>             lift_link (昇降キャリッジ)
   lift_link   =[r_joint (prismatic, x軸)]=>             arm_link (伸縮アーム)
-  arm_link    =[tip_theta_joint (continuous, z軸)]=>    tip_link (手先)
+  arm_link    =[tip_theta_joint (continuous, z軸。機械端は電流で検出)]=> tip_link (手先)
 
 z_joint/r_joint は実機ではmotor1/motor2の2モータによる差動機構で駆動される
 (z = k(m1+m2), r = k(m1-m2))ため、URDF上にもmotor1_joint/motor2_jointを
@@ -22,18 +22,18 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
 <robot name="soki_sim" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
   <!-- 寸法パラメータ -->
-  <xacro:property name="base_radius" value="0.15"/>
-  <xacro:property name="base_height" value="0.06"/>
+  <xacro:property name="base_radius" value="0.18"/>
+  <xacro:property name="base_height" value="0.08"/>
 
   <xacro:property name="mast_radius" value="0.035"/>
   <xacro:property name="mast_height" value="0.7"/>
 
   <xacro:property name="lift_size_xy" value="0.14"/>
   <xacro:property name="lift_size_z" value="0.08"/>
-  <xacro:property name="z_lower" value="0.0"/>
-  <xacro:property name="z_upper" value="0.432"/>
+  <xacro:property name="z_lower" value="0.118"/>
+  <xacro:property name="z_upper" value="0.508"/>
 
-  <xacro:property name="arm_length" value="1.244"/>
+  <xacro:property name="arm_length" value="1.0195"/>
   <xacro:property name="arm_size_yz" value="0.05"/>
   <xacro:property name="r_lower" value="${-arm_length / 2}"/>
   <xacro:property name="r_upper" value="${arm_length / 2}"/>
@@ -61,6 +61,14 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
        (2026-08-27)。 -->
   <xacro:property name="root_theta_reduction" value="${112.0 / 24.0}"/>
   <xacro:property name="root_theta_limit" value="${12.5 / root_theta_reduction}"/>
+
+  <!-- tip_theta: 2026-09-10、機構側に物理リミット(当てて止めるストッパ)が付いた
+       のに伴い、それまでの固定±135deg制限を廃止しcontinuousへ戻した
+       (ユーザー指定:「この角度制限はなくしていい」)。可動域の保護は
+       trajectory_follower_nodeが実電流+実速度から機械端を検出して指令を止める
+       方式へ移行した(TIP_THETA_STALL_*、note/hardware_mapping.txt参照)。
+       機械端の位置は起動時の手動ゼロ合わせ次第で毎回変わるため、URDF側に
+       固定値として書けるものが無い(書くとsimだけ実機と食い違う)。 -->
 
   <!-- マテリアル -->
   <material name="base_grey">
@@ -302,7 +310,7 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
        と同様trajectory_follower_nodeを経由しない)。範囲は仮に
        ±hand_offset_limit[m]としているので、実機とのズレの想定量に合わせて
        調整すること。 -->
-  <xacro:property name="hand_offset_limit" value="0.1"/>
+  <xacro:property name="hand_offset_limit" value="0.3"/>
 
   <link name="hand_offset_x_link"/>
   <joint name="hand_offset_x_joint" type="prismatic">

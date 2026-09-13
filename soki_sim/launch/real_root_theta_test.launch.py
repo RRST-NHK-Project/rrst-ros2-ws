@@ -4,7 +4,7 @@ from typing import List
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.conditions import IfCondition
+from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import Command, LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
@@ -17,7 +17,8 @@ def generate_launch_description():
     なので、実機確認時はこちらを使う(display.launch.pyと同時起動しないこと。
     trajectory_follower_nodeが二重起動になり衝突する)。
 
-    起動するもの: ros2can GUI, real_joint_bridge_node(帰還確認),
+    起動するもの: ros2can(既定はPyQt5ウィンドウあり。ros2can_nogui引数参照)、
+    real_joint_bridge_node(帰還確認),
     trajectory_follower_node(実機出力あり), command_gui_node。
     use_joy:=true でjoy_node/joy_teleop_nodeも起動する
     (この場合control_modeは自動的に'both'になる)。joy_teleop_nodeには
@@ -29,16 +30,20 @@ def generate_launch_description():
 
     device_id/motor_index/reduction/kp/kdは実機配線・note/hardware_mapping.txtの
     値に合わせて起動時に上書きすること(例: motor_index:=0 でM1配線に変更)。
-    デフォルトは2026-08-27の動作確認時点の配線(root_theta=M2)・低ゲイン
-    (Kp=5, Kd=0.5)。詳細はnote/command.txt参照。
+    デフォルトは2026-09-08時点の配線(root_theta=M2、旧tip_theta側AK40-10を
+    CAN ID据え置きで転用)・低ゲイン(Kp=5, Kd=0.5)。詳細はnote/hardware_mapping.txt
+    「root_theta_joint (旋回)」節参照。
 
     use_robomas:=true でz_joint/r_joint(motor1/motor2、ロボマスdevice_id=21、
     note/can_mapping.txt確認済み)へもMIT指令を送る(2026-08-29追加)。
-    robomas_kp/robomas_kdは要実機調整・低ゲインから開始すること(M2006の電流
-    上限1.0A(ros2can/firmware/.../config.hppのROBOMAS_MAX_CURRENT_A)基準で
-    デフォルト値を決めてある。詳細はnote/hardware_mapping.txt「z_joint/r_jointの
-    実機出力(RoboMas MITモード)」参照)。ホーミング未実施のままだとz/rの原点は
-    未較正(生値)のままなので、先にhoming_nodeのstart_homingを実施すること。
+    robomas_kp/robomas_kdは要実機調整(M2006の電流上限1.0A(ros2can/firmware/.../
+    config.hppのROBOMAS_MAX_CURRENT_A)基準でデフォルト値を決めてある。詳細は
+    note/hardware_mapping.txt「z_joint/r_jointの実機出力(RoboMas MITモード)」
+    参照)。既定値は2026-09-09時点でsoki_sim/config/gains.json経由の実機調整済み
+    値(Kp=0.5, Kd=0.1)に合わせてある(ユーザー指定:「r,zのゲインを最高速度が
+    ホーミングのときと同じくらいになるように」)。ホーミング未実施のままだと
+    z/rの原点は未較正(生値)のままなので、先にhoming_nodeのstart_homing_z/
+    start_homing_rを実施すること。
     """
     pkg_share = get_package_share_directory('soki_sim')
     xacro_file = os.path.join(pkg_share, 'urdf', 'soki_sim.urdf.xacro')
@@ -49,8 +54,10 @@ def generate_launch_description():
         'device_id', default_value='11',
         description='root_thetaのCubeMars(MODE_CUBEMARS)device_id')
     motor_index_arg = DeclareLaunchArgument(
-        'motor_index', default_value='0',
-        description='root_thetaのモータ番号(0-3=M1-M4)。2026-08-27時点はM2配線')
+        'motor_index', default_value='1',
+        description='root_thetaのモータ番号(0-3=M1-M4)。2026-09-08方針変更で'
+                    '旧tip_theta側のAK40-10をCAN ID据え置き(M2)で転用したため'
+                    '既定値は1(M2)')
     reduction_arg = DeclareLaunchArgument(
         'reduction', default_value='4.666666666666667',
         description='外部減速比(112/24)。note/hardware_mapping.txt参照')
@@ -64,6 +71,10 @@ def generate_launch_description():
     max_acceleration_arg = DeclareLaunchArgument(
         'max_acceleration', default_value='0.2',
         description='root_thetaの最大加速度[rad/s^2]')
+    max_deceleration_arg = DeclareLaunchArgument(
+        'max_deceleration', default_value='0.4',
+        description='root_thetaの最大減速度[rad/s^2](既定はmax_accelerationの2倍。'
+                    '停止時の応答性向上、trajectory_follower_node.py参照)')
     use_joy_arg = DeclareLaunchArgument(
         'use_joy', default_value='false',
         description='trueならjoy_node/joy_teleop_nodeも起動し、'
@@ -80,17 +91,29 @@ def generate_launch_description():
     use_viz_arg = DeclareLaunchArgument(
         'use_viz', default_value='false',
         description='trueならrobot_state_publisher/joint_state_publisher/rviz2も起動する')
+    ros2can_nogui_arg = DeclareLaunchArgument(
+        'ros2can_nogui', default_value='false',
+        description='trueならros2canを--nogui(ターミナルダッシュボード、PyQt5ウィンドウ'
+                    'なし)で起動する。ros2can自体は常に起動する。デフォルトfalse'
+                    '(=PyQt5ウィンドウあり。real_all_axes_test.launch.pyと同じ既定。'
+                    'ターミナルダッシュボードにしたい場合は ros2can_nogui:=true を指定する)')
     use_robomas_arg = DeclareLaunchArgument(
         'use_robomas', default_value='false',
         description='trueならz_joint/r_joint(motor1/motor2、ロボマスdevice_id=21)へも'
                     'MIT指令を送る(実機出力有効化)。falseならこれまで通りsoki_sim表示のみ')
     robomas_kp_arg = DeclareLaunchArgument(
-        'robomas_kp', default_value='0.02',
-        description='ロボマスMITモードKp[A/deg]。要実機調整、低ゲインから開始すること'
-                    '(M2006の電流上限1.0A基準、誤差10degで0.2A程度になる想定値)')
+        'robomas_kp', default_value='0.5',
+        description='ロボマスMITモードKp[A/deg]。2026-09-09、ユーザー指定「r,zの'
+                    'ゲインを最高速度がホーミングのときと同じくらいになるように」'
+                    'を受け、以前は低ゲインから開始する初期値0.02のままだったのを'
+                    '既にsoki_sim/config/gains.json経由で実機調整済みの値(0.5)に'
+                    '合わせた(GUIの「ゲイン調整」タブから自動適用される値と、この'
+                    'launch単体起動時の初期値が食い違っていたのを解消。M2006の'
+                    '電流上限1.0A基準、誤差2degで飽和する強さ)')
     robomas_kd_arg = DeclareLaunchArgument(
-        'robomas_kd', default_value='0.002',
-        description='ロボマスMITモードKd[A/rpm]。要実機調整、低ゲインから開始すること')
+        'robomas_kd', default_value='0.1',
+        description='ロボマスMITモードKd[A/rpm]。2026-09-09、robomas_kpと同じ理由で'
+                    'gains.jsonの実機調整済み値(0.1)に合わせた')
 
     device_id = LaunchConfiguration('device_id')
     motor_index = LaunchConfiguration('motor_index')
@@ -99,6 +122,7 @@ def generate_launch_description():
     kd = LaunchConfiguration('kd')
     max_velocity = LaunchConfiguration('max_velocity')
     max_acceleration = LaunchConfiguration('max_acceleration')
+    max_deceleration = LaunchConfiguration('max_deceleration')
     use_joy = LaunchConfiguration('use_joy')
     use_viz = LaunchConfiguration('use_viz')
     enable_button = LaunchConfiguration('enable_button')
@@ -114,11 +138,25 @@ def generate_launch_description():
     # (joy_teleop_nodeを起動しないなら'manual'を受け付けても無意味なため)。
     control_mode = PythonExpression(["'both' if '", use_joy, "' == 'true' else 'auto'"])
 
-    ros2can_node = Node(
+    # ros2canは常に起動する。--noguiの有無だけをros2can_noguiで切り替える
+    # (launch_ros.Nodeのargumentsは条件付きで一部だけ足すことができないため、
+    # 同名ノードをIfCondition/UnlessConditionで排他的に2つ用意する定番パターン。
+    # real_all_axes_test.launch.pyと同じ構成)。
+    ros2can_nogui = LaunchConfiguration('ros2can_nogui')
+    ros2can_gui_node = Node(
         package='ros2can',
         executable='ros2can',
         name='ros2can_gui',
         output='screen',
+        condition=UnlessCondition(ros2can_nogui),
+    )
+    ros2can_nogui_node = Node(
+        package='ros2can',
+        executable='ros2can',
+        name='ros2can_gui',
+        output='screen',
+        arguments=['--nogui'],
+        condition=IfCondition(ros2can_nogui),
     )
 
     real_joint_bridge_node = Node(
@@ -128,7 +166,14 @@ def generate_launch_description():
         output='screen',
         parameters=[
             real_joint_bridge_yaml,
-            {'cubemars_root_theta_index': motor_index},
+            {
+                'cubemars_root_theta_index': motor_index,
+                # trajectory_follower_node側のoutput_topic(下記)と一致させること。
+                # z/r(ROBOMAS未接続時)等、まだ実機帰還の無い軸はここから理想軌道を
+                # 転送してsim表示を動かし続ける(note/hardware_mapping.txt
+                # 「mixed_joint_statesの真値ソース」参照)。
+                'fallback_topic': 'trajectory_target_joint_states',
+            },
         ],
     )
 
@@ -148,8 +193,15 @@ def generate_launch_description():
             'joint_names': ['root_theta_joint', 'z_joint', 'r_joint'],
             'max_velocity': ParameterValue([max_velocity, 0.05, 0.05], value_type=List[float]),
             'max_acceleration': ParameterValue([max_acceleration, 0.1, 0.1], value_type=List[float]),
+            'max_deceleration': ParameterValue([max_deceleration, 0.2, 0.2], value_type=List[float]),
             'update_rate_hz': 50.0,
             'control_mode': control_mode,
+            # sim表示(mixed_joint_states)はreal_joint_bridge_nodeの実測値を
+            # 真値として使う(2026-09-07方針変更)。本ノードのpos_はMIT指令生成用の
+            # 理想軌道でしかなく、実機の追従遅れ次第でmixed_joint_statesに直接
+            # publishすると実測値と競合してsimが実機を置き去りにしたように見える
+            # 問題があったため、出力先を分離した。
+            'output_topic': 'trajectory_target_joint_states',
             'cubemars_joint_names': ['root_theta_joint'],
             'cubemars_device_ids': ParameterValue([[device_id]], value_type=List[int]),
             'cubemars_motor_indices': ParameterValue([[motor_index]], value_type=List[int]),
@@ -221,13 +273,16 @@ def generate_launch_description():
         kd_arg,
         max_velocity_arg,
         max_acceleration_arg,
+        max_deceleration_arg,
         use_joy_arg,
         use_viz_arg,
+        ros2can_nogui_arg,
         enable_button_arg,
         use_robomas_arg,
         robomas_kp_arg,
         robomas_kd_arg,
-        ros2can_node,
+        ros2can_gui_node,
+        ros2can_nogui_node,
         real_joint_bridge_node,
         trajectory_follower_node,
         command_gui_node,

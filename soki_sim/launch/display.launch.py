@@ -98,6 +98,9 @@ def generate_launch_description():
             'joint_names': ['root_theta_joint', 'z_joint', 'r_joint'],
             'max_velocity': [1.0, 0.2, 0.2],
             'max_acceleration': [2.0, 0.4, 0.4],
+            # 減速度(max_accelerationの2倍、停止時の応答性向上。2026-09-07新規、
+            # trajectory_follower_node.pyのmax_deceleration参照)。
+            'max_deceleration': [4.0, 0.8, 0.8],
             'update_rate_hz': 50.0,
             # デフォルトは'both'(command_gui_node/joy_teleop_node併用)。
             # command_gui_nodeの「動作モード」パネルから'auto'/'manual'に切り替え可能
@@ -122,6 +125,16 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration('use_joy')),
     )
 
+    # z/r上限・下限リミットスイッチの位置をrvizへ表示する(2026-09-09追加)。
+    # このlaunchではCAN配線パラメータを渡さない(device_id既定0=未配線)ため、
+    # soki_sim.urdf.xacroの見積り位置に灰色マーカーで固定表示するだけになる
+    # (実機配線込みの表示はreal_z_r_test.launch.py/real_all_axes_test.launch.py参照)。
+    limit_switch_marker_node = Node(
+        package='soki_sim',
+        executable='limit_switch_marker_node',
+        name='limit_switch_marker_node',
+    )
+
     rviz_node = Node(
         package='rviz2',
         executable='rviz2',
@@ -140,5 +153,6 @@ def generate_launch_description():
         trajectory_follower_node,
         joy_node,
         joy_teleop_node,
+        limit_switch_marker_node,
         rviz_node,
     ])

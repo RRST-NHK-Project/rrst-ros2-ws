@@ -35,6 +35,20 @@ MDは符号=方向・絶対値=PWMデューティの生値をセットして送�
 バッファを保持し、対象スロットのみ更新して送信する(trajectory_follower_nodeの
 CubeMars/RoboMas実装と同じパターン)。
 
+サーボの移動速度はソフト側の角度ランプで制御する(2026-09-12追加、ユーザー要望:
+「手先サーボの速度を変更できるように」)。ファームウェア(xiao-esp32-s3_can2io
+pin_ctrl_task.cpp IO_Servo_Outout)は受け取った角度をそのままPWM幅へ変換するだけで
+速度指定の手段が無く、ホビーサーボ自体も目標角へ最速で動くため、hand_node側で
+現在の送信角度から目標角度へ<prefix>_speed_deg_per_s[deg/s]の速さで小刻みに
+角度を更新して送る(SERVO_RAMP_PERIOD_SEC周期、_ramp_step参照)。0以下なら従来
+通り目標角度を即時送信する。起動後最初の指令はランプ元の角度が不明(サーボの
+実位置は分からない)なので即時送信し、2回目以降のみランプする。サービスの応答は
+ランプ完了を待たずに即時返す(応答メッセージに所要時間の目安を含める)ため、
+上位シーケンス(command_gui_node.pyのgather_settle_sec等)の待ち時間は
+ランプ所要時間を見込んで設定すること。速度パラメータはサービス呼び出し
+のたびに読み直すので`ros2 param set /hand_node pitch_servo_speed_deg_per_s 60`
+で実行中にも変更できる。
+
 device_id=0(既定)はその出力が未配線・無効であることを意味する(他ノードの
 limit_switch_device_id等と同じ規約)。実機配線が判明したら
 note/can_mapping.txt「## ハンド」節と、soki_sim/config/hand.yamlのパラメータを
@@ -44,8 +58,10 @@ note/can_mapping.txt「## ハンド」節と、soki_sim/config/hand.yamlのパ�
 (homing_nodeと同様、自動起動はしない):
   /hand_spread_pads      : 吸着パッド展開角度へ(spread、ワーク回収姿勢)
   /hand_gather_pads      : 吸着パッド収納角度へ(gathered、正三角形に集約)
-  /hand_pump_on          : ポンプduty_percentへ(吸着ON)
-  /hand_pump_off         : ポンプduty=0へ(吸着OFF)
+  /hand_pump_on          : ポンプduty_percentへ(吸着ON)。真空破壊リレーはOFF(閉)
+  /hand_pump_off         : ポンプduty=0へ(吸着OFF)。真空破壊リレーをON(開)にして
+                           ワークを離す(2026-09-07新規、MD2のDIRピンをリレー駆動
+                           信号として流用。独立サービスは設けず連動のみ)
   /hand_set_pitch_hold   : ピッチサーボを保持姿勢へ
   /hand_set_pitch_insert : ピッチサーボを投入姿勢へ
 
@@ -59,8 +75,11 @@ note/can_mapping.txt「## ハンド」節と、soki_sim/config/hand.yamlのパ�
 受け付けない/暴走する値を送らないよう、offset・オーバーライド値とも実機で
 安全な範囲に手動で追い込んで運用すること)。
 
-ポンプの現在ON/OFF状態は`hand_pump_state`(std_msgs/Bool)としてpublishする
-(2026-09-03追加)。GUIハンドパネルの「ポンプON/OFF」ボタンとjoy_teleop_nodeの
+ポンプの現在ON/OFF状態は`hand_pump_state`(std_msgs/Bool)、吸着パッドの展開状態は
+`hand_pads_spread`、ワークピッチの投入姿勢状態は`hand_pitch_insert`として
+publishする(ポンプは2026-09-03、残り2つは2026-09-10追加。いずれも
+transient_local(latched))。後者2つはjoy_teleop_nodeのL3/R3トグルが
+「今どちらの姿勢か」を知るために使う。GUIハンドパネルの「ポンプON/OFF」ボタンとjoy_teleop_nodeの
 PSコン丸ボタン(トグル)の両方から独立に操作できるようにするため、状態の真値は
 hand_node側に一元化し、joy_teleop_node側ではローカルに状態を推測しない。
 
@@ -82,15 +101,23 @@ suction_pad_1/2/3_jointはprismatic関節で、joint値0=spread(展開、同一�
 (soki_sim.urdf.xacroのhand_pad_side_travelと一致させること)。
 """
 import math
+import time
 
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Bool, Int16MultiArray
+from std_msgs.msg import Bool, Int16MultiArray, String
 from std_srvs.srv import Trigger
 
 SLOT_COUNT = 24
+# 状態表示灯の点滅トグル間隔[ms]。command_gui_node.pyのLedIndicatorWidgetと
+# 一致させること(sim表示と実機LEDの見た目を揃えるため、2026-09-08追加)。
+LED_BLINK_FAST_PERIOD_MS = 150
+LED_BLINK_SLOW_PERIOD_MS = 500
+# サーボ角度ランプ(速度制御)の更新周期[s]。ホビーサーボのPWM周期(50Hz=20ms)
+# より細かくしても意味が無いので20msにする(モジュールdocstring参照)。
+SERVO_RAMP_PERIOD_SEC = 0.02
 HAND_PITCH_JOINT = 'hand_pitch_joint'
 # soki_sim.urdf.xacroのhand_pad_side_travelと一致させること。
 # joint値0=spread(展開)、joint値=この上限値=gathered(収納、正三角形)。
@@ -101,6 +128,11 @@ HAND_PAD_TRAVEL = {
     'suction_pad_2_joint': 0.0,
     'suction_pad_3_joint': 0.174356,
 }
+
+
+def _ramp_note(duration_sec):
+    """サービス応答メッセージに付けるランプ所要時間の注記。即時送信なら空文字。"""
+    return f', 約{duration_sec:.1f}sかけて移動' if duration_sec > 0.0 else ''
 
 
 class HandNode(Node):
@@ -133,6 +165,9 @@ class HandNode(Node):
         self.declare_parameter('deploy_servo_retracted_can_deg', 0.0)
         self.declare_parameter('deploy_servo_deployed_can_deg_override', False)
         self.declare_parameter('deploy_servo_deployed_can_deg', 0.0)
+        # 展開/収納の移動速度[deg/s](2026-09-12追加、モジュールdocstring参照)。
+        # 0以下で即時送信(従来動作)。
+        self.declare_parameter('deploy_servo_speed_deg_per_s', 0.0)
 
         # ---- ワークピッチ変更サーボ (SERVOn、角度[deg]) ----
         self.declare_parameter('pitch_servo_device_id', 0)
@@ -154,24 +189,84 @@ class HandNode(Node):
         self.declare_parameter('pitch_servo_hold_can_deg', 0.0)
         self.declare_parameter('pitch_servo_insert_can_deg_override', False)
         self.declare_parameter('pitch_servo_insert_can_deg', 0.0)
+        # 保持/投入の移動速度[deg/s](deploy_servo_speed_deg_per_sと同じ設計)。
+        self.declare_parameter('pitch_servo_speed_deg_per_s', 0.0)
 
-        # ---- ダイヤフラムポンプ (MDn、符号=方向・絶対値=PWMデューティ) ----
+        # ---- ダイヤフラムポンプ (MDn、符号=方向・絶対値=PWMデューティ。SERVO1-3=
+        # local0-2なので、汎用IOノード1台分ではMD1=local3/MD2=local4になる) ----
         self.declare_parameter('pump_device_id', 0)
         self.declare_parameter('pump_node_index', 0)
-        self.declare_parameter('pump_local_index', 0)  # MD1=0/MD2=1
+        self.declare_parameter('pump_local_index', 3)  # MD1=3/MD2=4
         self.declare_parameter('pump_duty_percent', 50.0)
         # config.hppのMD_PWM_RESOLUTION(既定8bit)から算出される最大デューティ値。
         # ros2can/ros2can/device_profiles.pyのDEFAULT_MD_PWM_MAXと一致させること。
         self.declare_parameter('pump_md_pwm_max', 255)
 
+        # ---- 真空破壊リレー (MD2のDIRピンをリレー駆動信号として流用。2026-09-07
+        # 新規: ワークを離す際の真空破壊にリレーを使い、そのリレーをMDの方向ピンで
+        # 代用する。DIRピンは`digitalWrite(MDnD, raw>0 ? HIGH : LOW)`のようにduty量
+        # とは無関係に符号だけで決まる(ros2can/firmware/xiao-esp32-s3_can2io/src/
+        # pin_ctrl_task.cpp IO_MD_Output参照、PWM出力自体は未配線なので無視される)。
+        # 独立サービスにはせず、ポンプON中はリレーOFF(閉、真空保持)・ポンプOFF時は
+        # リレーON(開、真空破壊)という連動で_on_pump_on/_on_pump_offから駆動する) ----
+        self.declare_parameter('vacuum_release_device_id', 0)
+        self.declare_parameter('vacuum_release_node_index', 0)
+        self.declare_parameter('vacuum_release_local_index', 4)  # MD2
+        self.declare_parameter('vacuum_release_duty_percent', 50.0)
+
+        # ---- 状態表示灯(黄色/赤色LED、SERVOn=デジタル出力。2026-09-08追加) ----
+        # CAN_HOST device_id=101のMULTI1/MULTI2にそれぞれ接続(ファームウェアは
+        # soki_host_led_101、MULTI1/MULTI2=2でSERVOnピンをデジタル出力へ切替済み、
+        # CanIoRxData[local_index]の非ゼロでHIGH)。pump/vacuum_releaseと同じ
+        # device_id=101・node_index=0(汎用IOノードの自ノード分)を共有するため、
+        # 送信は本ノード(device_id=101のCAN送信元)にまとめる必要がある
+        # (note/note_soki/can_mapping.txt「## 状態表示灯」参照)。状態自体の
+        # 判定ロジックはcommand_gui_node.py(_update_status_leds)に一元化してあり、
+        # 本ノードはled_yellow_state/led_red_state(std_msgs/String、値は
+        # LedIndicatorWidget.STATE_*と同じ'off'/'on'/'blink_fast'/'blink_slow')を
+        # 購読して点滅の位相だけを自前で計算する(_update_led_output参照)。
+        self.declare_parameter('led_device_id', 0)
+        self.declare_parameter('led_node_index', 0)
+        self.declare_parameter('led_yellow_local_index', 0)  # SERVO1=MULTI1
+        self.declare_parameter('led_red_local_index', 1)      # SERVO2=MULTI2
+
         self._deploy = self._make_channel_cfg('deploy_servo')
         self._pitch = self._make_channel_cfg('pitch_servo')
         self._pump = self._make_channel_cfg('pump')
+        self._vacuum_release = self._make_channel_cfg('vacuum_release')
+        self._led = {
+            'device_id': int(self.get_parameter('led_device_id').value),
+            'node_index': int(self.get_parameter('led_node_index').value),
+            'yellow_local_index': int(self.get_parameter('led_yellow_local_index').value),
+            'red_local_index': int(self.get_parameter('led_red_local_index').value),
+        }
+
+        # サーボ角度ランプの状態(モジュールdocstring参照)。キーはチャンネル
+        # cfgのid()ではなくprefix文字列('deploy_servo'/'pitch_servo')。
+        #   current: 最後にCANへ送った角度[deg](float、未送信ならNone)
+        #   target : ランプ中の目標角度[deg](int、ランプ中でなければNone)
+        #   speed  : ランプ中の速度[deg/s]
+        self._ramps = {
+            'deploy_servo': {'cfg': self._deploy, 'current': None, 'target': None, 'speed': 0.0},
+            'pitch_servo': {'cfg': self._pitch, 'current': None, 'target': None, 'speed': 0.0},
+        }
+        self._ramp_timer_ = self.create_timer(SERVO_RAMP_PERIOD_SEC, self._ramp_step)
+        self._ramp_timer_.cancel()  # ランプ中のみ動かす(_start_servo_move参照)
 
         self.device_buffers_ = {}
         self.device_publishers_ = {}
-        for cfg in (self._deploy, self._pitch, self._pump):
+        for cfg in (self._deploy, self._pitch, self._pump, self._vacuum_release):
             self._ensure_publisher(cfg['device_id'])
+        self._ensure_publisher(self._led['device_id'])
+
+        self._led_yellow_state_ = 'off'
+        self._led_red_state_ = 'off'
+        led_state_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self.create_subscription(String, 'led_yellow_state', self._on_led_yellow_state, led_state_qos)
+        self.create_subscription(String, 'led_red_state', self._on_led_red_state, led_state_qos)
+        # 点滅のトグルには周期的な再送が要るため、pump/deploy等と違いタイマ駆動にする
+        # (他チャンネルはservice呼び出し時のイベント駆動のみ)。
+        self._led_blink_timer_ = self.create_timer(0.1, self._update_led_output)
 
         # RViz表示用(soki_sim.urdf.xacroのhand_deploy_joint/hand_pitch_joint、
         # モジュールdocstring参照)。実機配線(device_id)の有無に関わらず送る。
@@ -189,6 +284,22 @@ class HandNode(Node):
         pump_state_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self.pump_state_pub_ = self.create_publisher(Bool, 'hand_pump_state', pump_state_qos)
 
+        # 吸着パッド展開・ワークピッチの現在状態(2026-09-10追加、ユーザー指定:
+        # 「ハンドのサーボ操作をPSコンのL3/R3へ割り当て」)。joy_teleop_nodeの
+        # L3/R3はトグルなので、押した側が「今どちらの姿勢か」を知る必要がある。
+        # ポンプ(hand_pump_state)と同じ設計で、状態の真値はhand_node側に一元化し、
+        # 購読側ではローカルに推測しないこと: これらのサービスはGUIのハンド
+        # パネル・回収/投入シーケンスからも呼ばれるため、ローカル推測だと
+        # 必ずズレる。QoSもポンプと同じtransient_local(latched)にして、
+        # hand_node起動後に立ち上がったノードでも現在状態を受け取れるようにする。
+        hand_state_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self._pads_spread = False   # 起動時は収納(gathered)姿勢
+        self._pitch_insert = False  # 起動時は保持(hold)姿勢
+        self.pads_spread_pub_ = self.create_publisher(
+            Bool, 'hand_pads_spread', hand_state_qos)
+        self.pitch_insert_pub_ = self.create_publisher(
+            Bool, 'hand_pitch_insert', hand_state_qos)
+
         self.create_service(Trigger, 'hand_spread_pads', self._on_spread_pads)
         self.create_service(Trigger, 'hand_gather_pads', self._on_gather_pads)
         self.create_service(Trigger, 'hand_pump_on', self._on_pump_on)
@@ -205,13 +316,19 @@ class HandNode(Node):
         self._publish_joint_state(
             HAND_PITCH_JOINT, int(self.get_parameter('pitch_servo_hold_deg').value))
         self._publish_pump_state()
+        self._publish_pads_spread_state()
+        self._publish_pitch_insert_state()
 
         self.get_logger().info(
             'hand_node started: '
             f'deploy_servo(device_id={self._deploy["device_id"]}), '
             f'pitch_servo(device_id={self._pitch["device_id"]}), '
+            f'servo_speed(deploy={self.get_parameter("deploy_servo_speed_deg_per_s").value}, '
+            f'pitch={self.get_parameter("pitch_servo_speed_deg_per_s").value} deg/s, 0=即時), '
             f'pump(device_id={self._pump["device_id"]}, '
-            f'duty={self.get_parameter("pump_duty_percent").value}%)')
+            f'duty={self.get_parameter("pump_duty_percent").value}%), '
+            f'vacuum_release(device_id={self._vacuum_release["device_id"]}), '
+            f'led(device_id={self._led["device_id"]})')
 
     def _publish_joint_state(self, joint_name, deg):
         msg = JointState()
@@ -263,6 +380,43 @@ class HandNode(Node):
         self.device_publishers_[device_id].publish(msg)
         return True
 
+    def _on_led_yellow_state(self, msg):
+        self._led_yellow_state_ = msg.data
+
+    def _on_led_red_state(self, msg):
+        self._led_red_state_ = msg.data
+
+    def _led_lit(self, state):
+        """state('off'/'on'/'blink_fast'/'blink_slow')から、現在の瞬間の
+        点灯/消灯(bool)を計算する。位相はノード起動時刻からの経過時間を使う
+        自由継続方式(command_gui_node.pyのLedIndicatorWidgetと違い、状態が
+        変わった瞬間に位相をリセットしない。実機側では見た目の違いは無視できる)。"""
+        if state == 'on':
+            return True
+        if state not in ('blink_fast', 'blink_slow'):
+            return False
+        period_ms = LED_BLINK_FAST_PERIOD_MS if state == 'blink_fast' else LED_BLINK_SLOW_PERIOD_MS
+        phase_ms = int(time.monotonic() * 1000) % (period_ms * 2)
+        return phase_ms < period_ms
+
+    def _update_led_output(self):
+        """led_yellow_state/led_red_state(購読済み)から現在の点灯/消灯を計算し、
+        device_id=101の24スロットバッファへ反映して送信する(pump/vacuum_release
+        と同じバッファを共有するため、他スロットは前回値を保持したまま送る、
+        _send参照)。led_device_id=0(未配線)なら何もしない。0.1秒周期タイマ
+        (_led_blink_timer_)から呼ばれる。"""
+        device_id = self._led['device_id']
+        if device_id == 0:
+            return
+        buf = self.device_buffers_[device_id]
+        yellow_slot = self._led['node_index'] * self.slots_per_node_ + self._led['yellow_local_index']
+        red_slot = self._led['node_index'] * self.slots_per_node_ + self._led['red_local_index']
+        buf[yellow_slot] = 1 if self._led_lit(self._led_yellow_state_) else 0
+        buf[red_slot] = 1 if self._led_lit(self._led_red_state_) else 0
+        msg = Int16MultiArray()
+        msg.data = list(buf)
+        self.device_publishers_[device_id].publish(msg)
+
     def _resolve_can_deg(self, sim_deg, offset_deg, override_prefix):
         """実機へ送るCAN角度[deg]を決定する。<override_prefix>_can_deg_overrideが
         Trueなら<override_prefix>_can_degをそのまま使う(実機との相違を手動で
@@ -276,6 +430,59 @@ class HandNode(Node):
             return round(float(self.get_parameter(f'{override_prefix}_can_deg').value))
         return round(sim_deg + offset_deg)
 
+    def _servo_speed_deg_per_s(self, prefix):
+        try:
+            return float(self.get_parameter(f'{prefix}_speed_deg_per_s').value)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _start_servo_move(self, prefix, can_deg):
+        """prefix('deploy_servo'/'pitch_servo')のサーボをcan_deg[deg]へ動かす。
+        速度パラメータが正で、かつ前回の送信角度が分かっている場合はランプを
+        開始し(実際の送信は_ramp_stepのタイマで行う)、そうでなければ即時送信する
+        (モジュールdocstring参照)。戻り値は(送信できたか, 所要時間[s]の目安)。
+        device_id=0(未配線)なら_sendと同様に何もせずFalseを返す。"""
+        ramp = self._ramps[prefix]
+        speed = self._servo_speed_deg_per_s(prefix)
+        if ramp['cfg']['device_id'] == 0:
+            self._send(ramp['cfg'], can_deg)  # 警告ログのみ
+            return False, 0.0
+        if speed <= 0.0 or ramp['current'] is None:
+            # 即時送信。進行中のランプがあれば破棄する。
+            ramp['target'] = None
+            ramp['current'] = float(can_deg)
+            return self._send(ramp['cfg'], can_deg), 0.0
+        ramp['target'] = int(can_deg)
+        ramp['speed'] = speed
+        duration = abs(ramp['target'] - ramp['current']) / speed
+        if self._ramp_timer_.is_canceled():
+            self._ramp_timer_.reset()
+        return True, duration
+
+    def _ramp_step(self):
+        """SERVO_RAMP_PERIOD_SEC周期で呼ばれ、ランプ中の各サーボの送信角度を
+        speed*周期ぶんだけ目標へ近づけて送る。CANへは整数[deg]で送るため、
+        丸めた値が前回から変わったときだけ送信する(device_id=101のバッファは
+        LED点滅タイマからも10Hzで再送されるので、無駄な送信は避ける)。
+        全チャンネルが目標に到達したらタイマを止める。"""
+        any_active = False
+        for ramp in self._ramps.values():
+            if ramp['target'] is None:
+                continue
+            step = ramp['speed'] * SERVO_RAMP_PERIOD_SEC
+            prev = ramp['current']
+            delta = ramp['target'] - prev
+            if abs(delta) <= step:
+                ramp['current'] = float(ramp['target'])
+                ramp['target'] = None
+            else:
+                ramp['current'] = prev + math.copysign(step, delta)
+                any_active = True
+            if round(ramp['current']) != round(prev) or ramp['target'] is None:
+                self._send(ramp['cfg'], round(ramp['current']))
+        if not any_active:
+            self._ramp_timer_.cancel()
+
     def _deploy_offset_deg(self):
         return float(self.get_parameter('deploy_servo_offset_deg').value)
 
@@ -285,10 +492,14 @@ class HandNode(Node):
         (_set_pitchと同じ設計、2026-09-03追加。「収納・展開サーボにも同様の
         機能を」との要望に対応)。"""
         can_deg = self._resolve_can_deg(sim_deg, self._deploy_offset_deg(), override_prefix)
-        response.success = self._send(self._deploy, can_deg)
+        response.success, duration = self._start_servo_move('deploy_servo', can_deg)
         self._publish_pad_states(gathered=gathered)
+        # CAN送信の成否(device_id未配線か)に関わらず論理状態は更新する
+        # (_on_pump_onと同じ理由。配線前でもjoy_teleop_node側のトグル判定が正しく動く)。
+        self._pads_spread = not gathered
+        self._publish_pads_spread_state()
         response.message = (
-            f'吸着パッド{label}(sim={sim_deg}deg, 実機送信={can_deg}deg)' if response.success
+            f'吸着パッド{label}(sim={sim_deg}deg, 実機送信={can_deg}deg{_ramp_note(duration)})' if response.success
             else f'吸着パッド{label}(sim={sim_deg}deg、表示のみ): device_id未設定のためCAN送信できませんでした')
         return response
 
@@ -305,11 +516,35 @@ class HandNode(Node):
         msg.data = self._pump_on
         self.pump_state_pub_.publish(msg)
 
+    def _publish_pads_spread_state(self):
+        msg = Bool()
+        msg.data = self._pads_spread
+        self.pads_spread_pub_.publish(msg)
+
+    def _publish_pitch_insert_state(self):
+        msg = Bool()
+        msg.data = self._pitch_insert
+        self.pitch_insert_pub_.publish(msg)
+
+    def _set_vacuum_release(self, on):
+        """真空破壊リレー(MD2 DIRピン流用)をON/OFFする。ポンプON/OFFと連動して
+        呼ばれる専用の内部ヘルパーで、独立したサービスは設けない(_on_pump_on/
+        _on_pump_off参照)。DIRピンは符号のみで決まるため、OFF時は0を送ればよい。"""
+        if not on:
+            self._send(self._vacuum_release, 0)
+            return
+        duty_percent = float(self.get_parameter('vacuum_release_duty_percent').value)
+        pwm_max = int(self.get_parameter('pump_md_pwm_max').value)
+        duty_raw = round(pwm_max * duty_percent / 100.0)
+        self._send(self._vacuum_release, duty_raw)
+
     def _on_pump_on(self, request, response):
         duty_percent = float(self.get_parameter('pump_duty_percent').value)
         pwm_max = int(self.get_parameter('pump_md_pwm_max').value)
         duty_raw = round(pwm_max * duty_percent / 100.0)
         response.success = self._send(self._pump, duty_raw)
+        # 真空破壊リレーはポンプONの間は閉じておく(真空保持)。
+        self._set_vacuum_release(False)
         # RViz表示用publish等と同様、CAN送信の成否(device_id未配線か)に関わらず
         # 論理状態は更新する(配線前でもjoy_teleop_node側のトグル判定が正しく動く
         # ようにするため)。
@@ -322,9 +557,11 @@ class HandNode(Node):
 
     def _on_pump_off(self, request, response):
         response.success = self._send(self._pump, 0)
+        # 真空破壊リレーをONにして真空を破壊する(ワークを離す)。
+        self._set_vacuum_release(True)
         self._pump_on = False
         self._publish_pump_state()
-        response.message = 'ポンプOFF' if response.success else 'ポンプOFF: device_id未設定のためCAN送信できませんでした'
+        response.message = 'ポンプOFF(真空破壊)' if response.success else 'ポンプOFF: device_id未設定のためCAN送信できませんでした'
         return response
 
     def _pitch_offset_deg(self):
@@ -338,10 +575,12 @@ class HandNode(Node):
         イメージとリンクしていた表示が崩れる」問題があった。sim表示は常に
         オフセット・オーバーライドの影響を受けない論理角度のままにする)。"""
         can_deg = self._resolve_can_deg(sim_deg, self._pitch_offset_deg(), override_prefix)
-        response.success = self._send(self._pitch, can_deg)
+        response.success, duration = self._start_servo_move('pitch_servo', can_deg)
         self._publish_joint_state(HAND_PITCH_JOINT, sim_deg)
+        self._pitch_insert = (override_prefix == 'pitch_servo_insert')
+        self._publish_pitch_insert_state()
         response.message = (
-            f'ピッチ: {label}(sim={sim_deg}deg, 実機送信={can_deg}deg)' if response.success
+            f'ピッチ: {label}(sim={sim_deg}deg, 実機送信={can_deg}deg{_ramp_note(duration)})' if response.success
             else f'ピッチ: {label}(sim={sim_deg}deg、表示のみ): device_id未設定です')
         return response
 

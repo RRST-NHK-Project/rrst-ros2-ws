@@ -448,10 +448,13 @@ soki_simのワンクリック移動ボタン(command_gui_node.py)やcommand_gui_
 note/can_mapping.txt)。変換ノード(real_joint_bridge_node)も実装済みで
 soki_sim/config/real_joint_bridge.yamlのパラメータ変更のみで数値を反映できる
 (詳細はnote/claude.txt「実機とsimの関節角度校正」参照)。要点は以下:
-  - root_theta/tip_theta: CubeMars AK40-10、絶対値エンコーダ(電源再投入後も
-    実角度保持)。外部減速比は両方判明済み: root_theta=112/24(=14/3、2026-08-27変更)、
-    tip_theta=ベルト+プーリ(モーター側20T/手先側28T=1.4倍)。
-    原点センサは1箇所(初期較正用と思われる、要確認)。
+  - root_theta: CubeMars AK40-10、絶対値エンコーダ(電源再投入後も実角度保持)。
+    外部減速比=112/24(=14/3、2026-08-27変更)。原点センサは1箇所
+    (初期較正用と思われる、要確認)。
+  - tip_theta: 2026-09-08方針変更でRoboMas M2006(M3、相対エンコーダ)による
+    単独直接駆動へ移行(root_theta側AK40-10焼損に伴う機材転用、下記参照)。
+    外部減速比はベルト+プーリ(モーター側20T/手先側28T=1.4倍、変更無し)。
+    原点センサ無し、電源投入前に手で0degへ合わせる運用。
   - z_joint/r_joint: M2006+C610の差動機構。位置の真値はロボマス内蔵ロータ
     エンコーダのCAN帰還(M{n} angle)を使う設計(2026-08-31方針転換。以前は
     外付けAMTエンコーダ(ENC1/ENC2、CAN_HOST配下ノードのローカルチャンネル)を
@@ -473,6 +476,17 @@ soki_sim/config/real_joint_bridge.yamlのパラメータ変更のみで数値を
     2つの較正手段が併存している状態のため、実機投入前にどちらを正とするか整理が
     必要(root_thetaは既にsoftwareオフセットを廃止済みなので、同様にtip_theta_
     offset_radも廃止してSet Origin方式に一本化するのが自然だが未対応)。
+
+  **2026-09-08方針変更で上記のtip_theta併存問題は別の形で解消**: root_theta側の
+  AK40-10が電源逆接続で焼損したため、無事だったtip_theta側のAK40-10をroot_theta
+  へ転用し、tip_theta側は新規にRoboMas M2006+C610(z/rと同一device_id=21のM3)へ
+  移行した。これによりtip_thetaはCubeMars Set Origin方式(/set_tip_theta_origin、
+  command_gui_nodeのボタンごと削除済み)を使わなくなり、z/rのような差動ミックス
+  でもない単独直接駆動として、原点センサ無し・電源投入前の手動ゼロ合わせ
+  (M2006内蔵エンコーダの起動時リセット値=0を原点とする)という第三の方式に
+  一本化された。tip_theta_offset_rad自体は微調整用として存置。
+  詳細はnote/hardware_mapping.txt「root_theta_joint (旋回)」節、
+  note/can_mapping.txtのMODE_ROBOMAS M3割当を参照。
 
   - z_joint/r_jointについても、ros2canのMODE_ROBOMASにMITモードが実装された
     ことを受け、2026-08-29にtrajectory_follower_node経由でのMIT位置制御出力を
@@ -498,9 +512,10 @@ soki_sim/config/real_joint_bridge.yamlのパラメータ変更のみで数値を
     (2026-08-27時点、RPM=3/POS=4の続き番号として採用したのみで未検証。
     note/hardware_mapping.txt参照)
   - root_thetaの初回較正の実施(原点センサ位置で/set_root_theta_originを呼ぶ)
-  - tip_thetaの初回較正の実施。2026-09-03に/set_tip_theta_origin(root_thetaと
-    同じCubeMars Set Origin方式)を追加したため、こちらを使うか、従来の
-    tip_theta_offset_rad(real_joint_bridge.yaml)方式を使うか要整理(上記参照)
+  - tip_thetaは2026-09-08方針変更でRoboMas M2006(M3)側の単独直接駆動へ移行
+    (上記参照)。/set_tip_theta_originはCubeMars専用機構のため廃止済み。
+    残タスク: 実機組立後、電源投入前に機構原点(0deg)へ手で合わせる運用の徹底
+    (較正コマンド不要、tip_theta_offset_radは微調整用のみ)
   - homing_node(z/r起動時ホーミング)は実装済み(2026-08-27、soki_sim/scripts/
     homing_node.py)だが、以下は仮定のまま実機未検証:
     - z軸/r軸原点センサのSWチャンネル配線(node_index/local_index、
@@ -508,8 +523,9 @@ soki_sim/config/real_joint_bridge.yamlのパラメータ変更のみで数値を
     - センサ検出時の真のz_joint/r_joint値(z_ref_value_m/r_ref_value_m)
     - モータ回転符号とz/r移動方向の対応(z_home_motor*_vel_sign等)
     実機での動作確認・調整が必要(低速30rpm・タイムアウト20秒から開始する設計)。
-    start_homing/stop_homing(std_srvs/Trigger)サービスで手動起動・中断できる
-    (安全のため自動起動はしない)。
+    2026-09-05よりz軸/r軸は別サービス(start_homing_z/start_homing_r、
+    std_srvs/Trigger)に分離し、軸ごとに独立して手動起動・中断できる
+    (stop_homingは共通。安全のため自動起動はしない)。
 
 ## PSコンのL4/R4・ポンプボタン再割当と、実行中の予約キュー追加 (2026-09-03)
 ユーザー指定でjoy_teleop_node.pyのボタン割当を変更: 「□(四角)でL4、○(丸)で
@@ -804,3 +820,239 @@ R4、△(三角)でポンプトグル、×(バツ)で回収実行」(×のみ従
   - オフスクリーンQtで、_on_shoot_start_requested('L4')実行直後の
     gui._seq_steps[0]が('call', '/hand_set_pitch_insert')になっていることを
     確認済み(2026-09-04)。
+
+
+## ハンド取付オフセット拡大・実機セットアップの起動チェックボックス追加 (2026-09-07、以下2件のユーザープロンプトに対応)
+
+- 「ハンド取り付けオフセットが0.1では足りない。0.3は取っておいて。他にも0.1で
+  クランプされているところがあれば0.3に拡大」への対応: hand_offset_limit
+  (soki_sim.urdf.xacro)・HAND_OFFSET_LIMIT(command_gui_node.py)を0.1→0.3へ
+  拡大(両方を一致させる規約、command_gui_node.py:212のコメント参照)。他に
+  0.1でクランプされている箇所は無かった(urdf.xacroのtip_height=0.1は手先の
+  物理寸法でクランプ値ではないため対象外。MACHINE_ORIGIN_OFFSET_LIMITは
+  既に1.0)。
+- 「soki_simのGUIの全ノード起動ボタンで起動するrvizとros2canの起動を管理
+  できるチェックボックスを追加」→ユーザー訂正「ros2canは起動するよもちろん。
+  チェックボックスで選ぶのはros2can --noguiか否かだけ」への対応: 「実機
+  セットアップ」パネルに「rvizを起動する」(既定ON)・「ros2canをGUIで起動する
+  (オフで--nogui)」(既定ON=GUI)チェックボックスを追加。ros2canは常に起動、
+  --noguiの有無だけを切り替える。real_all_axes_test.launch.pyにros2can_nogui
+  引数(既定false)を新設し、同名(ros2can_gui)の2つのNode定義をIfCondition/
+  UnlessConditionで排他的に切り替える方式にした(launch_ros.Nodeのarguments
+  は条件付きで一部だけ追加できないため)。command_gui_node.py側はALL_AXES_
+  LAUNCH_CMD(固定コマンド)をuse_viz抜きのALL_AXES_LAUNCH_BASE_CMDに変更し、
+  _on_launch_all_nodesでチェックボックスの状態からuse_viz:=/ros2can_nogui:=
+  (GUIチェックボックスは反転)を都度組み立てて追加するようにした。
+rvizの起動はデフォルトでオン、ros2canについてはデフォルトでオフ（--noguiで起動）
+
+
+## ros2canの既定を--noguiからGUIありへ戻す (2026-09-10、ユーザー指定
+## 「ros2canがデフォで--noguiなんだけど、GUIありに変更」)
+
+2026-09-10に「操作はcommand_gui_node側で完結しておりros2canのPyQt5ウィンドウは
+通常不要」としてros2can_noguiの既定をtrue(--nogui)にしていたが、ros2can GUI側の
+デバイス状態・スロット生値を直接見たい場面が多いためユーザー指定で既定をfalse
+(PyQt5ウィンドウあり)へ戻した。ros2can自体は従来どおり常に起動し、--noguiの
+有無だけが変わる。ターミナルダッシュボードで動かしたい場合は
+ros2can_nogui:=true を明示する。
+
+変更箇所(5箇所、既定値は全て揃えること):
+  soki_sim/launch/real_all_axes_test.launch.py  ros2can_nogui既定 true -> false
+  soki_sim/launch/real_axes_test.launch.py       同上
+  soki_sim/launch/real_root_theta_test.launch.py 同上
+  soki_sim/launch/real_z_r_test.launch.py        同上
+  soki_sim/scripts/command_gui_node.py _on_launch_all_nodes
+    ros2can_nogui:=true -> false (GUI起動時の自動起動コマンド)
+
+**GUIモードと--noguiモードの実質的な差**: ros2can/main.pyは--nogui時だけ
+HardwareManager.deviceClaimedにフックしてch.direct_tx=Trueを強制する
+(serial_bridge互換の「常時ブリッジ」再現)。GUIモードではdirect_txはOFFのまま
+だが、外部ノードからの指令が実機へ届くかどうかを決めるのはtopic_passthrough
+(ChannelStateの既定True、ros_backend.py参照)の方なので、trajectory_follower_
+node等からの制御は既定のまま問題なく通る。差が出るのは「新しいトピック
+メッセージが来ていない間も周期的に前回値を再送するか」だけで、実機出力ノードは
+いずれも自分のタイマー周期でpublishし続けるため実害は無い。
+なお、ros2can GUIでdirect_txのチェックを手で入れるとGUI側の相互排他により
+topic_passthroughがOFFになり、外部ノードからの指令が届かなくなる点には注意
+(device_panel.py、docs/internals.md参照)。
+
+
+## GUI保存の設定値がcolcon buildで消える問題の修正 (2026-09-10、ユーザー報告
+## 「R軸格納速度が毎回0.2になってしまう。0.1に変えて保存しても次回起動時には
+## 戻ってる？原因を調査」→「Aで」)
+
+**原因**: command_gui_nodeの保存先解決(_resolve_gains_file_path /
+_resolve_config_yaml_path)がget_package_share_directory経由のパスだけを見て
+おり、実体はinstall/soki_sim/share/soki_sim/config/以下のコピーだった。
+コード上のコメントは「symlink-installならソースツリー側を直接編集」と書いて
+あったが、ビルドログを確認すると直近の全ビルドが素の`colcon build`
+('symlink_install': False)で、install側はシンボリックリンクではなくただの
+コピー。CMakeLists.txtのinstall(DIRECTORY config ...)が使うCMakeのfile(INSTALL)
+はコピー先の方がmtimeが新しくても内容が違えば上書きするため、GUIで保存した値は
+次のcolcon buildでsrc/側の内容(コミット済みの0.2)に戻されていた。GUIスクリプト
+自体もinstall(PROGRAMS)のコピーで、コードを触れば必ずリビルドするため実質毎回
+リセットされていた。同じ経路のreal_joint_bridge.yaml(配線設定)も同じ問題を
+抱えていた。
+
+**対処(選択肢Aを採用)**: 保存先をソースツリー側(<ws>/src/soki_sim/config/)優先に
+変更した。
+  - _iter_config_path_candidates()を新設。share_dirとCOLCON_PREFIX_PATHの各
+    エントリから親方向へ辿り、src/soki_sim/config/{filename}が実在する親を
+    <ws>として採用する(install/のレイアウト差を吸収するため決め打ちの階層数に
+    しない)。見つからなければ従来どおりshare側を返す。
+  - 環境変数での明示上書き(CONFIG_PATH_ENV_VARS): gains.jsonは
+    SOKI_SIM_GAINS_FILE、real_joint_bridge.yamlは
+    SOKI_SIM_REAL_JOINT_BRIDGE_YAML。ワークスペース構成が標準から外れた場合の
+    逃げ道。
+  - _write_config_file()を新設し、保存時はソースツリー側に書いた内容を
+    install側のコピーにも書き写す。real_joint_bridge.yamlは
+    real_joint_bridge_node/homing_nodeがFindPackageShare経由(=install側)で
+    読むため、これが無いとcolcon buildするまでノードに反映されなくなり、
+    従来の「保存すれば次回launchから反映される」挙動が壊れるため。
+    書き写しの失敗は保存失敗扱いにしない(次のcolcon buildで同期されるだけ)。
+
+変更箇所:
+  soki_sim/scripts/command_gui_node.py
+    CONFIG_PATH_ENV_VARS / _config_path_env_override / _iter_config_path_candidates
+    / _share_config_path / _write_config_file を新設、_resolve_config_yaml_path
+    と_resolve_gains_file_pathを書き換え、_on_save_yaml_wiringと_persist_gains
+    の書き込みを_write_config_file経由に変更
+  soki_sim/config/gains.json
+    sequence.retract_r_speed_mps 0.2 -> 0.1 (ユーザーが毎回設定していた値。
+    コード側フォールバックSEQ_RETRACT_R_SPEED_MPSも0.1で一致)
+
+**検証**: gains.jsonを0.12にしてcolcon build後も0.12のまま(src/install両方)で
+あることを確認済み。修正前は同条件でsrc側の値に巻き戻っていた。
+
+## 回収シーケンスで左側のワークだけ中心を狙って見える件 (2026-09-11)
+**症状**: 回収シーケンス(_start_pick_sequence、狙い点をワーク上面側へ
+pick_aim_y_offset_mずらす方式)で、右側の列は上面を向くのに左側の列だけ
+ワーク中心を向いているように見える(実機)。
+
+**調査**: GUI→send_target→trajectory_follower_node→CubeMars MIT指令→cubemars.cpp
+まで追ったが、x(左右)の符号で非対称になる箇所は無い。1-1/1-6のθは完全に鏡像。
+→ ソフトが左右で違う値を出しているのではなく、実機側に一定のずれが乗って
+片側だけ目立つ状況。ユーザー実測で「根本θ中心(旋回軸)が機体原点から
+フィールドに向かう向き(URDF x=前方)に20mmずれている」と判明(当初「Y軸正
+方向」と聞いて左ずれと解釈したが、前方ずれに訂正)。
+注意: 前方ずれ自体は左右対称にしか効かない(両側とも上面より20mm奥を向く)
+ので、「左だけ中心を向く」の直接原因ではない。ただし旋回軸ずれを逆運動学が
+無視していた欠陥自体は事実なので修正した。左右非対称分の残りは root_theta の
+零点バイアス(1-4で約4.6°、1-6で約6°の反時計回りずれで左側がちょうど中心を
+向く)が最有力。
+
+**原因**: WORK_POINTS等のフィールド座標は機体原点(machine_origin_link)基準で
+採寸した値だが、逆運動学(xyz_to_joint/_theta_r_from_xy、atan2(-x, y))は旋回軸
+=機体原点の前提で計算していた。機体原点オフセットパネル(machine_origin_x/y/z_
+joint)は/mixed_joint_statesへ送ってRViz表示を動かすだけで、逆運動学では
+一切使われていなかった。旋回軸が左へ20mm寄ると、左側のワークは旋回軸から
+見て中心線寄りになり、指令した光線がワーク列を手前(中心付近)で横切る。
+数値確認(参考、旋回軸が左へ0.02mの場合): 1-4(x=-0.1)は旧計算の光線がy=0.269で
+列を横切る(ワーク中心0.265、上面0.336)。旋回軸が前方へ0.02mの場合は左右とも
+y=0.356(上面より20mm奥)で対称。
+
+**対処**: command_gui_node.py
+  - field_to_axis/axis_to_field を新設し、xyz_to_joint/_theta_r_from_xy/
+    joint_to_xyz にmachine_origin引数(URDF座標のmachine_origin_x/y/z_joint値)を
+    追加。GUI座標(x=右,y=前)とURDF座標(x=前,y=左)の対応はWORK_POINTS定義部と
+    同じで、フィールド座標(x,y,z)は旋回軸基準で(x - my, y + mx, z + mz)。
+  - self._machine_origin(適用値)を回収/投入シーケンスのθ計算と現在位置XYZ
+    表示(joint_to_xyz)で使う。
+  - 「適用」でgains.jsonの'machine_origin'セクションへ保存し、起動時に
+    _restore_saved_gainsで編集欄・適用値へ復元してRVizへ送信。GUIより後に
+    joint_state_publisherが起動した場合に備え_refresh_machine_status(1秒周期)
+    から送り直す。
+  パネルの入力値は「旋回軸から機体原点までのズレ」(URDF座標: X=前方、Y=左)
+  なので、旋回軸が機体原点よりフィールド側へ20mmずれているなら X=-0.020 を
+  入れる。
+
+**未確認**: 実機での効果確認(X=-0.020適用後、左右とも上面より奥を向く分が
+消えるか)。左だけ中心寄りの残差はroot_theta零点の取り直し(θ=0を指令して
+アームがフィールド前後方向と平行か確認)で対処する。
+
+## XYモード(手先ワールドXYジョグ、低速モードと統合) (2026-09-11実装)
+ユーザー指定:「XY軸操作モードの実装は可能か? 手先の調整時のみ使う」→「SHAREの
+低速と統合、左スティックでXYどちらも出(る)」。
+  - joy_teleop_node.py: 低速モード(SHARE、_low_speed_enabled_)ON中は左スティックを
+    関節rではなく手先ワールドXY(X=右、Y=前方、GUI座標と同じ)のジョグにする。
+    手先速度(vx,vy)=入力×xy_speedを、実測の現在θ・R=r+ARM_LENGTH/2で
+      Ṙ = -vx·sinθ + vy·cosθ  → r_jointの速度指令(velocity_mode)/位置積分に加算
+      θ̇ = -(vx·cosθ + vy·sinθ)/R → root_theta目標角の積分に加算(L2/R2と加算併用)
+    に分解(冒頭docstring「XYモード」、_timer_callback参照)。θ̇はtheta_speed×
+    low_speed_multiplierで頭打ち、R<XY_MIN_RADIUS_M(0.05m)では回転成分を出さない。
+    新パラメータ: axis_xy_x(0)/axis_xy_y(1)/invert_xy_x(true)/invert_xy_y(false)/
+    xy_speed(0.05m/s、low_speed_multiplierは掛けない実速度)。
+    スティック向きの既定(左=+1のjoy_node標準を仮定してinvert_xy_x=true)は実機で要確認。
+  - command_gui_node.py: 「手動操作(joy)速度」パネルにxy_speed欄を追加。
+    gains.json joy_speedにxy_speed=0.05を追加(無いと適用時に0.0が送られ
+    「must be positive」で全体が弾かれる)。
+  - 制約: θは位置追従・rは速度指令なので速く動かすと直線からずれる(微調整用途
+    前提)。xy_speedをtrajectory_follower_nodeのr速度上限(max_velocity 0.2×
+    low_speed_multiplier 0.3=0.06m/s)より大きくするとr側だけ飽和して方向が狂う。
+  - 検証: 分解式をθ=35°,r=0.2から1秒積分するシミュレーションで(vx,vy)通りに
+    手先が動くことを確認(実機・sim未確認)。
+
+備考(同日): gains.jsonのmachine_originが y=-0.02 になっていた(前方ずれを
+「Y軸正方向」と聞いて左ずれと誤解釈した案内に従ってGUIから適用されたもの)。
+実際は前方(URDF x)ずれのため x=-0.02, y=0.0 に修正済み。
+
+## Z軸上昇時のみの速度バイアス (2026-09-12、ユーザー報告「Z軸について、上方向に
+## 動く時が遅いので上のときだけバイアスかけれないか」)
+原因の見立て: 速度モード(既定)のfirmware速度PIDはgains.jsonの実機調整値が
+Ki=0のP制御。重力に逆らう上昇では「重力分の電流÷Kp」だけ定常的に速度が
+目減りし、下降では逆に重力が助けるため上下で速度差が出る。
+速度モードのRxスロットは24個全部(target/mode/Kp/Ki/Kd/電流上限)で埋まって
+おり、MITモードのcurrent_ffに当たる電流FFスロットが無い(robomas.cpp先頭
+コメント)。firmwareを変えずにROS側で目標速度へ上乗せする形にした。
+  - trajectory_follower_node.py: 新パラメータrobomas_z_up_velocity_bias_mps
+    (既定0.0=無効)。_velocity_mode_target_rpmで、max_velocityクランプ・
+    スルーレート・リミットスイッチ0クランプの後、z_vel>0(上昇)のときだけ
+    加算する。停止(0)・下降には加えない。P制御の定常偏差は指令速度によらず
+    一定なので倍率ではなく加算[m/s]。負値はz上昇指令で下降させ上限側
+    リミットのブロック判定(z_vel>0)をすり抜けるため、
+    NON_NEGATIVE_GAIN_SCALAR_PARAMSで拒否+指令生成時nonneg_gainでクランプ。
+  - command_gui_node.py: 「速度モードゲイン」パネルに「Z上昇バイアス [m/s]」
+    欄(make_gain_edit、下限0)。読込/適用/gains.json永続化/起動時自動適用は
+    既存のrobomas_vel_gain節の経路をそのまま通る。ついでに、robomas_vel_gain節が
+    起動時のGUI復元(_restore_saved_gains)から漏れていたのを他の節と同様に
+    復元するよう修正。
+  - gains.json: robomas_vel_gainにrobomas_z_up_velocity_bias_mps=0.0を追加。
+  - 検証: ROS_DOMAIN_ID=77で単体実行し、上昇0.1→0.15/下降-0.1→-0.1/
+    停止0→0/上限ブロック中→0、負値のSetParameters拒否、GUI(offscreen)の
+    収集→保存→再起動復元を確認。実機未確認。
+  - 調整目安: 上昇/下降を同じスティック量で動かし、実速度(ros2can帰還rpm)の
+    差の半分程度から始める。上げすぎると上昇だけmax_velocityを超える。
+    位置モード(MIT)側には未適用(速度モードのみ)。根本対策としてはKi>0で
+    定常偏差自体を消す手もある(その場合このバイアスは0に戻す)。
+
+## シューティング位置をGUIで選択可能に、既定をフィールド側から2番目(L3/R3)へ (2026-09-13、
+## ユーザー指摘「シューティング位置は一番フィールドに近い位置だと思う。これをGUIで
+## 切り替えられるように、デフォルトはフィールド側から2番め」)
+これまで投入シーケンスの目標はSHOOT_FIXED_TARGETS={'L4','R4'}(SHOOT_POINTSの
+index 3=最もフィールド寄り)固定だった。
+  - command_gui_node.py: SHOOT_FIXED_TARGETSを廃止し、SHOOT_BOX_CHOICES
+    (「フィールド側からn番目 (Lk/Rk)」, index=4-n)とDEFAULT_SHOOT_BOX_INDEX
+    (当初2=L3/R3)、shoot_target(side, index)を追加。「ピック/投入 自動シーケンス」
+    パネルに「シューティング位置」QComboBox(shoot_box_combo)を置き、左右の
+    移動ボタン(shoot_l_btn/shoot_r_btn、文字列は「L3へ移動」のように選択に
+    追従)、PSコン経由の/shoot_sequence_start_l4・_r4(ハンドラ引数はラベルから
+    側'L'/'R'へ変更、応答messageに実際の箱ラベル)、ミニマップの強調表示
+    (FieldMinimapWidget.set_shoot_labels)がすべてこの選択に従う。
+    他のチェックボックス同様gains.jsonには保存せず、起動時は常に既定。
+    既定は同日中にユーザー指定で「フィールド側から3番目(L2/R2、index 1)」へ
+    変更(DEFAULT_SHOOT_BOX_INDEX=1、|θ|≈126deg → 手先θ≈±36deg)。
+    サービス名・joyパラメータ名の_l4/_r4は互換のためそのまま(左右の意味のみ)。
+  - joy_teleop_node.py: docstring/コメントのみ更新(挙動変更なし)。
+  - 手先θ追従のシューティングエリア判別(|θ|≥85deg)は、L3/R3で|θ|≈114deg、
+    L1/R1でも≈135deg、L4/R4で≈99degなので4箱いずれを選んでも変更不要。
+  - 検証: offscreen GUIで既定「L3へ移動/R3へ移動」・ミニマップ{L3,R3}、
+    選択を1番目に変えると「L4へ移動」・{L4,R4}、ハンドラ('R')が'R4'を返すこと
+    を確認。実機未確認。
+
+## 手動操作XY速度(xy_speed)の既定を0.1へ (2026-09-13、ユーザー指定「手動操作のXY速度の
+## デフォルトを0.1に」)
+  - joy_teleop_node.py: declare_parameter('xy_speed')の既定0.05→0.1。gains.json
+    joy_speed.xy_speedは既に本番値0.1(コミット67ff92c)なのでそちらは変更なし。
+    GUI「手動操作(joy)速度」パネルからの適用値・gains.json復元は従来どおり優先。
+  - 0.1はr側の速度クランプ(max_velocity 0.2×low_speed_multiplier 0.3=0.06m/s)を
+    超えるため、r成分が支配的な向きでは頭打ちで直線から少しずれる(既知)。
