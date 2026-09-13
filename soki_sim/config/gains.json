@@ -1,33 +1,35 @@
 {
   "trajectory": {
     "max_velocity": {
-      "root_theta_joint": 0.1,
-      "tip_theta_joint": 0.1,
-      "z_joint": 0.036,
-      "r_joint": 0.036
+      "root_theta_joint": 1.0,
+      "tip_theta_joint": 2.0,
+      "z_joint": 0.2,
+      "r_joint": 0.2
     },
     "max_acceleration": {
-      "root_theta_joint": 0.2,
-      "tip_theta_joint": 0.2,
-      "z_joint": 0.036,
-      "r_joint": 0.036
+      "root_theta_joint": 4.0,
+      "tip_theta_joint": 4.0,
+      "z_joint": 0.4,
+      "r_joint": 0.4
     },
     "max_deceleration": {
-      "root_theta_joint": 0.4,
-      "tip_theta_joint": 0.4,
-      "z_joint": 0.072,
-      "r_joint": 0.072
+      "root_theta_joint": 4.0,
+      "tip_theta_joint": 4.0,
+      "z_joint": 0.4,
+      "r_joint": 0.4
     }
   },
   "joy_speed": {
-    "theta_speed": 0.05,
-    "z_speed": 0.02,
-    "r_speed": 0.02,
-    "tip_theta_speed": 0.1
+    "theta_speed": 1.0,
+    "z_speed": 0.2,
+    "r_speed": 0.2,
+    "tip_theta_speed": 1.0,
+    "low_speed_multiplier": 0.3,
+    "xy_speed": 0.1
   },
   "mit_gain": {
     "cubemars_kp": {
-      "root_theta_joint": 5.0
+      "root_theta_joint": 2.0
     },
     "cubemars_kd": {
       "root_theta_joint": 0.5
@@ -44,22 +46,31 @@
     "robomas_kick_current_a": 0.1,
     "robomas_kick_duration_sec": 0.05,
     "robomas_kick_vel_threshold_mps": 0.001,
-    "robomas_tip_theta_kp": 0.02,
-    "robomas_tip_theta_kd": 0.002,
+    "robomas_tip_theta_kp": 0.2,
+    "robomas_tip_theta_kd": 0.05,
     "robomas_tip_theta_current_ff": 0.0
   },
   "sequence": {
-    "safe_transit_z_m": 0.252,
-    "r_retract_m": -0.322,
-    "pickup_z_offset_m": 0.0758,
-    "pickup_approach_clearance_m": 0.1,
-    "shoot_tip_theta_rad": 0.0,
-    "gather_settle_sec": 0.5
+    "shoot_tip_theta_trim_deg": 0.0,
+    "retract_r_speed_mps": 0.1,
+    "gather_settle_sec": 0.5,
+    "pick_aim_y_offset_m": 0.0,
+    "root_theta_trim_ak_deg": 0.0
   },
   "robomas_vel_gain": {
-    "robomas_vel_kp": 0.8,
+    "robomas_vel_kp": 1.0,
     "robomas_vel_ki": 0.0,
-    "robomas_vel_kd": 0.0,
-    "robomas_vel_max_current_a": 1.0
+    "robomas_vel_kd": 0.1,
+    "robomas_vel_max_current_a": 1.5,
+    "robomas_z_up_velocity_bias_mps": 0.1
+  },
+  "machine_origin": {
+    "machine_origin_x_joint": -0.02,
+    "machine_origin_y_joint": 0.0,
+    "machine_origin_z_joint": 0.0
+  },
+  "hand_servo_speed": {
+    "deploy_servo_speed_deg_per_s": 0.0,
+    "pitch_servo_speed_deg_per_s": 0.0
   }
 }

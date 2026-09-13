@@ -8,7 +8,7 @@ RVizでの見た目確認用途のため、慣性(inertial)や衝突形状(colli
   base_link   =[root_theta_joint (revolute, z軸, ±153.5°=実機MIT可動域)]=>  turret_link (旋回台+マスト)
   turret_link =[z_joint (prismatic, z軸)]=>             lift_link (昇降キャリッジ)
   lift_link   =[r_joint (prismatic, x軸)]=>             arm_link (伸縮アーム)
-  arm_link    =[tip_theta_joint (continuous, z軸)]=>    tip_link (手先)
+  arm_link    =[tip_theta_joint (continuous, z軸。機械端は電流で検出)]=> tip_link (手先)
 
 z_joint/r_joint は実機ではmotor1/motor2の2モータによる差動機構で駆動される
 (z = k(m1+m2), r = k(m1-m2))ため、URDF上にもmotor1_joint/motor2_jointを
@@ -61,6 +61,14 @@ motor1_joint/motor2_jointのスライダーを直接動かしても、z_joint/r_
        (2026-08-27)。 -->
   <xacro:property name="root_theta_reduction" value="${112.0 / 24.0}"/>
   <xacro:property name="root_theta_limit" value="${12.5 / root_theta_reduction}"/>
+
+  <!-- tip_theta: 2026-09-10、機構側に物理リミット(当てて止めるストッパ)が付いた
+       のに伴い、それまでの固定±135deg制限を廃止しcontinuousへ戻した
+       (ユーザー指定:「この角度制限はなくしていい」)。可動域の保護は
+       trajectory_follower_nodeが実電流+実速度から機械端を検出して指令を止める
+       方式へ移行した(TIP_THETA_STALL_*、note/hardware_mapping.txt参照)。
+       機械端の位置は起動時の手動ゼロ合わせ次第で毎回変わるため、URDF側に
+       固定値として書けるものが無い(書くとsimだけ実機と食い違う)。 -->
 
   <!-- マテリアル -->
   <material name="base_grey">

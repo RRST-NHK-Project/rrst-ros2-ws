@@ -72,9 +72,9 @@ from PyQt5.QtGui import (
     QColor, QDoubleValidator, QFont, QFontMetrics, QIcon, QIntValidator, QPainter, QPen, QPixmap,
 )
 from PyQt5.QtWidgets import (
-    QApplication, QButtonGroup, QCheckBox, QGridLayout, QGroupBox, QHBoxLayout,
-    QInputDialog, QLabel, QLineEdit, QListWidget, QMessageBox, QPushButton,
-    QRadioButton, QScrollArea, QSlider, QTabWidget, QVBoxLayout, QWidget,
+    QApplication, QButtonGroup, QCheckBox, QComboBox, QGridLayout, QGroupBox, QHBoxLayout,
+    QLabel, QLineEdit, QMessageBox, QPushButton,
+    QRadioButton, QScrollArea, QTabWidget, QVBoxLayout, QWidget,
 )
 
 # soki_sim.urdf.xacro の寸法定数と一致させること
@@ -91,22 +91,34 @@ ROOT_THETA_REDUCTION = 112.0 / 24.0
 ROOT_THETA_LIMIT = 12.5 / ROOT_THETA_REDUCTION
 ROOT_THETA_LOWER, ROOT_THETA_UPPER = -ROOT_THETA_LIMIT, ROOT_THETA_LIMIT
 
-# tip_theta(手先θ)は機構的にはcontinuous(2026-09-08、CubeMarsからROBOMAS(M2006)へ
-# 移行し、CubeMars時代のMIT範囲制約(±511.6°相当)は無くなった。note/hardware_
-# mapping.txt「root_theta/tip_thetaはMITモードの都合上そもそも…」参照)だが、
-# 関節スライダー(_build_joint_slider_panel)のUI上の目盛り範囲としては手動ジョグ
-# 用途で十分な±180degにしておく(実機の可動域自体を制限する値ではない)。
-TIP_THETA_LOWER, TIP_THETA_UPPER = -math.pi, math.pi
+# tip_theta(手先θ)の機構的な可動域(2026-09-10、ユーザー指定:「270度以上回らない
+# ようにしたい。つまり電源投入時の位置から左右に135度」)。tip_thetaは原点センサを
+# tip_theta(手先θ)の可動域について。
+# 2026-09-10、機構側に物理リミット(当てて止めるストッパ)が付いたのに伴い、
+# それまでの固定±135deg制限は廃止した(ユーザー指定:「手先θにリミットをつけた、
+# 物理的に当てて止めるものなので電流値を見て入力を止められないか」「この角度
+# 制限はなくしていい」)。代わりにtrajectory_follower_nodeが実電流+実速度から
+# 機械端を検出して指令を止める(TIP_THETA_STALL_*、_update_tip_theta_stall参照)。
+# このノード側では角度でのクランプは行わない。
+
+# 手先θ追従の符号: tip_theta_joint = TIP_THETA_FOLLOW_SIGN * root_theta_joint。
+# 吸着パッド3個の展開軸をワークの行(ワールドX軸)と平行に保つための関係式。
+# 2026-09-10、ユーザー報告「手先追従時はモーターの回転が逆、手動操作時の
+# コントローラーとの対応づけはあっている」により -1.0 から +1.0 へ修正した。
+# 手動ジョグ(L1/R1)はinvert_tip_theta未設定(sign_tip_theta_=+1)のまま正しい向きに
+# 動いているので、関節角の向きの定義自体は合っている。つまり追従の関係式だけが
+# 逆だった。原因は2026-09-08のtip_theta駆動系変更(CubeMars AK40-10の直接駆動から
+# RoboMas M2006 + タイミングベルト(20T/28T)へ)で、モータが機構のどちら側に付くかが
+# 変わり、root_thetaの回転に対して手先が回る向きが反転したため。-1.0はCubeMars
+# 時代(2026-09-03)の値をそのまま流用していた。
+# joy_teleop_node.pyとcommand_gui_node.pyの両方に同じ値を置くこと(片方だけ直すと
+# 手動運転中の追従と回収シーケンスで向きが食い違う)。
+TIP_THETA_FOLLOW_SIGN = 1.0
 
 # lift_link原点(z_joint基準)の地面からの高さオフセット
 Z_OFFSET = BASE_HEIGHT + LIFT_SIZE_Z / 2.0
 WORLD_Z_LOWER = Z_OFFSET + Z_LOWER
 WORLD_Z_UPPER = Z_OFFSET + Z_UPPER
-# 手先が原点(旋回軸)から届く最大水平距離(= r_upper + arm_length/2)
-MAX_RADIUS = R_UPPER + ARM_LENGTH / 2.0
-
-POINTS_FILE = os.path.expanduser('~/.config/soki_sim/points.json')
-
 # ---- フィールド(ワーク配置環境)・シューティングエリアの寸法定数 ----
 # soki_sim.urdf.xacro の該当プロパティと一致させること(ワンクリック移動ボタン用)
 FIELD_ROBOT_BOARD_DEPTH = 0.290
@@ -154,10 +166,26 @@ SHOOT_POINTS = {
     'L': [(f'L{i + 1}', -SHOOT_OFFSET_Y, SHOOT_CENTER_X + SHOOT_BOX_X[i], SHOOT_BOX_Z) for i in range(4)],
     'R': [(f'R{i + 1}', SHOOT_OFFSET_Y, SHOOT_CENTER_X + SHOOT_BOX_X[i], SHOOT_BOX_Z) for i in range(4)],
 }
-# 実運用で実際に使うシューティングエリアはL4/R4の2箇所のみ(2026-09-03、
-# ユーザー指摘: 「シューティングエリアはL4もしくはR4で、ボタンを2つおいておいて」)。
-# 「投入エリアへ移動」パネルの固定ボタン2つ(_on_shoot_start_requested)から使う。
-SHOOT_FIXED_TARGETS = {'L4': SHOOT_POINTS['L'][3], 'R4': SHOOT_POINTS['R'][3]}
+# 実運用で使うシューティングボックスは左右1箇所ずつ(2026-09-03、ユーザー指摘:
+# 「シューティングエリアはL4もしくはR4で、ボタンを2つおいておいて」)。どの箱を
+# 使うかはGUIの「ピック/投入 自動シーケンス」パネルのシューティング位置選択
+# (shoot_box_combo、_build_sequence_settings_panel)で切り替えられる(2026-09-13、
+# ユーザー指摘:「シューティング位置は一番フィールドに近い位置だと思う。GUIで
+# 切り替えられるように、デフォルトはフィールド側から2番目」)。
+# SHOOT_POINTS[side]の添字は機体側(フィールドから遠い)から順で、index 3(L4/R4)が
+# 最もフィールド寄り。選択肢は「フィールド側から何番目か」で提示する
+# (フィールド側からn番目 = index 4-n)。
+SHOOT_BOX_CHOICES = [
+    (f'フィールド側から{n}番目 (L{4 - n + 1}/R{4 - n + 1})', 4 - n) for n in range(1, 5)
+]
+# 既定はフィールド側から3番目(L2/R2、index 1。2026-09-13当初は2番目(L3/R3)
+# だったが同日ユーザー指定「デフォルトをフィールドから3番めに変更」)。
+DEFAULT_SHOOT_BOX_INDEX = 1
+
+
+def shoot_target(side, index):
+    """side('L'/'R')とSHOOT_POINTS添字から(ラベル, x, y, z)を返す。"""
+    return SHOOT_POINTS[side][index]
 
 JOINT_NAMES = ['root_theta_joint', 'z_joint', 'r_joint']
 # MITゲインパネル(CubeMars)対象関節。JOINT_NAMESとは別物: root_thetaのみが
@@ -178,13 +206,25 @@ CUBEMARS_JOINT_NAMES = ['root_theta_joint']
 TRAJ_PANEL_JOINT_NAMES = JOINT_NAMES + ['tip_theta_joint']
 TRAJ_NODE_NAME = 'trajectory_follower_node'
 JOY_NODE_NAME = 'joy_teleop_node'
-HOMING_NODE_NAME = 'homing_node'
+HAND_NODE_NAME = 'hand_node'
+# ハンドパネルから実行中に変更できるhand_nodeのパラメータ(2026-09-12追加、
+# ユーザー要望:「手先サーボの速度をGUIで調整できるように」)。hand_node側は
+# サービス呼び出しのたびにパラメータを読み直すのでSetParametersで即反映される
+# (hand_node.pyモジュールdocstring参照)。gains.jsonのhand_servo_speed節に永続化し、
+# GUI起動時にhand_nodeへ自動適用する(_auto_apply_saved_hand_servo_speed参照)。
+# hand.yamlの同名パラメータはhand_node起動時の初期値で、GUIの自動適用はそれを
+# 上書きする(robomasゲイン等と同じ運用)。
+HAND_SERVO_SPEED_FIELDS = (
+    ('deploy_servo_speed_deg_per_s', '展開/収納'),
+    ('pitch_servo_speed_deg_per_s', 'ピッチ'),
+)
 REAL_JOINT_BRIDGE_NODE_NAME = 'real_joint_bridge_node'
 AUTOTUNE_NODE_NAME = 'autotune_node'
 # 統合操作タブの「機体ステータス」パネルで起動状況を表示するノード
 # (command_gui_nodeがサービス/パラメータ・トピック経由で直接やり取りするノード。
-# autotune_nodeは2026-09-09追加)。
-STATUS_NODE_NAMES = [TRAJ_NODE_NAME, JOY_NODE_NAME, HOMING_NODE_NAME, REAL_JOINT_BRIDGE_NODE_NAME,
+# autotune_nodeは2026-09-09追加。homing_nodeは2026-09-09、manualブランチでの
+# 操作方針変更によりGUIから使わなくなったため対象から外した)。
+STATUS_NODE_NAMES = [TRAJ_NODE_NAME, JOY_NODE_NAME, REAL_JOINT_BRIDGE_NODE_NAME,
                      AUTOTUNE_NODE_NAME]
 
 # 状態表示灯(赤色LED、2026-09-08追加)の「ノード未起動」判定対象デバイス。
@@ -195,20 +235,25 @@ STATUS_NODE_NAMES = [TRAJ_NODE_NAME, JOY_NODE_NAME, HOMING_NODE_NAME, REAL_JOINT
 STATUS_DEVICE_IDS = [11, 21, 101]
 STATUS_DEVICE_STALE_TIMEOUT_SEC = 2.0
 
+# _spin_ros1回あたりのrclpy.spin_once()呼び出し回数(2026-09-09追加、
+# _spin_rosのコメント参照)。spin_once(timeout_sec=0)は1回につき保留中の
+# コールバックを1つしか処理しないため、購読トピック数の多いこのGUIでは
+# 複数回呼ばないと同じ50ms枠に届いた分を処理しきれない。
+_SPIN_ROS_DRAIN_COUNT = 10
+
 # CAN_HOSTのserial_rx_{device_id}_unwrappedの生値モニタ(配線設定パネルのz/r原点
 # センサのノード/スロット割当が実機と合っているか確認する用、2026-09-08追加)。
 # device_id自体は「原点センサ・ホーミング配線設定」パネルの入力値(既定101)を
 # 都度読む。スロット数はros2can/ros2can/device_profiles.pyのSLOT_COUNTと一致させること。
 CAN_HOST_RAW_SLOT_COUNT = 24
 
-# 統合操作タブの「実機セットアップ」パネルから起動する、本番でそのまま使う
-# launch構成(note/command.txt「4軸(root_theta/tip_theta/z/r)全軸の実機動作確認。
-# 本番でそのまま使う想定」のコマンドと同じ)。real_all_axes_test.launch.pyは
+# GUI起動時に自動で起動する(_check_existing_launch_nodes参照)、本番でそのまま
+# 使うlaunch構成(note/command.txt「4軸(root_theta/tip_theta/z/r)全軸の実機動作
+# 確認。本番でそのまま使う想定」のコマンドと同じ)。real_all_axes_test.launch.pyは
 # command_gui_nodeも起動するが、既にこのGUIプロセス自身が動いているため
-# launch_gui:=falseでGUIの二重起動を防ぐ。use_viz/use_ros2canは「実機セットアップ」
-# パネルのチェックボックスから起動のたびに選べる(2026-09-07追加、ユーザー指摘:
-# 「全ノード起動ボタンで起動するrvizとros2canの起動を管理できるチェックボックスを
-# 追加」。別途起動済みのrviz/ros2canと二重起動になるのを避けたい場合に使う)。
+# launch_gui:=falseでGUIの二重起動を防ぐ。use_viz/use_ros2canは固定値
+# (2026-09-09、全ノード起動ボタン廃止に伴いチェックボックスも廃止、_on_launch_
+# all_nodes参照)。
 ALL_AXES_LAUNCH_BASE_CMD = [
     'ros2', 'launch', 'soki_sim', 'real_all_axes_test.launch.py',
     'use_joy:=true', 'launch_gui:=false',
@@ -251,6 +296,13 @@ HAND_OFFSET_LIMIT = 0.3
 SEQ_MOVE_THETA_TOL = 0.02  # rad、到達判定の許容誤差
 SEQ_MOVE_LINEAR_TOL = 0.003  # m(z_joint/r_joint共通)、到達判定の許容誤差
 SEQ_MOVE_TIMEOUT_SEC = 20.0  # 1レグあたりのタイムアウト(homing_nodeの既定値に合わせる)
+# 投入シーケンスのR軸リトラクト('retract_r_to_limit'ステップ)で送る速度[m/s]の
+# 既定値(2026-09-09追加、_advance_retract_r_step参照)。r_lowerリミットスイッチに
+# 当たるまで一定速度で駆動する。実際に使う値はGUIの「ピック/投入 自動シーケンス」
+# パネルのsequence_edits['retract_r_speed_mps']が優先される(gains.jsonの
+# sequence.retract_r_speed_mpsとして永続化、DEFAULT_SEQUENCE_SETTINGS参照)。
+# これはgains.json未保存時・パース失敗時のフォールバック値としてのみ使う。
+SEQ_RETRACT_R_SPEED_MPS = 0.1
 
 # 手先θ(tip_theta_joint)の自動制御(2026-09-03新規、ユーザー指摘: 「ハンドは3つ
 # 一気に回収するので手先θはワークの行と平行になるように動く必要がある。シュート時は
@@ -260,15 +312,36 @@ SEQ_MOVE_TIMEOUT_SEC = 20.0  # 1レグあたりのタイムアウト(homing_node
 # 旋回させると手先ごと同じ角度だけ回るため、パッド展開軸を常にワークの行(GUIの
 # ワールドX軸、WORK_POINTSは同一行内でX方向にWORK_COL_PITCH間隔で並ぶ)と平行に
 # 保つには、tip_theta_jointをroot_theta_jointと逆方向に同じ量だけ回して打ち消す
-# 必要がある(tip_theta_target = -root_theta_target)。_start_pick_sequence参照。
-# シュート時は逆に一切打ち消さずtip_theta_joint=一定値(=常にr方向に垂直、
-# root_thetaの値によらず幾何学的に成立する)を使うが、この値はまだ実機で検証して
-# いない暫定値のため、DEFAULT_SEQUENCE_SETTINGSの'shoot_tip_theta_rad'として
-# GUIから調整可能にする(ユーザー指摘: 「シュート時の角度は暫定値である」)。
+# 必要がある(tip_theta_target = TIP_THETA_FOLLOW_SIGN*root_theta_target)。_start_pick_sequence参照。
+# シュート時(投入シーケンスでL4/R4へ向かうとき)も追従はするが、基準線が90度
+# 違う: パッド展開軸を回収時の追従直線(ワールドX)と直交する向き(ワールドY=
+# フィールド前方)と平行に保つ(2026-09-12、ユーザー指定:「手先θのシュート時の
+# 角度は手先追従+90度。左右のシューティングボックスで90度回す向きが異なる」
+# 「現在実装している手先追従のパッドを結んだ直線と直交する向きの直線と平行に
+# なるように追従させたい。これはシューティング時のみ」)。
+#   tip_theta_shoot = tip_follow - copysign(90deg, tip_follow)
+#   (tip_follow = TIP_THETA_FOLLOW_SIGN*root_theta、トリム前の幾何角)
+# +90度でも-90度でも幾何学的には同じ向きになるが(パッド3個は一直線)、手先θには
+# 物理ストッパ(電源投入位置から±135deg)があるため、追従値から0側へ90度戻す
+# 向きを選ぶ。L4(root_theta≈+99deg)なら-90度で≈+9deg、R4(≈-99deg)なら+90度で
+# ≈-9degとなり、これが「左右で90度回す向きが異なる」の正体。逆向きだと
+# ≈±189degでストッパ範囲外。_shoot_tip_theta / _start_shoot_sequence参照。
+# joy_teleop_node側の手先θ追従(OPTIONS)も同日から|root_theta|でワーク/シューティング
+# エリアを自動判別して同じ式を使う(joy_teleop_node.py TIP_THETA_SHOOT_AREA_*、
+# _tip_theta_follow_target)。式を変える場合は両方揃えること。
+# 以前(2026-09-03〜)は追従せず固定値'shoot_tip_theta_rad'(暫定0)を送っていた。
+# 実機微調整用に'shoot_tip_theta_trim_deg'(既定0)を上式に足す。
 
 # GUIのQLineEditへ復元できない場合(gains.json未保存の初回起動時)に使う既定値。
 # safe_transit_z_mは安全側(可動範囲上限)に倒しておき、実機確認後に低い値へ調整する想定。
 # r_retract_mはradius=0(旋回軸に最も近い位置)。
+# root_theta_trim_ak_degの許容範囲[AK軸deg](±30度=関節角±6.4度。原点のずれの
+# 補正にはこれで十分で、桁間違い等で大きく回さないための上限)。
+ROOT_THETA_TRIM_AK_DEG_LIMIT = 30.0
+# shoot_tip_theta_trim_degの許容範囲[関節deg](微調整用。±45度あれば取付誤差の
+# 補正には十分で、桁間違い等で手先θをストッパまで回さないための上限)。
+SHOOT_TIP_THETA_TRIM_DEG_LIMIT = 45.0
+
 DEFAULT_SEQUENCE_SETTINGS = {
     'safe_transit_z_m': WORLD_Z_UPPER,
     'r_retract_m': R_LOWER,
@@ -278,14 +351,44 @@ DEFAULT_SEQUENCE_SETTINGS = {
     # 指示を待つ(2026-09-03、ユーザー指摘: 「移動とZをある程度下げる動作は自動、
     # 次にPSコンまたはGUIのボタンで回収を指示、これでワークに当たる高さまで下げる」)。
     'pickup_approach_clearance_m': 0.15,
-    # 投入時の手先θ(tip_theta_joint)目標[rad]。r方向(アーム伸縮方向)に垂直となる
-    # 値だが、実機で未検証の暫定値(2026-09-03、ユーザー指摘)。
-    'shoot_tip_theta_rad': 0.0,
+    # 投入時の手先θ(tip_theta_joint)トリム[deg]。_shoot_tip_theta(追従値∓90deg)の
+    # 結果にこの分を足す。実機の取付誤差の微調整用で通常0(2026-09-12、旧
+    # 'shoot_tip_theta_rad'(固定目標値[rad]、暫定)を廃止して置き換え。キー名を
+    # 変えたのは、gains.jsonに残っている旧キーの値(rad、絶対角)をトリム[deg]と
+    # して誤って読み込まないため)。誤入力で大きく回らないよう
+    # SHOOT_TIP_THETA_TRIM_DEG_LIMITでクランプする。
+    'shoot_tip_theta_trim_deg': 0.0,
+    # 回収シーケンスでroot_thetaの目標角を決める際の狙い点を、ワーク中心から
+    # ワーク上面(円筒の端面のうち機体と反対側、+Y方向)側へずらす量[m]
+    # (2026-09-11追加、ユーザー指摘:「ワーク座標のXYから根本θの角度を決めて
+    # いるが、それがワーク中心をもとに決まっているので上面あたりを基準に
+    # 根本θを計算したい」)。WORK_POINTSのYはワーク(横倒し円筒、軸=Y方向、
+    # 底面=機体側)の長さ方向の中心なので、既定値WORK_LENGTH/2でちょうど上面。
+    # 実機で狙いを微調整できるようGUIの編集欄(sequence_edits)から変更可能。
+    # _start_pick_sequence参照。
+    'pick_aim_y_offset_m': WORK_LENGTH / 2.0,
+    # root_theta原点トリム[AK(CubeMars)アクチュエータ軸のdeg]。回収/投入シーケンスが
+    # 送るroot_theta目標にこの分を足す(関節角へはROOT_THETA_REDUCTIONで換算)。
+    # root_thetaの原点はSet Origin方式(目視で前方に合わせて/set_root_theta_originを
+    # 呼ぶ、note/hardware_mapping.txt参照)のため、原点が真の前方から少しずれると
+    # 左右対称なワークに対して必要な角度の絶対値が左右で食い違う(2026-09-12、
+    # ユーザー報告:「1列目、右側がAK角度180度のとき左側は200度」。左=θ正なので
+    # 真の前方はAK軸で+10度側、トリム=(200-180)/2=+10)。Set Originをやり直さずに
+    # ソフト側で補正するための値で、原点を取り直したら0に戻すこと。
+    # 単位をAK軸のdegにしているのは、ユーザーが実機確認でAKの角度表示を読んで
+    # いるため(関節角radより直感的に入力できる)。誤入力で大きく回らないよう
+    # ROOT_THETA_TRIM_AK_DEG_LIMITでクランプする。_root_theta_trim_rad参照。
+    'root_theta_trim_ak_deg': 0.0,
     # パッド収納(/hand_gather_pads)からピッチ投入姿勢への切替(/hand_set_pitch_
     # insert)までの待ち時間[s](2026-09-03、ユーザー指摘: 「収納から姿勢変更
     # までの待機時間も必要。ほぼ同時はまずい」。パッドが物理的に収納し切る前に
     # ピッチが回り始めると干渉する恐れがあるため)。
     'gather_settle_sec': 0.5,
+    # 'retract_r_to_limit'ステップ(R軸を自動でしまう)で送る速度[m/s]
+    # (2026-09-09追加。以前はSEQ_RETRACT_R_SPEED_MPS固定値だったが、
+    # ユーザー報告:「現状遅すぎて格納できない」により実機でGUIから調整できる
+    # ようにした。_advance_retract_r_step参照)。
+    'retract_r_speed_mps': SEQ_RETRACT_R_SPEED_MPS,
 }
 
 # ---- real_joint_bridge.yaml配線設定(初期化用センサID・CubeMars/RoboMasのID・
@@ -338,40 +441,9 @@ CUBEMARS_WIRING_FIELDS = [
         ('root_theta_sign', 'root_theta回転方向(±1)', 'float'),
     ]),
 ]
-HOMING_WIRING_FIELDS = [
-    (None, [
-        ('can_host_device_id', 'CAN_HOST ID', 'int'),
-        ('can_host_slots_per_node', 'ノードあたりスロット数', 'int'),
-        ('switch_triggered_value', 'SW検出値', 'int'),
-    ]),
-    ('z原点センサ', [
-        ('z_limit_switch_node_index', 'ノード', 'int'),
-        ('z_limit_switch_local_index', 'スロット', 'int'),
-    ]),
-    ('r原点センサ', [
-        ('r_limit_switch_node_index', 'ノード', 'int'),
-        ('r_limit_switch_local_index', 'スロット', 'int'),
-    ]),
-    (None, [
-        ('robomas_device_id', 'RoboMas ID', 'int'),
-        ('robomas_motor1_index', 'motor1スロット', 'int'),
-        ('robomas_motor2_index', 'motor2スロット', 'int'),
-    ]),
-    ('zホーミング回転方向(±1)', [
-        ('z_home_motor1_vel_sign', 'motor1', 'float'),
-        ('z_home_motor2_vel_sign', 'motor2', 'float'),
-    ]),
-    ('rホーミング回転方向(±1)', [
-        ('r_home_motor1_vel_sign', 'motor1', 'float'),
-        ('r_home_motor2_vel_sign', 'motor2', 'float'),
-    ]),
-    (None, [
-        ('z_ref_value_m', 'z原点センサ位置の真値[m]', 'float'),
-        ('r_ref_value_m', 'r原点センサ位置の真値[m]', 'float'),
-    ]),
-]
 # z/r上限・下限リミットスイッチ(過走防止の安全停止、trajectory_follower_node、
-# 2026-08-31追加)。HOMING_WIRING_FIELDSのz/r原点センサ(下限側、homing_node用)
+# 2026-08-31追加)。z/r原点センサ(下限側、homing_node用、GUIパネルは2026-09-09に
+# ホーミング廃止で削除済みだがreal_joint_bridge.yaml自体はhoming_nodeが読む)
 # とは別パラメータ(同じ配線を指してよいが、ノードが別なので値も別管理)。
 LIMIT_SWITCH_WIRING_FIELDS = [
     (None, [
@@ -425,6 +497,12 @@ HAND_WIRING_FIELDS = [
         ('deploy_servo_deployed_can_deg_override', '固定する', 'bool'),
         ('deploy_servo_deployed_can_deg', '角度[deg]', 'float'),
     ]),
+    # サーボの移動速度(2026-09-12追加、ユーザー要望:「手先サーボの速度を変更
+    # できるように」)。hand_node側の角度ランプで実現する(hand_node.py参照)。
+    # 0で即時送信(サーボ最速)。
+    (None, [
+        ('deploy_servo_speed_deg_per_s', '移動速度[deg/s](0=即時)', 'float'),
+    ]),
     ('ワークピッチ変更サーボ', [
         ('pitch_servo_device_id', 'ID', 'int'),
         ('pitch_servo_node_index', 'ノード', 'int'),
@@ -444,6 +522,9 @@ HAND_WIRING_FIELDS = [
     ('投入 実機送信角度 手動固定', [
         ('pitch_servo_insert_can_deg_override', '固定する', 'bool'),
         ('pitch_servo_insert_can_deg', '角度[deg]', 'float'),
+    ]),
+    (None, [
+        ('pitch_servo_speed_deg_per_s', '移動速度[deg/s](0=即時)', 'float'),
     ]),
     ('ダイヤフラムポンプ(MD)', [
         ('pump_device_id', 'ID', 'int'),
@@ -483,15 +564,95 @@ HAND_SERVO_PREVIEW_SPECS = [
 ]
 
 
+# GUIから保存する設定ファイル(config/gains.json・config/real_joint_bridge.yaml)の
+# 保存先を明示的に上書きするための環境変数名(2026-09-10追加)。
+# _iter_config_path_candidatesがワークスペースのソースツリーを見つけられない
+# 構成(<ws>/src/soki_sim以外の場所にリポジトリがある等)のための逃げ道。
+CONFIG_PATH_ENV_VARS = {
+    'gains.json': 'SOKI_SIM_GAINS_FILE',
+    'real_joint_bridge.yaml': 'SOKI_SIM_REAL_JOINT_BRIDGE_YAML',
+}
+
+
+def _config_path_env_override(filename):
+    """CONFIG_PATH_ENV_VARSの環境変数でconfig/{filename}のパスが明示指定されて
+    いればそれを返す(未設定ならNone)。"""
+    env_key = CONFIG_PATH_ENV_VARS.get(filename)
+    value = os.environ.get(env_key) if env_key else None
+    if not value:
+        return None
+    return os.path.abspath(os.path.expanduser(value))
+
+
+def _iter_config_path_candidates(filename):
+    """soki_sim/config/{filename}の探索候補を優先度順に列挙する。
+
+    ソースツリー側(<ws>/src/soki_sim/config/{filename})をshare側より優先するのが
+    肝(2026-09-10、ユーザー報告:「R軸格納速度が毎回0.2に戻る」の原因対処)。
+    command_gui_node自体はインストール後のパスから実行される(CMakeLists.txtで
+    RENAMEインストール)ため__file__相対では解決できず、以前は
+    get_package_share_directory経由のパスだけを使っていた。しかしCMakeLists.txtの
+    install(DIRECTORY config ...)はsymlink-installを付けずにcolcon buildすると
+    ただのコピーになるため、GUIの保存はinstall/側のコピーにしか届かず、
+    次のcolcon buildでsrc/側の内容に上書きされて消えていた(CMakeのfile(INSTALL)は
+    コピー先の方が新しくても内容が違えば上書きする)。GUIスクリプトを編集すれば
+    必ずリビルドするので、実質毎回リセットされていた。
+
+    <ws>はshare_dir(<ws>/install/soki_sim/share/soki_sim)とCOLCON_PREFIX_PATHの
+    各エントリから親方向へ辿って探す(install/のレイアウト差を吸収するため、
+    決め打ちの階層数ではなくsrc/soki_sim/config/{filename}が実在する親を採用する)。
+    見つからなければ従来どおりshare側(realpath。symlink-install時はこれ自体が
+    ソースツリー側を指す)を返す。"""
+    share_path = None
+    starts = []
+    try:
+        share_dir = get_package_share_directory('soki_sim')
+    except PackageNotFoundError:
+        pass
+    else:
+        share_path = os.path.realpath(os.path.join(share_dir, 'config', filename))
+        starts.append(share_dir)
+    starts.extend(p for p in os.environ.get('COLCON_PREFIX_PATH', '').split(os.pathsep) if p)
+
+    seen = set()
+    for start in starts:
+        d = os.path.abspath(start)
+        while True:
+            if d not in seen:
+                seen.add(d)
+                candidate = os.path.join(d, 'src', 'soki_sim', 'config', filename)
+                if os.path.isfile(candidate):
+                    yield os.path.realpath(candidate)
+            parent = os.path.dirname(d)
+            if parent == d:
+                break
+            d = parent
+
+    if share_path is not None:
+        yield share_path
+
+
 def _resolve_config_yaml_path(filename):
     """soki_sim/config/{filename}の実ファイルパスを解決する。
-    command_gui_node自体がインストール後のパスから実行される(CMakeLists.txtで
-    RENAMEインストール)ため、__file__相対ではなくget_package_share_directory経由
-    で解決する(_resource_pathと同じ理由)。symlink-installならrealpath()で
-    ソースツリー側のファイルが返るため、そちらを直接編集する
-    (「コードではなくこのファイルを編集すること」というyaml内コメントの
-    運用と一致させる。colcon buildをsymlink-installで行っていない場合は
-    次回launchには反映されるがソースツリー側は更新されない)。"""
+    ソースツリー側を優先する理由は_iter_config_path_candidatesのdocstring参照
+    (「コードではなくこのファイルを編集すること」というyaml内コメントの運用とも
+    一致する)。実在するファイルが1つも無ければNone。"""
+    override = _config_path_env_override(filename)
+    if override:
+        return override if os.path.isfile(override) else None
+    for path in _iter_config_path_candidates(filename):
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+def _resolve_real_joint_bridge_yaml_path():
+    return _resolve_config_yaml_path('real_joint_bridge.yaml')
+
+
+def _share_config_path(filename):
+    """install側(share)にあるconfig/{filename}のコピーのパスを返す
+    (見つからなければNone)。"""
     try:
         share_dir = get_package_share_directory('soki_sim')
     except PackageNotFoundError:
@@ -502,26 +663,44 @@ def _resolve_config_yaml_path(filename):
     return os.path.realpath(path)
 
 
-def _resolve_real_joint_bridge_yaml_path():
-    return _resolve_config_yaml_path('real_joint_bridge.yaml')
+def _write_config_file(filename, path, text):
+    """設定ファイルをソースツリー側(path)へ書き、install側(share)に別ファイルの
+    コピーがあればそちらへも同じ内容を書き写す(書けたらそのパスを返す)。
+
+    real_joint_bridge.yamlはreal_joint_bridge_node/homing_nodeがFindPackageShare
+    経由(=install側)で読むため、ソースツリー側だけを書き換えるとcolcon buildする
+    までノードに反映されない。「保存すれば次回launchから反映される」という
+    従来の挙動を保つために両方へ書く(2026-09-10、保存先をソースツリー優先に
+    変更した際の対処。_iter_config_path_candidatesのdocstring参照)。
+    install側はcolcon buildでソースツリー側の内容に戻るだけなので、書き写しに
+    失敗しても保存自体は成功扱いにする。"""
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(text)
+    mirror = _share_config_path(filename)
+    if mirror is None or os.path.abspath(mirror) == os.path.abspath(path):
+        return None
+    try:
+        with open(mirror, 'w', encoding='utf-8') as f:
+            f.write(text)
+    except OSError:
+        return None
+    return mirror
 
 
 def _resolve_gains_file_path():
-    """軌道生成パラメータ・MIT/robomasゲイン・joy速度のGUI保持値を書き込む
-    gains.jsonの実ファイルパスを解決する。実機で有効だった値をホーム
+    """軌道生成パラメータ・MIT/robomasゲイン・joy速度・シーケンス設定のGUI保持値を
+    書き込むgains.jsonの実ファイルパスを解決する。実機で有効だった値をホーム
     ディレクトリではなくリポジトリ内(soki_sim/config/gains.json)に置き、
     git管理下でバックアップ・共有できるようにするため、
-    _resolve_real_joint_bridge_yaml_pathと同じ方式(get_package_share_directory
-    経由、symlink-installならソースツリー側を直接編集)で解決する。パッケージ/
-    ファイルが見つからない場合(colcon build未実行の単体起動等)はホーム
-    ディレクトリ側にフォールバックする。"""
-    try:
-        share_dir = get_package_share_directory('soki_sim')
-        path = os.path.join(share_dir, 'config', 'gains.json')
+    _resolve_config_yaml_pathと同じ候補(ソースツリー優先)を使う。
+    パッケージ/ファイルが見つからない場合(colcon build未実行の単体起動等)は
+    ホームディレクトリ側にフォールバックする。"""
+    override = _config_path_env_override('gains.json')
+    if override:
+        return override
+    for path in _iter_config_path_candidates('gains.json'):
         if os.path.isfile(path):
-            return os.path.realpath(path)
-    except PackageNotFoundError:
-        pass
+            return path
     return os.path.expanduser('~/.config/soki_sim/gains.json')
 
 
@@ -577,13 +756,47 @@ def clamp(value, lower, upper):
     return max(lower, min(upper, value))
 
 
-def xyz_to_joint(x, y, z):
-    """ワールド座標(X,Y,Z) -> (theta, z_joint, r_joint)。可動域外はクランプする。
+NO_MACHINE_ORIGIN = (0.0, 0.0, 0.0)
 
-    X軸正=右向き、Y軸正=機体からワークに向かう前方。
+
+def field_to_axis(x, y, z, machine_origin=NO_MACHINE_ORIGIN):
+    """フィールド座標(machine_origin_link=機体原点基準、GUIのX=右/Y=前方/Z=高さ)
+    -> 旋回軸(base_link)基準の座標。machine_originはsoki_sim.urdf.xacroの
+    machine_origin_x/y/z_joint値(URDF座標: x=前方(奥行き)、y=左(幅)、z=上。
+    「base_link(旋回軸)から機体原点までのズレ」)のタプル。
+
+    2026-09-11追加、ユーザー報告:「左側だけワーク中心を狙っているように見える」
+    →「根本θ中心が(機体原点から)フィールド側へ20mmずれている」。WORK_POINTS等の
+    フィールド座標は全て機体原点基準で採寸した値だが、逆運動学(atan2(-x, y))は
+    旋回軸が機体原点と一致している前提で計算していたため、旋回軸が幅方向に
+    ずれていると左右で狙いが非対称になる(旋回軸が左(+y)へ寄ると、左側の
+    ワークは旋回軸から見て中心線寄り(=光線がワーク列を手前で横切り「中心を狙う」
+    ように見える)、右側は逆に奥へずれる)。機体原点オフセットパネル
+    (_build_machine_origin_offset_panel)はこれまでRViz表示のみに反映され、
+    逆運動学では無視されていたため、ここで明示的に取り込む。
+    GUI座標とURDF座標の対応はWORK_POINTS定義部のコメントと同じ(x_gui = -y_urdf,
+    y_gui = x_urdf)なので、machine_origin_link = base_link + (mx, my, mz)[URDF]
+    より、フィールド座標(x, y, z)の点は旋回軸から見て(x - my, y + mx, z + mz)。"""
+    mx, my, mz = machine_origin
+    return x - my, y + mx, z + mz
+
+
+def axis_to_field(x, y, z, machine_origin=NO_MACHINE_ORIGIN):
+    """field_to_axisの逆変換: 旋回軸(base_link)基準 -> フィールド座標(機体原点基準)。"""
+    mx, my, mz = machine_origin
+    return x + my, y - mx, z - mz
+
+
+def xyz_to_joint(x, y, z, machine_origin=NO_MACHINE_ORIGIN):
+    """フィールド座標(X,Y,Z) -> (theta, z_joint, r_joint)。可動域外はクランプする。
+
+    X軸正=右向き、Y軸正=機体からワークに向かう前方。座標はいずれも機体原点
+    (machine_origin_link)基準で、machine_origin(旋回軸から機体原点までのズレ、
+    field_to_axis参照)を通して旋回軸基準に直してから計算する。
     root_theta_joint角度は旋回軸に対して定義された内部基準(前方=Y+の時にtheta=0)
     に合わせるため、atan2の引数はatan2(-x, y)となる(X/Yをそのまま使うatan2(y,x)ではない)。
     """
+    x, y, z = field_to_axis(x, y, z, machine_origin)
     theta_raw = math.atan2(-x, y)
     theta = clamp(theta_raw, ROOT_THETA_LOWER, ROOT_THETA_UPPER)
     radius = math.hypot(x, y)
@@ -595,9 +808,11 @@ def xyz_to_joint(x, y, z):
     return theta, zj, r, clamped
 
 
-def _theta_r_from_xy(x, y):
+def _theta_r_from_xy(x, y, machine_origin=NO_MACHINE_ORIGIN):
     """xyz_to_jointのtheta/r算出部分のみを取り出したもの(z非依存)。ピック/投入
-    シーケンスで、安全高度を保ったまま先にtheta/rを決めるために使う。"""
+    シーケンスで、安全高度を保ったまま先にtheta/rを決めるために使う。
+    machine_originはxyz_to_jointと同じ(field_to_axis参照)。"""
+    x, y, _z = field_to_axis(x, y, 0.0, machine_origin)
     theta_raw = math.atan2(-x, y)
     theta = clamp(theta_raw, ROOT_THETA_LOWER, ROOT_THETA_UPPER)
     radius = math.hypot(x, y)
@@ -606,14 +821,15 @@ def _theta_r_from_xy(x, y):
     return theta, r
 
 
-def joint_to_xyz(theta, zj, r):
-    """xyz_to_jointの逆変換(順運動学): (theta, z_joint, r_joint) -> ワールド座標(X,Y,Z)。
-    現在の関節角度から手先座標をリアルタイム表示するために使う。"""
+def joint_to_xyz(theta, zj, r, machine_origin=NO_MACHINE_ORIGIN):
+    """xyz_to_jointの逆変換(順運動学): (theta, z_joint, r_joint) -> フィールド座標(X,Y,Z)
+    (機体原点基準、axis_to_field参照)。現在の関節角度から手先座標をリアルタイム
+    表示するために使う。"""
     radius = r + ARM_LENGTH / 2.0
     x = -radius * math.sin(theta)
     y = radius * math.cos(theta)
     z = zj + Z_OFFSET
-    return x, y, z
+    return axis_to_field(x, y, z, machine_origin)
 
 
 def _resource_path(filename):
@@ -682,28 +898,58 @@ def _normalize_numeral_text(text: str) -> str:
 
 
 class _NormalizingDoubleValidator(QDoubleValidator):
-    """全角入力を正規化してから検証するQDoubleValidator。"""
+    """全角入力を正規化して「検証だけ」行うQDoubleValidator。
+
+    validate()は(State, 文字列, 位置)を返し、Qtは返した文字列でウィジェットの
+    テキストを置き換える。以前はここで正規化後の文字列を返していたため、
+    日本語IMEでの入力中に「バリデータが半角へ書き換える」→「その直後にIMEが
+    変換確定した文字を追記する」が重なり、1と入力したのに11、2なら22になる
+    ことがあった(2026-09-10、ユーザー報告:「ゲインの入力欄、たまに1と入力
+    したのに11となったりして危険」。ゲイン欄で起きると桁が一つ増えた値が
+    そのまま実機へ適用されるため極めて危険)。
+    バリデータは判定に徹し、入力文字列は書き換えずそのまま返す。全角のまま
+    保持されても、値の読み出し側(get_float/get_int)が_normalize_numeral_textで
+    正規化するため実害はない。"""
 
     def validate(self, input_str, pos):
         normalized = _normalize_numeral_text(input_str)
-        return super().validate(normalized, min(pos, len(normalized)))
+        state, _fixed, _fixed_pos = super().validate(normalized, min(pos, len(normalized)))
+        return state, input_str, pos
 
 
 class _NormalizingIntValidator(QIntValidator):
-    """全角入力を正規化してから検証するQIntValidator。"""
+    """全角入力を正規化して「検証だけ」行うQIntValidator
+    (_NormalizingDoubleValidatorと同じ理由で入力文字列は書き換えない)。"""
 
     def validate(self, input_str, pos):
         normalized = _normalize_numeral_text(input_str)
-        return super().validate(normalized, min(pos, len(normalized)))
+        state, _fixed, _fixed_pos = super().validate(normalized, min(pos, len(normalized)))
+        return state, input_str, pos
 
 
-def make_float_edit(initial: float, width: int = 80) -> QLineEdit:
-    """数値入力用QLineEdit(Tkinter版のtk.Entry+DoubleVarに相当)を生成する。"""
+def make_float_edit(initial: float, width: int = 80, minimum: float = -1.0e6) -> QLineEdit:
+    """数値入力用QLineEdit(Tkinter版のtk.Entry+DoubleVarに相当)を生成する。
+
+    minimumで下限を指定できる(既定は従来どおり負値も許容)。ゲイン欄には
+    make_gain_editを使い、負値を入力できないようにすること。"""
     edit = QLineEdit()
-    edit.setValidator(_NormalizingDoubleValidator(-1.0e6, 1.0e6, 6))
+    edit.setValidator(_NormalizingDoubleValidator(minimum, 1.0e6, 6))
     edit.setMaximumWidth(width)
     set_float(edit, initial)
     return edit
+
+
+def make_gain_edit(initial: float, width: int = 80) -> QLineEdit:
+    """フィードバックゲイン専用の入力欄(負値を入力できない、2026-09-10追加)。
+
+    ユーザー報告:「手先θのゲインに誤って負の値を代入すると暴走、機構を破壊した」。
+    kpが負だと目標から遠ざかる向きにトルクが出る正帰還になり必ず暴走し、kdが
+    負だと負性ダンピングで振動が発散する。trajectory_follower_node側でも
+    _on_set_parametersで拒否・指令生成時にnonneg_gainでクランプしているが、
+    そもそも入力できないようにするのが一番安全なのでここでも下限0にする。
+    トルク/電流フィードフォワードは一定バイアスで正帰還にならず、重力補償で
+    負値が正当な場合もあるため通常のmake_float_editのままにする。"""
+    return make_float_edit(initial, width=width, minimum=0.0)
 
 
 def get_float(edit: QLineEdit) -> float:
@@ -739,80 +985,6 @@ def set_int(edit: QLineEdit, value: int):
     edit.setText(str(int(value)))
 
 
-class XYPlaneWidget(QWidget):
-    """XY平面クリックウィジェット。Tkinter版のtk.Canvas(円クリック・ピン表示・
-    現在位置マーカー)をQPainterによる自前描画で置き換えたもの。クリックされた
-    ワールド座標をon_clickコールバックへそのまま渡す(可動域クランプは呼び出し側
-    (CommandGuiApp._on_canvas_click)の責務)。"""
-
-    def __init__(self, size: int, max_radius: float, margin: int, on_click, parent=None):
-        super().__init__(parent)
-        self._max_radius = max_radius
-        self._margin = margin
-        self._on_click = on_click
-        self._pin = None
-        self._current = None
-        self.setFixedSize(size, size)
-        self.setStyleSheet('background-color: #f5f5f5; border: 1px solid #555;')
-
-    def set_pin(self, x: float, y: float):
-        self._pin = (x, y)
-        self.update()
-
-    def set_current(self, x: float, y: float):
-        self._current = (x, y)
-        self.update()
-
-    def _scale(self) -> float:
-        return (self.width() / 2.0 - self._margin) / self._max_radius
-
-    def world_to_widget(self, x: float, y: float):
-        c = self.width() / 2.0
-        s = self._scale()
-        return c + x * s, c - y * s
-
-    def widget_to_world(self, px: float, py: float):
-        c = self.width() / 2.0
-        s = self._scale()
-        return (px - c) / s, (c - py) / s
-
-    def mousePressEvent(self, event):
-        x, y = self.widget_to_world(event.pos().x(), event.pos().y())
-        self._on_click(x, y)
-
-    def paintEvent(self, _event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        c = self.width() / 2.0
-
-        painter.setPen(QColor('#cccccc'))
-        painter.drawLine(0, int(c), self.width(), int(c))
-        painter.drawLine(int(c), 0, int(c), self.height())
-
-        px_radius = self._scale() * self._max_radius
-        painter.setPen(QPen(QColor('#4a90d9'), 1, Qt.DashLine))
-        painter.drawEllipse(QPointF(c, c), px_radius, px_radius)
-
-        painter.setPen(QColor('#888888'))
-        painter.drawText(int(c) - 44, 14, 'Y+ (ワーク側)')
-        painter.drawText(int(c) - 44, self.height() - 6, 'Y- (機体後方)')
-        painter.drawText(self.width() - 28, int(c), 'X+')
-        painter.drawText(8, int(c), 'X-')
-        painter.drawText(int(c) + 10, int(c) + 16, '機体')
-
-        if self._current is not None:
-            cx, cy = self.world_to_widget(*self._current)
-            painter.setPen(QPen(QColor('#1a7a1a'), 2))
-            painter.setBrush(Qt.NoBrush)
-            painter.drawEllipse(QPointF(cx, cy), 5, 5)
-
-        if self._pin is not None:
-            cx, cy = self.world_to_widget(*self._pin)
-            painter.setPen(Qt.NoPen)
-            painter.setBrush(QColor('red'))
-            painter.drawEllipse(QPointF(cx, cy), 5, 5)
-
-
 class FieldMinimapWidget(QWidget):
     """フィールド(ワーク配置4行6列・シューティングボックスL/R各4)を実寸比率で
     俯瞰する読み取り専用ミニマップ。統合操作タブの「現在状態」パネル用
@@ -840,9 +1012,18 @@ class FieldMinimapWidget(QWidget):
         self.setFixedSize(width, height)
         self.setStyleSheet('background-color: #f5f5f5; border: 1px solid #555;')
         self._current = None
+        # 強調表示するシューティングボックスのラベル集合(set_shoot_labels参照)。
+        self._shoot_labels = set()
 
     def set_current(self, x: float, y: float):
         self._current = (x, y)
+        self.update()
+
+    def set_shoot_labels(self, labels):
+        """実運用で使う(投入シーケンスの目標となる)シューティングボックスの
+        ラベル(例: {'L3', 'R3'})を登録し、それ以外より目立たせて描く。GUIの
+        シューティング位置選択(CommandGuiApp.shoot_box_combo)に追従する。"""
+        self._shoot_labels = set(labels)
         self.update()
 
     def _to_widget(self, x, y):
@@ -866,9 +1047,9 @@ class FieldMinimapWidget(QWidget):
         for side in ('L', 'R'):
             for label, x, y, _z in SHOOT_POINTS[side]:
                 px, py = self._to_widget(x, y)
-                # 実運用ではL4/R4のみ使う(SHOOT_FIXED_TARGETS参照)ので、
-                # それ以外より枠を太く・塗りつぶして目立たせる。
-                is_fixed = label in SHOOT_FIXED_TARGETS
+                # 実運用で使う箱(set_shoot_labels、GUIのシューティング位置選択に
+                # 追従)はそれ以外より枠を太く・塗りつぶして目立たせる。
+                is_fixed = label in self._shoot_labels
                 painter.setPen(QPen(QColor('#e07b00'), 2 if is_fixed else 1))
                 painter.setBrush(QColor('#ffcc80') if is_fixed else Qt.NoBrush)
                 painter.drawRect(int(px) - 4, int(py) - 4, 8, 8)
@@ -981,6 +1162,8 @@ class CommandGuiNode(Node):
     def __init__(self):
         super().__init__('command_gui_node')
         self.pub_ = self.create_publisher(JointState, 'joint_targets', 10)
+        # 投入シーケンスのR軸リトラクトステップ用(send_velocity_r参照、2026-09-09追加)。
+        self.vel_pub_ = self.create_publisher(JointState, 'joint_velocity_targets', 10)
         self.mixed_pub_ = self.create_publisher(JointState, 'mixed_joint_states', 10)
 
         # tip_theta_jointはJOINT_NAMES(手動XY移動が編集欄を持つ関節)には含めないが、
@@ -992,53 +1175,34 @@ class CommandGuiNode(Node):
         self._current_received = False
         self.create_subscription(JointState, 'mixed_joint_states', self._on_mixed_joint_state, 10)
 
-        # 回収シーケンスが「ワーク手前で自動停止→人間の回収実行指示待ち」の状態に
-        # なっているとき、GUIの「回収実行」ボタンだけでなくPSコン(joy_teleop_node)
-        # のPSボタンからも進めさせるためのTriggerサービス(2026-09-03追加)。
-        # シーケンス状態自体はCommandGuiApp側にあるため、実際の判定・進行処理は
-        # set_pick_confirm_handlerで登録されたコールバック(CommandGuiApp._on_pick_
-        # confirm_only_requested)に委譲する。2026-09-03、同日当初は「×長押しで
-        # 回収実行確定」としていたが、選択中ワークへの「移動」(×の短押し)と
-        # 同じボタンを共有していたため、移動が実行中シーケンスを即座に中断・
-        # やり直す仕様(下記参照)と衝突し、長押しのつもりで押した瞬間に移動が
-        # 先に発火して回収実行待ち状態を壊してしまう不具合が発生した。ユーザー
-        # 指定:「回収ボタンをバツ長押しからPSボタンに変更」により、確定は
-        # 専用のPSボタンへ分離した(誤操作でワークに接触・吸着してしまうことを
-        # 防ぐ安全策として、移動用の×ボタンとは意図的に別ボタンにしている)。
-        self._pick_confirm_handler = None
-        self.create_service(Trigger, 'pick_sequence_confirm', self._on_pick_sequence_confirm_srv)
-
-        # 選択中のワークへ回収シーケンスを開始するだけのTriggerサービス
-        # (2026-09-03追加、pick_sequence_confirmから「移動」部分を分離)。
-        # 待機中の確定は行わない(それはpick_sequence_confirmの役目)。実際の
-        # 処理はset_pick_move_handlerで登録されたコールバック(CommandGuiApp.
-        # _on_pick_move_only_requested)に委譲する。PSコン側では×ボタン
-        # (立ち上がりエッジ即時)から呼ばれる。
-        self._pick_move_handler = None
-        self.create_service(Trigger, 'pick_sequence_move', self._on_pick_sequence_move_srv)
-
-        # 「L4へ移動」「R4へ移動」ボタン(固定のシューティングエリアへ、安全高度を
-        # 維持したまま向かうだけの投入シーケンスを実行する)を、GUIボタンだけでなく
-        # PSコン(joy_teleop_node)の割当ボタンからも呼べるようにするTriggerサービス
-        # (2026-09-03、ユーザー指摘: 「シューティングエリアはL4もしくはR4で、
-        # ボタンを2つおいておいて」)。pick_sequence_confirmと同じ構造で、実際の
-        # 処理はset_shoot_start_handlerで登録されたコールバック
-        # (CommandGuiApp._on_shoot_start_requested、対象ラベル引数付き)に委譲する。
+        # 「左箱へ移動」「右箱へ移動」ボタン(投入シーケンス、theta回転+手先ピッチ設定。
+        # 2026-09-09、Z軸位置指令とR軸の最終延伸は削除しR自動リトラクトは任意)を、
+        # GUIボタンだけでなくPSコン(joy_teleop_node)の割当ボタンからも呼べるように
+        # するTriggerサービス(2026-09-03、ユーザー指摘: 「シューティングエリアは
+        # L4もしくはR4で、ボタンを2つおいておいて」)。実際の処理は
+        # set_shoot_start_handlerで登録されたコールバック
+        # (CommandGuiApp._on_shoot_start_requested、側'L'/'R'引数付き)に委譲する。
+        # どの箱(L1..L4/R1..R4)へ向かうかはGUIのシューティング位置選択で決まる
+        # (2026-09-13、SHOOT_BOX_CHOICES参照)。サービス名の_l4/_r4は当時L4/R4固定
+        # だった名残で、joy_teleop_node側との互換のためそのまま(左右の意味のみ)。
         self._shoot_start_handler = None
         self.create_service(
             Trigger, 'shoot_sequence_start_l4',
-            functools.partial(self._on_shoot_sequence_start_srv, 'L4'))
+            functools.partial(self._on_shoot_sequence_start_srv, 'L'))
         self.create_service(
             Trigger, 'shoot_sequence_start_r4',
-            functools.partial(self._on_shoot_sequence_start_srv, 'R4'))
+            functools.partial(self._on_shoot_sequence_start_srv, 'R'))
+
+        # 選択中のワークへ回収シーケンスを開始するTriggerサービス(2026-09-09、
+        # 回収シーケンス復元。ハンド展開・ポンプON・theta回転のみ、R/Zは人が
+        # 操作する簡略版)。PSコン(joy_teleop_node)の×ボタンから呼ばれる。
+        self._pick_move_handler = None
+        self.create_service(Trigger, 'pick_sequence_move', self._on_pick_sequence_move_srv)
 
         # 矢印キー(D-pad)でGUI上の目標ワーク選択カーソルを移動するTriggerサービス
-        # 4つ(2026-09-03追加、ユーザー指定:「矢印キーでGUI上で目標ワークを選択し
-        # 移動バツで移動、再度バツで回収実行」)。実際の処理はset_work_select_
+        # 4つ(2026-09-09、回収シーケンス復元)。実際の処理はset_work_select_
         # handlerで登録されたコールバック(CommandGuiApp._on_work_select_requested、
-        # 方向文字列引数付き)に委譲する。選択自体の移動であり、シーケンスの開始は
-        # 行わない(開始は×ボタン=pick_sequence_confirm、_on_pick_confirm_requested
-        # 参照)。
+        # 方向文字列引数付き)に委譲する。
         self._work_select_handler = None
         for direction in ('up', 'down', 'left', 'right'):
             self.create_service(
@@ -1055,8 +1219,6 @@ class CommandGuiNode(Node):
         # ---- 状態表示灯(黄色/赤色LED)用の状態購読 (2026-09-08追加、
         # note/note_soki/can_mapping.txt「## 状態表示灯」参照) ----
         latched_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
-        self._homing_state = None  # homing_node.STATE_*文字列。未受信ならNone
-        self.create_subscription(String, 'homing_state', self._on_homing_state, latched_qos)
         # z/rのMITゲイン自動調整(autotune_node)の状態・進捗表示用(2026-09-09追加)。
         self._autotune_state = None
         self._autotune_progress = None
@@ -1066,6 +1228,21 @@ class CommandGuiNode(Node):
         self.create_subscription(Bool, 'estop_active', self._on_estop_active, latched_qos)
         self._limit_stop_active = False
         self.create_subscription(Bool, 'limit_stop_active', self._on_limit_stop_active, latched_qos)
+        # z/r × lower/upper各リミットスイッチの個別状態(2026-09-09追加。投入
+        # シーケンスのR軸リトラクトステップが「limit_stop_active(集約フラグ、
+        # どの軸のどちら側かは区別しない)」ではなくr_lowerの個別状態を見て、
+        # 人が同時にZ軸を操作してZ側のスイッチが反応した場合に誤ってR軸が到達
+        # したと判定しないようにするために元々r_lowerのみ購読していたが、
+        # 「リミットセンサの反応が遅い」調査用に残り3つも購読し、GUIで一覧
+        # 確認できるようにした(_build_limit_switch_status_panel参照)。
+        # trajectory_follower_node.py _setup_limit_switches参照。
+        self._limit_switch_triggered = {}
+        for axis, direction in (('z', 'lower'), ('z', 'upper'), ('r', 'lower'), ('r', 'upper')):
+            key = f'{axis}_{direction}'
+            self._limit_switch_triggered[key] = False
+            self.create_subscription(
+                Bool, f'{key}_limit_triggered',
+                functools.partial(self._on_limit_switch_triggered, key), latched_qos)
 
         # 上記から計算した最終的なLED論理状態('off'/'on'/'blink_fast'/'blink_slow'、
         # LedIndicatorWidget.STATE_*と同じ値)をpublishする(2026-09-08追加)。
@@ -1082,10 +1259,6 @@ class CommandGuiNode(Node):
         # 記録し、STATUS_DEVICE_STALE_TIMEOUT_SEC以上届いていなければ未起動とみなす
         # (ros2can側の接続判定と同じ「最近データが来ているか」の考え方)。
         self._device_last_seen_monotonic = {}
-        # 上記の生存監視(最終受信時刻)に加え、CAN_HOST(101)については生スロット値
-        # そのものも保持する(原点センサ配線確認パネル用、2026-09-08追加、
-        # get_device_raw_slots参照)。
-        self._device_last_data = {}
         for device_id in STATUS_DEVICE_IDS:
             self.create_subscription(
                 Int32MultiArray, f'serial_rx_{device_id}_unwrapped',
@@ -1110,7 +1283,7 @@ class CommandGuiNode(Node):
                 self.create_client(GetParameters, f'/{node_name}/get_parameters'),
                 self.create_client(SetParameters, f'/{node_name}/set_parameters'),
             )
-            for node_name in (TRAJ_NODE_NAME, JOY_NODE_NAME)
+            for node_name in (TRAJ_NODE_NAME, JOY_NODE_NAME, HAND_NODE_NAME)
         }
         # std_srvs/Triggerサービス(/set_root_theta_origin等)呼び出し用クライアント。
         # サービス名ごとに遅延生成してキャッシュする。
@@ -1139,14 +1312,6 @@ class CommandGuiNode(Node):
     def get_pump_on_state(self):
         """ポンプの現在ON/OFF状態(hand_pump_state購読)。まだ受信していなければNone。"""
         return self._pump_on_state
-
-    def _on_homing_state(self, msg):
-        self._homing_state = msg.data
-
-    def get_homing_state(self):
-        """homing_node.STATE_*文字列(idle/homing_z/homing_r/done/failed)。
-        homing_node未起動でまだ受信していなければNone。"""
-        return self._homing_state
 
     def _on_autotune_state(self, msg):
         self._autotune_state = msg.data
@@ -1181,14 +1346,34 @@ class CommandGuiNode(Node):
         (limit_stop_active購読)。"""
         return self._limit_stop_active
 
+    def _on_limit_switch_triggered(self, key, msg):
+        self._limit_switch_triggered[key] = msg.data
+
+    def get_limit_switch_triggered(self, axis, direction):
+        """axis('z'/'r')のdirection('lower'/'upper')側リミットスイッチが現在
+        トリガーされているか({axis}_{direction}_limit_triggered購読)。"""
+        return self._limit_switch_triggered.get(f'{axis}_{direction}', False)
+
+    def get_r_retract_limit_triggered(self):
+        """R軸を収納方向(r減少方向)へ動かした時に当たるリミットスイッチが現在
+        トリガーされているか。投入シーケンスのR軸リトラクト完了判定用。
+
+        R軸は名前と向きの対応がz軸と逆で、収納方向(r減少)で当たるのは
+        'r_upper'側になる(2026-09-10修正、ユーザー報告:「R軸自動収納が
+        動かない」)。note/note_soki/can_mapping.txtの実機報告参照:
+        「R軸のリミットスイッチは中心付近に2箇所配置されており、R軸両端の板が
+        外側から侵入することで反応する配線のため...r_lowerトリガー→増加方向を
+        ブロック、r_upperトリガー→減少方向をブロック」。
+        trajectory_follower_node側は_BLOCK_DIRECTION_FOR_INCREASEでこの逆転を
+        吸収済みだが、こちらの完了判定だけが'r_lower'を見たままだったため、
+        -r方向へ駆動しているのに永久に反応しない'r_lower'を待ち続けていた。
+        さらに実際にはr_upperがトリガーされた時点で_velocity_mode_target_rpmが
+        速度を0にクランプするため、R軸は端で止まったままタイムアウトするか、
+        既に収納位置にいる場合は最初から1mmも動かない状態になっていた。"""
+        return self.get_limit_switch_triggered('r', 'upper')
+
     def _on_device_feedback(self, device_id, msg):
         self._device_last_seen_monotonic[device_id] = time.monotonic()
-        self._device_last_data[device_id] = msg.data
-
-    def get_device_raw_slots(self, device_id):
-        """serial_rx_{device_id}_unwrappedの最新の生スロット値(Int32MultiArray.data)。
-        未受信ならNone(原点センサ配線確認パネル用、2026-09-08追加)。"""
-        return self._device_last_data.get(device_id)
 
     def get_stale_device_ids(self):
         """STATUS_DEVICE_IDSのうち、STATUS_DEVICE_STALE_TIMEOUT_SEC以上
@@ -1244,24 +1429,28 @@ class CommandGuiNode(Node):
         response.message = '緊急停止を解除しました'
         return response
 
-    def set_pick_confirm_handler(self, handler):
-        """CommandGuiApp._on_pick_confirm_only_requested(引数無し、bool返却)を
-        登録する(2026-09-03、PSボタンでのみ呼ばれる確定専用ハンドラ)。"""
-        self._pick_confirm_handler = handler
+    def set_shoot_start_handler(self, handler):
+        """CommandGuiApp._on_shoot_start_requested(side: 'L'/'R'、実際に向かう
+        箱のラベル(str)を返す。失敗時None)を登録する。"""
+        self._shoot_start_handler = handler
 
-    def _on_pick_sequence_confirm_srv(self, request, response):
-        if self._pick_confirm_handler is None:
+    def _on_shoot_sequence_start_srv(self, side, request, response):
+        if self._shoot_start_handler is None:
             response.success = False
             response.message = 'GUI未初期化です'
             return response
-        response.success = self._pick_confirm_handler()
-        response.message = (
-            '回収を実行します' if response.success else '現在「回収実行」待ちの状態ではありません')
+        label = self._shoot_start_handler(side)
+        response.success = label is not None
+        response.message = (f'{label}へ移動します' if response.success
+                            else f'{side}側シューティングボックスへの移動に失敗しました')
         return response
 
     def set_pick_move_handler(self, handler):
-        """CommandGuiApp._on_pick_move_only_requested(引数無し、bool返却)を
-        登録する(2026-09-03追加、×短押しで呼ばれる移動専用ハンドラ)。"""
+        """CommandGuiApp._on_pick_move_requested(引数無し、bool返却)を登録する
+        (2026-09-09、回収シーケンス復元。ワーク選択カーソルが指すワークへ回収
+        シーケンス(ハンド展開・ポンプON・theta回転のみ、R/Zは人が操作)を開始
+        する。以前あった「移動」「確定(回収実行)」の2段階は、Z軸自動降下が
+        無くなったため不要になり1つに統合した)。"""
         self._pick_move_handler = handler
 
     def _on_pick_sequence_move_srv(self, request, response):
@@ -1274,22 +1463,9 @@ class CommandGuiNode(Node):
             '選択中のワークへ移動します' if response.success else '移動できません(選択ワーク未確定?)')
         return response
 
-    def set_shoot_start_handler(self, handler):
-        """CommandGuiApp._on_shoot_start_requested(label: str、bool返却)を登録する。"""
-        self._shoot_start_handler = handler
-
-    def _on_shoot_sequence_start_srv(self, label, request, response):
-        if self._shoot_start_handler is None:
-            response.success = False
-            response.message = 'GUI未初期化です'
-            return response
-        response.success = self._shoot_start_handler(label)
-        response.message = f'{label}へ移動します' if response.success else f'{label}への移動に失敗しました'
-        return response
-
     def set_work_select_handler(self, handler):
         """CommandGuiApp._on_work_select_requested(direction: 'up'/'down'/'left'/
-        'right'、戻り値無し)を登録する。"""
+        'right'、戻り値無し)を登録する(2026-09-09、回収シーケンス復元)。"""
         self._work_select_handler = handler
 
     def _on_select_work_srv(self, direction, request, response):
@@ -1322,22 +1498,65 @@ class CommandGuiNode(Node):
     def get_current_positions(self):
         return dict(self._current_positions)
 
-    def send_target(self, theta, zj, r, tip_theta=None):
-        """tip_theta(手先θ)はNoneなら含めない(=trajectory_follower_node側が
-        保持している現在の目標のまま、他の呼び出し元(手動XY移動・ジョグ等)は
-        従来通りtip_thetaに触れない)。ピック/投入シーケンスのみワークの行との
-        平行/シュート方向との垂直を保つためtip_thetaも指定する
-        (2026-09-03、_start_pick_sequence/_start_shoot_sequence参照)。"""
+    def send_target(self, theta, zj=None, r=None, tip_theta=None):
+        """tip_theta(手先θ)・zj・rはNoneなら含めない(=trajectory_follower_node側が
+        保持している現在の目標のまま)。tip_thetaは元々、他の呼び出し元(手動XY
+        移動・ジョグ等)がtip_thetaに触れないようにするためNone対応していた
+        (2026-09-03、_start_pick_sequence/_start_shoot_sequence参照)。zj/rは
+        2026-09-09追加(manualブランチでの操作方針「Z軸は人が、R軸をしまうのは
+        リミットスイッチで」により、投入シーケンスがz_joint/r_jointを位置指令
+        しないようにするため。robomas_velocity_mode中はどのみちz/rの位置指令は
+        無視されるが、意図を明示するためNoneを渡せるようにした、
+        _start_shoot_sequence参照)。
+        tip_thetaはroot_theta(・zj/r)とは別のJointStateメッセージで送る
+        (2026-09-10、ユーザー報告:「根本θの自動シーケンスで移動が遅い」で判明。
+        trajectory_follower_node.target_callbackは同じメッセージに含まれる関節
+        同士を同時到達させるため、各関節の(自分のmax_velocity/max_accelerationでの)
+        所要時間のうち最大値に他の関節を合わせてスケールダウンする。回収/投入
+        シーケンスは毎回root_thetaとtip_thetaを1つのmove stepで同時に指令する
+        ため、tip_thetaの方が移動距離が長い(=所要時間が長い)場合、tip_theta側の
+        max_velocity/max_accelerationが同じでもroot_theta側の実効速度まで
+        引きずり下げられていた。joy_teleop_node.pyの手先θ追従(OPTIONSボタン)は
+        2026-09-09に同じ理由で既にメッセージを分離済み(_timer_callbackの
+        tip_theta_out参照)だったが、command_gui_node側のsend_targetはまだ
+        1メッセージにまとめたままだったため、こちらだけ非対称に取り残されていた)。"""
         msg = JointState()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.header.frame_id = 'auto'
-        if tip_theta is None:
-            msg.name = list(JOINT_NAMES)
-            msg.position = [theta, zj, r]
-        else:
-            msg.name = list(JOINT_NAMES) + ['tip_theta_joint']
-            msg.position = [theta, zj, r, tip_theta]
+        names = ['root_theta_joint']
+        positions = [theta]
+        if zj is not None:
+            names.append('z_joint')
+            positions.append(zj)
+        if r is not None:
+            names.append('r_joint')
+            positions.append(r)
+        msg.name = names
+        msg.position = positions
         self.pub_.publish(msg)
+        if tip_theta is not None:
+            # 角度でのクランプは2026-09-10に廃止した(冒頭の「tip_theta(手先θ)の
+            # 可動域について」参照)。機械端の保護はtrajectory_follower_node側の
+            # 電流によるストール検出(_update_tip_theta_stall)が受け持つ。
+            tip_theta_msg = JointState()
+            tip_theta_msg.header.stamp = self.get_clock().now().to_msg()
+            tip_theta_msg.header.frame_id = 'auto'
+            tip_theta_msg.name = ['tip_theta_joint']
+            tip_theta_msg.position = [tip_theta]
+            self.pub_.publish(tip_theta_msg)
+
+    def send_velocity_r(self, vel_mps):
+        """R軸の速度指令(joint_velocity_targets、trajectory_follower_nodeの
+        robomas_velocity_mode中のみ実際に使われる)。投入シーケンスのR軸
+        リトラクトステップ専用(2026-09-09追加、_advance_retract_r_step参照)。
+        frame_id='auto'はsend_targetと同じ理由(trajectory_follower_nodeの
+        control_modeによる送信元フィルタ、_on_velocity_targets参照)。"""
+        msg = JointState()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = 'auto'
+        msg.name = ['r_joint']
+        msg.velocity = [vel_mps]
+        self.vel_pub_.publish(msg)
 
     def send_machine_origin(self, x, y, z):
         """機体原点オフセット(machine_origin_x/y/z_joint)を/mixed_joint_statesへ
@@ -1482,7 +1701,6 @@ class CommandGuiApp(QWidget):
         if icon_pixmap is not None:
             self.setWindowIcon(QIcon(icon_pixmap))
 
-        self.points = self._load_points()
         # trajectory/MITとも、対象joint名は本来ノード側の実行構成次第だが、
         # 「読込」を経なくても起動直後からGUI保持値をそのまま適用できるように、
         # GUI側で既知の定数(JOINT_NAMES/CUBEMARS_JOINT_NAMES)を初期値にしておく。
@@ -1497,6 +1715,12 @@ class CommandGuiApp(QWidget):
         self._traj_loaded_extra = {}
         self._mit_joint_names = list(CUBEMARS_JOINT_NAMES)
         self._saved_gains = self._load_gains_file()
+        # 機体原点オフセット(machine_origin_x/y/z_joint、URDF座標)の現在の適用値。
+        # RViz表示だけでなく逆運動学(xyz_to_joint/_theta_r_from_xy/joint_to_xyz、
+        # field_to_axis参照)でも使う(2026-09-11)。gains.jsonの'machine_origin'
+        # セクションから起動時に復元し(_restore_saved_gains)、「適用」で更新・保存する
+        # (_on_apply_machine_origin)。
+        self._machine_origin = NO_MACHINE_ORIGIN
         self._apply_all_results = {}
         self._mode_buttons = {}
         # 実機セットアップパネルからros2 launchで起動する子プロセス(未起動ならNone)。
@@ -1510,26 +1734,9 @@ class CommandGuiApp(QWidget):
         self._seq_waiting_service = None
         self._seq_leg_target = None
         self._seq_leg_start_time = None
-        self._seq_delay_start_time = None
-        # 直近の回収対象(x, y, z)。吸着に失敗した場合など、シーケンス完了/中断後
-        # でも「回収実行」を再度押すだけで同じワークへやり直せるようにするため
-        # 記憶しておく(2026-09-03、ユーザー指摘: 「吸着できなかったときに回収
-        # 実行を再度行うことがある。現状だと回収実行が一回しかできない」)。
-        self._last_pick_target = None
-        # X/Y/Z編集欄は起動時点では固定デフォルト値(可動域中央付近)のままで
-        # 実機の現在位置とは無関係なため、電源投入直後にうっかり「送信」を押すと
-        # そのデフォルト値へ向けて急に動き出してしまう。電源off/on後もGUIを
-        # 起動し直すたびに再発するため、_refresh_current_stateで実機の現在位置を
-        # 最初に受信した時点で一度だけX/Y/Z欄を現在位置へ自動同期する
-        # (_on_copy_current_to_targetと同じ変換)。以後はユーザーの手動編集を
-        # 尊重し上書きしない。
-        self._target_synced_to_current_ = False
-
-        self.x_edit = make_float_edit(MAX_RADIUS / 2.0)
-        self.y_edit = make_float_edit(0.0)
-        self.z_edit = make_float_edit((WORLD_Z_LOWER + WORLD_Z_UPPER) / 2.0)
-        self.step_edit = make_float_edit(0.01, width=60)
-
+        self._seq_retract_start_time = None
+        self._seq_wait_until = None
+        self._seq_retract_speed_mps = SEQ_RETRACT_R_SPEED_MPS
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(8, 8, 8, 8)
 
@@ -1569,11 +1776,19 @@ class CommandGuiApp(QWidget):
         self.estop_status_label.setWordWrap(True)
         _set_status(self.estop_status_label, '', 'muted')
         estop_bar.addWidget(self.estop_status_label, 1)
+        # 2026-09-09、GUI起動時に自動でソフト緊急停止を掛けた状態で始まるように
+        # なったため(_auto_engage_estop参照)、「解除」が起動直後にまず押す
+        # ボタンになる。誤って見落とさないよう、両ボタンとも通常より大きく
+        # 目立たせる(ユーザー指定:「見やすい位置に緊急停止と解除ボタンを設置」)。
+        _estop_bar_btn_style = 'font-size: 14pt; font-weight: bold; padding: 8px 20px;'
         estop_btn = QPushButton('緊急停止')
         estop_btn.setProperty('variant', 'danger')
+        estop_btn.setStyleSheet(_estop_bar_btn_style)
         estop_btn.clicked.connect(self._on_emergency_stop_requested)
         estop_bar.addWidget(estop_btn)
         estop_clear_btn = QPushButton('解除')
+        estop_clear_btn.setProperty('variant', 'primary')
+        estop_clear_btn.setStyleSheet(_estop_bar_btn_style)
         estop_clear_btn.clicked.connect(self._on_clear_emergency_stop_requested)
         estop_bar.addWidget(estop_clear_btn)
         root_layout.addLayout(estop_bar)
@@ -1581,7 +1796,6 @@ class CommandGuiApp(QWidget):
         self.tabs = QTabWidget()
         root_layout.addWidget(self.tabs)
 
-        manual_tab = QWidget()
         overview_tab = QWidget()
         gain_tab = QWidget()
         calibration_tab = QWidget()
@@ -1590,34 +1804,31 @@ class CommandGuiApp(QWidget):
         # 統合操作を既定表示にするだけでなく、タブの並びも一番左にする
         # (先に追加した方が左側になる)。状態表示(拡大)はスマホでの画面共有
         # 閲覧用(操作ボタンは置かず表示専用)のため末尾に追加するだけでよい。
+        # 2026-09-09、manualブランチでの操作方針(手動移動にフォーカス)により
+        # 「座標指定操作」タブ(XY平面クリック・座標直接入力・ジョグ・保存済み
+        # ポイント・関節スライダー)を削除した(_build_move_tab/_build_joint_
+        # slider_panel、ユーザー指定:「座標の直接指定とかも意味ないので」)。
         self.tabs.addTab(overview_tab, '統合操作')
         self.tabs.addTab(gain_tab, 'ゲイン調整')
         self.tabs.addTab(calibration_tab, '原点校正')
         self.tabs.addTab(wiring_tab, '配線設定')
-        self.tabs.addTab(manual_tab, '座標指定操作')
         self.tabs.addTab(status_display_tab, '状態表示(拡大)')
 
-        self._build_move_tab(manual_tab)
         self._build_overview_tab(overview_tab)
         self._build_gain_tab(gain_tab)
         self._build_calibration_tab(calibration_tab)
         self._build_wiring_tab(wiring_tab)
         self._build_status_display_tab(status_display_tab)
         self._restore_saved_gains()
-        # PSコン(joy_teleop_node)から、PSボタン=/pick_sequence_confirm
-        # (確定のみ)・×ボタン=/pick_sequence_move(選択中ワークへの移動のみ)の
-        # 2つのサービス経由で呼ばれる(2026-09-03、ユーザー指定:「回収ボタンを
-        # バツ長押しからPSボタンに変更」。誤操作でワークに接触・吸着してしまう
-        # ことを防ぐため、確定操作は移動用の×ボタンとは別ボタンにしている)。
-        self.node.set_pick_confirm_handler(self._on_pick_confirm_only_requested)
-        self.node.set_pick_move_handler(self._on_pick_move_only_requested)
         # PSコン(joy_teleop_node)の割当ボタンから/shoot_sequence_start_l4・_r4
-        # サービス経由で呼ばれた際、GUIの「L4へ移動」「R4へ移動」ボタンと同じ
+        # サービス経由で呼ばれた際、GUIの「左箱へ移動」「右箱へ移動」ボタンと同じ
         # 処理を行わせる(2026-09-03)。
         self.node.set_shoot_start_handler(self._on_shoot_start_requested)
-        # PSコン(joy_teleop_node)の十字キー(D-pad)から/select_work_up・_down・
-        # _left・_rightサービス経由で呼ばれた際、ワーク選択カーソルを動かす
-        # (2026-09-03、ユーザー指定:「矢印キーでGUI上で目標ワークを選択し移動」)。
+        # PSコン(joy_teleop_node)から、×ボタン=/pick_sequence_move(選択中ワークへ
+        # 回収シーケンス開始)・十字キー=/select_work_up・_down・_left・_right
+        # (ワーク選択カーソル移動)経由で呼ばれた際の処理(2026-09-09、回収
+        # シーケンス復元)。
+        self.node.set_pick_move_handler(self._on_pick_move_requested)
         self.node.set_work_select_handler(self._on_work_select_requested)
         # PSコン(joy_teleop_node)のPSボタンから/emergency_stop・/clear_emergency_stop
         # サービス経由で呼ばれた際、GUIの「緊急停止」「解除」ボタンと同じ処理を行わせる
@@ -1626,11 +1837,6 @@ class CommandGuiApp(QWidget):
         self.node.set_estop_clear_handler(self._on_clear_emergency_stop_requested)
 
         self.tabs.setCurrentWidget(overview_tab)
-
-        for edit in (self.x_edit, self.y_edit, self.z_edit):
-            edit.textChanged.connect(self._redraw_pin)
-        self._redraw_pin()
-        self._refresh_point_list()
 
         # ゲイン調整タブは軌道生成/MIT/robomasゲイン等のグリッドが左右2列に並ぶため、
         # 940pxだとまだ右端が少し欠けて横スクロールが発生していた。実測で2列とも
@@ -1664,6 +1870,11 @@ class CommandGuiApp(QWidget):
         self._robomas_auto_loaded = False
         self._robomas_vel_auto_loaded = False
         self._joy_auto_loaded = False
+        # GUI起動時、trajectory_follower_nodeが使えるようになり次第自動でソフト
+        # 緊急停止を掛けた状態にする(2026-09-09追加、ユーザー指定:「起動すると
+        # 全ノード起動しソフト緊急停止の状態で起動」)。他の自動読込/適用と同じく
+        # _try_auto_setup_gainsのリトライループに乗せる(_auto_engage_estop参照)。
+        self._estop_auto_engaged = False
         # _traj_auto_loaded/_mit_auto_loadedは読込「リクエスト送信済み」を表すだけ
         # (request_node_paramsは非同期のため)。実際に_traj_joint_names/
         # _mit_joint_namesが応答で更新されたかは以下の別フラグで判定する
@@ -1675,6 +1886,7 @@ class CommandGuiApp(QWidget):
         self._robomas_auto_applied = False
         self._robomas_vel_auto_applied = False
         self._joy_auto_applied = False
+        self._hand_servo_auto_applied = False
         self._auto_load_timer = QTimer(self)
         self._auto_load_timer.timeout.connect(self._try_auto_setup_gains)
         self._auto_load_timer.start(500)
@@ -1685,206 +1897,6 @@ class CommandGuiApp(QWidget):
         self._machine_status_timer = QTimer(self)
         self._machine_status_timer.timeout.connect(self._refresh_machine_status)
         self._machine_status_timer.start(1000)
-
-    # ---------- manual tab ----------
-    def _build_move_tab(self, parent):
-        layout = QHBoxLayout(parent)
-
-        left = QVBoxLayout()
-        left.addWidget(QLabel('XY平面 (クリックでピン設置。上=ワーク側(Y+)、右=X+)'))
-        self.xy_widget = XYPlaneWidget(self.CANVAS_SIZE, MAX_RADIUS, self.MARGIN, self._on_canvas_click)
-        left.addWidget(self.xy_widget)
-        left.addStretch(1)
-        layout.addLayout(left)
-
-        mid = QVBoxLayout()
-
-        coord_box = QGroupBox('目標座標 [m]')
-        coord_grid = QGridLayout(coord_box)
-        for i, (label, edit) in enumerate((('X', self.x_edit), ('Y', self.y_edit), ('Z', self.z_edit))):
-            coord_grid.addWidget(QLabel(label), i, 0)
-            coord_grid.addWidget(edit, i, 1)
-        copy_btn = QPushButton('現在位置を目標にコピー')
-        copy_btn.clicked.connect(self._on_copy_current_to_target)
-        coord_grid.addWidget(copy_btn, 3, 0, 1, 2)
-        mid.addWidget(coord_box)
-
-        jog_box = QGroupBox('ジョグ (↑ワーク側 ↓機体側 ←X- →X+)')
-        jog_layout = QVBoxLayout(jog_box)
-        step_row = QHBoxLayout()
-        step_row.addWidget(QLabel('ステップ[m]'))
-        step_row.addWidget(self.step_edit)
-        step_row.addStretch(1)
-        jog_layout.addLayout(step_row)
-        pad = QGridLayout()
-        up_btn = QPushButton('↑')
-        down_btn = QPushButton('↓')
-        left_btn = QPushButton('←')
-        right_btn = QPushButton('→')
-        up_btn.clicked.connect(lambda: self._on_jog(0, 1))
-        down_btn.clicked.connect(lambda: self._on_jog(0, -1))
-        left_btn.clicked.connect(lambda: self._on_jog(-1, 0))
-        right_btn.clicked.connect(lambda: self._on_jog(1, 0))
-        for b in (up_btn, down_btn, left_btn, right_btn):
-            b.setFixedWidth(36)
-        pad.addWidget(up_btn, 0, 1)
-        pad.addWidget(left_btn, 1, 0)
-        pad.addWidget(right_btn, 1, 2)
-        pad.addWidget(down_btn, 2, 1)
-        jog_layout.addLayout(pad)
-        mid.addWidget(jog_box)
-
-        mid.addWidget(QLabel(f'Z [{WORLD_Z_LOWER:.2f} - {WORLD_Z_UPPER:.2f} m]'))
-        self.z_slider = QSlider(Qt.Vertical)
-        self.z_slider.setMinimum(int(round(WORLD_Z_LOWER * self.Z_SLIDER_SCALE)))
-        self.z_slider.setMaximum(int(round(WORLD_Z_UPPER * self.Z_SLIDER_SCALE)))
-        self.z_slider.setSingleStep(5)
-        self.z_slider.setValue(int(round(get_float(self.z_edit) * self.Z_SLIDER_SCALE)))
-        self.z_slider.setFixedHeight(180)
-        self.z_slider.valueChanged.connect(self._on_z_slider_changed)
-        self.z_edit.textChanged.connect(self._on_z_edit_changed)
-        mid.addWidget(self.z_slider, alignment=Qt.AlignHCenter)
-
-        self.status_label = QLabel('')
-        self.status_label.setWordWrap(True)
-        mid.addWidget(self.status_label)
-
-        send_btn = QPushButton('送信 (Send)')
-        send_btn.setProperty('variant', 'primary')
-        send_btn.clicked.connect(self._on_send)
-        mid.addWidget(send_btn)
-        mid.addStretch(1)
-        layout.addLayout(mid)
-
-        right = QVBoxLayout()
-        right.addWidget(QLabel('保存済みポイント (ダブルクリックで読込)'))
-        self.listbox = QListWidget()
-        self.listbox.itemDoubleClicked.connect(lambda _item: self._on_load_point())
-        right.addWidget(self.listbox)
-        btns = QHBoxLayout()
-        add_btn = QPushButton('追加')
-        send_sel_btn = QPushButton('送信')
-        del_btn = QPushButton('削除')
-        add_btn.clicked.connect(self._on_add_point)
-        send_sel_btn.clicked.connect(self._on_send_selected)
-        del_btn.clicked.connect(self._on_delete_point)
-        for b in (add_btn, send_sel_btn, del_btn):
-            btns.addWidget(b)
-        right.addLayout(btns)
-        layout.addLayout(right, 1)
-
-        joints = QVBoxLayout()
-        self._build_joint_slider_panel(joints)
-        joints.addStretch(1)
-        layout.addLayout(joints)
-
-    def _build_joint_slider_panel(self, layout):
-        """関節ごと(root_theta/tip_theta/z/r)に直接スライダーでジョグできる
-        パネル(2026-09-09追加、ユーザー要望: 「コントローラー操作は一旦おいて、
-        各軸をスライダーで操作できるように。ホーミング後にスライドバーの位置と
-        実機の位置が合うように」)。左のXY平面/座標入力(直交座標、IK経由)とは
-        独立な関節空間の直接操作。
-
-        「ホーミング後に実機の位置と合う」ようにするため、_refresh_joint_sliders
-        (_machine_status_timerとは別の専用QTimer、100ms間隔)がユーザーが
-        ドラッグ中でない(isSliderDown()==False)スライダーへ常時
-        get_current_positions()の値を反映し続ける(ホーミング後に限らず常時。
-        homing_nodeがoffsetを適用してmixed_joint_statesの値が飛んだ場合も、
-        次のタイマー周期で自動的に追従する)。この反映はblockSignals()で行うため
-        valueChangedは発火せず、ユーザーの実際の操作(ドラッグ・クリック・
-        キーボード)によるvalueChangedとは自己フィードバックなく区別できる。"""
-        box = QGroupBox('関節スライダー (直接ジョグ)')
-        col = QVBoxLayout(box)
-
-        note = QLabel()
-        note.setWordWrap(True)
-        _set_status(
-            note,
-            'ドラッグ中でない間は実機の現在値に自動追従する(ホーミング直後の\n'
-            '位置反映もここで行われる)。ドラッグ・クリック・キー操作で目標値を送信。',
-            'muted')
-        col.addWidget(note)
-
-        joint_slider_specs = (
-            ('root_theta_joint', 'root θ', ROOT_THETA_LOWER, ROOT_THETA_UPPER, 'rad'),
-            ('tip_theta_joint', 'tip θ', TIP_THETA_LOWER, TIP_THETA_UPPER, 'rad'),
-            ('z_joint', 'z', Z_LOWER, Z_UPPER, 'm'),
-            ('r_joint', 'r', R_LOWER, R_UPPER, 'm'),
-        )
-        self.joint_sliders = {}
-        self.joint_slider_value_labels = {}
-        for name, label, lower, upper, unit in joint_slider_specs:
-            row = QHBoxLayout()
-            name_label = QLabel(label)
-            name_label.setFixedWidth(36)
-            row.addWidget(name_label)
-            slider = QSlider(Qt.Horizontal)
-            slider.setMinimum(int(round(lower * self.JOINT_SLIDER_SCALE)))
-            slider.setMaximum(int(round(upper * self.JOINT_SLIDER_SCALE)))
-            slider.setFixedWidth(160)
-            value_label = QLabel('-')
-            value_label.setFixedWidth(64)
-            slider.valueChanged.connect(
-                lambda value, n=name, u=unit: self._on_joint_slider_changed(n, value, u))
-            self.joint_sliders[name] = slider
-            self.joint_slider_value_labels[name] = value_label
-            row.addWidget(slider)
-            row.addWidget(value_label)
-            col.addLayout(row)
-
-        layout.addWidget(box)
-
-        self._joint_slider_timer = QTimer(self)
-        self._joint_slider_timer.timeout.connect(self._refresh_joint_sliders)
-        self._joint_slider_timer.start(100)
-
-    def _refresh_joint_sliders(self):
-        if not self.node.has_current_state():
-            return
-        pos = self.node.get_current_positions()
-        for name, slider in self.joint_sliders.items():
-            if slider.isSliderDown():
-                continue
-            value = clamp(int(round(pos[name] * self.JOINT_SLIDER_SCALE)),
-                          slider.minimum(), slider.maximum())
-            if value == slider.value():
-                continue
-            slider.blockSignals(True)
-            slider.setValue(value)
-            slider.blockSignals(False)
-            self._set_joint_slider_label(name)
-
-    def _set_joint_slider_label(self, name):
-        unit = 'rad' if name in ('root_theta_joint', 'tip_theta_joint') else 'm'
-        value = self.joint_sliders[name].value() / self.JOINT_SLIDER_SCALE
-        self.joint_slider_value_labels[name].setText(f'{value:.3f}{unit}')
-
-    def _on_joint_slider_changed(self, name, _value, _unit):
-        # _refresh_joint_slidersからの反映はblockSignals()で行っているため、
-        # ここに来るのは常にユーザーの実操作(ドラッグ・クリック・キー)。
-        self._set_joint_slider_label(name)
-        theta = self.joint_sliders['root_theta_joint'].value() / self.JOINT_SLIDER_SCALE
-        tip_theta = self.joint_sliders['tip_theta_joint'].value() / self.JOINT_SLIDER_SCALE
-        z = self.joint_sliders['z_joint'].value() / self.JOINT_SLIDER_SCALE
-        r = self.joint_sliders['r_joint'].value() / self.JOINT_SLIDER_SCALE
-        self.node.send_target(theta, z, r, tip_theta)
-
-    def _on_z_slider_changed(self, value):
-        z = value / self.Z_SLIDER_SCALE
-        self.z_edit.blockSignals(True)
-        set_float(self.z_edit, z)
-        self.z_edit.blockSignals(False)
-        self._redraw_pin()
-
-    def _on_z_edit_changed(self, _text):
-        try:
-            z = get_float(self.z_edit)
-        except ValueError:
-            return
-        value = clamp(int(round(z * self.Z_SLIDER_SCALE)), self.z_slider.minimum(), self.z_slider.maximum())
-        self.z_slider.blockSignals(True)
-        self.z_slider.setValue(value)
-        self.z_slider.blockSignals(False)
 
     # ---------- panel tabs (統合操作・ゲイン調整・原点校正・配線設定) ----------
     def _build_panel_tab(self, parent, top_funcs=(), left_funcs=(), right_funcs=()):
@@ -1969,13 +1981,13 @@ class CommandGuiApp(QWidget):
     def _build_status_display_tab(self, parent):
         """PC画面から離れた位置(遠く)からでも読めることを想定した表示専用タブ。
         操作ボタンは置かず、選択中ワークと試合中に確認したい主要ステータス
-        (動作モード・ポンプ・ピック/投入シーケンス状態・現在状態)を大きく表示
-        するだけにする(値の実体は統合操作タブ側のラベル・ワークボタンのまま、
-        二重管理を避けるため_refresh_status_display_tabで都度ミラーする)。
-        選択中ワークは、フィールド上の実際のワーク配置(_build_field_buttons/
-        _build_button_grid)と対応づけたグリッド(X昇順=左->右、Y降順=奥->手前)
-        で表示し、選択中セルだけを目立つ色で塗る(ボタンではなく表示専用の
-        QLabelにして誤操作を防ぐ)。"""
+        (動作モード・ポンプ・シーケンス状態・現在状態)を大きく表示するだけに
+        する(値の実体は統合操作タブ側のラベル・ワークボタンのまま、二重管理を
+        避けるため_refresh_status_display_tabで都度ミラーする)。選択中ワークは、
+        フィールド上の実際のワーク配置(_build_field_buttons/_build_button_grid)
+        と対応づけたグリッド(X昇順=左->右、Y降順=奥->手前)で表示し、選択中
+        セルだけを目立つ色で塗る(ボタンではなく表示専用のQLabelにして誤操作を
+        防ぐ)。"""
         layout = QVBoxLayout(parent)
 
         work_box = QGroupBox('選択中ワーク (フィールド配置)')
@@ -2076,7 +2088,9 @@ class CommandGuiApp(QWidget):
             parent,
             top_funcs=[self._build_apply_all_panel],
             left_funcs=[self._build_trajectory_panel, self._build_joy_speed_panel],
-            right_funcs=[self._build_mit_gain_panel, self._build_robomas_gain_panel,
+            right_funcs=[self._build_mit_gain_panel, self._build_cubemars_resync_panel,
+                         self._build_cubemars_overspeed_panel,
+                         self._build_robomas_gain_panel,
                          self._build_robomas_autotune_panel, self._build_robomas_vel_gain_panel,
                          self._build_velocity_mode_panel])
 
@@ -2084,8 +2098,7 @@ class CommandGuiApp(QWidget):
         self._build_panel_tab(
             parent,
             left_funcs=[self._build_axis_enable_panel, self._build_machine_origin_offset_panel,
-                        self._build_hand_offset_panel, self._build_origin_panel,
-                        self._build_homing_panel])
+                        self._build_hand_offset_panel, self._build_origin_panel])
 
     def _build_wiring_tab(self, parent):
         self._build_panel_tab(
@@ -2093,8 +2106,7 @@ class CommandGuiApp(QWidget):
             top_funcs=[self._build_wiring_bulk_load_panel],
             left_funcs=[self._build_robomas_wiring_panel, self._build_cubemars_wiring_panel,
                         self._build_hand_wiring_panel],
-            right_funcs=[self._build_homing_wiring_panel, self._build_can_host_raw_monitor_panel,
-                         self._build_limit_switch_wiring_panel])
+            right_funcs=[self._build_limit_switch_wiring_panel])
 
     def _build_wiring_bulk_load_panel(self, layout):
         # 各配線設定パネルは_build_yaml_wiring_panelで起動時に自動読込済みだが、
@@ -2300,8 +2312,7 @@ class CommandGuiApp(QWidget):
         calib_grid = QGridLayout()
         self.calibration_summary_labels = {}
         for i, (key, title) in enumerate((
-                ('machine_origin', '機体原点オフセット'), ('root_theta', 'root_theta原点'),
-                ('homing', 'z/rホーミング'))):
+                ('machine_origin', '機体原点オフセット'), ('root_theta', 'root_theta原点'))):
             calib_grid.addWidget(QLabel(title), i, 0)
             label = QLabel()
             label.setWordWrap(True)
@@ -2313,8 +2324,18 @@ class CommandGuiApp(QWidget):
         column.addWidget(box)
 
     def _refresh_machine_status(self):
-        self._update_status_leds()
+        # _update_status_ledsは_spin_ros(50ms)側で呼ぶため、ここでは呼ばない
+        # (2026-09-09、ユーザー報告「表示灯の応答が遅い」。このメソッド自体は
+        # ノード起動状況のROSグラフ照会等それなりに重い処理を含むため1秒周期の
+        # ままでよいが、状態表示灯だけは既にpublish済みのbool値を読むだけの
+        # 軽い処理なので、1秒待たず_spin_rosの周期で反映できる)。
         self._refresh_autotune_progress()
+        # 機体原点オフセットの適用値をRViz(joint_state_publisher)へ送り直す
+        # (2026-09-11追加)。逆運動学はself._machine_originを直接使うので送信の
+        # 成否に関わらず正しいが、GUIより後にjoint_state_publisherが起動した場合
+        # (「全ノード起動」など)にRViz上のフィールド位置が0オフセットのまま
+        # 取り残され、シーケンスの狙いと表示が食い違うのを防ぐ。
+        self.node.send_machine_origin(*self._machine_origin)
         active = self.node.get_active_node_names()
         for name, label in self.node_status_labels.items():
             if name in active:
@@ -2331,8 +2352,7 @@ class CommandGuiApp(QWidget):
 
         for key, source_label in (
                 ('machine_origin', self.machine_origin_status_label),
-                ('root_theta', self.origin_status_label),
-                ('homing', self.homing_status_label)):
+                ('root_theta', self.origin_status_label)):
             target = self.calibration_summary_labels[key]
             target.setText(source_label.text())
             target.setStyleSheet(source_label.styleSheet())
@@ -2355,41 +2375,20 @@ class CommandGuiApp(QWidget):
         box = QGroupBox('実機セットアップ')
         layout = QVBoxLayout(box)
 
-        warn = QLabel()
-        warn.setWordWrap(True)
-        _set_status(warn, '(事前確認) 緊急停止ボタンを押すこと', 'error')
-        layout.addWidget(warn)
-
         desc = QLabel()
         desc.setWordWrap(True)
-        _set_status(desc, '上から順に実行する想定(ノード起動→ゲイン適用→原点校正)。\n'
-                          '各操作の詳細な値編集はゲイン調整・原点校正タブで行う。\n'
+        _set_status(desc, 'GUI起動時に全ノードを自動起動し、ソフト緊急停止を掛けた\n'
+                          '状態で開始する(2026-09-09、全ノード起動ボタンは廃止)。\n'
+                          '解除は画面上部の緊急停止バーの「解除」ボタンで行う。\n'
+                          'ノード再起動が必要な場合のみ、下の「停止」で止めてから\n'
+                          'GUIを再起動すること。\n'
+                          '各ゲインの詳細な値編集はゲイン調整・原点校正タブで行う。\n'
                           '進捗は左の機体ステータスパネル(適用ゲイン・校正状態)で確認できる。', 'muted')
         layout.addWidget(desc)
 
-        # rvizは別途起動済みの場合に二重起動を避けたいことがあるため、「全ノード
-        # 起動」のたびにON/OFFできるようにする。ros2canは常に起動する(実機接続の
-        # 前提として必須)が、GUI(PyQt5ウィンドウ)か--nogui(ターミナルダッシュ
-        # ボード)かは選べるようにする(2026-09-07追加、ユーザー指摘: 「全ノード
-        # 起動ボタンで起動するrvizとros2canの起動を管理できるチェックボックスを
-        # 追加」→「ros2canは起動するよもちろん。チェックボックスで選ぶのは
-        # ros2can --noguiか否かだけ」)。既定はrviz起動ON・ros2can GUI(従来通り)。
-        launch_options_row = QHBoxLayout()
-        self.launch_use_viz_checkbox = QCheckBox('rvizを起動する')
-        self.launch_use_viz_checkbox.setChecked(True)
-        self.launch_ros2can_gui_checkbox = QCheckBox('ros2canをGUIで起動する(オフで--nogui)')
-        self.launch_ros2can_gui_checkbox.setChecked(True)
-        launch_options_row.addWidget(self.launch_use_viz_checkbox)
-        launch_options_row.addWidget(self.launch_ros2can_gui_checkbox)
-        layout.addLayout(launch_options_row)
-
         launch_row = QHBoxLayout()
-        launch_btn = QPushButton('全ノード起動')
-        launch_btn.setProperty('variant', 'primary')  # よく使う操作のため目立つ色に(2026-09-03)
         stop_launch_btn = QPushButton('停止')
-        launch_btn.clicked.connect(self._on_launch_all_nodes)
         stop_launch_btn.clicked.connect(self._on_stop_all_nodes)
-        launch_row.addWidget(launch_btn)
         launch_row.addWidget(stop_launch_btn)
         layout.addLayout(launch_row)
         self.launch_status_label = QLabel()
@@ -2417,34 +2416,19 @@ class CommandGuiApp(QWidget):
         origin_row.addWidget(root_theta_btn)
         layout.addLayout(origin_row)
 
-        homing_row = QHBoxLayout()
-        homing_start_z_btn = QPushButton('z軸ホーミング開始')
-        homing_start_z_btn.setProperty('variant', 'primary')
-        homing_start_r_btn = QPushButton('r軸ホーミング開始')
-        homing_start_r_btn.setProperty('variant', 'primary')
-        homing_stop_btn = QPushButton('中断')
-        homing_skip_btn = QPushButton('スキップ')
-        homing_skip_btn.setProperty('variant', 'danger')
-        homing_start_z_btn.clicked.connect(self._on_start_homing_z)
-        homing_start_r_btn.clicked.connect(self._on_start_homing_r)
-        homing_stop_btn.clicked.connect(self._on_stop_homing)
-        homing_skip_btn.clicked.connect(self._on_skip_homing)
-        homing_row.addWidget(homing_start_z_btn)
-        homing_row.addWidget(homing_start_r_btn)
-        homing_row.addWidget(homing_stop_btn)
-        homing_row.addWidget(homing_skip_btn)
-        layout.addLayout(homing_row)
-
         column.addWidget(box)
 
     def _on_launch_all_nodes(self):
         if self._launch_process is not None and self._launch_process.poll() is None:
             QMessageBox.information(self, '起動済み', '既に起動中です(先に停止してください)')
             return
-        use_viz = 'true' if self.launch_use_viz_checkbox.isChecked() else 'false'
-        # チェックボックスは「GUIで起動する」なので、ros2can_nogui引数へは反転して渡す。
-        ros2can_nogui = 'false' if self.launch_ros2can_gui_checkbox.isChecked() else 'true'
-        cmd = ALL_AXES_LAUNCH_BASE_CMD + [f'use_viz:={use_viz}', f'ros2can_nogui:={ros2can_nogui}']
+        # 2026-09-09、全ノード起動ボタン廃止(GUI起動時に自動起動するため)に伴い、
+        # rviz起動・ros2can GUIのON/OFFを選ぶチェックボックスも廃止し、固定値で
+        # 起動する。ros2canはPyQt5ウィンドウあり(--nogui無し)で起動する
+        # (2026-09-10に一度--noguiへ変更したが、ros2can GUI側のデバイス状態・
+        # スロット値を直接見たい場面が多いためユーザー指定で戻した。
+        # real_all_axes_test.launch.pyのros2can_nogui引数の既定値と揃えること)。
+        cmd = ALL_AXES_LAUNCH_BASE_CMD + ['use_viz:=true', 'ros2can_nogui:=false']
         try:
             # start_new_session=True(setsid)でこの子プロセスを独立したプロセス
             # グループのリーダーにする。ros2 launchはさらに複数のノードを自分の
@@ -2507,6 +2491,8 @@ class CommandGuiApp(QWidget):
         # から更新するのみ、クリック操作は無い)。
         visual_row = QHBoxLayout()
         self.field_minimap = FieldMinimapWidget()
+        # 投入シーケンスの目標となる箱(シューティング位置選択に追従)を強調表示。
+        self.field_minimap.set_shoot_labels(self._current_shoot_labels())
         visual_row.addWidget(self.field_minimap)
         self.z_gauge = ZGaugeWidget(height=self.field_minimap.height())
         visual_row.addWidget(self.z_gauge)
@@ -2588,7 +2574,84 @@ class CommandGuiApp(QWidget):
         pitch_row.addWidget(insert_btn)
         layout.addLayout(pitch_row)
 
+        # サーボ移動速度[deg/s](HAND_SERVO_SPEED_FIELDSのコメント参照)。0=即時
+        # (サーボ最速)。負値は意味を持たない(hand_node側で0扱い)ので
+        # make_gain_editで入力できないようにする。
+        speed_row = QHBoxLayout()
+        speed_row.addWidget(QLabel('サーボ速度[deg/s] (0=即時)'))
+        self.hand_servo_speed_edits = {}
+        for key, label in HAND_SERVO_SPEED_FIELDS:
+            speed_row.addWidget(QLabel(label))
+            edit = make_gain_edit(0.0, width=56)
+            self.hand_servo_speed_edits[key] = edit
+            speed_row.addWidget(edit)
+        speed_load_btn = QPushButton('読込')
+        speed_apply_btn = QPushButton('適用')
+        speed_load_btn.clicked.connect(self._on_load_hand_servo_speed)
+        speed_apply_btn.clicked.connect(self._on_apply_hand_servo_speed)
+        speed_row.addWidget(speed_load_btn)
+        speed_row.addWidget(speed_apply_btn)
+        speed_row.addStretch(1)
+        layout.addLayout(speed_row)
+        self.hand_servo_speed_status_label = QLabel()
+        self.hand_servo_speed_status_label.setWordWrap(True)
+        _set_status(self.hand_servo_speed_status_label, '未読込', 'muted')
+        layout.addWidget(self.hand_servo_speed_status_label)
+
         column.addWidget(box)
+
+    def _on_load_hand_servo_speed(self):
+        ok = self.node.request_node_params(
+            HAND_NODE_NAME, list(self.hand_servo_speed_edits.keys()),
+            self._apply_loaded_hand_servo_speed,
+            lambda reason: _set_status(self.hand_servo_speed_status_label, f'読込失敗: {reason}', 'error'))
+        _set_status(self.hand_servo_speed_status_label,
+                    '読込中...' if ok else 'hand_nodeに接続できません(未起動?)',
+                    'muted' if ok else 'error')
+        return ok
+
+    def _apply_loaded_hand_servo_speed(self, values):
+        for name, edit in self.hand_servo_speed_edits.items():
+            if name in values:
+                set_float(edit, round(values[name], 2))
+        # 「読込」は表示のみ、gains.jsonへは「適用」時のみ永続化する
+        # (_apply_loaded_joy_speedと同じ)。
+        _set_status(self.hand_servo_speed_status_label, '読込完了', 'info')
+
+    def _collect_hand_servo_speed_values(self):
+        return {name: max(0.0, get_float(edit)) for name, edit in self.hand_servo_speed_edits.items()}
+
+    def _on_apply_hand_servo_speed(self):
+        try:
+            values = self._collect_hand_servo_speed_values()
+        except ValueError:
+            QMessageBox.critical(self, '入力エラー', 'サーボ速度に数値を入力してください')
+            return
+        self._persist_gains('hand_servo_speed', values)
+        ok = self.node.set_node_params(HAND_NODE_NAME, values, self._apply_hand_servo_speed_set_result)
+        _set_status(self.hand_servo_speed_status_label,
+                    '適用中...' if ok else 'hand_nodeに接続できません(未起動?)',
+                    'muted' if ok else 'error')
+
+    def _apply_hand_servo_speed_set_result(self, results):
+        if results is None:
+            _set_status(self.hand_servo_speed_status_label, '適用に失敗しました(応答なし)', 'error')
+            return
+        if all(r.successful for r in results):
+            _set_status(self.hand_servo_speed_status_label, '適用しました(次の展開/収納・ピッチ切替から有効)', 'success')
+        else:
+            reasons = '; '.join(r.reason for r in results if not r.successful)
+            _set_status(self.hand_servo_speed_status_label, f'適用失敗: {reasons}', 'error')
+
+    def _auto_apply_saved_hand_servo_speed(self):
+        """GUI起動時、hand_nodeが使えるようになり次第gains.jsonのサーボ速度を
+        一度だけ自動適用する(_auto_apply_saved_joyと同じ設計、
+        _try_auto_setup_gainsから呼ばれる)。保存値が無ければ何もせず完了扱い。"""
+        saved = self._saved_gains.get('hand_servo_speed')
+        if not saved:
+            return True
+        _set_status(self.hand_servo_speed_status_label, '自動適用中(gains.json)...', 'muted')
+        return self.node.set_node_params(HAND_NODE_NAME, saved, self._apply_hand_servo_speed_set_result)
 
     def _on_hand_trigger(self, service_name):
         _set_status(self.hand_status_label, f'{service_name} 呼び出し中...', 'muted')
@@ -2624,10 +2687,11 @@ class CommandGuiApp(QWidget):
     def _build_sequence_settings_panel(self, column):
         # ワーク・シューティングボックスパネル(_build_field_buttons)の隣に置く
         # 設定・状態パネル(2026-09-03、ユーザー指定でこの位置に変更)。
-        # 「自動シーケンスで実行」チェックボックスと連動する。各数値はGUIの
-        # QLineEditが真値で、「適用」はgains.jsonへの永続化のみ行う(他のゲイン系
-        # パネルと違いリモートノードへのSetParametersは無い。シーケンス開始時に
-        # このGUIプロセス自身が_collect_sequence_valuesで直接読み出すため)。
+        # 2026-09-09、manualブランチでの操作方針(手動移動にフォーカス、根本θのみ
+        # 自動位置合わせ、R/Zは人が速度制御)により回収・投入いずれもtheta回転
+        # (+ハンド自動操作)のみに簡略化。Z軸位置指令、R軸の伸長・最終位置合わせは
+        # 人がjoyの速度指令モードで操作する(_start_pick_sequence/
+        # _start_shoot_sequence参照)。
         box = QGroupBox('ピック/投入 自動シーケンス')
         layout = QVBoxLayout(box)
 
@@ -2635,18 +2699,53 @@ class CommandGuiApp(QWidget):
         desc.setWordWrap(True)
         _set_status(
             desc,
-            '「ワーク・シューティングボックス」パネルの「自動シーケンスで実行」を\n'
-            'ONにしてボタンを押すと使える。\n'
-            '回収: ハンドを保持姿勢・パッド展開・ポンプONにしてからワーク手前\n'
-            '(アプローチ高さ)まで自動で近づき、そこから先(実際の接触・回収)は\n'
-            '下の「回収実行」ボタンまたはPSコンのPSボタンを押すまで進まない\n'
-            '(×ボタンは選択中ワークへの移動のみ。矢印キーでワークを選択できる)。\n'
-            '投入: シューティングエリア(L4/R4固定)の真上に安全高度を維持したまま\n'
-            '自動で近づくだけで、シュート自体(降下・位置調整・ポンプOFF)は行わない。\n'
-            '以降はZ軸の降下も含めて全てコントローラーで手動操作する。下の\n'
-            '「L4へ移動」「R4へ移動」ボタン(またはPSコンの割当ボタン)でいつでも\n'
-            'この移動だけをやり直せる。', 'muted')
+            'ワークボタン(または×ボタン)を押すと、ハンドを保持姿勢・パッド展開・\n'
+            'ポンプONにしてroot_thetaを選択中ワークの方向へ自動で回転させる。\n'
+            '「左箱へ移動」「右箱へ移動」ボタン(またはPSコンの割当ボタン、シューティング\n'
+            'ボックスのボタンでも同じ)を押すと、手先ピッチを投入姿勢にし、\n'
+            'root_thetaをシューティングエリアの方向へ自動で回転させる。\n'
+            '向かう箱は下の「シューティング位置」で選ぶ(既定: フィールド側から3番目)。\n'
+            'Z軸・R軸はいずれもコントローラーで手動操作する(joy速度指令モード)。', 'muted')
         layout.addWidget(desc)
+
+        # R軸自動リトラクト(2026-09-09追加、ユーザー指定:「R軸を自動でもとに
+        # 戻すのはデフォルトでfalse」)。ONの間だけtheta回転前にR軸を
+        # r_lowerリミットスイッチまで自動で戻す(_advance_retract_r_step参照)。
+        # OFF(既定)なら退避ステップ自体を飛ばし、R軸は常に人の操作のみで動く。
+        self.retract_r_checkbox = QCheckBox('R軸を自動でしまう(theta回転前にr_lowerリミットスイッチまで retract)')
+        # 既定OFF(2026-09-10に一度「デフォルトでオンに」で既定ONへ変更したが、
+        # 2026-09-12にユーザー指定「デフォルト無効に」で既定OFFへ戻した)。
+        self.retract_r_checkbox.setChecked(False)
+        layout.addWidget(self.retract_r_checkbox)
+
+        # ハンド姿勢の自動操作(2026-09-12追加、ユーザー指定:「自動シーケンスで
+        # ピッチと収納が作動するのを無効化。有効化もチェックボックスで選べる
+        # ように」)。ONの間だけ、回収シーケンス冒頭のピッチ保持姿勢・パッド展開と、
+        # 投入シーケンス冒頭のパッド収納・(gather_settle_sec待ち)・ピッチ投入姿勢を
+        # 自動で行う。OFF(既定)ならこれらのステップ自体を飛ばし、ハンド姿勢は
+        # 常に人の操作(GUIのハンド操作パネル/PSコンのL3・R3)のみで変わる。
+        # 回収シーケンスのポンプONは姿勢操作ではないので対象外(従来どおり自動)。
+        # retract_r_checkboxと同様、gains.jsonには保存しない(起動時は常にOFF)。
+        self.hand_pose_auto_checkbox = QCheckBox(
+            'ハンド姿勢を自動で切り替える(回収: ピッチ保持+パッド展開 / 投入: パッド収納+ピッチ投入)')
+        self.hand_pose_auto_checkbox.setChecked(False)
+        layout.addWidget(self.hand_pose_auto_checkbox)
+
+        # 投入シーケンス開始時にjoy側の手先θ追従(OPTIONS)を自動OFFするか
+        # (2026-09-12追加、ユーザー指定:「自動シーケンスで手先追従を自動オフする
+        # 設定もデフォルトをオフに」)。2026-09-03の「手先θ追従はシューティング
+        # ボックスへの自動移動時には自動で無効化」は、投入シーケンスの手先θ目標
+        # (当時は固定値)と追従の上書きが競合するのを防ぐためだったが、同日から
+        # joy側の追従もシューティングエリアでは投入シーケンスと同じ式になった
+        # (joy_teleop_node.py TIP_THETA_SHOOT_AREA_*)ため、追従ONのままでも最終的に
+        # 同じ角度に落ち着く。OFF(既定)なら追従状態には触らず、シュート後も
+        # OPTIONSを押し直さずに追従が続く。ONなら従来どおりシーケンス開始時に
+        # 追従をOFFにする(旋回途中の追従上書きも完全に避けたい場合用)。
+        # 他のチェックボックスと同様gains.jsonには保存しない。
+        self.follow_auto_off_checkbox = QCheckBox(
+            '投入シーケンス開始時に手先θ追従(OPTIONS)を自動でOFFにする')
+        self.follow_auto_off_checkbox.setChecked(False)
+        layout.addWidget(self.follow_auto_off_checkbox)
 
         self.sequence_status_label = QLabel()
         self.sequence_status_label.setWordWrap(True)
@@ -2654,21 +2753,45 @@ class CommandGuiApp(QWidget):
         layout.addWidget(self.sequence_status_label)
 
         btn_row = QHBoxLayout()
-        pick_confirm_btn = QPushButton('回収実行')
-        pick_confirm_btn.setProperty('variant', 'primary')
-        pick_confirm_btn.clicked.connect(self._on_pick_confirm_button_clicked)
-        btn_row.addWidget(pick_confirm_btn)
-        shoot_l4_btn = QPushButton('L4へ移動')
-        shoot_l4_btn.clicked.connect(lambda: self._on_shoot_start_requested('L4'))
-        btn_row.addWidget(shoot_l4_btn)
-        shoot_r4_btn = QPushButton('R4へ移動')
-        shoot_r4_btn.clicked.connect(lambda: self._on_shoot_start_requested('R4'))
-        btn_row.addWidget(shoot_r4_btn)
+        pick_move_btn = QPushButton('回収実行(選択中ワークへ)')
+        pick_move_btn.setProperty('variant', 'primary')
+        pick_move_btn.clicked.connect(self._on_pick_move_button_clicked)
+        btn_row.addWidget(pick_move_btn)
+        # 左右のシューティングボックスへ向かうボタン。ボタン文字列は選択中の箱
+        # (shoot_box_combo)に合わせて「L3へ移動」のように更新する
+        # (_on_shoot_box_changed参照)。
+        self.shoot_l_btn = QPushButton()
+        self.shoot_l_btn.clicked.connect(lambda: self._on_shoot_start_requested('L'))
+        btn_row.addWidget(self.shoot_l_btn)
+        self.shoot_r_btn = QPushButton()
+        self.shoot_r_btn.clicked.connect(lambda: self._on_shoot_start_requested('R'))
+        btn_row.addWidget(self.shoot_r_btn)
         abort_btn = QPushButton('中断')
         abort_btn.setProperty('variant', 'danger')
         abort_btn.clicked.connect(self._on_abort_sequence)
         btn_row.addWidget(abort_btn)
         layout.addLayout(btn_row)
+
+        # シューティング位置の選択(2026-09-13追加、ユーザー指摘:「シューティング
+        # 位置は一番フィールドに近い位置だと思う。GUIで切り替えられるように、
+        # デフォルトはフィールド側から2番目」)。以前はL4/R4(最もフィールド寄り)
+        # 固定だった。左右共通で「フィールド側から何番目の箱か」を選ぶ
+        # (SHOOT_BOX_CHOICES)。「左箱へ移動」「右箱へ移動」ボタン、PSコンの
+        # 割当ボタン(/shoot_sequence_start_l4・_r4)、ミニマップの強調表示が
+        # これに追従する。他のチェックボックスと同様gains.jsonには保存せず、
+        # 起動時は常に既定(DEFAULT_SHOOT_BOX_INDEX、L2/R2)に戻る。
+        shoot_box_row = QHBoxLayout()
+        shoot_box_row.addWidget(QLabel('シューティング位置'))
+        self.shoot_box_combo = QComboBox()
+        for text, index in SHOOT_BOX_CHOICES:
+            self.shoot_box_combo.addItem(text, index)
+        self.shoot_box_combo.setCurrentIndex(
+            [index for _text, index in SHOOT_BOX_CHOICES].index(DEFAULT_SHOOT_BOX_INDEX))
+        self.shoot_box_combo.currentIndexChanged.connect(self._on_shoot_box_changed)
+        shoot_box_row.addWidget(self.shoot_box_combo)
+        shoot_box_row.addStretch(1)
+        layout.addLayout(shoot_box_row)
+        self._on_shoot_box_changed()
 
         # ポンプON/OFFはハンドパネルと重複するが、シーケンス操作中にタブを
         # 切り替えずに吸着のON/OFFができるよう、ここにも同じ操作を置く
@@ -2692,12 +2815,24 @@ class CommandGuiApp(QWidget):
         grid = QGridLayout()
         self.sequence_edits = {}
         for i, (key, label) in enumerate((
-                ('safe_transit_z_m', '安全高度Z[m]'),
-                ('r_retract_m', 'R退避量[m]'),
-                ('pickup_z_offset_m', '回収Zオフセット[m]'),
-                ('pickup_approach_clearance_m', '回収アプローチ余裕[m]'),
-                ('shoot_tip_theta_rad', '投入時手先θ[rad](暫定)'),
-                ('gather_settle_sec', '収納後の待ち時間[s]'))):
+                # 投入時手先θ(追従値∓90deg、_shoot_tip_theta参照)への微調整トリム
+                # (2026-09-12、旧「投入時手先θ[rad](暫定)」固定値を置き換え)。
+                ('shoot_tip_theta_trim_deg', '投入時手先θトリム[deg]'),
+                # R軸自動リトラクトの速度(2026-09-09追加、retract_r_checkbox ON時のみ
+                # 使う。ユーザー報告:「現状遅すぎて格納できない」)。
+                ('retract_r_speed_mps', 'R軸格納速度[m/s]'),
+                # 投入シーケンスのパッド収納 -> ピッチ投入姿勢の間の待ち時間
+                # (2026-09-10、投入シーケンスが収納も行うようになったのに伴い
+                # 編集欄を追加。定数自体は2026-09-03からDEFAULT_SEQUENCE_SETTINGSに
+                # あったが、使う箇所が無くなっていたため編集欄も無かった。
+                # パッドが収納し切る前にピッチが回ると干渉するので実機で要調整)。
+                ('gather_settle_sec', '収納→ピッチ待ち[s]'),
+                # 回収時のroot_theta狙い点をワーク中心から上面側(+Y)へずらす量
+                # (2026-09-11追加、DEFAULT_SEQUENCE_SETTINGSのコメント参照)。
+                ('pick_aim_y_offset_m', '回収θ狙い点 中心→上面[m]'),
+                # root_theta原点のずれをソフト側で補正するトリム(2026-09-12追加、
+                # DEFAULT_SEQUENCE_SETTINGSのコメント参照)。回収・投入の両方に効く。
+                ('root_theta_trim_ak_deg', '根本θ原点トリム[AK deg]'),)):
             grid.addWidget(QLabel(label), i, 0)
             edit = make_float_edit(DEFAULT_SEQUENCE_SETTINGS[key])
             self.sequence_edits[key] = edit
@@ -2709,6 +2844,30 @@ class CommandGuiApp(QWidget):
         layout.addWidget(apply_btn)
 
         column.addWidget(box)
+
+    def _shoot_box_index(self):
+        """シューティング位置選択(shoot_box_combo)が指すSHOOT_POINTS添字(0..3)。
+        未構築時や不正値は既定(DEFAULT_SHOOT_BOX_INDEX)。"""
+        combo = getattr(self, 'shoot_box_combo', None)
+        index = combo.currentData() if combo is not None else None
+        if not isinstance(index, int) or not 0 <= index < len(SHOOT_POINTS['L']):
+            return DEFAULT_SHOOT_BOX_INDEX
+        return index
+
+    def _current_shoot_labels(self):
+        index = self._shoot_box_index()
+        return [shoot_target(side, index)[0] for side in ('L', 'R')]
+
+    def _on_shoot_box_changed(self, *_args):
+        """シューティング位置選択の変更を、左右移動ボタンの文字列とミニマップの
+        強調表示へ反映する。ミニマップは構築順の都合でこのパネルより後に作られる
+        ため、未構築なら_build_current_state_panel側で初期値を取りにくる。"""
+        l_label, r_label = self._current_shoot_labels()
+        self.shoot_l_btn.setText(f'{l_label}へ移動')
+        self.shoot_r_btn.setText(f'{r_label}へ移動')
+        minimap = getattr(self, 'field_minimap', None)
+        if minimap is not None:
+            minimap.set_shoot_labels((l_label, r_label))
 
     def _collect_sequence_values(self):
         return {key: get_float(edit) for key, edit in self.sequence_edits.items()}
@@ -2722,128 +2881,134 @@ class CommandGuiApp(QWidget):
         self._persist_gains('sequence', values)
         _set_status(self.sequence_status_label, '設定を保存しました', 'success')
 
+    def _root_theta_trim_rad(self):
+        """シーケンス設定パネルのroot_theta原点トリム[AK軸deg]を関節角[rad]で返す
+        (2026-09-12追加、DEFAULT_SEQUENCE_SETTINGSのコメント参照)。数値でない
+        入力は0、範囲外はROOT_THETA_TRIM_AK_DEG_LIMITでクランプする。"""
+        try:
+            trim_ak_deg = get_float(self.sequence_edits['root_theta_trim_ak_deg'])
+        except (ValueError, KeyError):
+            trim_ak_deg = DEFAULT_SEQUENCE_SETTINGS['root_theta_trim_ak_deg']
+        trim_ak_deg = clamp(trim_ak_deg, -ROOT_THETA_TRIM_AK_DEG_LIMIT, ROOT_THETA_TRIM_AK_DEG_LIMIT)
+        return math.radians(trim_ak_deg) / ROOT_THETA_REDUCTION
+
+    def _apply_root_theta_trim(self, theta):
+        """回収/投入シーケンスのroot_theta目標に原点トリムを足し、可動域で
+        クランプして返す(_root_theta_trim_rad参照)。"""
+        return clamp(theta + self._root_theta_trim_rad(), ROOT_THETA_LOWER, ROOT_THETA_UPPER)
+
+    def _shoot_tip_theta(self, theta):
+        """投入シーケンスの手先θ目標[rad]。thetaはトリム前の幾何学的なroot_theta。
+        回収時の追従値(TIP_THETA_FOLLOW_SIGN*theta、パッド列∥ワールドX)から
+        0側へ90deg戻し、パッド列を回収時の追従直線と直交する向き(ワールドY)に
+        する(2026-09-12、冒頭「手先θ(tip_theta_joint)の自動制御」のコメント参照。
+        0側へ戻すのは手先θの物理ストッパ±135degを避けるためで、L4/R4で回す向きが
+        自動的に逆になる)。シーケンス設定パネルのトリム[deg]を足して返す
+        (数値でない入力は0、範囲外はSHOOT_TIP_THETA_TRIM_DEG_LIMITでクランプ)。"""
+        tip_follow = TIP_THETA_FOLLOW_SIGN * theta
+        tip_shoot = tip_follow - math.copysign(math.pi / 2.0, tip_follow)
+        try:
+            trim_deg = get_float(self.sequence_edits['shoot_tip_theta_trim_deg'])
+        except (ValueError, KeyError):
+            trim_deg = DEFAULT_SEQUENCE_SETTINGS['shoot_tip_theta_trim_deg']
+        trim_deg = clamp(trim_deg, -SHOOT_TIP_THETA_TRIM_DEG_LIMIT, SHOOT_TIP_THETA_TRIM_DEG_LIMIT)
+        return tip_shoot + math.radians(trim_deg)
+
     def _start_pick_sequence(self, x, y, z):
-        """workボタン用: ピッチ保持姿勢・パッド展開・ポンプONを移動開始前に
-        まとめて行ってから、安全高度退避→R退避→θ回転→R伸長→ワーク手前
-        (アプローチ高さ)まで自動降下→(人間の「回収実行」指示待ち。GUIの
-        「回収実行」ボタンまたはPSコンの回収確認ボタン)→ワークに当たる高さまで
-        降下→上昇→パッド収納→ピッチ投入姿勢、という回収シーケンス
-        (2026-09-03、ユーザー指摘: 「半自動化を大雑把にしよう。ワークへの移動を
-        指示されたらハンドを保持姿勢、パッド展開、ポンプオンにして向かう。人の
-        操作でワークを回収する。回収時のZ軸下降はそのまま残しておいて」。以前は
-        ポンプONを最終降下の後(回収実行を押した後)に自動で呼んでいたが、
-        移動開始前に前倒しし、実際の接触・吸着(=回収そのもの)は人間の操作に
-        委ねる形にした。Z軸の自動降下(アプローチ高さまで→回収実行待ち→
-        最終降下)自体は変更せずそのまま維持している)。パッド収納とピッチ切替の
-        間はgather_settle_sec秒待ってから行う(ユーザー指摘: 「収納から姿勢変更
-        までの待機時間も必要。ほぼ同時はまずい」。パッドが物理的に収納し切る前に
-        ピッチが回り始めると干渉する恐れがあるため)。
-        theta回転以降は手先θ(tip_theta_joint)も同時に制御し、吸着パッド3個の
-        展開軸がワークの行と平行になるよう自動で打ち消す(2026-09-03、ユーザー
-        指摘: 「ハンドは3つ一気に回収するので手先θはワークの行と平行になるように
-        動く必要がある」)。
-        既に回収シーケンス実行中(回収実行待ち含む)に再度workボタンが押された
-        場合は、中断を要求せず自動的に新しいワークへやり直す(2026-09-03、
-        ユーザー指摘: 「ワークに移動し回収実行待ちの時に再度ワークの位置が
-        送信された場合は自動的にワーク移動からやり直すように」)。この場合は
-        直前のワークから近距離の移動とみなし、R軸を旋回軸まで戻す退避を省略して
-        直接回転+伸縮する(ユーザー指摘: 「ワークからワークに移動する際はR軸を
-        戻さなくていい。近距離なので」)。
-        ピッチ保持姿勢・パッド展開・ポンプONの呼び出しはポンプの現在ON/OFF状態に
-        関わらず常に行う(2026-09-03、ユーザー指摘: 「ポンプのオンオフによる機体の
-        動作制約がないようにしたい」。一時、ポンプが既にONの間はこれらの呼び出しを
-        省略する実装を試したが、「回収実行を押してもハンドの向きが現状維持の
-        ままになる」という問題が生じたため撤回し、常に呼ぶ方式に戻した)。
-        シーケンス完了/中断後で非アクティブな場合でも、この呼び出しは常に
-        self._last_pick_targetを更新する。これにより「回収実行」ボタン
-        (_on_pick_confirm_requested)は、シーケンスが完了した後でも同じワークへの
-        回収シーケンスを再度呼び出せる(吸着失敗時の再試行用、2026-09-03、
-        ユーザー指摘: 「吸着できなかったときに回収実行を再度行うことがある。
-        現状だと回収実行が一回しかできない」)。
-        他のシーケンス(投入シーケンス含む)実行中でも、確認や中断操作なしに
-        即座にこちらへ切り替える(2026-09-03、ユーザー指摘:「回収実行を押さ
-        なくてもシューティング位置へ移動できるように。ユーザーの動きを制限
-        したくない。状況判断はユーザーが行うため」。以前は投入シーケンスなど
-        「回収」以外が実行中だとQMessageBoxで拒否していたが、状況判断は人間
-        (ユーザー)に委ね、システム側では止めない方針に変更した)。"""
-        restarting_from_work = self._seq_active and self._seq_kind == '回収'
+        """workボタン用の回収シーケンス(2026-09-09、manualブランチでの操作方針
+        「根本θのみ自動で位置合わせ、RとZは人が速度制御で操作」に合わせて
+        簡略化して復元。以前はここでR退避・θ回転・R伸長・Z自動降下(アプローチ→
+        回収実行待ち→接触→上昇)まで全て自動で行っていたが、Z軸自動制御を
+        廃止したことで「Z軸を下げて接触・吸着する」区間がまるごと不要になった。
+        自動区間はハンド準備(保持姿勢・パッド展開・ポンプON)とtheta回転のみで、
+        このうち保持姿勢・パッド展開はhand_pose_auto_checkbox ON時のみ(2026-09-12、
+        既定OFF。ユーザー指定:「自動シーケンスでピッチと収納が作動するのを
+        無効化。有効化もチェックボックスで選べるように」)。
+        R/Zは人がjoyの速度指令モードで操作してワークへ実際に近づき回収する。
+        「回収実行」による2段階確認も、Z自動降下(＝人間が操作を代われるタイミング)
+        が無くなったため不要になり、workボタン/×ボタン1回で完結する。
+        吸着パッド3個の展開軸をワークの行(ワールドX軸)と平行に保つため、
+        手先θ(tip_theta_joint)をroot_thetaと同じ量だけ回して打ち消す
+        (向きはTIP_THETA_FOLLOW_SIGN、宣言部のコメント参照)
+        (2026-09-03、ユーザー指摘: 「ハンドは3つ一気に回収するので手先θは
+        ワークの行と平行になるように動く必要がある」)。
+        既に他のシーケンス実行中でも、確認や中断操作なしに即座にこちらへ
+        切り替える(2026-09-03、ユーザー指摘:「ユーザーの動きを制限したくない。
+        状況判断はユーザーが行うため」)。"""
         if self._seq_active:
             self._abort_sequence(f'{self._seq_kind}シーケンスを中断し、回収シーケンスへ切り替えます')
         if not self.node.has_current_state():
             QMessageBox.information(self, '未取得', 'まだ現在位置を受信していません')
             return
+
+        # root_thetaの狙い点はワーク中心(x, y)ではなく、そこからワーク上面側(+Y)へ
+        # pick_aim_y_offset_mだけずらした点にする(2026-09-11、ユーザー指摘:
+        # 「ワーク座標のXYから根本θの角度を決めているが、それがワーク中心を
+        # もとに決まっているので上面あたりを基準に根本θを計算したい」)。
+        # 中心と上面ではatan2(-x, y)のyが変わるため、特に外側の列ほどθが変わる。
+        # 編集欄の値が数値でない場合は既定値、大きすぎる値はワーク長でクランプ
+        # (誤入力で狙い点がワークから大きく外れないようにする)。
         try:
-            settings = self._collect_sequence_values()
-        except ValueError:
-            QMessageBox.critical(self, '入力エラー', 'シーケンス設定パネルの数値を確認してください')
-            return
-        self._last_pick_target = (x, y, z)
+            aim_y_offset = get_float(self.sequence_edits['pick_aim_y_offset_m'])
+        except (ValueError, KeyError):
+            aim_y_offset = DEFAULT_SEQUENCE_SETTINGS['pick_aim_y_offset_m']
+        aim_y_offset = clamp(aim_y_offset, -WORK_LENGTH, WORK_LENGTH)
+        target_theta, _target_r = _theta_r_from_xy(x, y + aim_y_offset, self._machine_origin)
+        # 手先θの追従値はトリム前の幾何学的なθから決める(トリムはroot_thetaの
+        # エンコーダ原点のずれを補正するものなので、実際にアームが向く物理角度は
+        # トリム前のθ。tip_thetaの原点は別途手動で合わせている)。
+        tip_theta_pick = TIP_THETA_FOLLOW_SIGN * target_theta
+        target_theta = self._apply_root_theta_trim(target_theta)
 
-        pos = self.node.get_current_positions()
-        theta0, r0 = pos['root_theta_joint'], pos['r_joint']
-        target_theta, target_r = _theta_r_from_xy(x, y)
-        safe_zj = clamp(settings['safe_transit_z_m'] - Z_OFFSET, Z_LOWER, Z_UPPER)
-        final_zj = clamp((z + settings['pickup_z_offset_m']) - Z_OFFSET, Z_LOWER, Z_UPPER)
-        approach_zj = clamp(
-            (z + settings['pickup_z_offset_m'] + settings['pickup_approach_clearance_m']) - Z_OFFSET,
-            Z_LOWER, Z_UPPER)
-        r_retract = clamp(settings['r_retract_m'], R_LOWER, R_UPPER)
-        # 吸着パッド3個の展開軸をワークの行(ワールドX軸)と平行に保つため、
-        # 手先θ(tip_theta_joint)をroot_thetaと逆方向に同じ量だけ回して打ち消す
-        # (SHOOT_TIP_THETA_RAD付近のコメント参照、2026-09-03ユーザー指摘)。
-        # theta回転を始めるレグ(パッドが目的の行へ向く前)から適用する。
-        tip_theta_pick = -target_theta
-
-        if restarting_from_work:
-            # ワークtoワークの近距離移動: R退避を省略し、回転とR伸縮を1レグで行う。
-            approach_legs = [('move', target_theta, safe_zj, target_r, tip_theta_pick)]
-        else:
-            approach_legs = [
-                ('move', theta0, safe_zj, r_retract),         # Rを旋回軸近くへ退避
-                ('move', target_theta, safe_zj, r_retract, tip_theta_pick),  # theta回転(手先θも同時に打ち消し)
-                ('move', target_theta, safe_zj, target_r, tip_theta_pick),   # Rを目標半径まで伸長
+        steps = []
+        if self.hand_pose_auto_checkbox.isChecked():
+            # ハンド姿勢の自動操作はチェックボックスON時のみ(2026-09-12、
+            # 既定OFF。hand_pose_auto_checkbox宣言部のコメント参照)。
+            steps += [
+                ('call', '/hand_set_pitch_hold'),   # 回収時は保持姿勢
+                ('call', '/hand_spread_pads'),      # パッド展開
             ]
-
-        steps = [
-            ('call', '/hand_set_pitch_hold'),             # 回収待機中は保持姿勢にしておく
-            ('call', '/hand_spread_pads'),                # 移動前にパッド展開
-            ('call', '/hand_pump_on'),                    # 移動前に吸着ON(接触したらすぐ吸着できるように)
-            ('move', theta0, safe_zj, r0),               # 現在地のまま安全高度へ
-            *approach_legs,
-            ('move', target_theta, approach_zj, target_r, tip_theta_pick),  # ワーク手前まで自動降下
-            ('wait_pick_confirm',),                       # 人間の「回収実行」指示待ち(=人の操作でワークを回収)
-            ('move', target_theta, final_zj, target_r, tip_theta_pick),  # ワークに当たる高さまで降下
-            ('move', target_theta, safe_zj, target_r, tip_theta_pick),  # 安全高度へ上昇
-            ('call', '/hand_gather_pads'),
-            ('delay', settings['gather_settle_sec']),     # パッドが物理的に収納し切るまで少し待つ
-            ('call', '/hand_set_pitch_insert'),           # 収納後は投入姿勢へ(シュートへの搬送に備える)
+        steps += [
+            ('call', '/hand_pump_on'),          # 吸着ON(接触したらすぐ吸着できるように)
+            ('move', target_theta, None, None, tip_theta_pick),  # theta回転のみ
         ]
         self._begin_sequence('回収', steps)
 
     def _start_shoot_sequence(self, x, y, z):
-        """shootボタン用: 安全高度を維持したままシューティングエリアのXYへ
-        向かうだけの投入シーケンス(2026-09-03、ユーザー指摘: 「半自動化を
+        """shootボタン用の投入シーケンス(2026-09-03、ユーザー指摘: 「半自動化を
         大雑把にしよう。特にシューティングについてはシューティングエリアに
-        安全高度を維持したまま向かうだけでシュート自体は行わない」)。Z軸の
-        降下・ポンプOFFはいずれも自動区間に含めず、すべて人間がコントローラーで
-        操作する(ユーザー指摘: 「シューティングエリアへ移動人が位置を調整し
-        ポンプをオフする。Z軸の操作も人が行う」)。手先ピッチを投入姿勢へ
-        揃えることだけは例外で、シーケンス開始時に自動で行う(下記steps先頭の
-        hand_set_pitch_insert呼び出し、2026-09-04追加。当初は回収シーケンス末尾
-        での自動切替に任せて投入シーケンス側では何もしていなかったが、
-        「回収実行を押さなくてもシューティング位置へ移動できるように」により
-        回収シーケンスをいつでも中断できるようになった結果、保持姿勢のまま
-        シュートへ向かってしまうことがあり「手先ピッチが作動したりしなかったり
-        する」不具合として顕在化したため、投入シーケンス自身が保証するように
-        変更した。ユーザー指摘: 「シュート時は手先ピッチ投入姿勢でなくては
-        ならない」)。
-        theta回転以降は手先θ(tip_theta_joint)もr方向に垂直な一定値
-        (shoot_tip_theta_rad)へ制御する(2026-09-03、ユーザー指摘: 「シュート時は
-        Rと垂直になるように」。この値自体は実機未検証の暫定値)。
-        実運用ではx, y, zはSHOOT_FIXED_TARGETS(L4/R4)固定で、「L4へ移動」
-        「R4へ移動」ボタン(_on_shoot_start_requested、GUIボタンまたはPSコンの
-        割当ボタン)経由で呼ばれる想定(2026-09-03、ユーザー指摘: 「シューティング
-        エリアはL4もしくはR4で、ボタンを2つおいておいて」)。
+        安全高度を維持したまま向かうだけでシュート自体は行わない」)。
+        2026-09-09、manualブランチでの操作方針「根本θのみ自動で位置合わせ、
+        RとZは人が速度制御で操作。R軸をしまうのはエンコーダーではなくリミット
+        スイッチで行う」により、Z軸の位置指令とR軸のシュート位置への最終延伸を
+        シーケンスから削除した(いずれも人がjoyの速度指令モードで操作する。
+        以前からZ軸の降下・ポンプOFFは人間が行う方針だったが、Rも同様に人へ
+        委ねる)。自動区間はtheta回転とR軸のリトラクト(r_lowerリミットスイッチ
+        まで)のみ。手先ピッチを投入姿勢へ揃えることだけは例外で、シーケンス
+        開始時に自動で行う(下記steps先頭のhand_set_pitch_insert呼び出し。
+        ただし2026-09-12以降はhand_pose_auto_checkbox ON時のみで既定OFF、
+        ユーザー指定:「自動シーケンスでピッチと収納が作動するのを無効化。
+        有効化もチェックボックスで選べるように」。
+        2026-09-04追加。当初は回収シーケンス末尾での自動切替に任せて投入
+        シーケンス側では何もしていなかったが、「回収実行を押さなくても
+        シューティング位置へ移動できるように」により回収シーケンスをいつでも
+        中断できるようになった結果、保持姿勢のままシュートへ向かってしまう
+        ことがあり「手先ピッチが作動したりしなかったりする」不具合として
+        顕在化したため、投入シーケンス自身が保証するように変更した。
+        ユーザー指摘: 「シュート時は手先ピッチ投入姿勢でなくてはならない」)。
+        theta回転と同時に手先θ(tip_theta_joint)も、回収時の追従直線(ワールドX)
+        と直交する向き(ワールドY)へ追従させる(_shoot_tip_theta参照。2026-09-12、
+        ユーザー指定:「手先θのシュート時の角度は手先追従+90度。左右のシューティング
+        ボックスで90度回す向きが異なる」「これはシューティング時のみ」。以前は
+        2026-09-03の「シュート時はRと垂直になるように」により固定値
+        shoot_tip_theta_rad(暫定0)を送っていた)。
+        実運用ではx, y, zはシューティング位置選択(shoot_box_combo、既定L2/R2)
+        の左右いずれかの箱で、「左箱へ移動」「右箱へ移動」ボタン
+        (_on_shoot_start_requested、GUIボタンまたはPSコンの割当ボタン)経由で
+        呼ばれる想定(2026-09-03、ユーザー指摘: 「シューティングエリアはL4もしくは
+        R4で、ボタンを2つおいておいて」。2026-09-13から箱の位置は選択式)。zは
+        SHOOT_POINTSの互換のため引数として残しているが、Z軸を自動制御しなくなった
+        ため実際には使わない。
         他のシーケンス(回収シーケンス含む、回収実行待ちの状態でも)実行中でも、
         確認や中断操作なしに即座にこちらへ切り替える(2026-09-03、ユーザー指摘:
         「回収実行を押さなくてもシューティング位置へ移動できるように。ユーザー
@@ -2864,46 +3029,74 @@ class CommandGuiApp(QWidget):
             QMessageBox.critical(self, '入力エラー', 'シーケンス設定パネルの数値を確認してください')
             return
 
-        # 投入シーケンスは手先θを固定値(tip_theta_shoot、下記)へ制御するため、
+        # 投入シーケンスは手先θを自前の目標(tip_theta_shoot、下記)へ制御するため、
         # joy_teleop_node側の手先θroot_theta追従(OPTIONSボタン、既定ON)が
-        # ONのままだと毎周期-root_thetaへ上書きされて競合する。シーケンス開始時に
-        # 自動でOFFにする(2026-09-03、ユーザー指定:「手先θ追従はシューティング
+        # ONのままだと毎周期追従先へ上書きされて競合しうる。follow_auto_off_
+        # checkbox ON時のみシーケンス開始時に自動でOFFにする(2026-09-12から
+        # 既定OFF、ユーザー指定:「自動シーケンスで手先追従を自動オフする設定も
+        # デフォルトをオフに」。joy側の追従もシューティングエリアでは同じ式に
+        # なったため、追従ONのままでも同じ角度に収束する)。
+        # 元の経緯(2026-09-03、ユーザー指定:「手先θ追従はシューティング
         # ボックスへの自動移動時には自動で無効化」。joy_teleop_node未起動時は
         # set_joy_tip_theta_follow内で黙って無視されるだけで、本シーケンス自体は
         # 続行する)。
-        self.node.set_joy_tip_theta_follow(False)
+        if self.follow_auto_off_checkbox.isChecked():
+            self.node.set_joy_tip_theta_follow(False)
 
-        pos = self.node.get_current_positions()
-        theta0, r0 = pos['root_theta_joint'], pos['r_joint']
-        target_theta, target_r = _theta_r_from_xy(x, y)
-        safe_zj = clamp(settings['safe_transit_z_m'] - Z_OFFSET, Z_LOWER, Z_UPPER)
-        r_retract = clamp(settings['r_retract_m'], R_LOWER, R_UPPER)
-        # 投入時はr方向に垂直な姿勢(root_thetaの値によらず一定のtip_theta)にする
-        # (SHOOT_TIP_THETA_RAD付近のコメント参照、ユーザー指摘:「シュート時はRと
-        # 垂直になるように」。値自体は未検証の暫定値)。
-        tip_theta_shoot = settings['shoot_tip_theta_rad']
+        target_theta, _target_r = _theta_r_from_xy(x, y, self._machine_origin)
+        # 手先θは回収シーケンスと同様、トリム前の幾何学的なθから決める
+        # (トリムはroot_thetaのエンコーダ原点のずれの補正なので、アームが実際に
+        # 向く物理角度はトリム前のθ)。追従値∓90deg、_shoot_tip_theta参照。
+        tip_theta_shoot = self._shoot_tip_theta(target_theta)
+        target_theta = self._apply_root_theta_trim(target_theta)
 
-        steps = [
-            # シュート時は手先ピッチが投入姿勢でなければならない(2026-09-04、
-            # ユーザー指摘: 「手先ピッチが作動したりしなかったりする理由。
-            # シュート時は手先ピッチ投入姿勢でなくてはならない」)。以前はこの
-            # 呼び出しが無く、回収シーケンス末尾の(call, '/hand_set_pitch_insert')
-            # (パッド収納後に投入姿勢へ切り替える箇所)が完了した場合のみ結果的に
-            # 投入姿勢になっていた。2026-09-03の「回収実行を押さなくても
-            # シューティング位置へ移動できるように」「ユーザーの動きを制限したく
-            # ない」により、回収シーケンスを最後まで待たずいつでも即座に投入
-            # シーケンスへ中断・切り替えられるようになったため、回収シーケンスが
-            # 保持姿勢(hand_set_pitch_hold、シーケンス冒頭)のまま・あるいは
-            # ピッチ未設定のまま中断された状態で投入シーケンスが始まるケースが
-            # 増え、「手先ピッチが作動したりしなかったりする」不具合として顕在化
-            # した。原因は投入シーケンス自身がピッチ姿勢を一切指定していなかった
-            # ことなので、シーケンス開始時に必ず投入姿勢へ揃えるようにする。
-            ('call', '/hand_set_pitch_insert'),
-            ('move', theta0, safe_zj, r0),
-            ('move', theta0, safe_zj, r_retract),
-            ('move', target_theta, safe_zj, r_retract, tip_theta_shoot),
-            ('move', target_theta, safe_zj, target_r, tip_theta_shoot),  # 安全高度のままシューティングエリアのXYへ
-        ]
+        steps = []
+        if self.hand_pose_auto_checkbox.isChecked():
+            # 以下のハンド姿勢の自動操作(収納→待ち→ピッチ投入姿勢)はチェック
+            # ボックスON時のみ(2026-09-12、ユーザー指定:「自動シーケンスで
+            # ピッチと収納が作動するのを無効化。有効化もチェックボックスで
+            # 選べるように」。既定OFF。hand_pose_auto_checkbox宣言部参照)。
+            # OFFのときはピッチ・パッドとも人が操作する(下記の経緯にある
+            # 「投入シーケンス自身がピッチ姿勢を保証する」動作は無効になる)。
+            steps += [
+                # シュート時は手先ピッチが投入姿勢でなければならない(2026-09-04、
+                # ユーザー指摘: 「手先ピッチが作動したりしなかったりする理由。
+                # シュート時は手先ピッチ投入姿勢でなくてはならない」)。以前はこの
+                # 呼び出しが無く、回収シーケンス末尾の(call, '/hand_set_pitch_insert')
+                # (パッド収納後に投入姿勢へ切り替える箇所)が完了した場合のみ結果的に
+                # 投入姿勢になっていた。2026-09-03の「回収実行を押さなくても
+                # シューティング位置へ移動できるように」「ユーザーの動きを制限したく
+                # ない」により、回収シーケンスを最後まで待たずいつでも即座に投入
+                # シーケンスへ中断・切り替えられるようになったため、回収シーケンスが
+                # 保持姿勢(hand_set_pitch_hold、シーケンス冒頭)のまま・あるいは
+                # ピッチ未設定のまま中断された状態で投入シーケンスが始まるケースが
+                # 増え、「手先ピッチが作動したりしなかったりする」不具合として顕在化
+                # した。原因は投入シーケンス自身がピッチ姿勢を一切指定していなかった
+                # ことなので、シーケンス開始時に必ず投入姿勢へ揃えるようにする。
+                # 投入時はワークを中央へ集めてから姿勢を変える(2026-09-10、ユーザー
+                # 指定:「シューティングボックス移動時は収納し投入姿勢に」)。以前は
+                # ピッチ投入姿勢への切替だけを行っており、パッドが展開したまま
+                # シューティングエリアへ向かうことがあった。
+                # 収納とピッチ切替の間はgather_settle_sec待つ: パッドが物理的に
+                # 収納し切る前にピッチが回り始めると干渉する恐れがある
+                # (ユーザー指摘:「収納から姿勢変更までの待機時間も必要。ほぼ同時は
+                # まずい」。この設定値は以前から用意されていたが、回収シーケンス末尾に
+                # あった収納->投入姿勢の並びが無くなって以降どこからも使われて
+                # いなかったため、ここで使うようにした)。
+                ('call', '/hand_gather_pads'),
+                ('wait', settings['gather_settle_sec']),
+                ('call', '/hand_set_pitch_insert'),
+            ]
+        if self.retract_r_checkbox.isChecked():
+            # R軸をr_lowerリミットスイッチまでリトラクト(旋回時にワークや周囲へ
+            # 引っかからないようにする安全動作、2026-09-09変更:
+            # r_retract_m(エンコーダ位置)ではなくリミットスイッチで判定)。
+            # 既定OFF(ユーザー指定:「R軸を自動でもとに戻すのはデフォルトで
+            # false」)。ONの間だけ実行する。
+            steps.append(('retract_r_to_limit',))
+        # theta回転のみ(Z軸・R軸のシュート位置への延伸は人がjoyの速度指令で
+        # 行う、2026-09-09変更)。
+        steps.append(('move', target_theta, None, None, tip_theta_shoot))
         self._begin_sequence('投入', steps)
 
     def _begin_sequence(self, kind, steps):
@@ -2914,7 +3107,9 @@ class CommandGuiApp(QWidget):
         self._seq_waiting_service = None
         self._seq_leg_target = None
         self._seq_leg_start_time = None
-        self._seq_delay_start_time = None
+        self._seq_retract_start_time = None
+        # 'wait'ステップの終了時刻(待機中でなければNone、_advance_wait_step参照)。
+        self._seq_wait_until = None
         _set_status(self.sequence_status_label, f'{kind}シーケンス開始', 'muted')
 
     def _advance_sequence(self):
@@ -2931,16 +3126,37 @@ class CommandGuiApp(QWidget):
         step = self._seq_steps[self._seq_index]
         if step[0] == 'move':
             self._advance_move_step(step)
+        elif step[0] == 'retract_r_to_limit':
+            self._advance_retract_r_step(step)
         elif step[0] == 'call':
             self._advance_hand_step(step)
-        elif step[0] == 'wait_pick_confirm':
-            self._advance_wait_pick_confirm_step(step)
-        elif step[0] == 'delay':
-            self._advance_delay_step(step)
+        elif step[0] == 'wait':
+            self._advance_wait_step(step)
+
+    def _advance_wait_step(self, step):
+        """('wait', 秒数)ステップ。指定秒だけ何もせずに待ってから次へ進む
+        (2026-09-10追加)。サーボが物理的に動き切るのを待つためのもので、
+        投入シーケンスのパッド収納 -> ピッチ投入姿勢の間に挟む
+        (gather_settle_sec、ユーザー指摘:「収納から姿勢変更までの待機時間も
+        必要。ほぼ同時はまずい」)。"""
+        _, duration_sec = step
+        now = time.monotonic()
+        if self._seq_wait_until is None:
+            self._seq_wait_until = now + float(duration_sec)
+            _set_status(self.sequence_status_label,
+                        f'{self._seq_kind}: 待機中({float(duration_sec):.1f}秒)...', 'muted')
+            return
+        if now < self._seq_wait_until:
+            return
+        self._seq_wait_until = None
+        self._seq_index += 1
 
     def _advance_move_step(self, step):
-        # 5要素目(tip_theta)は任意。指定時のみsend_target/到達判定に加える
-        # (ピック/投入シーケンス専用、_start_pick_sequence/_start_shoot_sequence参照)。
+        # zj/r/tip_theta(2,3,5要素目)はいずれも任意。Noneならsend_target/到達
+        # 判定の対象から外す(2026-09-09、zj/rはmanualブランチでの操作方針
+        # 「Z軸は人が、R軸をしまうのはリミットスイッチで」により、投入シーケンス
+        # がz_joint/r_jointを位置指令しなくなったことに対応、_start_shoot_
+        # sequence参照。tip_thetaは元々2026-09-03からNone対応)。
         theta, zj, r = step[1], step[2], step[3]
         tip_theta = step[4] if len(step) > 4 else None
         if self._seq_leg_target is None:
@@ -2954,11 +3170,23 @@ class CommandGuiApp(QWidget):
         if not self.node.has_current_state():
             return
         pos = self.node.get_current_positions()
-        reached = (
-            abs(pos['root_theta_joint'] - theta) <= SEQ_MOVE_THETA_TOL
-            and abs(pos['z_joint'] - zj) <= SEQ_MOVE_LINEAR_TOL
-            and abs(pos['r_joint'] - r) <= SEQ_MOVE_LINEAR_TOL
-            and (tip_theta is None or abs(pos['tip_theta_joint'] - tip_theta) <= SEQ_MOVE_THETA_TOL))
+        # 「軸の有効/無効」パネルで無効にした軸は到達判定から外す(2026-09-10追加、
+        # ユーザー報告:「ワーク位置移動の際に最後にタイムアウトになる」「手先θの
+        # モーターは未配線」)。trajectory_follower_node.target_callbackは
+        # disabled_jointsに入っている関節の目標更新を捨てて現在位置で凍結するため、
+        # その軸のpos_は目標へ永久に到達しない。ここで待ち続けると必ず
+        # SEQ_MOVE_TIMEOUT_SECでシーケンスが中断されてしまう(未配線の軸を
+        # 無効化する、というこのパネル本来の使い方をするとシーケンスが一切
+        # 完走できなくなっていた)。
+        reached = True
+        if self._axis_enabled('root_theta_joint'):
+            reached = abs(pos['root_theta_joint'] - theta) <= SEQ_MOVE_THETA_TOL
+        if zj is not None and self._axis_enabled('z_joint'):
+            reached = reached and abs(pos['z_joint'] - zj) <= SEQ_MOVE_LINEAR_TOL
+        if r is not None and self._axis_enabled('r_joint'):
+            reached = reached and abs(pos['r_joint'] - r) <= SEQ_MOVE_LINEAR_TOL
+        if tip_theta is not None and self._axis_enabled('tip_theta_joint'):
+            reached = reached and abs(pos['tip_theta_joint'] - tip_theta) <= SEQ_MOVE_THETA_TOL
         if reached:
             self._seq_leg_target = None
             self._seq_index += 1
@@ -2966,17 +3194,52 @@ class CommandGuiApp(QWidget):
         if time.monotonic() - self._seq_leg_start_time > SEQ_MOVE_TIMEOUT_SEC:
             self._abort_sequence(f'{self._seq_kind}: 移動タイムアウト(ステップ{self._seq_index + 1})')
 
-    def _advance_delay_step(self, step):
-        """指定秒数だけ待って次のステップへ進む(現状はパッド収納後のgather_
-        settle_sec待ちのみ用途、_start_pick_sequence参照)。"""
-        _, seconds = step
-        if self._seq_delay_start_time is None:
-            self._seq_delay_start_time = time.monotonic()
-            _set_status(self.sequence_status_label, f'{self._seq_kind}: 待機中...', 'muted')
-            return
-        if time.monotonic() - self._seq_delay_start_time >= seconds:
-            self._seq_delay_start_time = None
+    def _advance_retract_r_step(self, step):
+        """'retract_r_to_limit'ステップ: R軸をr_lowerリミットスイッチ(しまう/
+        収納側)に当たるまで速度指令で駆動する(2026-09-09追加、manualブランチ
+        での操作方針「R軸をしまうのはエンコーダーではなくリミットスイッチで
+        行う」)。r_retract_m(既存のR退避量設定、_start_pick_sequence用)のような
+        特定のエンコーダ位置は使わず、trajectory_follower_node側のリミット
+        スイッチ安全クランプ(_velocity_mode_target_rpm)が実際にR軸を止める
+        まで一定速度を送り続ける。収納方向(r減少)で当たるスイッチの個別状態
+        (get_r_retract_limit_triggered参照。R軸は名前と向きの対応がz軸と逆で
+        'r_upper'側になる)がTrueになったら完了とする
+        (集約フラグlimit_stop_activeを使わないのは、人が同時にZ軸を操作して
+        Z側のスイッチが先に反応した場合に誤ってR軸到達と判定しないため)。
+        速度はGUIのsequence_edits['retract_r_speed_mps']から読む(2026-09-09、
+        ユーザー報告:「現状遅すぎて格納できない」により固定値から変更)。
+        ステップ開始時に一度だけ読んで以降は使い回す(タイムアウト判定や停止
+        処理の途中で毎周期パースし直すと、編集中の一時的な不正値で例外に
+        なりR軸が速度指令を送りっぱなしのまま止まる恐れがあるため)。"""
+        if not self._axis_enabled('r_joint'):
+            # R軸を「軸の有効/無効」パネルで無効にしている場合、速度指令を送っても
+            # 動かずリミットスイッチにも当たらないため、待つだけ無駄にタイムアウト
+            # する(2026-09-10追加、_advance_move_stepの到達判定と同じ理由)。
+            self._seq_retract_start_time = None
             self._seq_index += 1
+            return
+        if self._seq_retract_start_time is None:
+            self._seq_retract_start_time = time.monotonic()
+            try:
+                speed = get_float(self.sequence_edits['retract_r_speed_mps'])
+            except ValueError:
+                speed = SEQ_RETRACT_R_SPEED_MPS
+            self._seq_retract_speed_mps = speed if speed > 0.0 else SEQ_RETRACT_R_SPEED_MPS
+            _set_status(self.sequence_status_label,
+                        f'{self._seq_kind}: R軸リトラクト中 (ステップ{self._seq_index + 1}/'
+                        f'{len(self._seq_steps)})', 'muted')
+        if self.node.get_r_retract_limit_triggered():
+            self.node.send_velocity_r(0.0)
+            self._seq_retract_start_time = None
+            self._seq_index += 1
+            return
+        if time.monotonic() - self._seq_retract_start_time > SEQ_MOVE_TIMEOUT_SEC:
+            self.node.send_velocity_r(0.0)
+            self._abort_sequence(
+                f'{self._seq_kind}: R軸リトラクトタイムアウト(ステップ{self._seq_index + 1}、'
+                'r_upper_limit_triggered(収納方向側)を受信できていない可能性があります)')
+            return
+        self.node.send_velocity_r(-self._seq_retract_speed_mps)
 
     def _advance_hand_step(self, step):
         """'call'ステップ(人間の判断を要しない自動実行分)。実際の呼び出し結果は
@@ -2990,112 +3253,60 @@ class CommandGuiApp(QWidget):
                     f'{self._seq_kind}: {service_name} 呼び出し中...', 'muted')
         self._on_hand_trigger(service_name)
 
-    def _advance_wait_pick_confirm_step(self, step):
-        """'wait_pick_confirm'ステップ: 人間が「回収実行」を指示する(GUIの
-        「回収実行」ボタン、またはPSコンのPSボタン経由でcommand_gui_nodeの
-        /pick_sequence_confirmサービスを呼ぶ、2026-09-03、ユーザー指定:「回収
-        ボタンをバツ長押しからPSボタンに変更」)まで一時停止する。実際の解除は
-        _on_pick_confirm_only_requestedで行う(ここでは表示のみ)。"""
-        if self._seq_waiting_service is None:
-            self._seq_waiting_service = '(pick_confirm)'
-            _set_status(
-                self.sequence_status_label,
-                f'{self._seq_kind}: 回収実行の指示待ち(GUIの「回収実行」ボタンまたは'
-                'PSコンのPSボタンで操作してください)', 'muted')
-
-    def _try_confirm_pick(self):
-        """wait_pick_confirmで一時停止中ならそのまま次のステップへ進める
-        (=回収実行を確定する)。それ以外は何もせずFalseを返す。"""
-        if self._seq_active and self._seq_waiting_service == '(pick_confirm)':
-            self._seq_waiting_service = None
-            self._seq_index += 1
-            return True
-        return False
-
-    def _try_move_to_selected_work(self):
-        """矢印キー(D-pad)で選択中のワークへの回収シーケンスを開始する
-        (2026-09-03、ユーザー指定:「矢印キーでGUI上で目標ワークを選択し
-        移動」)。選択カーソルは常にどこかのワークを指しているため(既定は
-        先頭のワーク、マウスでのワーククリックでも同期される、_build_field_
-        buttons/_on_field_point参照)基本的に常に成功するが、万一_work_grid未構築
-        (GUI初期化前)なら従来の_last_pick_target(吸着失敗時の再試行用、
-        2026-09-03、ユーザー指摘: 「吸着できなかったときに回収実行を再度行う
-        ことがある」)にフォールバックする。
-        他のシーケンス実行中(回収実行待ち・投入シーケンス中含む)でも、
-        _start_pick_sequence自身が確認や中断操作なしに即座に中断して切り替える
-        ため、ここでは一切ブロックしない(2026-09-03、ユーザー指摘: 「矢印での
-        ワーク位置選択と移動後、回収実行をしないと移動ができない。誤って選択
-        しても移動できるように回収実行を押さなくてもワーク位置移動を再度指示
-        できるように」、続けて「回収実行を押さなくてもシューティング位置へ移動
-        できるように。ユーザーの動きを制限したくない。状況判断はユーザーが
-        行うため」により、_start_pick_sequence側の「実行中は拒否する」guardを
-        撤去し常に即座に切り替わるよう変更済み。以前はここで
-        `self._seq_active and self._seq_kind != '回収'`のとき投入シーケンス側の
-        モーダルダイアログを避けるためにブロックしていたが、そのダイアログ自体
-        が無くなったため不要になった)。"""
-        target = self._selected_work_xyz()
-        if target is None:
-            target = self._last_pick_target
-        if target is None:
-            return False
-        self._start_pick_sequence(*target)
-        return True
-
-    def _on_pick_confirm_requested(self):
-        """GUIの「回収実行」ボタン(マウスクリック)から呼ばれる。待機中なら確定、
-        非アクティブなら選択中ワークへの移動を試みる、という統合動作(マウス
-        クリックには誤操作防止のボタン分離の必要が薄いため、従来通り1クリックで
-        両方の役割を兼ねる)。PSコン(joy_teleop_node)は2026-09-03、ユーザー
-        指定:「回収ボタンをバツ長押しからPSボタンに変更」により、この統合
-        ハンドラは使わず、×ボタン=_on_pick_move_only_requested
-        (pick_sequence_moveサービス)、PSボタン=_on_pick_confirm_only_requested
-        (pick_sequence_confirmサービス)に分離済み(誤操作でワークに接触・吸着
-        してしまうことを防ぐ安全策)。"""
-        return self._try_confirm_pick() or self._try_move_to_selected_work()
-
-    def _on_pick_confirm_only_requested(self):
-        """CommandGuiNode.set_pick_confirm_handler経由、PSコン×ボタンの長押しから
-        呼ばれる(2026-09-03追加)。確定のみ行い、移動は行わない
-        (_on_pick_move_only_requested参照)。"""
-        return self._try_confirm_pick()
-
-    def _on_pick_move_only_requested(self):
-        """CommandGuiNode.set_pick_move_handler経由、PSコン×ボタンの短押し
-        (立ち上がりエッジ即時)から呼ばれる(2026-09-03追加)。選択中ワークへの
-        移動のみ行い、待機中の確定は行わない(確定は長押しのみ、
-        _on_pick_confirm_only_requested参照)。"""
-        return self._try_move_to_selected_work()
-
-    def _on_pick_confirm_button_clicked(self):
-        if not self._on_pick_confirm_requested():
-            _set_status(self.sequence_status_label, '現在「回収実行」待ちの状態ではありません', 'error')
-
-    def _on_shoot_start_requested(self, label):
-        """GUIの「L4へ移動」「R4へ移動」ボタン、またはCommandGuiNodeの
+    def _on_shoot_start_requested(self, side):
+        """GUIの「左箱へ移動」「右箱へ移動」ボタン、またはCommandGuiNodeの
         /shoot_sequence_start_l4・_r4サービス経由(PSコンの割当ボタン、
-        joy_teleop_node)から呼ばれる。SHOOT_FIXED_TARGETS[label]の固定
-        シューティングエリアへ、安全高度を維持したまま向かうだけの投入シーケンスを
-        実行する(2026-09-03、ユーザー指摘: 「シューティングエリアはL4もしくは
+        joy_teleop_node)から呼ばれる。side('L'/'R')側の、シューティング位置
+        選択(shoot_box_combo、_shoot_box_index)で選ばれている箱へ、安全高度を
+        維持したまま向かうだけの投入シーケンスを実行し、向かった箱のラベル
+        (例 'L3')を返す(失敗時None)。
+        (2026-09-03、ユーザー指摘: 「シューティングエリアはL4もしくは
         R4で、ボタンを2つおいておいて」。以前は直前にシーケンスで向かった対象を
         覚えておいて再送信する方式だったが、実運用の対象がL4/R4の2箇所固定と
-        分かったため、対象を記憶せず直接その場で指定する方式に変更した)。
+        分かったため、対象を記憶せず直接その場で指定する方式に変更した。
+        2026-09-13、箱の位置をGUIで選べるようにし既定をL2/R2へ変更、
+        SHOOT_BOX_CHOICES参照)。
         既に別のシーケンスが実行中でも、_start_shoot_sequence側が確認や中断
         操作なしに即座に中断して切り替える(2026-09-03、ユーザー指摘:「回収実行
         を押さなくてもシューティング位置へ移動できるように。ユーザーの動きを
         制限したくない」。以前はここで1件だけ予約し完了後に自動開始する
         キュー機構があったが、即座に切り替えられるようになったため不要になり
         削除した)。"""
-        _, x, y, z = SHOOT_FIXED_TARGETS[label]
+        label, x, y, z = shoot_target(side, self._shoot_box_index())
         self._start_shoot_sequence(x, y, z)
+        return label
+
+    def _on_pick_move_requested(self):
+        """CommandGuiNode.set_pick_move_handler経由、PSコン×ボタン(立ち上がり
+        エッジ即時)またはGUIのワークボタンから呼ばれる(2026-09-09、回収
+        シーケンス復元)。選択カーソルが指すワークへ回収シーケンスを開始する。
+        選択カーソルは常にどこかのワークを指しているため(既定は先頭のワーク、
+        マウスでのワーククリックでも同期される、_build_field_buttons/
+        _on_field_point参照)基本的に常に成功する。他のシーケンス実行中でも
+        _start_pick_sequence側が確認や中断操作なしに即座に切り替える。"""
+        target = self._selected_work_xyz()
+        if target is None:
+            return False
+        self._start_pick_sequence(*target)
         return True
 
+    def _on_pick_move_button_clicked(self):
+        if not self._on_pick_move_requested():
+            _set_status(self.sequence_status_label, 'ワーク未選択です', 'error')
+
     def _abort_sequence(self, message):
+        if self._seq_retract_start_time is not None:
+            # R軸リトラクト中に中断した場合、速度指令を送りっぱなしにしない
+            # (joint_velocity_targetsのstale判定(0.3s)で自然に0扱いにはなるが、
+            # 即座に止めておく方が安全、_advance_retract_r_step参照)。
+            self.node.send_velocity_r(0.0)
         self._seq_active = False
         self._seq_steps = []
         self._seq_index = 0
         self._seq_waiting_service = None
         self._seq_leg_target = None
-        self._seq_delay_start_time = None
+        self._seq_retract_start_time = None
+        self._seq_wait_until = None
         _set_status(self.sequence_status_label, message, 'error')
 
     def _on_abort_sequence(self):
@@ -3107,15 +3318,12 @@ class CommandGuiApp(QWidget):
     def _on_emergency_stop_requested(self):
         """ソフト緊急停止(2026-09-08追加)。GUIの「緊急停止」ボタン・PSコン
         (joy_teleop_node)のPSボタン(/emergency_stopサービス経由)いずれからも
-        呼ばれる。自動シーケンスの中断・ホーミングの中断・trajectory_follower_node
+        呼ばれる。自動シーケンスの中断・trajectory_follower_node
         のcubemars/robomas出力凍結をまとめて行う。解除は_on_clear_emergency_stop_
         requested(GUIの「解除」ボタンのみ)からしか行えない(誤操作で即再始動しない
         よう、緊急停止ボタン自体はトグルにしていない)。"""
         if self._seq_active:
             self._abort_sequence('緊急停止によりシーケンスを中断しました')
-        # 未実行時も無条件成功で返るだけなので結果は無視してよい(homing_node.
-        # _on_stop_homing参照)。homing_node未起動でも安全に無視できる。
-        self.node.call_trigger_service('/stop_homing', lambda success, message: None)
         # trajectory_follower_node未起動時もcall_trigger_serviceが同期的に
         # on_done(False, ...)を呼ぶため、ここでの戻り値チェックは不要
         # (_on_estop_engage_doneがどちらの場合もestop_status_labelを更新する)。
@@ -3138,20 +3346,12 @@ class CommandGuiApp(QWidget):
         Widget側の内蔵タイマーが行うため、ここではロジック状態の設定のみ)。
         優先順位はnote/note_soki/can_mapping.txt「## 状態表示灯」の表と一致させる
         こと(複数の状態が同時に該当する場合は上位を優先表示)。"""
-        # 黄色LED(注意系): シーケンス実行中 > ホーミング中 > 未ホーミング > 通常
+        # 黄色LED(注意系): シーケンス実行中 > 通常(2026-09-09、ホーミング廃止に
+        # より「未ホーミング」判定は削除)。
         if self._seq_active:
             yellow = LedIndicatorWidget.STATE_BLINK_FAST
         else:
-            # 文字列はhoming_node.pyのSTATE_*定数と一致させること。pausing_z/
-            # pausing_rはpause_robomas_output応答待ち(2026-09-08追加、モータは
-            # まだ動いていないがユーザー視点では「ホーミング中」に含めてよい)。
-            homing_state = self.node.get_homing_state()
-            if homing_state in ('pausing_z', 'pausing_r', 'homing_z', 'homing_r'):
-                yellow = LedIndicatorWidget.STATE_BLINK_SLOW
-            elif homing_state == 'done':
-                yellow = LedIndicatorWidget.STATE_OFF
-            else:  # None(未受信/homing_node未起動)・'idle'・'failed'
-                yellow = LedIndicatorWidget.STATE_ON
+            yellow = LedIndicatorWidget.STATE_OFF
         self.yellow_led.set_state(yellow)
 
         # 赤色LED(異常系): 緊急停止中 > ノード未起動 > リミットスイッチ安全停止中 > 異常なし
@@ -3180,12 +3380,12 @@ class CommandGuiApp(QWidget):
             # 行ラベルは"_joint"を省いて表示(ボックス見出しで対象は自明なため、
             # 列幅を無駄に広げないようにする)。辞書キーは元のjoint名のまま。
             grid.addWidget(QLabel(name.removesuffix('_joint')), i + 1, 0)
-            vel_edit = make_float_edit(0.0, width=70)
-            accel_edit = make_float_edit(0.0, width=70)
+            vel_edit = make_gain_edit(0.0, width=70)
+            accel_edit = make_gain_edit(0.0, width=70)
             # 減速度(max_decel、2026-09-07新規: 停止時の応答性向上のため
             # 加速度と別値にできるようにした。trajectory_follower_node.py
             # trap_step/move_time参照)。
-            decel_edit = make_float_edit(0.0, width=70)
+            decel_edit = make_gain_edit(0.0, width=70)
             self.traj_vel_edits[name] = vel_edit
             self.traj_accel_edits[name] = accel_edit
             self.traj_decel_edits[name] = decel_edit
@@ -3221,6 +3421,13 @@ class CommandGuiApp(QWidget):
             ('z_speed', 'z', 'm/s'),
             ('r_speed', 'r', 'm/s'),
             ('tip_theta_speed', 'tip_theta', 'rad/s'),
+            # 低速モード(SHAREボタン、2026-09-09追加)の倍率。上記速度全てに掛かる
+            # (joy_teleop_node.py _timer_callbackのspeed_scale参照)。
+            ('low_speed_multiplier', '低速モード倍率', '倍'),
+            # XYモード(低速モード中の左スティックによる手先ワールドXYジョグ、
+            # 2026-09-11追加)のフル入力時の手先速度。low_speed_multiplierは
+            # 掛からない実速度(joy_teleop_node.pyのxy_speed宣言部参照)。
+            ('xy_speed', 'XYモード(低速時 左スティック)', 'm/s'),
         )
         for i, (name, label, unit) in enumerate(fields):
             grid.addWidget(QLabel(f'{label} [{unit}]'), i, 0)
@@ -3260,8 +3467,8 @@ class CommandGuiApp(QWidget):
         self.mit_torque_edits = {}
         for i, name in enumerate(CUBEMARS_JOINT_NAMES):
             grid.addWidget(QLabel(name.removesuffix('_joint')), i + 1, 0)
-            kp_edit = make_float_edit(0.0, width=60)
-            kd_edit = make_float_edit(0.0, width=60)
+            kp_edit = make_gain_edit(0.0, width=60)
+            kd_edit = make_gain_edit(0.0, width=60)
             tff_edit = make_float_edit(0.0, width=60)
             self.mit_kp_edits[name] = kp_edit
             self.mit_kd_edits[name] = kd_edit
@@ -3287,15 +3494,172 @@ class CommandGuiApp(QWidget):
 
         column.addWidget(box)
 
+    def _build_cubemars_resync_panel(self, column):
+        # trajectory_follower_node._on_cubemars_feedbackの「静止を指令中に実機
+        # 帰還と乖離したらtarget_ごと強制的に実角度へ再同期する」安全機構
+        # (CubeMars/root_theta用、物理緊急停止をソフト緊急停止なしで行った場合や
+        # 実機スタックの検知用)のON/OFF切替(2026-09-10追加、ユーザー報告:
+        # 「根本θにキックが発生。反対方向にガクッとなるもしくは目標値に到達しない
+        # まま止まる。手動、自動シーケンスのどちらでも発生」の原因切り分け用)。
+        # 既定OFF(2026-09-10、ユーザー指定「強制再同期と速度超過のリミットを
+        # デフォルトでオフに」。trajectory_follower_node側の
+        # cubemars_divergence_resync_enabledの既定値もfalseに合わせてある)。
+        # OFFの間はこの保護が無いため、必要なときだけここでONにする。
+        box = QGroupBox('根本θ 静止乖離時の強制再同期')
+        layout = QVBoxLayout(box)
+
+        desc = QLabel()
+        desc.setWordWrap(True)
+        _set_status(
+            desc,
+            '静止を指令中に実機帰還(絶対値エンコーダ)と5°以上ズレたらtarget_ごと\n'
+            '実角度へ強制的に再同期する安全機構(物理緊急停止・スタック検知用)。\n'
+            '既定OFF。ONにすると保護が働くが、キック/未到達停止の原因にもなりうる\n'
+            'ため、必要なときだけONにすること。', 'muted')
+        layout.addWidget(desc)
+
+        self.cubemars_resync_check = QCheckBox('強制再同期を有効にする')
+        # 既定OFF(trajectory_follower_nodeのcubemars_divergence_resync_enabledの
+        # 既定値と一致させること)。toggled接続はこのsetChecked後に行うので、
+        # 起動時にノードへ適用リクエストは飛ばない。
+        self.cubemars_resync_check.setChecked(False)
+        self.cubemars_resync_check.toggled.connect(self._on_cubemars_resync_toggled)
+        layout.addWidget(self.cubemars_resync_check)
+
+        self.cubemars_resync_status_label = QLabel()
+        self.cubemars_resync_status_label.setWordWrap(True)
+        _set_status(self.cubemars_resync_status_label, '無効 (既定)', 'muted')
+        layout.addWidget(self.cubemars_resync_status_label)
+
+        column.addWidget(box)
+
+    def _on_cubemars_resync_toggled(self, checked):
+        ok = self.node.set_node_params(
+            TRAJ_NODE_NAME, {'cubemars_divergence_resync_enabled': checked},
+            self._apply_cubemars_resync_result)
+        if not ok:
+            _set_status(self.cubemars_resync_status_label,
+                        'trajectory_follower_nodeに接続できません(未起動?)', 'error')
+        else:
+            _set_status(self.cubemars_resync_status_label, '適用中...', 'muted')
+
+    def _apply_cubemars_resync_result(self, results):
+        if results is None:
+            _set_status(self.cubemars_resync_status_label, '適用失敗(通信エラー)', 'error')
+            return
+        if all(r.successful for r in results):
+            checked = self.cubemars_resync_check.isChecked()
+            _set_status(
+                self.cubemars_resync_status_label,
+                '有効' if checked else '無効 (既定)',
+                'muted')
+        else:
+            reasons = '; '.join(r.reason for r in results if not r.successful)
+            _set_status(self.cubemars_resync_status_label, f'適用失敗: {reasons}', 'error')
+
+    def _build_cubemars_overspeed_panel(self, column):
+        # trajectory_follower_node._on_cubemars_feedbackの、実機帰還(エンコーダ)
+        # から計算した実速度・実加速度が閾値を超えたら自動でソフト緊急停止を
+        # 入れる機能(2026-09-10追加、ユーザー提案:「実機のスタックとかって
+        # エンコーダー見てたら分かる気がする」「一定の速度以上でソフト緊急停止を
+        # 入れられないか」「加速度でもいい」)。静止判定に頼る上のパネル(静止乖離時
+        # の強制再同期)とは独立に、実機の動きそのものを毎回見るため、キックの
+        # ような急な異常動作を静止/移動中を問わず検知できる。しきい値は実機で
+        # 未検証の仮の値(trajectory_follower_node.pyのcubemars_overspeed_
+        # limit_radps/cubemars_overaccel_limit_radps2宣言部のコメント参照)なので、
+        # 実機の挙動を見ながらここで調整すること。
+        box = QGroupBox('根本θ 過速度/急加速で自動緊急停止')
+        layout = QVBoxLayout(box)
+
+        desc = QLabel()
+        desc.setWordWrap(True)
+        _set_status(
+            desc,
+            '実機帰還(エンコーダ)から計算した実速度・実加速度がしきい値を超えたら\n'
+            '自動でソフト緊急停止を入れる(キック等の異常な動きを静止/移動中を問わず\n'
+            '検知)。既定OFF(しきい値がまだ実機未検証の仮の値のため、正常動作を\n'
+            '誤検知する方が実害が大きい)。しきい値を詰めてからONにすること。', 'muted')
+        layout.addWidget(desc)
+
+        self.cubemars_overspeed_check = QCheckBox('自動緊急停止を有効にする')
+        # 既定OFF(2026-09-10、ユーザー指定。trajectory_follower_nodeの
+        # cubemars_overspeed_estop_enabledの既定値と一致させること)。
+        self.cubemars_overspeed_check.setChecked(False)
+        layout.addWidget(self.cubemars_overspeed_check)
+
+        grid = QGridLayout()
+        grid.addWidget(QLabel('速度しきい値 [rad/s]'), 0, 0)
+        self.cubemars_overspeed_limit_edit = make_float_edit(3.0, width=70)
+        grid.addWidget(self.cubemars_overspeed_limit_edit, 0, 1)
+        grid.addWidget(QLabel('加速度しきい値 [rad/s^2]'), 1, 0)
+        self.cubemars_overaccel_limit_edit = make_float_edit(15.0, width=70)
+        grid.addWidget(self.cubemars_overaccel_limit_edit, 1, 1)
+        layout.addLayout(grid)
+
+        apply_btn = QPushButton('適用')
+        apply_btn.setProperty('variant', 'primary')
+        apply_btn.clicked.connect(self._on_apply_cubemars_overspeed)
+        layout.addWidget(apply_btn)
+
+        self.cubemars_overspeed_status_label = QLabel()
+        self.cubemars_overspeed_status_label.setWordWrap(True)
+        _set_status(self.cubemars_overspeed_status_label, '無効 (既定)', 'muted')
+        layout.addWidget(self.cubemars_overspeed_status_label)
+
+        column.addWidget(box)
+
+    def _on_apply_cubemars_overspeed(self):
+        try:
+            vel_limit = get_float(self.cubemars_overspeed_limit_edit)
+            accel_limit = get_float(self.cubemars_overaccel_limit_edit)
+        except ValueError:
+            QMessageBox.critical(self, '入力エラー', '速度・加速度のしきい値に数値を入力してください')
+            return
+        if vel_limit <= 0.0 or accel_limit <= 0.0:
+            QMessageBox.critical(self, '入力エラー', 'しきい値は正の値にしてください')
+            return
+        values = {
+            'cubemars_overspeed_estop_enabled': self.cubemars_overspeed_check.isChecked(),
+            'cubemars_overspeed_limit_radps': vel_limit,
+            'cubemars_overaccel_limit_radps2': accel_limit,
+        }
+        ok = self.node.set_node_params(
+            TRAJ_NODE_NAME, values, self._apply_cubemars_overspeed_result)
+        _set_status(self.cubemars_overspeed_status_label,
+                    '適用中...' if ok else 'trajectory_follower_nodeに接続できません(未起動?)',
+                    'muted' if ok else 'error')
+
+    def _apply_cubemars_overspeed_result(self, results):
+        if results is None:
+            _set_status(self.cubemars_overspeed_status_label, '適用失敗(通信エラー)', 'error')
+            return
+        if all(r.successful for r in results):
+            enabled = self.cubemars_overspeed_check.isChecked()
+            if enabled:
+                vel_limit = get_float(self.cubemars_overspeed_limit_edit)
+                accel_limit = get_float(self.cubemars_overaccel_limit_edit)
+                _set_status(self.cubemars_overspeed_status_label,
+                            f'有効 (速度{vel_limit:.2f}rad/s, 加速度{accel_limit:.2f}rad/s^2)',
+                            'muted')
+            else:
+                _set_status(self.cubemars_overspeed_status_label, '無効 (既定)', 'muted')
+        else:
+            reasons = '; '.join(r.reason for r in results if not r.successful)
+            _set_status(self.cubemars_overspeed_status_label, f'適用失敗: {reasons}', 'error')
+
     def _build_machine_origin_offset_panel(self, column):
         box = QGroupBox('機体原点オフセット (soki_sim.urdf.xacro)')
         layout = QVBoxLayout(box)
 
         desc = QLabel()
         desc.setWordWrap(True)
-        _set_status(desc, f'base_link(旋回軸)から実機の機体原点までのズレ[m]。\n'
-                          f'ワーク・シューティングボックスもこのオフセットに\n'
-                          f'追従して動く(可動範囲: 各軸±{MACHINE_ORIGIN_OFFSET_LIMIT:.2f}m)。', 'muted')
+        _set_status(desc, f'base_link(旋回軸)から実機の機体原点までのズレ[m]\n'
+                          f'(URDF座標: X=前方(奥行き), Y=左(幅), Z=上)。\n'
+                          f'ワーク・シューティングボックスのRViz表示と、回収/投入\n'
+                          f'シーケンスのθ計算・現在位置XYZ表示の両方に反映される\n'
+                          f'(可動範囲: 各軸±{MACHINE_ORIGIN_OFFSET_LIMIT:.2f}m)。\n'
+                          f'「適用」でgains.jsonに保存し、次回起動時に自動で復元・送信する。\n'
+                          f'例: 旋回軸が機体原点よりフィールド側(前方)へ20mmずれているなら X=-0.020', 'muted')
         layout.addWidget(desc)
 
         self.machine_origin_edits = {name: make_float_edit(0.0, width=70) for name in MACHINE_ORIGIN_JOINT_NAMES}
@@ -3346,7 +3710,11 @@ class CommandGuiApp(QWidget):
             set_float(self.machine_origin_edits[name], round(v, 4))
         self.node.send_machine_origin(*(clamped[name] for name in MACHINE_ORIGIN_JOINT_NAMES))
         x, y, z = (clamped[name] for name in MACHINE_ORIGIN_JOINT_NAMES)
-        text = f'送信しました (x={x:.3f}, y={y:.3f}, z={z:.3f})'
+        # 逆運動学用の適用値を更新し、gains.jsonへ保存する(2026-09-11。以前は
+        # RVizへ送るだけで保存されず、逆運動学にも使われていなかった)。
+        self._machine_origin = (x, y, z)
+        self._persist_gains('machine_origin', {name: clamped[name] for name in MACHINE_ORIGIN_JOINT_NAMES})
+        text = f'送信・保存しました (x={x:.3f}, y={y:.3f}, z={z:.3f})'
         if any(abs(raw[name] - clamped[name]) > 1e-9 for name in MACHINE_ORIGIN_JOINT_NAMES):
             text += '\n(可動範囲外のためクランプされました)'
         _set_status(self.machine_origin_status_label, text, 'success')
@@ -3435,12 +3803,16 @@ class CommandGuiApp(QWidget):
         layout.addWidget(desc)
 
         self.velocity_mode_check = QCheckBox('joy出力を速度指令にする')
+        # 既定ON(2026-09-09、手動移動にフォーカスするmanualブランチでの方針変更。
+        # joy_teleop_node/trajectory_follower_node双方のデフォルトも合わせて
+        # trueにしてあるので、ここはノードの実際の既定値に表示を揃えているだけ)。
+        self.velocity_mode_check.setChecked(True)
         self.velocity_mode_check.toggled.connect(self._on_velocity_mode_toggled)
         layout.addWidget(self.velocity_mode_check)
 
         self.velocity_mode_status_label = QLabel()
         self.velocity_mode_status_label.setWordWrap(True)
-        _set_status(self.velocity_mode_status_label, '位置指令モード', 'muted')
+        _set_status(self.velocity_mode_status_label, '速度指令モード', 'muted')
         layout.addWidget(self.velocity_mode_status_label)
 
         column.addWidget(box)
@@ -3487,15 +3859,21 @@ class CommandGuiApp(QWidget):
         layout.addWidget(desc)
 
         grid = QGridLayout()
-        self.robomas_vel_kp_edit = make_float_edit(0.8, width=70)
-        self.robomas_vel_ki_edit = make_float_edit(0.0, width=70)
-        self.robomas_vel_kd_edit = make_float_edit(0.0, width=70)
-        self.robomas_vel_max_current_a_edit = make_float_edit(1.0, width=70)
+        self.robomas_vel_kp_edit = make_gain_edit(0.8, width=70)
+        self.robomas_vel_ki_edit = make_gain_edit(0.0, width=70)
+        self.robomas_vel_kd_edit = make_gain_edit(0.0, width=70)
+        self.robomas_vel_max_current_a_edit = make_gain_edit(1.0, width=70)
+        # z上昇時のみ目標速度へ上乗せするバイアス(2026-09-12追加、ユーザー報告:
+        # 「Z軸の上方向に動く時が遅い」。P制御の重力分の定常偏差を補う。
+        # trajectory_follower_node.pyのrobomas_z_up_velocity_bias_mps宣言部参照)。
+        # 負値はz上昇指令で下降させてしまうためmake_gain_editで下限0にする。
+        self.robomas_z_up_velocity_bias_mps_edit = make_gain_edit(0.0, width=70)
         for i, (label, edit) in enumerate((
                 ('Kp', self.robomas_vel_kp_edit),
                 ('Ki', self.robomas_vel_ki_edit),
                 ('Kd', self.robomas_vel_kd_edit),
-                ('電流上限 [A]', self.robomas_vel_max_current_a_edit))):
+                ('電流上限 [A]', self.robomas_vel_max_current_a_edit),
+                ('Z上昇バイアス [m/s]', self.robomas_z_up_velocity_bias_mps_edit))):
             grid.addWidget(QLabel(label), i, 0)
             grid.addWidget(edit, i, 1)
         layout.addLayout(grid)
@@ -3520,7 +3898,8 @@ class CommandGuiApp(QWidget):
     def _on_load_robomas_vel_gains(self):
         ok = self.node.request_node_params(
             TRAJ_NODE_NAME,
-            ['robomas_vel_kp', 'robomas_vel_ki', 'robomas_vel_kd', 'robomas_vel_max_current_a'],
+            ['robomas_vel_kp', 'robomas_vel_ki', 'robomas_vel_kd', 'robomas_vel_max_current_a',
+             'robomas_z_up_velocity_bias_mps'],
             self._apply_loaded_robomas_vel_gains,
             lambda reason: _set_status(self.robomas_vel_gain_status_label, f'読込失敗: {reason}', 'error'))
         _set_status(self.robomas_vel_gain_status_label,
@@ -3538,6 +3917,9 @@ class CommandGuiApp(QWidget):
         if 'robomas_vel_max_current_a' in values:
             set_float(self.robomas_vel_max_current_a_edit,
                       round(values['robomas_vel_max_current_a'], 6))
+        if 'robomas_z_up_velocity_bias_mps' in values:
+            set_float(self.robomas_z_up_velocity_bias_mps_edit,
+                      round(values['robomas_z_up_velocity_bias_mps'], 6))
         # 「読込」はノードの現在値をGUIに表示するだけに留め、gains.jsonへは
         # 「適用」時のみ永続化する(他のゲインパネルと同じ方針)。
         _set_status(self.robomas_vel_gain_status_label, '読込完了', 'info')
@@ -3548,13 +3930,15 @@ class CommandGuiApp(QWidget):
             'robomas_vel_ki': get_float(self.robomas_vel_ki_edit),
             'robomas_vel_kd': get_float(self.robomas_vel_kd_edit),
             'robomas_vel_max_current_a': get_float(self.robomas_vel_max_current_a_edit),
+            'robomas_z_up_velocity_bias_mps': get_float(self.robomas_z_up_velocity_bias_mps_edit),
         }
 
     def _on_apply_robomas_vel_gains(self):
         try:
             values = self._collect_robomas_vel_values()
         except ValueError:
-            QMessageBox.critical(self, '入力エラー', 'Kp/Ki/Kd/電流上限に数値を入力してください')
+            QMessageBox.critical(self, '入力エラー',
+                                 'Kp/Ki/Kd/電流上限/Z上昇バイアスに数値を入力してください')
             return
         reply = QMessageBox.question(
             self, '速度モードゲイン適用の確認',
@@ -3613,6 +3997,15 @@ class CommandGuiApp(QWidget):
         layout.addWidget(self.axis_enable_status_label)
 
         column.addWidget(box)
+
+    def _axis_enabled(self, name):
+        """「軸の有効/無効」パネルでその軸が有効か(2026-09-10追加)。
+        シーケンスの到達判定・R軸リトラクトが、無効化された軸(=trajectory_
+        follower_node側がdisabled_jointsとして目標を捨て、現在位置で凍結する軸)を
+        待ち続けてタイムアウトしないようにするために使う(_advance_move_step/
+        _advance_retract_r_step参照)。パネル未構築時は有効扱い。"""
+        cb = self.axis_enable_checks.get(name)
+        return True if cb is None else cb.isChecked()
 
     def _on_axis_enable_toggled(self, _checked=None):
         disabled = [name for name, cb in self.axis_enable_checks.items() if not cb.isChecked()]
@@ -3710,114 +4103,6 @@ class CommandGuiApp(QWidget):
             description='real_joint_bridge_node起動時のみ反映。実行中には反映されません。',
             field_specs=CUBEMARS_WIRING_FIELDS)
 
-    def _build_homing_wiring_panel(self, column):
-        self._build_yaml_wiring_panel(
-            column, attr_prefix='homing_wiring',
-            title='原点センサ・ホーミング配線設定 (real_joint_bridge.yaml)',
-            note='CAN_HOSTはz/r原点センサ(SW1/SW2のリミットスイッチ)専用。\n'
-                 'motor1/motor2の位置取得にはROBOMAS内蔵エンコーダを使うため、\n'
-                 'CAN_HOSTのENC1/ENC2は使わない。',
-            description='homing_node起動時のみ反映。実行中には反映されません。',
-            field_specs=HOMING_WIRING_FIELDS)
-
-    def _build_can_host_raw_monitor_panel(self, column):
-        """上の「原点センサ・ホーミング配線設定」で設定したノード/スロットが実機と
-        合っているかを確認するための生値モニタ(2026-09-08追加、ユーザー要望:
-        「現在割り当てられている原点センサの対応付けがあっているか確認できるように
-        GUIで表示」)。CAN_HOST(device_id=101)のserial_rx_101_unwrappedを直接
-        (ros2canのtopic_passthrough経由ではなく)購読してSLOT_COUNT分すべての
-        生値を一覧表示し、上のz/r原点センサ欄から計算したスロットに
-        →z原点/→r原点の印を付ける。原点センサを実機で手動操作しながらどの
-        スロットの値が変化するかを見比べることで、配線設定欄の値が正しいか
-        (このパネルの目的はnote/note_soki/hardware_mapping.txt「未確認事項」に
-        あった原点センサ配線の実機検証を、ノード再起動・ログ確認無しでGUI上から
-        直接行えるようにすること)確認できる。"""
-        box = QGroupBox('原点センサ 生値モニタ (実機確認用)')
-        layout = QVBoxLayout(box)
-
-        note = QLabel()
-        note.setWordWrap(True)
-        _set_status(
-            note,
-            '上の「原点センサ・ホーミング配線設定」のノード/スロット欄に対応する\n'
-            'スロットに →z原点 / →r原点 と表示する。原点センサを手で押しながら\n'
-            'どのslotの値がSW検出値に変わるか見比べ、印の付いた欄と一致していれば\n'
-            '設定は正しい。違うslotが反応する場合は上の欄をそのslot番号\n'
-            '(ノード=slot÷ノードあたりスロット数、スロット=slot mod ノードあたり\n'
-            'スロット数)に書き換えて保存すること。',
-            'muted')
-        layout.addWidget(note)
-
-        self.can_host_raw_status_label = QLabel()
-        _set_status(self.can_host_raw_status_label, '未受信', 'muted')
-        layout.addWidget(self.can_host_raw_status_label)
-
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(14)
-        grid.setVerticalSpacing(2)
-        self.can_host_raw_slot_labels = {}
-        cols = 4
-        for slot in range(CAN_HOST_RAW_SLOT_COUNT):
-            r, c = divmod(slot, cols)
-            label = QLabel()
-            _set_status(label, f'slot{slot}: -', 'muted')
-            self.can_host_raw_slot_labels[slot] = label
-            grid.addWidget(label, r, c)
-        layout.addLayout(grid)
-
-        column.addWidget(box)
-
-        # 実機のSW押下に追従して見えるよう、他の状態パネル(_machine_status_timer、
-        # 1000ms間隔)より短い周期で更新する専用タイマー。
-        self._can_host_raw_timer = QTimer(self)
-        self._can_host_raw_timer.timeout.connect(self._refresh_can_host_raw_monitor)
-        self._can_host_raw_timer.start(150)
-
-    def _refresh_can_host_raw_monitor(self):
-        edits = self._homing_wiring_edits
-        try:
-            device_id = get_int(edits['can_host_device_id'])
-            slots_per_node = get_int(edits['can_host_slots_per_node'])
-            triggered_value = get_int(edits['switch_triggered_value'])
-            z_slot = (get_int(edits['z_limit_switch_node_index']) * slots_per_node
-                      + get_int(edits['z_limit_switch_local_index']))
-            r_slot = (get_int(edits['r_limit_switch_node_index']) * slots_per_node
-                      + get_int(edits['r_limit_switch_local_index']))
-        except ValueError:
-            _set_status(self.can_host_raw_status_label, '上の配線設定欄の入力エラー', 'error')
-            return
-
-        data = self.node.get_device_raw_slots(device_id)
-        if data is None:
-            _set_status(self.can_host_raw_status_label,
-                        f'device_id={device_id}のserial_rx未受信(CAN_HOST起動・'
-                        'topic_passthrough ON確認)', 'error')
-            for slot, label in self.can_host_raw_slot_labels.items():
-                _set_status(label, f'slot{slot}: -', 'muted')
-            return
-        _set_status(self.can_host_raw_status_label,
-                    f'device_id={device_id} 受信中 (ノードあたりスロット数={slots_per_node})',
-                    'success')
-
-        for slot, label in self.can_host_raw_slot_labels.items():
-            if slot >= len(data):
-                _set_status(label, f'slot{slot}: -', 'muted')
-                continue
-            value = data[slot]
-            node_idx, local_idx = ((slot // slots_per_node, slot % slots_per_node)
-                                    if slots_per_node > 0 else (0, slot))
-            tag = ''
-            if slot == z_slot:
-                tag += ' →z原点'
-            if slot == r_slot:
-                tag += ' →r原点'
-            text = f'slot{slot}(n{node_idx}/{local_idx}): {value}{tag}'
-            if tag:
-                role = 'success' if value == triggered_value else 'error'
-            else:
-                role = 'info' if value == triggered_value else 'muted'
-            _set_status(label, text, role)
-
     def _build_limit_switch_wiring_panel(self, column):
         self._build_yaml_wiring_panel(
             column, attr_prefix='limit_switch_wiring',
@@ -3828,6 +4113,51 @@ class CommandGuiApp(QWidget):
                  'IDを0のままにするとそのスイッチは無効(未配線)扱い。',
             description='trajectory_follower_node起動時のみ反映。実行中には反映されません。',
             field_specs=LIMIT_SWITCH_WIRING_FIELDS)
+        self._build_limit_switch_status_panel(column)
+
+    def _build_limit_switch_status_panel(self, column):
+        """z/r×lower/upper 4個のリミットスイッチの個別状態をリアルタイム表示する
+        (2026-09-09追加、ユーザー報告「リミットセンサの反応が遅い」の調査用。
+        上の配線設定と実際に当たっているスイッチが対応しているか、実機で手で
+        押しながらその場で確認できる。集約フラグlimit_stop_active(状態表示灯)
+        だけでは「どれか1個」しか分からず、配線・方向の食い違いに気付けない
+        ため個別に見えるようにした)。"""
+        box = QGroupBox('リミットスイッチ 個別状態 (実機確認用)')
+        layout = QVBoxLayout(box)
+
+        desc = QLabel()
+        desc.setWordWrap(True)
+        _set_status(
+            desc,
+            '実機のスイッチを手で押しながら、押した方向と対応するラベルが\n'
+            '赤(トリガー中)になるか確認する。違う方向のラベルが反応する場合は\n'
+            '上の配線設定(ノード/スロット)が実機と食い違っている。', 'muted')
+        layout.addWidget(desc)
+
+        grid = QGridLayout()
+        self._limit_switch_status_labels = {}
+        for i, (axis, direction) in enumerate((('z', 'lower'), ('z', 'upper'),
+                                                 ('r', 'lower'), ('r', 'upper'))):
+            key = f'{axis}_{direction}'
+            grid.addWidget(QLabel(f'{axis}軸 {direction}'), i, 0)
+            label = QLabel()
+            _set_status(label, '未受信', 'muted')
+            self._limit_switch_status_labels[key] = label
+            grid.addWidget(label, i, 1)
+        layout.addLayout(grid)
+        column.addWidget(box)
+        # 独自タイマーは持たず_spin_ros(50ms、rclpy.spin_once実行と同じ場所)から
+        # 呼ぶ(2026-09-09、ユーザー報告「センサ反応からGUI表示までワンテンポ
+        # 遅れる」。当初は専用の100msタイマーで更新していたが、rclpy.spin_once
+        # (新しいsubscriptionデータの取り込み自体)を待たずに独自周期で"表示だけ"
+        # 更新しても意味が無く、むしろ100ms分の遅延を上乗せしていただけだった)。
+
+    def _refresh_limit_switch_status_panel(self):
+        for key, label in self._limit_switch_status_labels.items():
+            axis, direction = key.split('_', 1)
+            triggered = self.node.get_limit_switch_triggered(axis, direction)
+            _set_status(label, 'トリガー中' if triggered else '未トリガー',
+                        'error' if triggered else 'success')
 
     def _build_hand_wiring_panel(self, column):
         self._build_yaml_wiring_panel(
@@ -4025,12 +4355,14 @@ class CommandGuiApp(QWidget):
                 text = f.read()
             for key, value_str in updates.items():
                 text = _replace_yaml_scalar(text, key, value_str)
-            with open(path, 'w', encoding='utf-8') as f:
-                f.write(text)
+            mirror = _write_config_file(yaml_filename, path, text)
         except OSError as exc:
             _set_status(status_label, f'保存失敗: {exc}', 'error')
             return
-        _set_status(status_label, f'保存しました ({path})\ngit diffで変更内容を確認してください', 'success')
+        status = f'保存しました ({path})\ngit diffで変更内容を確認してください'
+        if mirror:
+            status += f'\ninstall側にも反映済み ({mirror})'
+        _set_status(status_label, status, 'success')
 
     def _build_field_buttons(self, layout):
         # 以前はワーク/シューティングボックスを別々のボックス(別々の座標系)で
@@ -4040,19 +4372,11 @@ class CommandGuiApp(QWidget):
         # (WORK_POINTS/SHOOT_POINTSのx,y)でボタン位置を決めることで、実際の
         # フィールド配置(奥からワーク4列・機体・シューティングボックス4列の順)と
         # 対応する見た目にする。
-        # 「自動シーケンスで実行」ON時は、workボタンで回収シーケンス・shootボタンで
-        # 投入シーケンスを開始する(_on_field_point参照)。OFFなら従来通り即時移動
-        # のみ行う(2026-09-03新規、既定は当初OFFだったが、同日ユーザー指定で
-        # 既定ONに変更)。
-        self.seq_auto_checkbox = QCheckBox(
-            '自動シーケンスで実行(ワーク=回収・シューティングボックス=投入。'
-            '設定は下の「ピック/投入 自動シーケンス」パネル)')
-        self.seq_auto_checkbox.setChecked(True)
-        seq_row = QHBoxLayout()
-        seq_row.addWidget(self.seq_auto_checkbox)
-        seq_row.addStretch(1)
-        layout.addLayout(seq_row)
-
+        # workボタン=回収シーケンス(ハンド展開・ポンプON・theta回転のみ、R/Zは
+        # 人が操作)、shootボタン=投入シーケンスを、それぞれクリックで即座に
+        # 開始する(2026-09-09、回収シーケンス復元。「自動シーケンスで実行」
+        # チェックボックスは廃止し常時シーケンス実行のみとした。座標直接指定
+        # タブは削除済みのため、即時移動という選択肢自体が無くなったため)。
         box = QGroupBox('ワーク・シューティングボックス (クリックで移動、実フィールド配置)')
         grid = QGridLayout(box)
         work_points = [(*p, 'pick') for row in WORK_POINTS for p in row]
@@ -4060,9 +4384,8 @@ class CommandGuiApp(QWidget):
         n_work_rows = len({round(p[2], 6) for p in work_points})
         # 矢印キー(D-pad)でのワーク選択カーソル用に、ワークボタンのウィジェット
         # 参照を(round(x,6), round(y,6))キーで覚えておく(2026-09-03追加、
-        # ユーザー指定:「矢印キーでGUI上で目標ワークを選択し移動バツで移動、
-        # 再度バツで回収実行」)。on_buttonコールバック経由で_build_button_grid
-        # から受け取る。
+        # ユーザー指定:「矢印キーでGUI上で目標ワークを選択し移動バツで移動」)。
+        # on_buttonコールバック経由で_build_button_gridから受け取る。
         self._work_buttons = {}
 
         def _register_button(label, x, y, z, kind, btn):
@@ -4110,9 +4433,8 @@ class CommandGuiApp(QWidget):
         gap_after_rankを指定すると、Y順位でその順位を超えた行を1行分下にずらし、
         間にgap_labelを挟む(ワーク行とシューティングボックス行の間に機体分の
         空白を作るため)。on_button(label, x, y, z, kind, btn)を指定すると、
-        作成した各QPushButtonを呼び出し元へ渡す(2026-09-03追加、ワーク選択
-        カーソルのハイライト用にウィジェット参照を回収するため、
-        _build_field_buttons参照)。"""
+        作成した各QPushButtonを呼び出し元へ渡す(ワーク選択カーソルのハイライト
+        用にウィジェット参照を回収するため、_build_field_buttons参照)。"""
         grid.setHorizontalSpacing(4)
         xs = sorted({round(p[1], 6) for p in points})
         ys = sorted({round(p[2], 6) for p in points}, reverse=True)
@@ -4163,20 +4485,16 @@ class CommandGuiApp(QWidget):
     def _on_field_point(self, x, y, z, kind):
         # ワークボタンをマウスでクリックした場合も、矢印キー(D-pad)の選択
         # カーソルを同じワークへ同期させる(2026-09-03追加。これによりPSコンの
-        # ×ボタンでの「移動」「回収実行」がマウス操作と矛盾しない)。
+        # ×ボタンでの「移動」がマウス操作と矛盾しない)。
         if kind == 'pick':
             rc = self._work_grid_rc_by_xy.get((round(x, 6), round(y, 6)))
             if rc is not None and rc != self._selected_work_rc:
                 self._highlight_selected_work(False)
                 self._selected_work_rc = rc
                 self._highlight_selected_work(True)
-        if self.seq_auto_checkbox.isChecked():
-            if kind == 'pick':
-                self._start_pick_sequence(x, y, z)
-            else:
-                self._start_shoot_sequence(x, y, z)
+            self._start_pick_sequence(x, y, z)
         else:
-            self._send_xyz(x, y, z)
+            self._start_shoot_sequence(x, y, z)
 
     def _highlight_selected_work(self, selected):
         """現在のワーク選択カーソル(self._selected_work_rc)が指すボタンの
@@ -4219,17 +4537,30 @@ class CommandGuiApp(QWidget):
 
     def _selected_work_xyz(self):
         """現在のワーク選択カーソルが指すワークの(x, y, z)を返す(2026-09-03追加、
-        _on_pick_confirm_requested参照)。"""
+        _on_pick_move_requested参照)。"""
         return self._work_grid.get(self._selected_work_rc)
 
     # ---------- realtime state / trajectory params ----------
     def _spin_ros(self):
         # rclpy.spin_once()はmixed_joint_states購読・パラメータサービスの
         # 応答処理に必要(このメソッドの呼び出し=QTimer=Qtのイベントループと
-        # 同じメインスレッド上で完結する)。
-        rclpy.spin_once(self.node, timeout_sec=0)
+        # 同じメインスレッド上で完結する)。spin_once(timeout_sec=0)は1回の呼び出し
+        # につき保留中のコールバックを1つしか処理しないため、この購読数の多い
+        # GUI(mixed_joint_states・ポンプ状態・リミットスイッチ4個・autotune状態等)
+        # では、同じ50ms枠に複数メッセージが届くと後回しにされるものが出て
+        # 数ティック分の遅延になる(2026-09-09、ユーザー報告「センサ反応から
+        # GUI表示までワンテンポ遅れる」)。1tickあたり複数回spinして、その時点で
+        # 溜まっている分をまとめて処理する。
+        for _ in range(_SPIN_ROS_DRAIN_COUNT):
+            rclpy.spin_once(self.node, timeout_sec=0)
+        # 状態表示灯(黄色/赤色LED)は既にpublish済みのbool値(estop_active・
+        # limit_stop_active等)を読むだけの軽い処理なので、_refresh_machine_status
+        # (1秒周期)を待たずここで毎tick更新する(2026-09-09、ユーザー報告
+        # 「表示灯の応答が遅い」。以前は1秒周期のみだったため最大1秒待たされていた)。
+        self._update_status_leds()
         self._refresh_current_state()
         self._refresh_sequence_pump_status()
+        self._refresh_limit_switch_status_panel()
         self._advance_sequence()
         self._refresh_status_display_tab()
 
@@ -4249,18 +4580,12 @@ class CommandGuiApp(QWidget):
         theta = pos['root_theta_joint']
         zj = pos['z_joint']
         r = pos['r_joint']
-        x, y, z = joint_to_xyz(theta, zj, r)
+        x, y, z = joint_to_xyz(theta, zj, r, self._machine_origin)
         self.current_label.setText(
             f'theta={math.degrees(theta):.1f}deg  z_joint={zj:.3f}  r_joint={r:.3f}\n'
             f'X={x:.3f}  Y={y:.3f}  Z={z:.3f}')
-        self.xy_widget.set_current(x, y)
         self.field_minimap.set_current(x, y)
         self.z_gauge.set_z(z)
-        if not self._target_synced_to_current_:
-            set_float(self.x_edit, round(x, 3))
-            set_float(self.y_edit, round(y, 3))
-            set_float(self.z_edit, round(z, 3))
-            self._target_synced_to_current_ = True
 
     def _on_load_traj_params(self):
         # joint_namesも取得する: trajectory_follower_nodeは実行構成によって
@@ -4301,6 +4626,8 @@ class CommandGuiApp(QWidget):
             self._robomas_vel_auto_loaded = True
         if not self._joy_auto_loaded and self._on_load_joy_speed():
             self._joy_auto_loaded = True
+        if not self._estop_auto_engaged and self._auto_engage_estop():
+            self._estop_auto_engaged = True
 
         # 軌道生成・MITは配列の並び順・要素数がjoint_names次第のため、読込の
         # 「応答」が届いてから適用する(_traj_names_known/_mit_names_known参照。
@@ -4319,12 +4646,23 @@ class CommandGuiApp(QWidget):
             self._robomas_vel_auto_applied = True
         if not self._joy_auto_applied and self._auto_apply_saved_joy():
             self._joy_auto_applied = True
+        if not self._hand_servo_auto_applied and self._auto_apply_saved_hand_servo_speed():
+            self._hand_servo_auto_applied = True
 
         if all((self._traj_auto_loaded, self._mit_auto_loaded,
                 self._robomas_auto_loaded, self._robomas_vel_auto_loaded, self._joy_auto_loaded,
                 self._traj_auto_applied, self._mit_auto_applied,
-                self._robomas_auto_applied, self._robomas_vel_auto_applied, self._joy_auto_applied)):
+                self._robomas_auto_applied, self._robomas_vel_auto_applied, self._joy_auto_applied,
+                self._hand_servo_auto_applied, self._estop_auto_engaged)):
             self._auto_load_timer.stop()
+
+    def _auto_engage_estop(self):
+        """GUI起動時、trajectory_follower_nodeの/engage_estopが使えるように
+        なり次第、自動でソフト緊急停止を掛ける(2026-09-09追加)。他の自動読込/
+        適用と同じく、_on_emergency_stop_requestedとは別に単独でリトライする
+        (シーケンス中断処理は起動直後は不要なため、call_trigger_serviceを
+        直接呼ぶだけでよい)。"""
+        return self.node.call_trigger_service('/engage_estop', self._on_estop_engage_done)
 
     def _auto_apply_saved_traj(self):
         """gains.jsonのtrajectory値を、読込で学習した_traj_joint_names順の配列に
@@ -4348,6 +4686,24 @@ class CommandGuiApp(QWidget):
             'max_acceleration': [accel_map[n] for n in names],
             'max_deceleration': [decel_map[n] if n in decel_map else accel_map[n] * 2.0 for n in names],
         }
+        # 送る値で入力欄も上書きしておく(2026-09-10追加、ユーザー報告:「ゲイン調整
+        # タブを開くと適用しましたと表示される。しかし表示されているのはデフォルト
+        # ゲイン」)。この自動適用は必ず_apply_loaded_traj_params(読込応答)の後に
+        # 走る(_traj_names_knownで待っているため)ので、入力欄にはこの直前に
+        # 読み込んだ「適用前のノードの値」=launchファイルの既定値が入っている。
+        # 適用結果のコールバック(_apply_traj_set_result)はステータス文字列を
+        # 更新するだけなので、ここで揃えておかないと「表示はlaunch既定値・実機は
+        # gains.jsonの値」という食い違いが残り続ける。表示された既定値は「適用」
+        # ボタン1回で本物になってしまうため(例: root_thetaのmax_velocityが
+        # 1.0→0.1)、実態に合わせておく。
+        for name in names:
+            if name in self.traj_vel_edits:
+                set_float(self.traj_vel_edits[name], round(vel_map[name], 4))
+            if name in self.traj_accel_edits:
+                set_float(self.traj_accel_edits[name], round(accel_map[name], 4))
+            if name in self.traj_decel_edits:
+                decel = decel_map[name] if name in decel_map else accel_map[name] * 2.0
+                set_float(self.traj_decel_edits[name], round(decel, 4))
         _set_status(self.traj_status_label, '自動適用中(gains.json)...', 'muted')
         return self.node.set_node_params(TRAJ_NODE_NAME, payload, self._apply_traj_set_result)
 
@@ -4366,6 +4722,17 @@ class CommandGuiApp(QWidget):
             'cubemars_kd': [kd_map[n] for n in names],
             'cubemars_torque_ff': [tff_map.get(n, 0.0) for n in names],
         }
+        # 軌道生成パネルと同じ理由で、送る値を入力欄にも反映しておく
+        # (_auto_apply_saved_trajのコメント参照)。MITゲインは表示された既定値を
+        # そのまま適用してしまうとkp/kdが実機の調整値から戻ってしまうため、
+        # 特に食い違いを残したくない。
+        for name in names:
+            if name in self.mit_kp_edits:
+                set_float(self.mit_kp_edits[name], round(kp_map[name], 4))
+            if name in self.mit_kd_edits:
+                set_float(self.mit_kd_edits[name], round(kd_map[name], 4))
+            if name in self.mit_torque_edits:
+                set_float(self.mit_torque_edits[name], round(tff_map.get(name, 0.0), 4))
         _set_status(self.mit_gain_status_label, '自動適用中(gains.json)...', 'muted')
         return self.node.set_node_params(TRAJ_NODE_NAME, payload, self._apply_mit_gain_set_result)
 
@@ -4388,7 +4755,17 @@ class CommandGuiApp(QWidget):
         if not saved:
             return True
         _set_status(self.joy_speed_status_label, '自動適用中(gains.json)...', 'muted')
-        return self.node.set_node_params(JOY_NODE_NAME, saved, self._apply_joy_speed_set_result)
+        joy_ok = self.node.set_node_params(JOY_NODE_NAME, saved, self._apply_joy_speed_set_result)
+        # low_speed_multiplierはtrajectory_follower_node側にも送る必要がある
+        # (_on_apply_joy_speedのコメント参照)。両方送信できて初めて完了扱いにする
+        # (どちらかが未起動ならこの関数はFalseを返し、_try_auto_setup_gainsが
+        # 次回tickで再試行する)。
+        traj_ok = True
+        if 'low_speed_multiplier' in saved:
+            traj_ok = self.node.set_node_params(
+                TRAJ_NODE_NAME, {'low_speed_multiplier': saved['low_speed_multiplier']},
+                self._apply_joy_speed_set_result)
+        return joy_ok and traj_ok
 
     def _apply_loaded_traj_params(self, values):
         vel = values.get('max_velocity')
@@ -4588,8 +4965,8 @@ class CommandGuiApp(QWidget):
         layout.addWidget(desc)
 
         grid = QGridLayout()
-        self.robomas_kp_edit = make_float_edit(0.0, width=70)
-        self.robomas_kd_edit = make_float_edit(0.0, width=70)
+        self.robomas_kp_edit = make_gain_edit(0.0, width=70)
+        self.robomas_kd_edit = make_gain_edit(0.0, width=70)
         self.robomas_current_ff_edit = make_float_edit(0.0, width=70)
         for i, (label, edit) in enumerate((
                 ('Kp [A/deg]', self.robomas_kp_edit),
@@ -4636,8 +5013,8 @@ class CommandGuiApp(QWidget):
         # 入力欄だけ分ける。
         layout.addWidget(QLabel('tip_theta(M3)'))
         tip_grid = QGridLayout()
-        self.robomas_tip_theta_kp_edit = make_float_edit(0.0, width=70)
-        self.robomas_tip_theta_kd_edit = make_float_edit(0.0, width=70)
+        self.robomas_tip_theta_kp_edit = make_gain_edit(0.0, width=70)
+        self.robomas_tip_theta_kd_edit = make_gain_edit(0.0, width=70)
         self.robomas_tip_theta_current_ff_edit = make_float_edit(0.0, width=70)
         for i, (label, edit) in enumerate((
                 ('Kp [A/deg]', self.robomas_tip_theta_kp_edit),
@@ -4870,91 +5247,6 @@ class CommandGuiApp(QWidget):
             self._autotune_progress_shown = progress
             _set_status(self.autotune_progress_label, progress, 'info')
 
-    def _build_homing_panel(self, column):
-        box = QGroupBox('z/rホーミング (homing_node)')
-        layout = QVBoxLayout(box)
-
-        desc = QLabel()
-        desc.setWordWrap(True)
-        _set_status(desc, '開始(z軸/r軸): motor1/motor2を低速駆動しその軸の\n'
-                          '原点センサまで動かす(z/rは独立に実行できるが、差動\n'
-                          '機構のためどちらの軸でもmotor1/motor2両方が回転する)。\n'
-                          'スキップ: 機体を先に原点センサ位置相当へ手動で\n'
-                          '合わせてから使うこと(モータは駆動せずz/r両方を反映)。', 'muted')
-        layout.addWidget(desc)
-
-        self.homing_status_label = QLabel()
-        self.homing_status_label.setWordWrap(True)
-        _set_status(self.homing_status_label, '未実行', 'muted')
-        layout.addWidget(self.homing_status_label)
-
-        start_row = QHBoxLayout()
-        start_z_btn = QPushButton('z軸 開始')
-        start_z_btn.setProperty('variant', 'primary')
-        start_r_btn = QPushButton('r軸 開始')
-        start_r_btn.setProperty('variant', 'primary')
-        start_z_btn.clicked.connect(self._on_start_homing_z)
-        start_r_btn.clicked.connect(self._on_start_homing_r)
-        start_row.addWidget(start_z_btn)
-        start_row.addWidget(start_r_btn)
-        layout.addLayout(start_row)
-
-        btn_row = QHBoxLayout()
-        stop_btn = QPushButton('中断')
-        skip_btn = QPushButton('スキップ(z/r両方)')
-        skip_btn.setProperty('variant', 'danger')
-        stop_btn.clicked.connect(self._on_stop_homing)
-        skip_btn.clicked.connect(self._on_skip_homing)
-        btn_row.addWidget(stop_btn)
-        btn_row.addWidget(skip_btn)
-        layout.addLayout(btn_row)
-
-        column.addWidget(box)
-
-    def _on_start_homing_axis(self, axis_label, service_name):
-        reply = QMessageBox.question(
-            self, f'{axis_label}ホーミング開始の確認',
-            f'motor1/motor2を低速駆動して{axis_label}原点センサまで動かします\n'
-            f'(差動機構のためmotor1/motor2両方が回転します)。\n'
-            '周囲に人・障害物がないか確認してください。',
-            QMessageBox.Yes | QMessageBox.No)
-        if reply != QMessageBox.Yes:
-            return
-        _set_status(self.homing_status_label, f'{axis_label}: 開始中...', 'muted')
-        ok = self.node.call_trigger_service(service_name, self._on_homing_service_done)
-        if not ok:
-            _set_status(self.homing_status_label, 'サービス未起動です(homing_node起動確認)', 'error')
-
-    def _on_start_homing_z(self):
-        self._on_start_homing_axis('z軸', '/start_homing_z')
-
-    def _on_start_homing_r(self):
-        self._on_start_homing_axis('r軸', '/start_homing_r')
-
-    def _on_stop_homing(self):
-        _set_status(self.homing_status_label, '中断中...', 'muted')
-        ok = self.node.call_trigger_service('/stop_homing', self._on_homing_service_done)
-        if not ok:
-            _set_status(self.homing_status_label, 'サービス未起動です(homing_node起動確認)', 'error')
-
-    def _on_skip_homing(self):
-        reply = QMessageBox.question(
-            self, 'ホーミングスキップの確認',
-            'motor1/motor2は駆動せず、現在位置を原点センサ位置(z_ref_value_m/\n'
-            'r_ref_value_m)とみなしてoffsetを即座に反映します。\n\n'
-            '機体は今、原点センサ位置相当にありますか？\n'
-            '間違った位置で実行すると以後のz/r値が全てズレます。',
-            QMessageBox.Yes | QMessageBox.No)
-        if reply != QMessageBox.Yes:
-            return
-        _set_status(self.homing_status_label, 'スキップ処理中...', 'muted')
-        ok = self.node.call_trigger_service('/skip_homing', self._on_homing_service_done)
-        if not ok:
-            _set_status(self.homing_status_label, 'サービス未起動です(homing_node起動確認)', 'error')
-
-    def _on_homing_service_done(self, success, message):
-        _set_status(self.homing_status_label, message, 'success' if success else 'error')
-
     def _on_load_joy_speed(self):
         ok = self.node.request_node_params(
             JOY_NODE_NAME, list(self.joy_speed_edits.keys()),
@@ -4984,9 +5276,19 @@ class CommandGuiApp(QWidget):
             return
         self._persist_gains('joy_speed', values)
         ok = self.node.set_node_params(JOY_NODE_NAME, values, self._apply_joy_speed_set_result)
+        # low_speed_multiplierはtrajectory_follower_node側にも同名パラメータが
+        # あり、そちらが実際の速度モード上限(_slew_velocityのmax_vクランプ)を
+        # 下げる役目を持つ(joy側のz_speed/r_speedは常時そのクランプへ飽和させる
+        # 設計のため、joy側だけ倍率を掛けても実速度が変わらない。2026-09-09、
+        # ユーザー報告:「低速モードが機能していない」)。両ノードへ同じ値を送り
+        # 揃える。
+        traj_ok = self.node.set_node_params(
+            TRAJ_NODE_NAME, {'low_speed_multiplier': values['low_speed_multiplier']},
+            self._apply_joy_speed_set_result)
         _set_status(self.joy_speed_status_label,
-                    '適用中...' if ok else 'joy_teleop_nodeに接続できません(use_joy:=trueで起動?)',
-                    'muted' if ok else 'error')
+                    '適用中...' if (ok and traj_ok) else
+                    '接続できないノードがあります(joy_teleop_node/trajectory_follower_node起動確認)',
+                    'muted' if (ok and traj_ok) else 'error')
 
     def _apply_joy_speed_set_result(self, results):
         if results is None:
@@ -5012,142 +5314,6 @@ class CommandGuiApp(QWidget):
         current = next((v for v, rb in self._mode_buttons.items() if rb.isChecked()), '?')
         _set_status(self.mode_status_label, f'現在のモード: {current}', 'success')
 
-    def _on_copy_current_to_target(self):
-        if not self.node.has_current_state():
-            QMessageBox.information(self, '未取得', 'まだ現在位置を受信していません')
-            return
-        pos = self.node.get_current_positions()
-        x, y, z = joint_to_xyz(pos['root_theta_joint'], pos['z_joint'], pos['r_joint'])
-        set_float(self.x_edit, round(x, 3))
-        set_float(self.y_edit, round(y, 3))
-        set_float(self.z_edit, round(z, 3))
-
-    # ---------- coordinate handling ----------
-    def _on_canvas_click(self, x, y):
-        radius = math.hypot(x, y)
-        if radius > MAX_RADIUS:
-            x *= MAX_RADIUS / radius
-            y *= MAX_RADIUS / radius
-        set_float(self.x_edit, round(x, 3))
-        set_float(self.y_edit, round(y, 3))
-
-    def _redraw_pin(self, *_args):
-        try:
-            x = get_float(self.x_edit)
-            y = get_float(self.y_edit)
-        except ValueError:
-            return
-        self.xy_widget.set_pin(x, y)
-        self._update_status()
-
-    def _update_status(self):
-        try:
-            x = get_float(self.x_edit)
-            y = get_float(self.y_edit)
-            z = get_float(self.z_edit)
-        except ValueError:
-            return
-        theta, zj, r, clamped = xyz_to_joint(x, y, z)
-        text = f'theta={math.degrees(theta):.1f}deg  z_joint={zj:.3f}  r_joint={r:.3f}'
-        if clamped:
-            text += '\n(可動域外のためクランプされました)'
-        _set_status(self.status_label, text, 'error' if clamped else 'info')
-
-    # ---------- send ----------
-    def _on_send(self):
-        try:
-            x = get_float(self.x_edit)
-            y = get_float(self.y_edit)
-            z = get_float(self.z_edit)
-        except ValueError:
-            QMessageBox.critical(self, '入力エラー', 'X/Y/Zに数値を入力してください')
-            return
-        theta, zj, r, _ = xyz_to_joint(x, y, z)
-        self.node.send_target(theta, zj, r)
-        self._update_status()
-
-    def _on_jog(self, dx, dy):
-        try:
-            step = get_float(self.step_edit)
-            x = get_float(self.x_edit) + dx * step
-            y = get_float(self.y_edit) + dy * step
-        except ValueError:
-            QMessageBox.critical(self, '入力エラー', 'X/Y/ステップに数値を入力してください')
-            return
-        set_float(self.x_edit, round(x, 4))
-        set_float(self.y_edit, round(y, 4))
-        self._on_send()
-
-    def _send_xyz(self, x, y, z):
-        set_float(self.x_edit, x)
-        set_float(self.y_edit, y)
-        set_float(self.z_edit, z)
-        self._on_send()
-
-    # ---------- points list ----------
-    def _on_add_point(self):
-        try:
-            x = get_float(self.x_edit)
-            y = get_float(self.y_edit)
-            z = get_float(self.z_edit)
-        except ValueError:
-            QMessageBox.critical(self, '入力エラー', 'X/Y/Zに数値を入力してください')
-            return
-        name, ok = QInputDialog.getText(
-            self, 'ポイント名', '保存する名前を入力してください',
-            text=f'Point{len(self.points) + 1}')
-        if not ok or not name:
-            return
-        self.points.append({'name': name, 'x': x, 'y': y, 'z': z})
-        self._save_points()
-        self._refresh_point_list()
-
-    def _on_delete_point(self):
-        row = self.listbox.currentRow()
-        if row < 0:
-            return
-        del self.points[row]
-        self._save_points()
-        self._refresh_point_list()
-
-    def _on_load_point(self):
-        row = self.listbox.currentRow()
-        if row < 0:
-            return
-        p = self.points[row]
-        set_float(self.x_edit, p['x'])
-        set_float(self.y_edit, p['y'])
-        set_float(self.z_edit, p['z'])
-
-    def _on_send_selected(self):
-        row = self.listbox.currentRow()
-        if row < 0:
-            QMessageBox.information(self, '未選択', '一覧からポイントを選択してください')
-            return
-        p = self.points[row]
-        self._send_xyz(p['x'], p['y'], p['z'])
-
-    def _refresh_point_list(self):
-        self.listbox.clear()
-        for p in self.points:
-            self.listbox.addItem(f"{p['name']}  ({p['x']:.3f}, {p['y']:.3f}, {p['z']:.3f})")
-
-    # ---------- persistence ----------
-    @staticmethod
-    def _load_points():
-        if not os.path.exists(POINTS_FILE):
-            return []
-        try:
-            with open(POINTS_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, OSError):
-            return []
-
-    def _save_points(self):
-        os.makedirs(os.path.dirname(POINTS_FILE), exist_ok=True)
-        with open(POINTS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(self.points, f, ensure_ascii=False, indent=2)
-
     # ---------- gain persistence ----------
     # 軌道生成・MIT・robomas・joy速度の各ゲインは、「読込」(GetParameters)を
     # 経由しなくても起動直後からGUI保持値を使えるよう、最後に適用/読込した値を
@@ -5170,8 +5336,8 @@ class CommandGuiApp(QWidget):
         self._saved_gains[section] = data
         path = _resolve_gains_file_path()
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(self._saved_gains, f, ensure_ascii=False, indent=2)
+        text = json.dumps(self._saved_gains, ensure_ascii=False, indent=2) + '\n'
+        _write_config_file('gains.json', path, text)
 
     def _persist_traj_values(self, traj):
         names = self._traj_joint_names
@@ -5223,6 +5389,19 @@ class CommandGuiApp(QWidget):
         if 'robomas_kick_vel_threshold_mps' in robomas:
             set_float(self.robomas_kick_vel_threshold_mps_edit, robomas['robomas_kick_vel_threshold_mps'])
 
+        # 速度モードゲイン(robomas_vel_gain節)は、以前は起動時の復元対象から漏れて
+        # おり、GUI表示がノードの「読込」応答(起動直後はノード既定値)頼みだった。
+        # Z上昇バイアス追加(2026-09-12)に合わせて他の節と同様に復元する
+        # (_apply_loaded_robomas_vel_gainsと同じ対応表)。
+        robomas_vel = self._saved_gains.get('robomas_vel_gain', {})
+        for name, edit in (('robomas_vel_kp', self.robomas_vel_kp_edit),
+                           ('robomas_vel_ki', self.robomas_vel_ki_edit),
+                           ('robomas_vel_kd', self.robomas_vel_kd_edit),
+                           ('robomas_vel_max_current_a', self.robomas_vel_max_current_a_edit),
+                           ('robomas_z_up_velocity_bias_mps', self.robomas_z_up_velocity_bias_mps_edit)):
+            if name in robomas_vel:
+                set_float(edit, robomas_vel[name])
+
         joy = self._saved_gains.get('joy_speed', {})
         for name, edit in self.joy_speed_edits.items():
             if name in joy:
@@ -5233,6 +5412,27 @@ class CommandGuiApp(QWidget):
             if name in sequence:
                 set_float(edit, sequence[name])
 
+        hand_servo = self._saved_gains.get('hand_servo_speed', {})
+        for name, edit in self.hand_servo_speed_edits.items():
+            if name in hand_servo:
+                set_float(edit, hand_servo[name])
+
+        # 機体原点オフセット(2026-09-11追加): 編集欄へ復元するだけでなく、逆運動学用の
+        # 適用値(self._machine_origin)にも即座に反映し、RVizへも送る(送信は
+        # joint_state_publisherがまだ起動していなければ届かないため、
+        # _refresh_machine_statusから1秒周期で送り直す)。
+        origin = self._saved_gains.get('machine_origin', {})
+        if origin:
+            values = []
+            for name in MACHINE_ORIGIN_JOINT_NAMES:
+                v = clamp(float(origin.get(name, 0.0)), -MACHINE_ORIGIN_OFFSET_LIMIT, MACHINE_ORIGIN_OFFSET_LIMIT)
+                set_float(self.machine_origin_edits[name], round(v, 4))
+                values.append(v)
+            self._machine_origin = tuple(values)
+            self.node.send_machine_origin(*values)
+            _set_status(self.machine_origin_status_label,
+                        f'保存値を復元しました (x={values[0]:.3f}, y={values[1]:.3f}, z={values[2]:.3f})', 'info')
+
     def _check_existing_launch_nodes(self):
         """GUI起動時に、自分が把握していない(self._launch_process=Noneのままの)
         実機ノード群が既に動いていないか確認する(ALL_AXES_LAUNCH_NODE_NAMES定義部の
@@ -5241,18 +5441,24 @@ class CommandGuiApp(QWidget):
         start_new_session=Trueで独立させたlaunchプロセスは生き残り続けるが、
         self._launch_processはこのGUIプロセスのメモリ上の変数でしかないため
         新しいGUIプロセスからはその存在が見えず、「停止」ボタンでも管理できない。
-        気づかず放置される事故を防ぐため、起動時に一度だけ警告する。"""
+        気づかず放置される事故を防ぐため、起動時に一度だけ警告する。
+
+        何も動いていなければ、2026-09-09追加分として自動で全ノードを起動する
+        (ユーザー指定:「全ノード起動ボタンは廃止し、起動すると全ノード起動」)。
+        ソフト緊急停止の自動投入は_try_auto_setup_gains/_auto_engage_estop側で、
+        trajectory_follower_nodeが使えるようになり次第リトライしながら行う。"""
         try:
             running = set(self.node.get_node_names()) & ALL_AXES_LAUNCH_NODE_NAMES
         except Exception:
             return
         if not running:
+            self._on_launch_all_nodes()
             return
         QMessageBox.warning(
             self, '起動中の実機ノードを検知',
             'このGUIが起動していないはずの実機ノードが既に動作中です:\n'
             '  ' + ', '.join(sorted(running)) + '\n\n'
-            'おそらく前回のGUIセッションで「全ノード起動」したプロセスが、\n'
+            'おそらく前回のGUIセッションで自動起動したプロセスが、\n'
             'GUI終了時に停止されずそのまま生き残っています\n'
             '(self._launch_processはGUIプロセスごとに独立した変数のため、\n'
             'このGUIの「停止」ボタンでは止められません)。\n\n'

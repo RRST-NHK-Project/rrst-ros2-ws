@@ -115,6 +115,42 @@ tip_theta_offset_radパラメータは残しているが、通常は0のまま�
 z_joint/r_jointは元々毎起動homing_nodeが/zero_channelを呼ぶ設計なので、
 こちらはros2can側オフセットが非永続でも問題ない(むしろ意図通り)。
 
+## tip_theta_jointの可動域を±135deg(合計270deg)に制限 (2026-09-10、ユーザー指定:
+## 「270度以上回らないようにしたい。つまり電源投入時の位置から左右に135度」)
+tip_thetaは2026-09-08にCubeMars AK40-10からRoboMas M2006(M3)へ移行した際、
+CubeMars時代のMITプロトコル制約(±511.6°相当、下記「MITモードの都合上そもそも
+continuousではない」節参照)が無くなり一旦「無制限」になっていた。実機側の配線・
+エア配管の巻き込み防止のため、機構制約として改めて±135deg(合計270deg)へ制限する。
+
+基準は「電源投入時の位置」。tip_thetaは原点センサを持たず、電源投入前に機構原点へ
+手で合わせておき、M2006内蔵ロータエンコーダの起動時リセット値(=0)をそのまま原点
+として使う設計(上記「root_theta/tip_thetaの原点初期化」節参照)なので、
+「アクチュエータ角0 = 電源投入時の位置」であり、アクチュエータ角を
+±135deg×減速比1.4 = ±189deg で切ることが、そのまま指定どおりの制限になる。
+
+実装(4箇所。値を変える場合は全て揃えること):
+  soki_sim/scripts/trajectory_follower_node.py TIP_THETA_LIMIT_RAD
+    - target_callback(_clamp_joint_target): joint空間で目標をクランプ。
+      台形プロファイル自体が範囲外を狙わないようにするため
+    - _publish_robomas_commands: アクチュエータ空間(±189deg)でクランプ。
+      実機へ出る最後の砦で、帰還同期によるpos_上書き・外部ノードからの
+      直接publish等、target_callbackを通らない経路も必ずここで止まる。
+      クランプ中は速度FF(mit_velocity_ff)も0にしてkd項が境界の外へ
+      押し続けないようにしている。到達/復帰時にエッジでログを出す
+  soki_sim/scripts/joy_teleop_node.py TIP_THETA_LOWER/UPPER
+    - 手先θ追従ON時(-root_theta)と、L1/R1手動ジョグの積算値の両方をクランプ
+  soki_sim/scripts/command_gui_node.py TIP_THETA_LOWER/UPPER
+    - send_target()のtip_theta(回収シーケンスの追従値・投入シーケンスの
+      shoot_tip_theta_rad(2026-09-12に廃止、下記「投入シーケンスの手先θは
+      追従値∓90deg」節参照))をクランプ
+  soki_sim/urdf/soki_sim.urdf.xacro tip_theta_limit
+    - tip_theta_jointをcontinuous -> revolute(±135deg)へ変更。simと実機で
+      到達可能範囲を揃えるため
+
+既知の副作用: root_thetaの可動域(±153.4deg)の方が広いため、手先θ追従ONで
+root_thetaを端まで回すと追従先(-root_theta)が±135degで頭打ちになり、
+ハンドのワーク行との平行が保てなくなる(機構制約上避けられない)。
+
 ## root_theta/tip_thetaはMITモードの都合上そもそも「continuous」ではない
 ## (2026-08-27、AK Seriesマニュアル確認により判明。対応方針決定済み)
 claude.txt/soki_sim.urdf.xacroではroot_theta_joint(旋回)/tip_theta_joint
@@ -552,3 +588,323 @@ ROBOMAS_MAX_CURRENT_VEL_Aを参照するよう変更した。これによりhomi
 firmware/xiao-esp32-s3_can2io/・generated_firmware/soki_robomas_21/・
 soki_robomas_21_safe/の3箇所とも同期済み(config.hpp/robomas.cpp、デバイス
 固有設定(DEVICE_ID/MODE_ROBOMAS/ENC1_MD等)は各ディレクトリの値を保持)。
+
+## M2006内蔵エンコーダの「起動時角度=0」前提が成立していなかった
+## (2026-09-10、ユーザー報告「soki_simの手先θが起動時原点にいるのに勝手に回る。
+## 少しずつ回って停止する」)
+**症状**: 電源投入前に手先θ(tip_theta_joint)を機構原点へ手で合わせてあるのに、
+起動直後に実機が勝手に少しだけ回って止まる。回る量は毎起動ばらつく。
+
+**原因**: 上記「root_theta/tip_thetaの原点初期化」節でtip_thetaが前提にしている
+「M2006内蔵ロータエンコーダの起動時リセット値(=0)をそのまま原点として扱う」が、
+ファームウェア側で成立していなかった。robomas.cppのreceiveFeedback()は
+
+  total_encoder[m] = rotation_count[m] * ENCODER_MAX + encoder_count[m];
+
+としており、初回フレーム(was_stale)でrotation_count=0にはしていたものの、
+encoder_count(C610の帰還が持つ1回転内の絶対値、0-8191)がそのまま基準に残って
+いた。このためangle[]の起点は0ではなく、電源投入時のロータ位相次第で
+0-(360/ギア比)deg = M2006なら出力軸0-10degのランダム値になる。
+tip_theta_jointへ換算すると /tip_theta_reduction(1.4) で0-7.1deg。
+これがそのまま「勝手に回る量」になっていた:
+
+  1. trajectory_follower_node._on_robomas_feedback()が最初の帰還で
+     pos_/target_[tip_theta_joint]を+Δ(上記オフセット)へ同期する
+  2. joy_teleop_nodeの手先θ追従(既定ON)はデッドマン非押下でも毎周期
+     tip_theta = -root_theta をpublishし続ける。root_thetaが原点なら目標は0
+  3. 台形プロファイルが +Δ -> 0 を走り、実機がΔぶんゆっくり回って止まる
+
+帰還とjoy目標のどちらが先に届くかのレースで、joy目標(0)が先だとpos_は0のまま
+has_target_=Trueになり、firmware側MITが kp*(0-Δ) をステップ入力として一気に
+詰める。同一原因で「勢いよく回る」側にもなるため、以前のユーザー報告
+「同じゲインでもモーターが勢いよく回るときとピクピクと少しずつ回るときがある」の
+両方の見え方がこれ1つで説明できる。
+
+**対策(実装済み、robomas.cpp)**: モータごとにencoder_origin[]を持ち、初回フレーム
+および途絶からの復帰フレーム(was_stale、上の「ロボマスCAN帰還の途絶検出」節)で
+そのときのencoder_countを書き込み、total_encoderから差し引く。これでangle[]は
+起動時にちょうど0から始まり、note記載の設計前提どおりになる。
+z/rは毎起動homing_nodeで再ホーミングする設計なので基準の取り方が変わっても影響
+しない(ホーミングが吸収する)。
+firmware/xiao-esp32-s3_can2io/・generated_firmware/soki_robomas_21_safe/の2箇所を
+同期済み(pio runでビルド確認済み)。**要実機確認**: 書き込み後、起動直後に手先θが
+動かなくなるか。
+
+**残る既知の挙動**: ESC(C610)側だけ電源off/onするとwas_stale経由でencoder_origin
+が引き直されるため、tip_thetaの原点はその瞬間の物理位置へ移る(以前はランダム値へ
+飛んでいたので改善ではあるが、原点は手動で合わせ直す必要がある)。またその際
+ホスト側のpos_/target_はそのままなので、ROBOMAS_RESYNC_HOLD_MS(200ms)の
+電流0固定が明けた後に目標へ向かって動く。tip_thetaはESC電源を落としたら
+ROSノード側も再起動する運用が前提。
+
+## 手先θが起動直後に135degへ向かう (2026-09-10、ユーザー報告「起動直後に135度に
+## 向かっている。可動域を左右135度ずつと言った時があったがそれが影響している?」)
+**回答**: ±135degの可動域制限(TIP_THETA_LIMIT)自体は原因ではない。制限は
+「すでに間違っている目標値」を頭打ちにしているだけで、135という具体的な数字が
+出るのはそのため。真因はjoy_teleop_nodeの手先θ追従(既定ON)。
+
+**原因**: joy_teleop_node._timer_callbackの手先θ追従分岐は、
+enabled(デッドマン押下)も has_current_state_(root_thetaの実値受信済みか)も
+見ずに、joyメッセージが1つでも届いていれば50Hzで
+tip_theta = clamp(-root_theta, ±135deg) をpublishし続けていた。このため
+
+  1. 起動直後、mixed_joint_statesがまだ届いていない間は
+     target_theta_ = INITIAL_ROOT_THETA_RAD(-90deg)なので tip_theta=+90deg を
+     指令する(デッドマンに触れていなくても出る)
+  2. mixed_joint_statesが届くと target_theta_ = 実機のroot_theta になり、
+     tip_theta = -root_theta へ向かう。root_thetaが±135degより外にいれば
+     TIP_THETA_LOWER/UPPERで頭打ちになり、ちょうど135degへ向かう
+
+**対策(実装済み、joy_teleop_node.py)**: 追従分岐に enabled and
+has_current_state_ の条件を付け、どちらかが偽の間は現在値
+(_current_tip_theta_)へ同期するだけにした。root_theta/z/rの各軸と同じ扱いに
+なり、デッドマンに触れていない起動直後は手先θへ一切指令が出なくなる。
+
+**別途の要確認事項**: 上記2の「root_thetaが±135degより外にいる」が実際に
+起きているなら、それ自体がroot_theta側の原点較正の問題である可能性が高い。
+2026-09-08にtip_theta側のAK40-10をroot_thetaへ転用しているが、転用後に
+/set_root_theta_originでの再較正を実施したかどうかがnote上で未記録
+(「root_theta/tip_thetaの原点初期化」節の較正手順は組み立て後1回だけ実施する
+前提。アクチュエータを載せ替えたら当然やり直しが必要)。起動直後に
+  ros2 topic echo /mixed_joint_states --once
+でroot_theta_jointの値を確認し、機構が原点にいるのに0付近でなければ再較正する。
+
+## 上記対策のデグレ: 手先θが一切追従しなくなった (2026-09-10、同日のユーザー報告
+## 「今度は手先θが一切追従しなくなった。初期同じ角度を保持し続けている」)
+**原因1(直接の原因)**: 上記対策で追従条件に付けた has_current_state_ が、実機構成
+では永遠にTrueにならなかった。joy_teleop_node._on_mixed_joint_stateは
+root_theta/z/rの3つが同じメッセージに揃っている前提で msg.name.index() を並べ、
+1つでも欠けるとValueErrorで何も更新せずreturnする作りだった。ところが
+real_joint_bridge_nodeは実機帰還をCubeMars群(name=[root_theta_joint])と
+ROBOMAS群(name=[z_joint, r_joint, tip_theta_joint])の**別メッセージ**でpublishする
+ため、どちらのメッセージも3つ揃わない。3つ揃うのは実機帰還前のフォールバック
+(理想軌道の全関節メッセージ、_on_fallback)だけだが、それも
+trajectory_follower_node.timer_callbackが冒頭で has_target_ を待つため、最初の
+/joint_targets を受け取るまでpublishされない。そしてその最初の/joint_targetsは
+まさに手先θ追従が送っていたもので、循環依存になっていた。
+
+**原因2(以前から潜在していたバグ)**: 同じ早期returnにより、ROBOMAS群の
+メッセージ(z/r/tip_theta)が丸ごと捨てられていた。つまり
+_current_z_/_current_r_/_current_tip_theta_ と has_tip_theta_state_ は、実機帰還に
+一度も追従していなかった(フォールバックが流れていた起動直後の値のまま)。
+
+**対策(実装済み、joy_teleop_node.py)**:
+  - _on_mixed_joint_stateを関節ごとの独立取り込みに書き換え(欠けている関節は
+    スキップするだけで、含まれている関節は必ず更新する)。関節ごとの受信フラグ
+    _has_root_theta_state_/_has_z_state_/_has_r_state_ を持ち、has_current_state_は
+    「3つとも一度は受け取った」の意味で維持する
+  - 追従の条件を has_current_state_ から _has_root_theta_state_ へ変更。追従に
+    必要なのはroot_thetaの実値だけで、z/rの受信を待つ理由が無い
+  - デッドマン(enabled)は追従の条件に入れない。追従は「root_thetaがどこを向いて
+    いてもハンドをワークの行と平行に保つ」常時機能で、スティックを離している間も
+    維持する必要がある(このデグレの元になった条件なので、再度付けないこと)
+
+**L1/R1の手動ジョグについて(同日質問「L1、R1での手先θ操作もあったはずだが
+どうなっている?」)**: 仕様どおり残っているが、手先θ追従がON(既定ON)の間は
+無視される(_timer_callbackの分岐が estop > 追従 > L1/R1ジョグ の順で、追従ONなら
+そこで確定するため)。L1/R1で手動ジョグしたい場合はOPTIONSボタンで追従をOFFに
+する。今回のデグレ中は「追従ONなので L1/R1 は無視、しかし追従自体も
+has_current_state_ で止まっている」という状態だったため、手先θがjoyから一切
+動かせなくなっていた。
+
+## 追従をOFFにしても手先θが止まらない (2026-09-10、ユーザー報告「OPTION押しても
+## 追従し続ける」。OPTIONSのindexは9で正しいことを実機側コードで確認済み)
+**原因**: joy_teleop_node._timer_callbackの手先θ分岐は、「追従OFF・L1/R1も
+押していない」状態ではどこにもpublishしない(現在値へ変数を同期するだけ)。
+そのためtrajectory_follower_node側のtarget_[tip_theta_joint]は追従ONだった頃の
+最後の目標のまま残り、OFFにしても手先θはその目標へ向かって動き続ける。
+tip_theta_jointのmax_velocityは既定0.1rad/s(gains.json)と遅く、135degぶんの
+移動に20秒以上かかるため、「OPTIONSが効いていない/追従し続けている」ようにしか
+見えなかった。
+
+**対策(実装済み、joy_teleop_node.py)**: OPTIONSで追従をONからOFFへ落とした
+瞬間に_tip_theta_follow_just_released_を立て、次の周期で現在値を目標として
+1回だけpublishしてその場で停止させる。毎周期publishはしないこと(追従OFF中も
+50Hzで送り続けると、GUIの自動シーケンス(20Hz)が同じ関節へ送る目標を数で
+押し負けさせる。「R軸の自動格納が機能しない」と同じ競合パターン)。
+GUI経由のOFF(_on_set_tip_theta_follow_srv)ではこのフラグを立てない: あちらは
+投入シーケンスが投入時の手先θ目標(_shoot_tip_theta、2026-09-12までは固定値
+shoot_tip_theta_rad)を送る直前に呼ぶもので、停止目標を割り込ませるとGUIの目標と
+競合するため。
+
+## 手先θの速度・ゲインはGUIから調整可能 (2026-09-10、ユーザー質問への回答)
+追加実装は不要。既に以下の3パネルで編集・適用・gains.jsonへの保存ができる:
+  軌道生成パラメータパネル : tip_theta_jointのmax_velocity/max_acceleration/
+                             max_deceleration (TRAJ_PANEL_JOINT_NAMES)
+  RoboMasゲインパネル      : robomas_tip_theta_kp[A/deg]/kd[A/rpm]/current_ff[A]
+  joy速度パネル            : tip_theta_speed[rad/s] (L1/R1ジョグ速度)
+firmware側の速度PID(robomas_vel_kp/ki/kd/max_current)はz/r専用で、tip_thetaは
+常にMIT位置制御のため効かない。
+
+## 手動ジョグの速度がタイミングによって変わる (2026-09-10、ユーザー報告「手先θの
+## 速度のレンジが全然ちがうときがある。手動操作で」。切り分け: 進行方向によらず
+## タイミングで変わる、ボタンを離せば止まる)
+**原因**: joy_teleop_node._timer_callbackのジョグ積分が、経過時間としてタイマー
+周期の**公称値**(self.dt_ = 1/update_rate_hz)を使っていた。ROS2のタイマーはCPU
+負荷で遅れるため、実際には50Hzで回っていなくても「50Hzで回った前提」で目標を
+進めることになり、遅れたぶんだけ目標の進みが実時間に対して遅くなる。同じボタンを
+同じ時間押しても、そのときの負荷次第で移動量・体感速度が変わる。
+2026-09-10にros2canを--noguiからGUIありへ戻したぶんCPU負荷が増えており
+(rviz + command_gui_node + ros2can GUIの同時起動)、症状が出やすくなっていた。
+
+**対策(実装済み、joy_teleop_node.py)**:
+  - ジョグ積分をtime.monotonic()の差分(実測経過時間)で行う。root_theta/z/r/
+    tip_thetaの4軸すべて。異常に長いギャップ(取りこぼし・一時停止)で目標が
+    飛ばないよう、公称周期の5倍で頭打ちにする
+  - _check_timer_slipを追加。実測dtが公称の2倍を超えた回数と最悪値を5秒ごとに
+    まとめて1行警告する(毎周期出すとログが流れるため間引く)。積分は補正済み
+    なので目標の進みは狂わないが、操作の応答自体は粗くなるので、負荷を減らすか
+    update_rateを下げる判断材料にする
+
+**参考: 手先θの速度が変わる「仕様上の」要因**(上記とは別。混同しないこと):
+  追従ON(既定)     : L1/R1は無視され、-root_thetaとしてtheta_speed(1.0rad/s)で動く
+  追従OFF + L1/R1  : tip_theta_speed(1.0rad/s)
+  低速モードON     : 上記すべてlow_speed_multiplier(0.3)倍 = 3.3倍差
+  低速モード(SHARE)・追従(OPTIONS)はどちらもトグル時にINFOログを出すので、
+  速度が違うと感じたらまずログでどちらの状態にいるかを確認する。
+
+## 手先θ追従の回転方向が逆だった (2026-09-10、ユーザー報告「手先追従時はモーターの
+## 回転が逆、手動操作時のコントローラーとの対応づけはあっている」)
+**切り分け**: 手動ジョグ(L1/R1)は正しい向きに動いており、invert_tip_thetaは
+どのlaunch/configでも設定されていない(sign_tip_theta_=+1.0のまま)。つまり
+tip_theta_jointの関節角の向きの定義自体は合っていて、**追従の関係式だけが逆**
+だった。real_joint_bridge.yamlのtip_theta_signやfirmware側は触る必要が無い
+(触ると手動操作まで逆になる)。
+
+**原因**: 追従式 tip_theta = -root_theta の符号が、2026-09-08のtip_theta駆動系
+変更(CubeMars AK40-10の直接駆動 -> RoboMas M2006 + タイミングベルト20T/28T)に
+追随していなかった。モータが機構のどちら側に付くかが変わり、root_thetaの回転に
+対して手先が回る向きが反転したが、-1.0はCubeMars時代(2026-09-03、回収シーケンス
+実装時)の値をそのまま流用していた。
+
+**対策(実装済み)**: TIP_THETA_FOLLOW_SIGNという名前付き定数を新設して+1.0とし、
+追従式を tip_theta_joint = TIP_THETA_FOLLOW_SIGN * root_theta_joint に統一した。
+追従式は2箇所にあり、**必ず両方を同じ値に揃えること**(片方だけ直すと手動運転中の
+追従と回収シーケンスで向きが食い違う):
+  soki_sim/scripts/joy_teleop_node.py   TIP_THETA_FOLLOW_SIGN
+    - _timer_callbackの手先θ追従分岐(OPTIONSトグルON時、既定ON)
+  soki_sim/scripts/command_gui_node.py  TIP_THETA_FOLLOW_SIGN
+    - _start_pick_sequenceのtip_theta_pick(回収シーケンス)
+関連する説明コメントの「-root_theta」表記も全てTIP_THETA_FOLLOW_SIGN*root_theta
+へ更新済み。
+
+**要実機確認**: 追従ONでroot_thetaを回したとき、吸着パッド3個の展開軸がワークの行
+(ワールドX軸)と平行に保たれるか。回収シーケンス(workボタン/×ボタン)でも同様に
+平行になるか。sim(rviz)と実機で向きが一致しているかも併せて確認すること。
+
+## 投入シーケンスの手先θは追従値∓90deg (2026-09-12、ユーザー指定「手先θのシュート時の
+## 角度は手先追従+90度。左右のシューティングボックスで90度回す向きが異なる」
+## 「現在実装している手先追従のパッドを結んだ直線と直交する向きの直線と平行になる
+## ように追従させたい。これはシューティング時のみ」)
+それまで投入シーケンス(L4へ移動/R4へ移動)は手先θを固定値shoot_tip_theta_rad
+(暫定0、「Rと垂直」のつもり)へ送っていたが、シュート時も追従はしつつ基準線を
+90deg変える方式に変更した。
+  回収時  : tip_follow = TIP_THETA_FOLLOW_SIGN * root_theta
+            (パッド展開軸 ∥ ワールドX = ワークの行)
+  シュート時: tip_shoot = tip_follow - copysign(90deg, tip_follow) + トリム
+            (パッド展開軸 ∥ ワールドY = 回収時の追従直線と直交する向き)
+root_thetaはトリム前の幾何角(atan2(-x, y))を使う(回収シーケンスと同じ理由:
+root_theta_trim_ak_degはエンコーダ原点ずれの補正なので、アームが物理的に向く
+角度はトリム前のθ)。
+
+**「左右で90度回す向きが異なる」の正体**: パッド3個は一直線なので幾何学的には
++90degでも-90degでも同じ向きになるが、手先θには物理ストッパ(電源投入位置から
+±135deg、上記節参照)がある。L4はroot_theta≈+99deg(atan2(0.525, -0.08))、R4は
+≈-99degなので、
+  L4: +99 - 90 = +9deg  (+90だと+189degでストッパ範囲外)
+  R4: -99 + 90 = -9deg  (-90だと-189degでストッパ範囲外)
+「追従値から0側へ90deg戻す」の1式で左右とも自動的に正しい向きになる。
+L4/R4ごとに符号を持つ必要は無い。
+2026-09-13からシューティング位置はGUIで選択式(既定L2/R2=フィールド側から
+3番目、root_theta≈±126deg → 手先θ≈±36deg)。L1/R1(≈±135deg → ≈±45deg)まで
+どの箱でもストッパ範囲内、かつjoy側のエリア判別(|θ|≥85deg)にも入る。
+
+**設定値の置き換え**: gains.json sequence.shoot_tip_theta_rad(固定目標[rad])を
+廃止し、sequence.shoot_tip_theta_trim_deg(上式に足す微調整[関節deg]、既定0、
+SHOOT_TIP_THETA_TRIM_DEG_LIMIT=±45degでクランプ)に置き換えた。キー名を変えたのは、
+gains.jsonに残った旧キーの値(実機調整中に55.0=rad単位のまま「55度」のつもりで
+入力されたと思われる値があった)をトリム[deg]として誤読しないため。旧キーは
+sequence_editsに無いので読み込み時に単に無視される。GUIラベルは
+「投入時手先θトリム[deg]」。
+
+実装: soki_sim/scripts/command_gui_node.py
+  _shoot_tip_theta(theta)         上式+トリム(クランプ込み)
+  _start_shoot_sequence           tip_theta_shoot = self._shoot_tip_theta(幾何θ)
+  DEFAULT_SEQUENCE_SETTINGS       'shoot_tip_theta_trim_deg'
+  SHOOT_TIP_THETA_TRIM_DEG_LIMIT  トリム上限
+
+**要実機確認**: L4/R4へ移動したとき手先θが≈±9deg(ほぼ電源投入位置)で止まり、
+パッド展開軸がフィールド前方(Y)と平行になるか。ずれていればトリム[deg]で微調整。
+joy側の手先θ追従(OPTIONS)のシーケンス開始時自動OFFは、同日中に
+follow_auto_off_checkbox(既定OFF)へ変更した(下記「投入シーケンス開始時の
+手先θ追従自動OFFを既定OFFに」節参照)。
+
+## 手先θ追従(OPTIONS)のワーク/シューティングエリア自動判別 (2026-09-12、ユーザー指定
+## 「根本θの角度からワークエリアなのかシューティングエリアなのか判断して追従モードを
+## 自動切り替え。OPTIONを押すたびに手動操作か手先追従か切り替え、追従モードは
+## 根本θから判断」)
+OPTIONSボタンの役割は従来どおり「手動ジョグ(右スティック左右) ⇔ 手先θ追従」の
+トグルのまま。追従ONの間の追従先だけを、root_thetaの向きで自動的に切り替える:
+  |root_theta| が小さい(ワークエリア)      : tip = TIP_THETA_FOLLOW_SIGN*root_theta
+  |root_theta| が大きい(シューティングエリア): tip = 上の値 - copysign(90deg, 上の値)
+                                           (上記「投入シーケンスの手先θは追従値∓90deg」
+                                           節と同じ式)
+しきい値はフィールド座標から決めた: ワークは最大でも|θ|≈62deg(1行目の外側の列)、
+シューティングボックスは最小でも|θ|≈99deg(L4/R4。L1/R1は≈135deg)。中間の80degを
+境に±5degのヒステリシス(85degで入り、75degで戻る)を持たせ、境界付近でroot_thetaが
+揺れても手先θが90deg往復し続けないようにした。**フィールド寸法を変えたら
+しきい値も見直すこと。**
+
+エリア切替の瞬間は追従目標が90deg飛ぶが、既存の_limit_tip_theta_lead(実角度
+±15degで頭打ち)がそのまま効くので、実機は連続的に回る(max_velocityで律速)。
+切替時はINFOログを出す。
+
+実装: soki_sim/scripts/joy_teleop_node.py
+  TIP_THETA_SHOOT_AREA_ENTER_RAD / EXIT_RAD  しきい値(85deg / 75deg)
+  _tip_theta_follow_shoot_area_              現在のエリア判定(ヒステリシス用状態)
+  _tip_theta_follow_target(theta)            追従先の計算(判定込み)
+  _timer_callback 追従分岐                   上を呼ぶよう変更
+
+GUIの投入シーケンス開始時に追従を自動OFFする動作は、同日中にチェックボックス
+(follow_auto_off_checkbox、既定OFF)化した(下記節参照)。既定では追従ONのまま
+投入シーケンスが走り、joy(50Hz)の追従先とGUI(20Hz)のtip_theta目標が並走するが、
+どちらもシューティングエリアでは同じ式なので最終的に同じ角度へ収束する。
+
+**要実機確認**: 手動でroot_thetaを回して85deg/75degをまたいだとき、手先θが90deg
+分だけ滑らかに回り、往復振動しないこと。L4/R4付近で手先θ≈±9deg付近に落ち着くこと。
+
+## 自動シーケンスのハンド姿勢操作(ピッチ・パッド収納/展開)を既定OFFに (2026-09-12、
+## ユーザー指定「自動シーケンスでピッチと収納が作動するのを無効化。有効化も
+## チェックボックスで選べるように」)
+GUIの「投入エリアへ移動」パネルにチェックボックス「ハンド姿勢を自動で切り替える」
+(hand_pose_auto_checkbox)を追加、既定OFF。R軸自動格納のチェックボックスと同じく
+gains.jsonには保存しない(起動時は常にOFF)。
+  ON のとき: 回収シーケンス冒頭の /hand_set_pitch_hold・/hand_spread_pads、
+            投入シーケンス冒頭の /hand_gather_pads・gather_settle_sec待ち・
+            /hand_set_pitch_insert を従来どおり自動で行う
+  OFFのとき: 上記ステップを全て飛ばす。ハンド姿勢はGUIのハンド操作パネル/
+            PSコン(L3・R3)で人が操作する。回収シーケンスのポンプONは姿勢操作では
+            ないので従来どおり自動(ステップは残る)
+2026-09-04の「投入シーケンス自身がピッチ投入姿勢を保証する」動作はOFFの間は
+効かないので、シュート前のピッチ切替は人が忘れずに行うこと。
+実装: soki_sim/scripts/command_gui_node.py hand_pose_auto_checkbox、
+_start_pick_sequence / _start_shoot_sequence のsteps組み立て。
+
+## 投入シーケンス開始時の手先θ追従自動OFFを既定OFFに (2026-09-12、ユーザー指定
+## 「自動シーケンスで手先追従を自動オフする設定もデフォルトをオフに」)
+2026-09-03以降、投入シーケンス(L4/R4へ移動)開始時にGUIがjoy_teleop_nodeの
+set_tip_theta_follow_thetaサービスでOPTIONS追従を自動OFFしていた(当時は投入時の
+手先θが固定値で、追従の毎周期上書きと競合したため)。「投入エリアへ移動」パネルに
+チェックボックス「投入シーケンス開始時に手先θ追従(OPTIONS)を自動でOFFにする」
+(follow_auto_off_checkbox)を追加し既定OFF。他のチェックボックス同様gains.jsonには
+保存しない。
+  OFF(既定): 追従状態に触らない。シュート後もOPTIONSを押し直さず追従が続く。
+            旋回中はjoy側(50Hz、エリア判定は85degをまたいだ時点で切替)とGUI側
+            (20Hz、最初から∓90deg)の目標が並走するが、trajectory_follower側の
+            目標はどちらも同じ最終角度に落ち着く(joy側が数で勝つので、旋回中の
+            手先θの動き方はjoy側の判定タイミングに従う)。
+  ON      : 従来どおりシーケンス開始時に追従OFF。旋回中の並走を完全に避けたい
+            場合用。
+実装: soki_sim/scripts/command_gui_node.py follow_auto_off_checkbox、
+_start_shoot_sequence冒頭のset_joy_tip_theta_follow(False)呼び出しを条件付きに。
+joy_teleop_node側のサービス自体は残している。

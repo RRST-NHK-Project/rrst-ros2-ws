@@ -4,7 +4,7 @@ from typing import List
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
-from launch.conditions import IfCondition
+from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import Command, LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
@@ -26,7 +26,8 @@ def generate_launch_description():
     display.launch.py・real_root_theta_test.launch.pyと同時起動しないこと
     (いずれもtrajectory_follower_nodeを起動するため二重起動になり衝突する)。
 
-    起動するもの: ros2can GUI, real_joint_bridge_node(帰還確認),
+    起動するもの: ros2can(既定はPyQt5ウィンドウあり。ros2can_nogui引数参照)、
+    real_joint_bridge_node(帰還確認),
     trajectory_follower_node(root_theta+z/r実機出力あり), homing_node
     (z/rの起動時ホーミング。自動開始はしない、start_homing_z/start_homing_r
     serviceで軸ごとに明示的に起動すること)、command_gui_node。
@@ -142,6 +143,12 @@ def generate_launch_description():
     use_viz_arg = DeclareLaunchArgument(
         'use_viz', default_value='false',
         description='trueならrobot_state_publisher/joint_state_publisher/rviz2も起動する')
+    ros2can_nogui_arg = DeclareLaunchArgument(
+        'ros2can_nogui', default_value='false',
+        description='trueならros2canを--nogui(ターミナルダッシュボード、PyQt5ウィンドウ'
+                    'なし)で起動する。ros2can自体は常に起動する。デフォルトfalse'
+                    '(=PyQt5ウィンドウあり。real_all_axes_test.launch.pyと同じ既定。'
+                    'ターミナルダッシュボードにしたい場合は ros2can_nogui:=true を指定する)')
 
     device_id = LaunchConfiguration('device_id')
     motor_index = LaunchConfiguration('motor_index')
@@ -167,11 +174,25 @@ def generate_launch_description():
     # use_joy:=trueならGUI/joy両方を受け付ける。falseならGUI専用のまま
     control_mode = PythonExpression(["'both' if '", use_joy, "' == 'true' else 'auto'"])
 
-    ros2can_node = Node(
+    # ros2canは常に起動する。--noguiの有無だけをros2can_noguiで切り替える
+    # (launch_ros.Nodeのargumentsは条件付きで一部だけ足すことができないため、
+    # 同名ノードをIfCondition/UnlessConditionで排他的に2つ用意する定番パターン。
+    # real_all_axes_test.launch.pyと同じ構成)。
+    ros2can_nogui = LaunchConfiguration('ros2can_nogui')
+    ros2can_gui_node = Node(
         package='ros2can',
         executable='ros2can',
         name='ros2can_gui',
         output='screen',
+        condition=UnlessCondition(ros2can_nogui),
+    )
+    ros2can_nogui_node = Node(
+        package='ros2can',
+        executable='ros2can',
+        name='ros2can_gui',
+        output='screen',
+        arguments=['--nogui'],
+        condition=IfCondition(ros2can_nogui),
     )
 
     real_joint_bridge_node = Node(
@@ -331,8 +352,10 @@ def generate_launch_description():
         r_max_deceleration_arg,
         use_joy_arg,
         use_viz_arg,
+        ros2can_nogui_arg,
         enable_button_arg,
-        ros2can_node,
+        ros2can_gui_node,
+        ros2can_nogui_node,
         real_joint_bridge_node,
         homing_node,
         trajectory_follower_node,

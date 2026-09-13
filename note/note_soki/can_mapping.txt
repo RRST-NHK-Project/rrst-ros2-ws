@@ -110,6 +110,17 @@ motor1/motor2の速度指令符号とz/r移動方向の対応(実機で低速か
 上記の原点センサ(下限側、homing_node用)とは別に、反対側(上限側)にもz軸・r軸
 それぞれ1個ずつセンサがある。trajectory_follower_nodeがこれらを直接監視し、
 トリガーされている方向への移動だけをロックする(反対方向への後退は許可)。
+
+2026-09-09追記・実機報告: R軸のリミットスイッチは中心付近に2箇所配置されており、
+R軸両端の板が外側から侵入することで反応する配線のため、上記の「トリガーされた
+方向をブロック」の対応がz軸とr軸で逆になる(r_lowerトリガー→増加方向をブロック、
+r_upperトリガー→減少方向をブロック。z軸は素直にupper=増加ブロック/lower=減少
+ブロックのまま)。trajectory_follower_node.py側は_limit_blocks/
+_BLOCK_DIRECTION_FOR_INCREASEで軸ごとに吸収済み。r_lower/r_upperどちらの
+device_id/local_indexがどちらの物理スイッチかという配線自体の対応関係は
+このロジック変更とは別問題(そちらが逆なら従来通りreal_joint_bridge.yaml側の
+local_index入れ替えで対処すること)。
+
 soki_sim/config/real_joint_bridge.yamlのtrajectory_follower_node:セクションに
 これらのパラメータ(*_device_id/*_node_index/*_local_index、device_id=0で無効)
 がある(既定は全て0=未配線)。command_gui_nodeの「z/r安全停止センサ配線設定」
