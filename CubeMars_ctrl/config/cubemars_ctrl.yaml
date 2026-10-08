@@ -1,0 +1,74 @@
+# CubeMars_ctrl のパラメータ。値を変えたら colcon build し直してから launch すること
+# (install/ 側にコピーされたものが読まれるため)。
+# device_id は 3 ノードとファーム(firmware/soki_cubemars/src/config.hpp の DEVICE_ID)で必ず揃える。
+
+cubemars_bridge_node:
+  ros__parameters:
+    # XIAO ESP32-S3はネイティブUSBなので通常 /dev/ttyACM0。ls /dev/ttyACM* で確認。
+    # launch引数 serial_port:=... で上書きできる。
+    serial_port: /dev/ttyACM0
+    device_id: 11
+    # 指令が来ていなくてもこの周期でESP32へ再送する(ESP32側の300msタイムアウト対策)
+    resend_period_sec: 0.05
+    # serial_tx_11 がこの秒数届かなければゼロ指令(その場停止)に切り替える
+    upstream_timeout_sec: 0.5
+
+cubemars_driver_node:
+  ros__parameters:
+    device_id: 11
+    # ファームの何番目のモータ枠か(0=M1)。CUBEMARS_MOTOR_COUNT=1なので0のまま。
+    motor_index: 0
+    joint_name: cubemars_joint
+    publish_rate_hz: 50.0
+
+    # 速度の単位換算: ERPM = 出力軸rpm * pole_pairs * gear_ratio
+    # AK40-10は減速比10:1。極対数14は販売店の仕様表の値でV3.0での裏付けが無いため、
+    # 初回の速度テストでログの「ERPM/出力rpm比」(実測)が 140 になるか確認すること。
+    pole_pairs: 14.0
+    gear_ratio: 10.0
+
+    # ---- 速度モード ----
+    # 出力軸rpmの上限。AK40-10の無負荷最高速は約435rpm(24V)。初回は小さく。
+    max_rpm: 60.0
+    # 加減速の上限[rpm/s]。120なら0->60rpmに0.5秒。
+    rpm_slew_per_sec: 120.0
+    # cmd_velocity がこの秒数来なければ停止する
+    velocity_cmd_timeout_sec: 0.5
+
+    # ---- 角度モード(MIT) ----
+    # 出力軸角度の許容範囲[deg]。MITモードの限界(±700deg)より内側にすること。
+    angle_min_deg: -360.0
+    angle_max_deg: 360.0
+    # 目標角度を動かす最大速度[deg/s]。△/×で90deg指令すると約1秒かけて動く。
+    max_angle_speed_dps: 90.0
+    # MITの剛性(Kp[N·m/rad])と減衰(Kd[N·m·s/rad])。
+    # チーム(cr26_soki/ros2can_practice.cpp)で実機動作済みの値。硬すぎ・振動する場合は下げる。
+    mit_kp: 3.6
+    mit_kd: 1.08
+    # この速度[rpm]以上で回っている間は角度モードに入らない
+    angle_entry_max_rpm: 10.0
+
+    # モータの帰還がこの秒数止まったら停止する
+    feedback_timeout_sec: 0.5
+    # 状態ログの表示間隔[s]
+    log_period_sec: 0.5
+
+ps4_teleop_node:
+  ros__parameters:
+    # ボタン番号はチームのsoki_sim/joy_teleop_nodeと同じ joy_node の割り当て。
+    # 違う場合は ros2 topic echo /joy で押したボタンの番号を確認して書き換える。
+    deadman_button: 5       # R1(押している間だけ有効)
+    mode_toggle_button: 3   # □ (速度 <-> 角度)
+    angle_plus_button: 2    # △ (+angle_step_deg)
+    angle_minus_button: 0   # × (-angle_step_deg)
+    angle_zero_button: 1    # ○ (0degへ)
+    stick_axis: 1           # 左スティック上下(上で+1.0)
+    invert_stick: false
+    deadzone: 0.1
+    # 最終的な上限は cubemars_driver_node の max_rpm で切られる
+    max_rpm: 60.0
+    angle_step_deg: 90.0
+    jog_speed_dps: 90.0
+    angle_limit_deg: 360.0
+    joy_timeout_sec: 0.5
+    publish_rate_hz: 50.0

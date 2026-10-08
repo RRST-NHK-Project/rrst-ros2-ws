@@ -8,10 +8,18 @@ VEL(速度)モード・POS_VEL(位置+速度)モードのドライバ。MITモ�
 Kp/Kd調整が必要で初回動作確認に不向きなため未実装(将来必要になれば
 cubemars.cppのsendMitCommand()と同じ考え方で追加できる)。
 
-CANプロトコル (標準11bit ID, 1Mbps):
-  Enable/Disable/原点設定 (ID = モータのCAN ID, DLC=8):
+CANプロトコル (標準11bit ID, 1Mbps)。2026-10-01、ユーザーが過去に実機で
+動作確認済みのArduinoリファレンス実装(Arduino Mega + MCP2515 + PS4USB)
+を一次情報として全面的に見直した:
+  Enable/Disable/ClearError/原点設定 (ID = モータのCAN IDそのまま, DLC=8):
     data = [0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF, cmd]
-    cmd: 0xFC=Enable, 0xFD=Disable, 0xFE=原点設定(SetZero)
+    cmd: 0xFC=Enable, 0xFD=Disable, 0xFB=ClearError, 0xFE=原点設定(SetZero)
+  モードレジスタ書き込み (ID = 0x7FF固定, DLC=8):
+    data = [motor_id下位8bit, motor_id上位3bit, 0x55, RID(=10/CMODE), value(int32 LE)]
+    value: 2=POS_VELモード, 3=VELモード(要検証)。
+    制御フレームを送る前に、このレジスタ書き込みでモータ側の受付モードを
+    切り替えておかないと、モータは制御フレームに一切反応しない
+    (今回最大の見落としだった箇所)。
   VELモード (ID = 0x200 + モータCAN ID, DLC=8):
     data[0:4] = 目標速度[rad/s] (float32 little-endian), data[4:8] = 0
   POS_VELモード (ID = 0x100 + モータCAN ID, DLC=8):
@@ -58,21 +66,74 @@ constexpr int16_t MODE_DISABLED = 0;
 constexpr int16_t MODE_VEL = 1;
 constexpr int16_t MODE_POS_VEL = 2;
 
-// Damiao制御コマンド (公式DM_CAN.pyのenable()/disable()/set_zero_position()と同一)
+// Damiao制御コマンド (公式DM_CAN.pyのenable()/disable()/set_zero_position()と同一)。
+// 2026-10-01、ユーザーが過去に実機で動作確認済みのArduinoリファレンス
+// 実装(Arduino Mega + MCP2515 + PS4USB)で確認: Enable/Disable/ClearError
+// の宛先CAN IDはmotor_can_idそのまま(オフセット無し)。以前「公式STM32
+// サンプル(DM3519一拖四)」を参考にmotor_can_id+モードオフセットへ変更
+// したが、DM3519は別系統の製品であり誤りだった。
 constexpr uint8_t CMD_ENABLE = 0xFC;
 constexpr uint8_t CMD_DISABLE = 0xFD;
+constexpr uint8_t CMD_CLEAR_ERROR = 0xFB;
+constexpr uint8_t CMD_SET_ZERO = 0xFE;
+
+// パラメータ書き込み(レジスタ)コマンド。固定CAN ID 0x7FFへ
+// {motor_id_lo, motor_id_hi, 0x55, RID, d0,d1,d2,d3} を送る。
+// RID_CMODE(=10)に制御モード値を書き込むことで、モータ側の受付モードを
+// 切り替える。この書き込みを行わずに制御フレームだけ送っても、モータは
+// 反応しない(今回のバグの本命)。
+constexpr uint8_t RID_CMODE = 10;
+constexpr int32_t CMODE_POS_VEL = 2;
+constexpr int32_t CMODE_VEL = 3; // TODO: 要実機確認(MIT=1,POS_VEL=2から類推。要検証)
 
 const uint16_t kMotorCanId[DAMIAO_MOTOR_COUNT] = {
     DAMIAO_MOTOR_ID_1,
 };
 
 bool g_enabled[DAMIAO_MOTOR_COUNT] = {false};
+// 現在Enable済みのモード(MODE_VEL/MODE_POS_VEL)。モードが変わったら
+// 一旦Disable+再初期化(モードレジスタ書き込み)してからEnableし直す。
+int16_t g_enabled_mode[DAMIAO_MOTOR_COUNT] = {MODE_DISABLED};
+
+void logTransmitFailure(const char *message);
+
+bool installTwaiDriver() {
+    twai_general_config_t g_config =
+        TWAI_GENERAL_CONFIG_DEFAULT((gpio_num_t)CAN_TX, (gpio_num_t)CAN_RX, TWAI_MODE_NORMAL);
+#if CAN_BITRATE_1MBPS
+    twai_timing_config_t t_config = TWAI_TIMING_CONFIG_1MBITS();
+#else
+    twai_timing_config_t t_config = TWAI_TIMING_CONFIG_500KBITS();
+#endif
+    twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
+
+    if (twai_driver_install(&g_config, &t_config, &f_config) != ESP_OK) {
+        return false;
+    }
+    if (twai_start() != ESP_OK) {
+        twai_driver_uninstall();
+        return false;
+    }
+    return true;
+}
 
 // CAN未接続/ESC無応答が続くとBus-Offへ遷移するが、TWAIドライバは自動復帰
 // しない。ros2canのcan_task.cpp/cubemars.cppと同じ対策。
+//
+// さらに、既知のESP-IDF TWAIドライバのバグ(espressif/esp-idf#19068)への
+// 対策も兼ねる: TXパイプラインがレースコンディションで永久にスタックする
+// ことがあり、この場合エラーカウンタは0のまま・bus-offにもならず、
+// twai_transmit()がESP_ERR_TIMEOUTを返し続けるだけになる(=タスク側の
+// エラーカウンタ監視だけでは検知できない)。msgs_to_txが一定時間変化
+// しない状態が続いたら、詰まっていると判断してドライバを再インストール
+// する。
 void recoverBusIfNeeded() {
     constexpr uint32_t CHECK_PERIOD_MS = 100;
+    constexpr uint32_t STUCK_THRESHOLD_MS = 300; // msgs_to_txが変化しないまま許容する時間
     static uint32_t last_check_ms = 0;
+    static uint32_t last_msgs_to_tx_change_ms = 0;
+    static uint32_t last_msgs_to_tx = 0;
+
     const uint32_t now_ms = millis();
     if (now_ms - last_check_ms < CHECK_PERIOD_MS) {
         return;
@@ -85,8 +146,27 @@ void recoverBusIfNeeded() {
     }
     if (status.state == TWAI_STATE_BUS_OFF) {
         twai_initiate_recovery();
-    } else if (status.state == TWAI_STATE_STOPPED) {
+        return;
+    }
+    if (status.state == TWAI_STATE_STOPPED) {
         twai_start();
+        return;
+    }
+
+    if (status.msgs_to_tx != last_msgs_to_tx) {
+        last_msgs_to_tx = status.msgs_to_tx;
+        last_msgs_to_tx_change_ms = now_ms;
+        return;
+    }
+    if (status.msgs_to_tx > 0 && (now_ms - last_msgs_to_tx_change_ms) > STUCK_THRESHOLD_MS) {
+        // 送信キューに滞留したまま進まない = TXパイプラインのスタック。
+        // ドライバを再インストールして復旧する(滞留していたフレームは失われる)。
+        logTransmitFailure("[ERR] damiao: TWAI TX stuck, reinstalling driver");
+        twai_stop();
+        twai_driver_uninstall();
+        installTwaiDriver();
+        last_msgs_to_tx = 0;
+        last_msgs_to_tx_change_ms = now_ms;
     }
 }
 
@@ -122,6 +202,15 @@ void sendControlCmd(uint16_t motor_can_id, uint8_t cmd) {
     sendStandard(motor_can_id, data, 8);
 }
 
+// レジスタ書き込みコマンド(固定ID 0x7FF)。
+void writeRegister(uint16_t motor_can_id, uint8_t rid, int32_t value) {
+    uint8_t can_id_l = motor_can_id & 0xFF;
+    uint8_t can_id_h = (motor_can_id >> 8) & 0x07;
+    uint8_t data[8] = {can_id_l, can_id_h, 0x55, rid, 0, 0, 0, 0};
+    std::memcpy(&data[4], &value, 4);
+    sendStandard(0x7FF, data, 8);
+}
+
 void floatToBytesLE(float value, uint8_t *out4) {
     std::memcpy(out4, &value, 4);
 }
@@ -139,6 +228,22 @@ void sendPosVel(uint16_t motor_can_id, float pos_rad, float vel_radps) {
     sendStandard(0x100 + motor_can_id, data, 8);
 }
 
+// モード切替+Enableの初期化シーケンス。実機で動作確認済みのArduino
+// リファレンス実装(initMotor())と同じ順序: Disable -> ClearError ->
+// モードレジスタ書き込み -> Enable。各コマンド間に短い待ち時間を入れる
+// (リファレンスは200-500ms待っていたが、ここでは起動時の一度きりの
+// 処理なので50msに短縮)。
+void initAndEnable(uint16_t motor_can_id, int32_t cmode_value) {
+    sendControlCmd(motor_can_id, CMD_DISABLE);
+    delay(50);
+    sendControlCmd(motor_can_id, CMD_CLEAR_ERROR);
+    delay(50);
+    writeRegister(motor_can_id, RID_CMODE, cmode_value);
+    delay(50);
+    sendControlCmd(motor_can_id, CMD_ENABLE);
+    delay(50);
+}
+
 // -------- CAN送信 (指令 -> DM3520) -------- //
 
 void sendCommands() {
@@ -154,13 +259,21 @@ void sendCommands() {
             if (g_enabled[m]) {
                 sendControlCmd(motor_can_id, CMD_DISABLE);
                 g_enabled[m] = false;
+                g_enabled_mode[m] = MODE_DISABLED;
             }
             continue;
         }
 
-        if (!g_enabled[m]) {
-            sendControlCmd(motor_can_id, CMD_ENABLE);
+        if (!g_enabled[m] || g_enabled_mode[m] != mode) {
+            // 初回Enable、またはモードが切り替わった場合は、
+            // Disable -> ClearError -> モードレジスタ書き込み -> Enable の
+            // 初期化シーケンスをやり直す(実機確認済みのArduinoリファレンス
+            // 実装と同じ手順)。これを行わないとモータが制御フレームに
+            // 一切反応しない。
+            const int32_t cmode_value = (mode == MODE_POS_VEL) ? CMODE_POS_VEL : CMODE_VEL;
+            initAndEnable(motor_can_id, cmode_value);
             g_enabled[m] = true;
+            g_enabled_mode[m] = mode;
         }
 
         if (mode == MODE_VEL) {
@@ -227,22 +340,8 @@ void receiveFeedback() {
 } // namespace
 
 void damiaoInit() {
-    twai_general_config_t g_config =
-        TWAI_GENERAL_CONFIG_DEFAULT((gpio_num_t)CAN_TX, (gpio_num_t)CAN_RX, TWAI_MODE_NORMAL);
-#if CAN_BITRATE_1MBPS
-    twai_timing_config_t t_config = TWAI_TIMING_CONFIG_1MBITS();
-#else
-    twai_timing_config_t t_config = TWAI_TIMING_CONFIG_500KBITS();
-#endif
-    twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
-
-    if (twai_driver_install(&g_config, &t_config, &f_config) != ESP_OK) {
+    if (!installTwaiDriver()) {
         Serial.println("[ERR] damiao: TWAI install failed");
-        while (1)
-            ;
-    }
-    if (twai_start() != ESP_OK) {
-        Serial.println("[ERR] damiao: TWAI start failed");
         while (1)
             ;
     }
