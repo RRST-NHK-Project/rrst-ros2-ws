@@ -32,13 +32,6 @@ config.hpp/defs.hppと同じ構成に合わせてある。damiao_ctrlは単一�
 //     か、オシロスコープ無しで確認するための診断用。
 #define DAMIAO_LOGIC_PROBE_MODE 0
 
-// 3 = CANピン特定モード (pinHuntTaskのみ動作。全候補GPIOの素のレベルを
-//     読み、どのピンにCANトランシーバのRXDが繋がっているかを特定する。
-//     さらに候補ピンペアで実際に送信し、送信キューが掃けるか(=本当に
-//     ワイヤー上へ出たか)を確認する。基板バリアントによってCANピンが
-//     GPIO1/2(SOKI)かGPIO43/44(MES/SS)かで異なるため、その切り分け用。
-#define DAMIAO_PIN_HUNT_MODE 1
-
 // ================= CAN(TWAI)配線 =================
 // XIAO ESP32-S3 + MCP2561 (ros2canのBOARD_SOKIと同じ組み合わせ)。
 // 実機のCANトランシーバとの配線が違う場合はここを変更すること

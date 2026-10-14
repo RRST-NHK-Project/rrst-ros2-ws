@@ -12,20 +12,20 @@ Damiao DM2325(モータ) + DM3520(ESC) を ESP32 経由のCAN通信で
                                                   | damiao/motor1/cmd
                                                   v
 [PC: damiao_driver_node] <--damiao/motor1/state--+
-        |  serial_tx_1 (Int16MultiArray, 24要素)
+        |  serial_tx_201 (Int16MultiArray, 24要素)
         v
-[PC: bridge_node] <--USBシリアル(115200bps, 52byteフレーム)--> [ESP32]
-        ^  serial_rx_1                                            |
-        |                                                         v CAN(TWAI)
-        +---------------------------------------------  [DM3520 ESC] -- [DM2325]
+[PC: ros2can --nogui] <--USBシリアル(52byteフレーム)--> [ESP32 (SOKI基板, XIAO ESP32-S3)]
+        ^  serial_rx_201                                       |
+        |                                                      v CAN 1Mbps (TWAI + MCP2561)
+        +------------------------------------------  [DM3520 ESC] -- [DM2325]
 ```
 
-- PC-ESP32間は RRST-NHK-Project/ros2can と同じ52バイト固定長フレーム
-  (`0xAA, DEVICE_ID, LEN=48, int16x24 big-endian, XORチェックサム`)を使用。
-  ros2can本体には依存しない(フレーム形式だけ合わせてある)。
-- ESP32-DM3520間は達妙(Damiao)公式のCANプロトコル(MIT/POS_VEL/VELモード)。
-  今回は VELモード・POS_VELモードのみ使用(MITモードはKp/Kd調整が必要で
-  初回動作確認には不向きなため見送り)。
+- PC-ESP32間は RRST-NHK-Project/ros2can を使う(`~/claude_ws/src/ros2can`)。
+  ESP32には ros2can の `firmware/xiao-esp32-s3_can2io` を `MODE_DAMIAO`・
+  `DEVICE_ID 201` で書き込む(Damiaoの設定は同ファームの `config.hpp` の
+  `DAMIAO_*`)。旧来の `bridge_node` は `use_builtin_bridge:=true` の時だけ使う。
+- ESP32-DM3520間は達妙(Damiao)公式のCANプロトコル(VEL/POS_VELモード)。
+  帰還は Master ID(0x000)で届く。
 
 ## スロット割り当て (`include/damiao_ctrl/slot_layout.hpp`)
 
@@ -37,8 +37,10 @@ Damiao DM2325(モータ) + DM3520(ESC) を ESP32 経由のCAN通信で
 | 0 | ROS→ESP32 | mode_word (0=DISABLE, 1=VEL, 2=POS_VEL) | - |
 | 1 | ROS→ESP32 | target (VEL:rad/s, POS_VEL:rad) | 0.001 |
 | 2 | ROS→ESP32 | vel_limit (POS_VELのみ有効) | 0.001 rad/s |
-| 3 | ESP32→ROS | position | 0.001 rad |
-| 4 | ESP32→ROS | velocity | 0.001 rad/s |
+| 0 | ESP32→ROS | motor_state (0=Disable, 1=Enable, それ以外=故障。13=通信喪失) | - |
+| 1 | ESP32→ROS | fb_counter (帰還を受け取るたび+1。止まったら帰還途絶) | - |
+| 3 | ESP32→ROS | position (出力軸、±12.5rad) | 0.001 rad |
+| 4 | ESP32→ROS | velocity (出力軸、モータ側分解能約0.098rad/sで静止中も±0.049) | 0.001 rad/s |
 | 5 | ESP32→ROS | torque | 0.001 N・m |
 
 **`mode_word=0`(全スロット0)が起動直後・通信途絶時の既定値**。Damiaoモータは
@@ -49,9 +51,9 @@ Damiao DM2325(モータ) + DM3520(ESC) を ESP32 経由のCAN通信で
 
 | トピック | 型 | 説明 |
 |:---|:---|:---|
-| `serial_tx_1` / `serial_rx_1` | `std_msgs/Int16MultiArray` | PC-ESP32間の生の24スロット |
-| `damiao/motor1/cmd` | `std_msgs/Float32MultiArray` [control_mode, target, vel_limit] | 上位からの指令。control_mode: -1=DISABLE, 0=VEL, 1=POS_VEL |
-| `damiao/motor1/state` | `std_msgs/Float32MultiArray` [position, velocity, torque] | モータ帰還値 |
+| `serial_tx_201` / `serial_rx_201` | `std_msgs/Int16MultiArray` | PC-ESP32間の生の24スロット(ros2canが中継) |
+| `damiao/motor1/cmd` | `std_msgs/Float32MultiArray` [control_mode, target, vel_limit] | 上位からの指令。control_mode: -1=DISABLE, 0=VEL, 1=POS_VEL。**`cmd_timeout_sec`(既定0.5秒)以上届かないと自動でDISABLE**になるので、動かし続けるには周期的に送ること |
+| `damiao/motor1/state` | `std_msgs/Float32MultiArray` [position, velocity, torque, motor_state, feedback_ok] | モータ帰還値。feedback_ok: 1=帰還あり, 0=途絶 |
 | `/joy` | `sensor_msgs/Joy` | joy_nodeが出すPS4コントローラの生入力 |
 
 ## ビルド
@@ -74,30 +76,54 @@ ros2 run damiao_ctrl frame_codec_selftest
 ## 実行
 
 ```bash
-ros2 launch damiao_ctrl damiao_ctrl.launch.py serial_port:=/dev/ttyUSB0
-# PS4を使わない場合: use_joy:=false
+# ターミナル1: PC<->ESP32の通信(ros2can)
+ros2 run ros2can ros2can --nogui
+```
+
+```bash
+# ターミナル2: 駆動ノード(PS4はまだ使わない)
+ros2 launch damiao_ctrl damiao_ctrl.launch.py
+```
+
+```bash
+# 動作確認の例: 0.5rad/sで回す(Ctrl+Cで止めると0.5秒後に自動DISABLE)
+ros2 topic pub -r 20 damiao/motor1/cmd std_msgs/msg/Float32MultiArray "{data: [0.0, 0.5, 0.0]}"
 ```
 
 ## 安全上の注意
 
-- 初回通電時は `damiao/motor1/cmd` を一切publishしない状態(=DISABLE)で
-  まずESP32↔PC間の通信(`serial_rx_1`)とESP32↔DM3520間のCAN疎通(帰還値が
-  正しく届くか)を確認してから、初めて低速でのVELモード指令を試すこと。
-- `ps4_teleop_node` はデッドマンスイッチ方式(既定: R1を押している間だけ
-  有効、Optionsボタンで強制DISABLE)。実際のボタン/軸番号はドライバに
-  依存するため、使用前に必ず `ros2 topic echo /joy` でPS4のボタンを押して
-  実際のindexを確認し、`config/damiao_ctrl.yaml` を合わせること。
-- ノード終了時(Ctrl+C)は自動的にDISABLE指令が送られるが、ESP32ファーム
-  ウェア側にCAN/シリアル途絶に対するフェイルセーフは実装しない予定
-  (チームのros2can/cubemarsファームウェアも同様の設計)。ノードが異常終了
-  (kill -9等)した場合は最後の指令を保持し続ける点に注意。
+止まる仕組み(2026-10-14 実機確認済み):
+
+| 起きたこと | 止まる仕組み | 止まるまで |
+|:---|:---|:---|
+| 上位ノード(PS4等)が落ちた・cmdが途絶えた | damiao_driver_nodeの見張り(`cmd_timeout_sec`) | 約0.7秒 |
+| damiao_driver_nodeをCtrl+Cで終了 | 終了直前にDISABLEを送信(pre-shutdown) | 約0.2秒 |
+| ros2canが落ちた・USBが抜けた | ESP32ファームの見張り(`DAMIAO_CMD_TIMEOUT_MS`=300) | 0.3秒 |
+| ESP32が固まった・CAN線が抜けた | モータ自身の通信タイムアウト(`DAMIAO_MOTOR_TIMEOUT_MS`=100) | 0.1秒 |
+
+- 故障(通信喪失を含む)でモータが止まった場合、指令を送り続けても再始動しない。
+  復帰は「一度DISABLE(-1)を送る → 改めて指令する」。
+- **注意: damiao_driver_nodeが`kill -9`等で強制終了した場合**、ros2can(--nogui)は
+  最後に受け取った指令を送り続けるため、モータは止まらない。その場合はros2canを
+  止める(Ctrl+C)とESP32の見張りで止まる。
+- `ps4_teleop_node`(`use_joy:=true` で起動)の操作:
+  - **R1を押している間だけ**左スティック上下で速度指令(最大 `max_vel_radps`、既定1.0rad/s)。
+    R1を離すと即DISABLE。
+  - **Options = E-STOP**。再開はR1を一度離して押し直す。
+  - R1を押したまま起動・復帰しても動かない(必ずR1の押し直しが必要)。
+  - `/joy` が0.5秒途絶える(コントローラのUSB抜け等)と停止。
+  - モータが故障で止まった時も、R1を離して押し直せば復帰する。
+- ボタン番号(DualShock 4をUSB有線で確認済み): R1=5, Options=9, 左スティック上下=軸1(上が+)。
+  別のコントローラ・接続方法(Bluetooth等)では番号が変わることがあるので、
+  `ros2 topic echo /joy` でボタンを押して確認し、`config/damiao_ctrl.yaml` を合わせること。
+- コントローラのUSB接続が不安定(カーネルログに `error -71`、30秒ごとに切断)な場合は
+  ケーブルを交換する(2026-10-14、ケーブル交換で解消)。
 
 ## 現在の状態 / TODO
 
-- [x] PC側: フレームコーデック・ブリッジノード・駆動ノード・PS4テレオペノード実装、単体テスト済み(実機不要分)
-- [ ] ESP32ファームウェア本体(`firmware/esp32_damiao_bridge/src/`)は未実装。
-      ボード型番確定後に着手する: TWAI初期化、52バイトフレーム受信、
-      Damiao CANプロトコル(Enable/Disable/VEL/POS_VEL送信、フィードバック
-      受信、起動時にPMAX/VMAX/TMAXをモータから読み出し)。
-- [ ] `firmware/esp32_damiao_bridge/include/config.hpp` のCAN GPIOピン・
-      CANビットレート・DAMIAO_MOTOR_CAN_IDを実機に合わせて確定する。
+- [x] ros2can(MODE_DAMIAO)経由でCAN通信・角度制御(POS_VEL)・速度制御(VEL)を実機確認
+- [x] PMAX/VMAX/TMAX=12.5/200/10、減速比25をモータのレジスタから読み出して確認
+- [x] 停止系(上表)を実機確認
+- [x] damiao_driver_node を新しいスロット配置(状態コード・受信回数)に対応
+- [x] ps4_teleop_node の安全機能(デッドマン・E-STOP・押し直し・joy途絶・Ctrl+C)を偽の/joyで確認
+- [ ] PS4コントローラ実機でのボタン番号確認・テレオペ確認

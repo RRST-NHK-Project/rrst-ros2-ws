@@ -1,20 +1,27 @@
+# 旧・内蔵ブリッジ(use_builtin_bridge:=true の時だけ起動)。通常はros2canを使う。
 damiao_bridge_node:
   ros__parameters:
-    serial_port: /dev/ttyUSB0
+    serial_port: /dev/ttyACM0
     baud_rate: 115200
-    device_id: 1
+    device_id: 201
     resend_divider: 2
 
 damiao_driver_node:
   ros__parameters:
-    device_id: 1
+    device_id: 201             # ESP32ファームウェア(ros2can MODE_DAMIAO)のDEVICE_IDと一致させる
     motor_index: 0
+    cmd_timeout_sec: 0.5       # cmdがこの時間届かないと自動でDISABLE
+    feedback_timeout_sec: 0.5  # モータ帰還がこの時間途絶えたらfeedback_ok=0にして警告
+    publish_rate_hz: 50.0
 
 ps4_teleop_node:
   ros__parameters:
-    velocity_axis_index: 1
-    deadman_button_index: 5
-    estop_button_index: 9
-    max_vel_radps: 3.0
+    # 番号は2026-10-14実機確認済み(DualShock 4 USB有線, joy 3.3.0, 軸8本・ボタン13個)
+    velocity_axis_index: 1     # 左スティック上下(上に倒すと正転)
+    deadman_button_index: 5    # R1(押している間だけ動く)
+    estop_button_index: 9      # Options(E-STOP)
+    max_vel_radps: 1.0         # スティックを倒し切った時の速度[rad/s](初回は控えめ)
     deadzone: 0.08
+    invert_axis: false         # 回転方向を逆にしたい時はtrue
+    joy_timeout_sec: 0.5       # /joyがこの時間途絶えたら停止
     motor_number: 1

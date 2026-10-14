@@ -18,7 +18,6 @@ Description:
 #include "damiao.hpp"
 #include "frame_data.hpp"
 #include "logic_probe.hpp"
-#include "pin_hunt.hpp"
 #include "scan_task.hpp"
 #include "serial_task.hpp"
 #include <Arduino.h>
@@ -29,16 +28,7 @@ void setup() {
     delay(200);
     delay(1 * DEVICE_ID); // 安定待ち、IDごとに開始タイミングをずらす
 
-#if DAMIAO_PIN_HUNT_MODE
-    // CANピン特定モード。pinHuntTaskのみ動作する。
-    xTaskCreate(
-        pinHuntTask,   // タスク関数
-        "pinHuntTask", // タスク名
-        4096,          // スタックサイズ(words)
-        NULL,
-        11, // 優先度
-        NULL);
-#elif DAMIAO_LOGIC_PROBE_MODE
+#if DAMIAO_LOGIC_PROBE_MODE
     // 簡易ロジックアナライザモード。logicProbeTaskのみ動作する。
     xTaskCreate(
         logicProbeTask,   // タスク関数
