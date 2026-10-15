@@ -1,6 +1,6 @@
 """PS4コントローラ(joy_node) + teleop を起動する。cubemars.launch.py とは別ターミナルで使う。
 
-    ros2 launch CubeMars_ctrl teleop.launch.py
+    ros2 launch cubemars_ctrl teleop.launch.py
 
 操作: R1を押している間だけ有効 / □でモード切替 / 速度モード: 左スティック上下 /
       角度モード: △+90deg ×-90deg ○0deg 左スティック上下で微調整
@@ -17,7 +17,7 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     params = os.path.join(
-        get_package_share_directory('CubeMars_ctrl'), 'config', 'cubemars_ctrl.yaml')
+        get_package_share_directory('cubemars_ctrl'), 'config', 'cubemars_ctrl.yaml')
 
     joy_dev = DeclareLaunchArgument(
         'joy_device_id', default_value='0',
@@ -37,7 +37,7 @@ def generate_launch_description():
     )
 
     teleop = Node(
-        package='CubeMars_ctrl',
+        package='cubemars_ctrl',
         executable='ps4_teleop_node',
         name='ps4_teleop_node',
         output='screen',

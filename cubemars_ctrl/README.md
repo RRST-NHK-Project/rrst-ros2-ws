@@ -1,4 +1,4 @@
-# CubeMars_ctrl
+# cubemars_ctrl
 
 CubeMars **AK40-10 V3.0 KV170** を、ESP32（soki基板 / XIAO ESP32-S3）経由のCAN通信で
 **速度制御**・**角度制御**し、PS4コントローラで操作するためのROS 2 Jazzyパッケージ。
@@ -53,8 +53,8 @@ PS4 ──/joy──> ps4_teleop_node ──cubemars/cmd_velocity [rpm]──┐
 | `src/cubemars_driver_node.cpp` | 速度/角度指令→24スロット変換、安全処理、状態ログ |
 | `src/bridge_node.cpp` | シリアル送受信（tmotor_ctrlのブリッジがベース） |
 | `src/ps4_teleop_node.cpp` | PS4操作 |
-| `src/selftest.cpp` | 実機なしの単体チェック（`ros2 run CubeMars_ctrl cubemars_selftest`） |
-| `tools/fake_esp32.py` | 実機なしでROS側を動かすための疑似ESP32（`ros2 run CubeMars_ctrl fake_esp32.py`） |
+| `src/selftest.cpp` | 実機なしの単体チェック（`ros2 run cubemars_ctrl cubemars_selftest`） |
+| `tools/fake_esp32.py` | 実機なしでROS側を動かすための疑似ESP32（`ros2 run cubemars_ctrl fake_esp32.py`） |
 
 ## ファーム側の変更点（soki_ak_11 との差分）
 

@@ -79,7 +79,7 @@ uint8_t rx_buf[Rx16NUM * 2];
 uint8_t rx_index = 0;
 uint8_t rx_checksum = 0;
 
-// [CubeMars_ctrlで追加] 最後に有効なフレームを受信した時刻(フェイルセーフ用)
+// [cubemars_ctrlで追加] 最後に有効なフレームを受信した時刻(フェイルセーフ用)
 static volatile uint32_t g_last_valid_rx_ms = 0;
 static volatile bool g_has_valid_rx = false;
 

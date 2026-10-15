@@ -1,4 +1,4 @@
-> **CubeMars_ctrl版について**: このフォルダは `ros2can/generated_firmware/soki_ak_11` のコピーです。
+> **cubemars_ctrl版について**: このフォルダは `ros2can/generated_firmware/soki_ak_11` のコピーです。
 > 変更点(モード切替をplatformio.iniの環境で行う / モータ1台 / シリアル途絶フェイルセーフ /
 > 帰還スロット20-23に受信カウンタ)は `src/config.hpp` 冒頭と、パッケージ直下の README.md を参照。
 >

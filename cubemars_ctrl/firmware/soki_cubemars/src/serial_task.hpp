@@ -16,5 +16,5 @@ void send_frame();
 void receive_frame();
 
 // 最後に自分宛ての有効なフレームを受信した時刻[ms](millis())。一度も受信して
-// いなければ false を返す。[CubeMars_ctrlで追加] cubemars.cppのフェイルセーフが参照する。
+// いなければ false を返す。[cubemars_ctrlで追加] cubemars.cppのフェイルセーフが参照する。
 bool serialLastValidRxMs(uint32_t *out_ms);

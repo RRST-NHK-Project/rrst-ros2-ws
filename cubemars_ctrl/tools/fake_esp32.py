@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""実機なしで CubeMars_ctrl のROS側を確認するための疑似ESP32(MODE_CUBEMARS)。
+"""実機なしで cubemars_ctrl のROS側を確認するための疑似ESP32(MODE_CUBEMARS)。
 
 疑似シリアルポート(pty)を作り、ファーム(firmware/soki_cubemars)と同じ
 52バイトフレームで指令を受け取り、簡単なモータモデルを回して帰還を返す。
 
-    ros2 run CubeMars_ctrl fake_esp32.py
+    ros2 run cubemars_ctrl fake_esp32.py
     # 表示された /dev/pts/N を使って別ターミナルで
-    ros2 launch CubeMars_ctrl cubemars.launch.py serial_port:=/dev/pts/N
+    ros2 launch cubemars_ctrl cubemars.launch.py serial_port:=/dev/pts/N
 
 --no-motor を付けると「ESP32は動いているがモータが応答しない」状態(CAN断線・
 CAN ID違い)を再現する(受信カウンタが増えない)。
@@ -146,7 +146,7 @@ def main():
 
     print(f'疑似ESP32を起動しました: {slave_name}  (DEVICE_ID={args.device_id}'
           f'{", モータ無応答" if args.no_motor else ""})')
-    print(f'  ros2 launch CubeMars_ctrl cubemars.launch.py serial_port:={args.link or slave_name}')
+    print(f'  ros2 launch cubemars_ctrl cubemars.launch.py serial_port:={args.link or slave_name}')
     print('Ctrl+C で終了')
 
     motor = FakeMotor(args.erpm_per_rpm)

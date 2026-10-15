@@ -1,7 +1,7 @@
 """ブリッジ(シリアル) + ドライバ を起動する。
 
-    ros2 launch CubeMars_ctrl cubemars.launch.py
-    ros2 launch CubeMars_ctrl cubemars.launch.py serial_port:=/dev/ttyACM1
+    ros2 launch cubemars_ctrl cubemars.launch.py
+    ros2 launch cubemars_ctrl cubemars.launch.py serial_port:=/dev/ttyACM1
 
 PS4操作は別ターミナルで teleop.launch.py を起動する(止めたい側だけ止められるように分けている)。
 """
@@ -17,14 +17,14 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     params = os.path.join(
-        get_package_share_directory('CubeMars_ctrl'), 'config', 'cubemars_ctrl.yaml')
+        get_package_share_directory('cubemars_ctrl'), 'config', 'cubemars_ctrl.yaml')
 
     serial_port = DeclareLaunchArgument(
         'serial_port', default_value='/dev/ttyACM0',
         description='ESP32のシリアルポート(ls /dev/ttyACM* で確認)')
 
     bridge = Node(
-        package='CubeMars_ctrl',
+        package='cubemars_ctrl',
         executable='cubemars_bridge_node',
         name='cubemars_bridge_node',
         output='screen',
@@ -33,7 +33,7 @@ def generate_launch_description():
     )
 
     driver = Node(
-        package='CubeMars_ctrl',
+        package='cubemars_ctrl',
         executable='cubemars_driver_node',
         name='cubemars_driver_node',
         output='screen',

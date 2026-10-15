@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>CubeMars_ctrl</name>
+  <name>cubemars_ctrl</name>
   <version>0.0.0</version>
   <description>CubeMars AK40-10 V3.0 KV170 を ESP32(soki基板, MODE_CUBEMARS)経由のCANで速度制御・角度制御するROS 2パッケージ</description>
   <maintainer email="haru0517fujisawa@gmail.com">ubuntu</maintainer>

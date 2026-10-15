@@ -4,7 +4,7 @@
 MDは基本的に変更不要ですが，サーボは型番、機構に応じて適切に設定する必要があります．
 Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 
-[CubeMars_ctrl版の変更点] ros2can/generated_firmware/soki_ak_11(チームで実機
+[cubemars_ctrl版の変更点] ros2can/generated_firmware/soki_ak_11(チームで実機
 動作済みの設定)をコピーし、以下だけを変更している。
   1. 動作モードをplatformio.iniの環境(env)で切り替えるようにした
      (pio run -e cubemars / pio run -e can_monitor)。手でコメントアウトを
@@ -276,13 +276,13 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 // 無関係にアクチュエータ側のタイマで自律送信されるため、こちらの帯域は
 // robomasTask/cubemarsTaskの送信頻度を下げても減らない。
 
-// CubeMars_ctrlではAK40-10を1台だけ動かす。4のままだと存在しないID宛ての指令も
+// cubemars_ctrlではAK40-10を1台だけ動かす。4のままだと存在しないID宛ての指令も
 // 毎周期送ることになり、別のモータを繋いだ時に意図せず動かす可能性があるため1にする。
 #define CUBEMARS_MOTOR_COUNT 1 // 1バスあたりの接続台数(最大4)
 
 // 各モータのCAN ID (R-Link CubeMarsTool の Application Configuration -> CAN ID
 // 設定と一致させること。1台ずつ重複しない値を書き込んでおく)
-// [CubeMars_ctrl] CUBEMARS_MOTOR_ID_1は「pio run -e can_monitor」で調べた実機の
+// [cubemars_ctrl] CUBEMARS_MOTOR_ID_1は「pio run -e can_monitor」で調べた実機の
 // CAN IDに書き換えること。帰還フレームの拡張IDが 0x29XX のとき、XX(16進)が
 // CAN IDになる(例: id=0x2966 -> 0x66 = 102)。
 // 初期値102はsokiのroot_thetaに転用されたAK40-10のR-Link設定値(note/hardware_mapping.txt)。
@@ -318,7 +318,7 @@ Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
 #define CUBEMARS_MIT_KD_MIN 0.0f
 #define CUBEMARS_MIT_KD_MAX 5.0f
 
-// ---- シリアル途絶時のフェイルセーフ [CubeMars_ctrlで追加] ----
+// ---- シリアル途絶時のフェイルセーフ [cubemars_ctrlで追加] ----
 // PCから有効なフレーム(DEVICE_ID一致・チェックサム正常)がこの時間届かなければ、
 // 受信済みの指令を捨てて全モータへゼロ速度指令(その場停止)を送る。
 // 元のファーム(soki_ak_11)は最後の指令を保持し続けるため、ROSノードの異常終了や

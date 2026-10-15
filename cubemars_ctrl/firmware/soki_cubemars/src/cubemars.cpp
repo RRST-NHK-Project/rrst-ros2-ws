@@ -44,7 +44,7 @@ AK40-10等のAKシリーズはアクチュエータ内蔵のクローズドル�
     12-15: motor temperature [degC]
     16-19: error code (0=no fault, 1=motor over-temp, 2=over-current, 3=over-voltage,
                         4=under-voltage, 5=encoder fault, 6=MOSFET over-temp, 7=motor stall)
-    20-23: 帰還フレーム受信カウンタ [CubeMars_ctrlで追加。元は未使用]
+    20-23: 帰還フレーム受信カウンタ [cubemars_ctrlで追加。元は未使用]
            0x29フレームを受信するたびに+1(int16で折り返す)。ROS側はこの値が
            変化しているかでモータの応答有無を判定する。
 
@@ -211,7 +211,7 @@ void sendMitCommand(uint8_t motor_can_id, float pos_rad, float vel_radps, float 
     sendExtended(CUBEMARS_CMD_MIT, motor_can_id, buffer, 8);
 }
 
-// [CubeMars_ctrlで追加] PCからの有効フレームがCUBEMARS_CMD_TIMEOUT_MS以上
+// [cubemars_ctrlで追加] PCからの有効フレームがCUBEMARS_CMD_TIMEOUT_MS以上
 // 途絶えているか。一度も受信していない場合もtrue(Rx_16Dataは全ゼロのままなので、
 // ゼロ速度指令を送るという元の起動直後の挙動と変わらない)。
 bool commandTimedOut() {
@@ -225,7 +225,7 @@ bool commandTimedOut() {
 // -------- CAN送信 (指令 -> AKシリーズ) -------- //
 
 void sendCommands() {
-    // [CubeMars_ctrlで追加] シリアル途絶時のフェイルセーフ。最後の指令を保持せず、
+    // [cubemars_ctrlで追加] シリアル途絶時のフェイルセーフ。最後の指令を保持せず、
     // 全モータへゼロ速度指令(その場停止、ros2canのE-STOPと同じ)を送る。
     // 通信が復帰すれば次の周期から通常の指令に戻る。
     if (commandTimedOut()) {
@@ -310,7 +310,7 @@ void receiveFeedback() {
         Tx_16Data[8 + m] = current;
         Tx_16Data[12 + m] = temperature;
         Tx_16Data[16 + m] = error_code;
-        // [CubeMars_ctrlで追加] 帰還フレーム受信カウンタ(元は未使用スロット20-23)。
+        // [cubemars_ctrlで追加] 帰還フレーム受信カウンタ(元は未使用スロット20-23)。
         // 値自体に意味は無く「増え続けているか」だけを見る。位置等の値はモータが
         // 止まっていると変化しないため、それだけでは「モータが応答しているか」を
         // ROS側から判定できない(CAN断線・ID違いでも最後の値が残り続ける)。

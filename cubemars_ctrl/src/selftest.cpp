@@ -1,5 +1,5 @@
 // 実機なしで実行できる単体チェック。
-//   ros2 run CubeMars_ctrl cubemars_selftest
+//   ros2 run cubemars_ctrl cubemars_selftest
 // フレームのエンコード/デコードと、出力軸rpm・deg -> スロット値の換算が
 // ファーム(firmware/soki_cubemars/src/cubemars.cpp)の解釈と一致しているかを確かめる。
 // ファーム側の式はここに書き写して照合している(片方だけ変えると失敗する)。

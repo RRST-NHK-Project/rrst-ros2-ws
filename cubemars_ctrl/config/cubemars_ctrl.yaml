@@ -1,4 +1,4 @@
-# CubeMars_ctrl のパラメータ。値を変えたら colcon build し直してから launch すること
+# cubemars_ctrl のパラメータ。値を変えたら colcon build し直してから launch すること
 # (install/ 側にコピーされたものが読まれるため)。
 # device_id は 3 ノードとファーム(firmware/soki_cubemars/src/config.hpp の DEVICE_ID)で必ず揃える。
 
