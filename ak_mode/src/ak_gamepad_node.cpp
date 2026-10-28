@@ -6,7 +6,7 @@
 // 起動例:
 //   ros2 run joy joy_node
 //   ros2 run <ros2can のノード> ...        (serial_tx_11 / serial_rx_11 を橋渡しするもの)
-//   ros2 run AKmode ak_gamepad_node --ros-args -p device_id:=11 -p motor:=1
+//   ros2 run ak_mode ak_gamepad_node --ros-args -p device_id:=11 -p motor:=1
 //
 // 操作 (PS4):
 //   L1 : 押している間だけ動作 (デッドマン)。離すと 速度=減速停止 / 位置=その位置を保持
