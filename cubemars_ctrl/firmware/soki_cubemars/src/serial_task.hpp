@@ -1,7 +1,8 @@
 /*====================================================================
 <serial_task.hpp>
 ・シリアル通信関連のタスクと関数のヘッダーファイル
-Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
+Copyright (c) 2025 RRST-NHK-Project
+SPDX-License-Identifier: MIT
 ====================================================================*/
 
 #pragma once

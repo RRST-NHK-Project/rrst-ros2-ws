@@ -5,7 +5,8 @@ CAN/シリアルそれぞれの活動を別々に記録し、CANが動いてい�
 CANは止まっていてシリアルだけ動いていれば短いパルス点滅、
 どちらも途絶えたら消灯、という3状態をstatusLedUpdate()側で表現する。
 serialTask/canTaskの両方から呼び出されることを想定している。
-Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
+Copyright (c) 2025 RRST-NHK-Project
+SPDX-License-Identifier: MIT
 ====================================================================*/
 
 #pragma once

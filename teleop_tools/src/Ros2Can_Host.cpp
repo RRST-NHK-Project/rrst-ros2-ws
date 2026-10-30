@@ -2,7 +2,8 @@
 ros2can (CANホスト) ノードのホスト側プログラム
 Serial_Bridge_Host.cpp のros2can版。Ros2CanPacketControllerを使用してノード/スロット
 分配を意識せずに送受信配列へアクセスする。
-Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
+Copyright (c) 2025 RRST-NHK-Project
+SPDX-License-Identifier: MIT
 */
 
 #include <chrono>

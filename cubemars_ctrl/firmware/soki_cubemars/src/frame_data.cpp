@@ -1,7 +1,8 @@
 /*====================================================================
 <frame_data.cpp>
 ・シリアル通信のフレームデータ定義ファイル
-Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
+Copyright (c) 2025 RRST-NHK-Project
+SPDX-License-Identifier: MIT
 ====================================================================*/
 
 #include "frame_data.hpp"

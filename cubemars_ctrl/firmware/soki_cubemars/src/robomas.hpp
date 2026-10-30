@@ -16,7 +16,8 @@ robomas.cpp先頭コメント参照)。モータごとにcontrol_modeスロッ�
 指令(PC -> 本機, Rx_16Data)/帰還(本機 -> PC, Tx_16Data)のスロット割り当ては
 robomas.cppの先頭コメント、およびREADME.mdを参照。
 
-Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
+Copyright (c) 2025 RRST-NHK-Project
+SPDX-License-Identifier: MIT
 ====================================================================*/
 
 #pragma once
