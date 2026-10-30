@@ -7,7 +7,8 @@ Description:
   PCから送られてくるバイナリデータを受信、デコードしマイコンのGPIO出力に反映させる。
   config.hppで各種設定をするだけで使用可能です。このファイル(main.cpp)を直接編集しないこと。
 
-Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
+Copyright (c) 2025 RRST-NHK-Project
+SPDX-License-Identifier: MIT
 ====================================================================*/
 
 #include "can_task.hpp"

@@ -1,7 +1,8 @@
 /*====================================================================
 <pin_ctrl_task.cpp>
 ・ピン操作関連の関数とタスクの実装ファイル
-Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
+Copyright (c) 2025 RRST-NHK-Project
+SPDX-License-Identifier: MIT
 ====================================================================*/
 
 #include "config.hpp"

@@ -1,7 +1,8 @@
 /*====================================================================
 <pin_ctrl_init.hpp>
 ・ピン初期化関連の関数のヘッダーファイル
-Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
+Copyright (c) 2025 RRST-NHK-Project
+SPDX-License-Identifier: MIT
 ====================================================================*/
 
 #pragma once

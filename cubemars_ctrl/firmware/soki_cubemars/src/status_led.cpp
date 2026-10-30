@@ -15,7 +15,8 @@ CANとシリアルの活動は別々に記録する。ホストモードでノ�
 LEDだけで見分けたい。そこでCAN活動があれば従来通りの高速点滅、
 CANは途絶えていてシリアルだけ活動していれば短いパルス点滅、という
 異なるパターンで表示する。
-Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
+Copyright (c) 2025 RRST-NHK-Project
+SPDX-License-Identifier: MIT
 ====================================================================*/
 
 #include "status_led.hpp"

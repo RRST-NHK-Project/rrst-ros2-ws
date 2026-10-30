@@ -2,7 +2,8 @@
 <config.h>
 書き込み前にここでIDと動作モードを設定してください．MDやサーボの設定もここで行います．
 MDは基本的に変更不要ですが，サーボは型番、機構に応じて適切に設定する必要があります．
-Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
+Copyright (c) 2025 RRST-NHK-Project
+SPDX-License-Identifier: MIT
 
 [cubemars_ctrl版の変更点] ros2can/generated_firmware/soki_ak_11(チームで実機
 動作済みの設定)をコピーし、以下だけを変更している。

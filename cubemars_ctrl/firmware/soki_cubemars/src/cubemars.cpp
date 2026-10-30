@@ -48,7 +48,8 @@ AK40-10等のAKシリーズはアクチュエータ内蔵のクローズドル�
            0x29フレームを受信するたびに+1(int16で折り返す)。ROS側はこの値が
            変化しているかでモータの応答有無を判定する。
 
-Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
+Copyright (c) 2025 RRST-NHK-Project
+SPDX-License-Identifier: MIT
 ====================================================================*/
 
 #include "cubemars.hpp"

@@ -16,7 +16,8 @@ MODE_CUBEMARSは、xiao-esp32-s3_can2ioの他モード(MODE_IO/MODE_CAN/MODE_CAN
 指令(PC -> 本機, Rx_16Data)/帰還(本機 -> PC, Tx_16Data)のスロット割り当ては
 cubemars.cppの先頭コメント、およびREADME.mdを参照。
 
-Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
+Copyright (c) 2025 RRST-NHK-Project
+SPDX-License-Identifier: MIT
 ====================================================================*/
 
 #pragma once

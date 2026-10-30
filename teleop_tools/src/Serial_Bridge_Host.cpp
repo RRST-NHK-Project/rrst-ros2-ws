@@ -1,6 +1,7 @@
 /*
 Serial_Bridgeノードのホスト側プログラム
-Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
+Copyright (c) 2025 RRST-NHK-Project
+SPDX-License-Identifier: MIT
 */
 
 #include <chrono>

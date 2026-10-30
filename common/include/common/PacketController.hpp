@@ -1,6 +1,7 @@
 /*
 マイコンへ送信する配列data_へ安全にアクセスするためのライブラリ
-Copyright (c) 2025 RRST-NHK-Project. All rights reserved.
+Copyright (c) 2025 RRST-NHK-Project
+SPDX-License-Identifier: MIT
 */
 
 // ===== 使用例コメント =====

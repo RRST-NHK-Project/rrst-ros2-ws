@@ -5,7 +5,7 @@
   <version>0.0.0</version>
   <description>RobStride EduLite 05 の速度・角度制御(ESP32 + ros2can 経由のCAN)とPS4テレオペ</description>
   <maintainer email="haru0517fujisawa@icloud.com">ubuntu</maintainer>
-  <license>Apache-2.0</license>
+  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
