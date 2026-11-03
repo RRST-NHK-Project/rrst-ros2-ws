@@ -1,3 +1,12 @@
+# =====================================================================
+# damiao_ctrl の設定ファイル(launchで読み込まれる)
+#   【モータを増やす時に変える場所】 damiao_driver_node の motor_count
+#                                    (+PS4で動かすなら ps4_teleop_node の各配列)
+#   ※ESP32側(ros2can の config.hpp の DAMIAO_MOTORS)の台数と必ずそろえる。
+#   ※詳しくは docs/開発ガイド.md
+#   ※書き換えたら colcon build してから起動し直す(installされたものが読まれるため)。
+# =====================================================================
+
 # 旧・内蔵ブリッジ(use_builtin_bridge:=true の時だけ起動)。通常はros2canを使う。
 damiao_bridge_node:
   ros__parameters:
@@ -8,20 +17,33 @@ damiao_bridge_node:
 
 damiao_driver_node:
   ros__parameters:
-    device_id: 201             # ESP32ファームウェア(ros2can MODE_DAMIAO)のDEVICE_IDと一致させる
-    motor_index: 0
+    device_id: 201             # ESP32ファームウェア(config.hppのDEVICE_ID)と同じ番号
+    motor_count: 2             # このESP32につないだ台数 = config.hppのDAMIAO_MOTORSの行数
+    first_motor_number: 1      # トピック名の最初の番号(damiao/motor1〜)。2枚目以降のESP32で使う
     cmd_timeout_sec: 0.5       # cmdがこの時間届かないと自動でDISABLE
     feedback_timeout_sec: 0.5  # モータ帰還がこの時間途絶えたらfeedback_ok=0にして警告
+    max_vel_radps: 45.6        # 速度の上限[rad/s] = 実測の最高速度48rad/s(458rpm)の95%(435rpm)
     publish_rate_hz: 50.0
 
 ps4_teleop_node:
   ros__parameters:
     # 番号は2026-10-14実機確認済み(DualShock 4 USB有線, joy 3.3.0, 軸8本・ボタン13個)
-    velocity_axis_index: 1     # 左スティック上下(上に倒すと正転)
+    motor_numbers: [1, 2]                  # 動かすモータ
+    control_modes: ["velocity", "angle"]   # velocity=スティック上下で速度 / angle=スティックを倒した方向を向く
+    stick_y_axes: [1, 4]                   # 上下の軸: 1=左スティック, 4=右スティック(上が+)
+    stick_x_axes: [0, 3]                   # 左右の軸: 0=左スティック, 3=右スティック(angleで使う)
+    invert_axes: [false, false]            # velocity: 回転方向を逆に / angle: 向きを鏡写しに(右に倒して左を向く時true)
     deadman_button_index: 5    # R1(押している間だけ動く)
     estop_button_index: 9      # Options(E-STOP)
-    max_vel_radps: 1.0         # スティックを倒し切った時の速度[rad/s](初回は控えめ)
+    zero_button_index: 2       # △(角度制御のモータの今の向きを「スティック上」にする)
+    max_vel_radps: 45.6        # velocity: スティックを倒し切った時の速度[rad/s] = 実測の最高速度48rad/sの95%
     deadzone: 0.08
-    invert_axis: false         # 回転方向を逆にしたい時はtrue
+    angle_vel_limit_radps: 10.0  # angle: 向きを変える時の速さの上限[rad/s](約95rpm)
+    angle_deadzone: 0.5        # angle: これ未満しか倒していない時は今の向きを保つ
+    angle_limit_rad: 12.0      # angle: 目標角度の範囲±[rad](帰還が一周する±12.5radの内側)
     joy_timeout_sec: 0.5       # /joyがこの時間途絶えたら停止
-    motor_number: 1
+
+# 回転数の表示(ros2 run damiao_ctrl motor_monitor --ros-args --params-file <このファイル>)
+motor_monitor:
+  ros__parameters:
+    motor_numbers: [1, 2]

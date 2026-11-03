@@ -1,33 +1,44 @@
-// 1台のDamiaoモータ(DM2325+DM3520)向け高レベル駆動ノード。
-// damiao/motor<N>/cmd を購読してVEL/POS_VELの指令をserial_tx_<device_id>の
-// 該当6スロットへ書き込み、serial_rx_<device_id>から自分のモータ分の
-// フィードバックを damiao/motor<N>/state として配信する。
-// PC<->ESP32間はros2can(--nogui)を使う想定(device_idはESP32のDEVICE_ID)。
+// =====================================================================
+// damiao_driver_node : DamiaoモータとPCの間をつなぐ「駆動ノード」
+// =====================================================================
+// ■ やっていること
+//   自分のプログラム(PS4ノードなど)        このノード                 ros2can → ESP32 → モータ
+//   damiao/motorN/cmd   を送る   ─────→  指令を24個の数値の枠に詰める ─→ serial_tx_<device_id>
+//   damiao/motorN/state を受け取る ←───  返事の枠から取り出す        ←─ serial_rx_<device_id>
+//   1つのノードで1枚のESP32(=1つのdevice_id、最大4台)を担当する。
 //
-// cmd (std_msgs/Float32MultiArray, data=[control_mode, target, vel_limit]):
-//   control_mode: -1.0=DISABLE(E-STOP), 0.0=VELモード(targetはrad/s),
-//                 1.0=POS_VELモード(targetはrad, vel_limitで移動速度上限をrad/sで指定)
-//   cmd_timeout_sec以上cmdが届かないと自動でDISABLEにする。ros2canの--noguiは
-//   最後に受け取った指令を送り続けるため、上位ノードが落ちても止まるように
-//   ここで見張る。動かし続けるには上位ノードがcmdを周期的(例: 50Hz)に送ること。
-// state (std_msgs/Float32MultiArray,
-//        data=[position_rad, velocity_rad_s, torque_Nm, motor_state, feedback_ok]):
-//   motor_state: 0=Disable 1=Enable それ以外=故障コード(13=通信喪失など)
-//   feedback_ok: 1=モータから帰還が届いている 0=途絶(電源OFF・CAN線抜け等)
+// ■ cmd(自分のプログラムから送る。std_msgs/Float32MultiArray、data=[モード, 目標, 速さ上限])
+//   [-1, 0, 0]          脱力(止める)
+//   [ 0, 速度, 0]       速度制御。速度[rad/s](出力軸)
+//   [ 1, 角度, 速さ]    角度制御。角度[rad]へ、速さ[rad/s]以下で回る
+//   ・動かし続けるには、50回/秒くらいで送り続けること。cmd_timeout_sec(0.5秒)届かないと
+//     そのモータは自動で脱力する(自分のプログラムが落ちても止まるように)。
+//   ・速度と速さは ±max_vel_radps(45.6rad/s)に制限される。
 //
-// 故障からの復帰: モータは故障すると自分で止まり、PCが指令を出し続けても
-// 再始動しない(ESP32ファームウェアとモータ側でラッチされる)。復帰させるには
-// 一度DISABLE(-1)を送ってから、改めてVEL/POS_VELを送る。
+// ■ state(このノードが送る。data=[位置, 速度, トルク, 状態, 帰還OK, 内部の位置])
+//   位置[rad]: ±12.5radで一周する  速度[rad/s]  トルク[N・m]
+//   状態: 0=脱力 1=有効 それ以外=故障(13=通信喪失)
+//   帰還OK: 1=モータから返事が届いている 0=途絶(電源OFF・CAN線抜けなど)
+//   内部の位置[rad]: モータが内部で数えている位置(不明ならNaN)。±12radを超えていると
+//                    角度制御は使えない(モータの電源を入れ直すと0に戻る)
 //
-// 同一device_idに対して駆動ノードは1つだけを想定している(複数ノードが
-// 同時にserial_tx_<ID>へpublishすると互いの担当外スロットを0で上書きして
-// しまうため)。複数モータを同時に使う場合はこのノードを拡張すること。
+// ■ 故障からの復帰
+//   故障するとモータは自分で止まり、指令を出し続けても再始動しない。
+//   一度 [-1,0,0](脱力)を送ってから、改めて指令すると復帰する。
+//
+// ■ 【よく変える場所】config/damiao_ctrl.yaml の damiao_driver_node:
+//   device_id(ESP32のDEVICE_ID)、motor_count(台数)、first_motor_number(2枚目以降のESP32用)
+//
+// ■ 注意: 同じdevice_idに駆動ノードを2つ起動しないこと(お互いの指令を0で上書きする)。
+// =====================================================================
 
 #include <chrono>
+#include <cmath>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
@@ -47,15 +58,26 @@ public:
   : Node("damiao_driver_node")
   {
     device_id_ = declare_parameter<int>("device_id", 201);
-    motor_index_ = declare_parameter<int>("motor_index", 0);  // 0-origin, 0=モータ1
+    const int motor_count = declare_parameter<int>("motor_count", 1);  // このESP32につないだ台数
+    // このESP32の1台目のモータ番号。2枚目以降のESP32で、トピック名を続き番号にするために使う
+    // (例: 2枚目に4台なら 5 → damiao/motor5〜motor8)。
+    const int first_motor_number = declare_parameter<int>("first_motor_number", 1);
     cmd_timeout_sec_ = declare_parameter<double>("cmd_timeout_sec", 0.5);
     feedback_timeout_sec_ = declare_parameter<double>("feedback_timeout_sec", 0.5);
+    // 速度の上限[rad/s]。説明書の無負荷最高速度は560rpm(58.6rad/s)だが、実機は
+    // 48rad/s(458rpm)で頭打ちになる(2026-10-15実測。モータの最高速度レジスタRID6が
+    // 1200(モータ軸rad/s)÷減速比25=48rad/sのため。2台目のESCも同じ値を確認)。
+    // その95%を上限にする。
+    max_vel_radps_ = declare_parameter<double>("max_vel_radps", 45.6);
     const double publish_rate_hz = declare_parameter<double>("publish_rate_hz", 50.0);
-    const int motor_number = motor_index_ + 1;
 
-    if (motor_index_ < 0 || static_cast<size_t>(motor_index_) >= kMaxMotors) {
-      RCLCPP_FATAL(get_logger(), "motor_indexは0〜%zuの範囲で指定してください", kMaxMotors - 1);
-      throw std::runtime_error("invalid motor_index");
+    if (motor_count < 1 || static_cast<size_t>(motor_count) > kMaxMotors) {
+      RCLCPP_FATAL(get_logger(), "motor_countは1〜%zuの範囲で指定してください", kMaxMotors);
+      throw std::runtime_error("invalid motor_count");
+    }
+    if (first_motor_number < 1) {
+      RCLCPP_FATAL(get_logger(), "first_motor_numberは1以上にしてください");
+      throw std::runtime_error("invalid first_motor_number");
     }
     if (publish_rate_hz <= 0.0) {
       RCLCPP_FATAL(get_logger(), "publish_rate_hzは正の値を指定してください");
@@ -72,11 +94,19 @@ public:
       "serial_rx_" + std::to_string(device_id_), 10,
       std::bind(&DamiaoDriverNode::on_rx, this, std::placeholders::_1));
 
-    state_pub_ = create_publisher<std_msgs::msg::Float32MultiArray>(
-      "damiao/motor" + std::to_string(motor_number) + "/state", 10);
-    cmd_sub_ = create_subscription<std_msgs::msg::Float32MultiArray>(
-      "damiao/motor" + std::to_string(motor_number) + "/cmd", 10,
-      std::bind(&DamiaoDriverNode::on_cmd, this, std::placeholders::_1));
+    for (int i = 0; i < motor_count; ++i) {
+      auto motor = std::make_unique<Motor>();
+      motor->index = static_cast<size_t>(i);  // ESP32の中での順番(データ枠の位置)
+      const int number = first_motor_number + i;  // トピック名の番号
+      motor->tag = "モータ" + std::to_string(number);
+      const std::string prefix = "damiao/motor" + std::to_string(number);
+      motor->state_pub = create_publisher<std_msgs::msg::Float32MultiArray>(prefix + "/state", 10);
+      Motor * raw = motor.get();
+      motor->cmd_sub = create_subscription<std_msgs::msg::Float32MultiArray>(
+        prefix + "/cmd", 10,
+        [this, raw](const std_msgs::msg::Float32MultiArray::SharedPtr msg) {on_cmd(*raw, msg);});
+      motors_.push_back(std::move(motor));
+    }
 
     timer_ = create_wall_timer(
       std::chrono::duration<double>(1.0 / publish_rate_hz),
@@ -90,9 +120,10 @@ public:
 
     RCLCPP_INFO(
       get_logger(),
-      "damiao_driver_node: device_id=%d motor_index=%d cmd_timeout=%.2fs "
-      "(topics: damiao/motor%d/cmd, damiao/motor%d/state)",
-      device_id_, motor_index_, cmd_timeout_sec_, motor_number, motor_number);
+      "damiao_driver_node: device_id=%d motor_count=%d cmd_timeout=%.2fs max_vel=%.2frad/s "
+      "(topics: damiao/motor%d〜%d/cmd, /state)",
+      device_id_, motor_count, cmd_timeout_sec_, max_vel_radps_, first_motor_number,
+      first_motor_number + motor_count - 1);
   }
 
   ~DamiaoDriverNode() override
@@ -104,10 +135,30 @@ public:
 private:
   using SteadyClock = std::chrono::steady_clock;
 
-  void on_cmd(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
+  // モータ1台分の状態
+  struct Motor
+  {
+    size_t index{0};  // 0-origin(スロットの位置)
+    std::string tag;  // ログ用("モータ1"等)
+    rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr state_pub;
+    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr cmd_sub;
+
+    SteadyClock::time_point last_cmd_time{};
+    bool cmd_timed_out{false};
+
+    bool have_feedback{false};
+    int16_t last_fb_counter{0};
+    SteadyClock::time_point last_fb_change_time{};
+    int16_t last_state{kMotorStateDisabled};
+    bool internal_pos_large{false};
+  };
+
+  void on_cmd(Motor & motor, const std_msgs::msg::Float32MultiArray::SharedPtr msg)
   {
     if (msg->data.size() < 3) {
-      RCLCPP_WARN(get_logger(), "cmdは[control_mode, target, vel_limit]の3要素が必要です");
+      RCLCPP_WARN(
+        get_logger(), "[%s] cmdは[control_mode, target, vel_limit]の3要素が必要です",
+        motor.tag.c_str());
       return;
     }
     DamiaoControlMode mode;
@@ -122,11 +173,26 @@ private:
     if (shutting_down_) {
       return;  // 終了処理中は上位からの指令でDISABLEを上書きさせない
     }
-    set_command(tx_data_, static_cast<size_t>(motor_index_), mode, msg->data[1], msg->data[2]);
-    last_cmd_time_ = SteadyClock::now();
-    if (cmd_timed_out_) {
-      RCLCPP_INFO(get_logger(), "cmdを再び受信しました");
-      cmd_timed_out_ = false;
+    double target = msg->data[1];
+    double vel_limit = msg->data[2];
+    // cmdはfloatなので、上限ちょうど(例: 45.6)でも誤差で僅かに超えることがある。1e-3は許容する。
+    if (mode == DamiaoControlMode::kVelocity && std::abs(target) > max_vel_radps_ + 1e-3) {
+      RCLCPP_WARN_THROTTLE(
+        get_logger(), *get_clock(), 2000, "[%s] 速度指令%.2frad/sを上限%.2frad/sに制限しました",
+        motor.tag.c_str(), target, max_vel_radps_);
+      target = std::copysign(max_vel_radps_, target);
+    }
+    if (mode == DamiaoControlMode::kPositionVelocity && vel_limit > max_vel_radps_ + 1e-3) {
+      RCLCPP_WARN_THROTTLE(
+        get_logger(), *get_clock(), 2000, "[%s] 速度上限%.2frad/sを%.2frad/sに制限しました",
+        motor.tag.c_str(), vel_limit, max_vel_radps_);
+      vel_limit = max_vel_radps_;
+    }
+    set_command(tx_data_, motor.index, mode, target, vel_limit);
+    motor.last_cmd_time = SteadyClock::now();
+    if (motor.cmd_timed_out) {
+      RCLCPP_INFO(get_logger(), "[%s] cmdを再び受信しました", motor.tag.c_str());
+      motor.cmd_timed_out = false;
     }
     publish_tx();
   }
@@ -136,28 +202,34 @@ private:
     const auto now = SteadyClock::now();
 
     // 帰還途絶の警告(ros2canは届いているが、モータから返事が無い)
-    if (have_feedback_ && seconds_since(last_fb_change_time_, now) > feedback_timeout_sec_) {
-      RCLCPP_WARN_THROTTLE(
-        get_logger(), *get_clock(), 2000,
-        "モータからの帰還がありません(モータの電源・CAN線を確認してください)");
+    for (const auto & motor : motors_) {
+      if (motor->have_feedback &&
+        seconds_since(motor->last_fb_change_time, now) > feedback_timeout_sec_)
+      {
+        RCLCPP_WARN_THROTTLE(
+          get_logger(), *get_clock(), 2000,
+          "[%s] モータからの帰還がありません(モータの電源・CAN線・ESC_IDを確認してください)",
+          motor->tag.c_str());
+      }
     }
 
     std::lock_guard<std::mutex> lock(tx_mutex_);
     if (shutting_down_) {
       return;
     }
-    const size_t off = motor_slot_offset(static_cast<size_t>(motor_index_));
-    const bool commanding = tx_data_[off + 0] != static_cast<int16_t>(DamiaoControlMode::kDisabled);
-
-    // cmd途絶 -> DISABLE
-    if (commanding && seconds_since(last_cmd_time_, now) > cmd_timeout_sec_) {
-      set_command(
-        tx_data_, static_cast<size_t>(motor_index_), DamiaoControlMode::kDisabled, 0.0, 0.0);
-      cmd_timed_out_ = true;
-      RCLCPP_WARN(
-        get_logger(), "cmdが%.2f秒以上届かないためDISABLEにしました", cmd_timeout_sec_);
+    for (auto & motor : motors_) {
+      const size_t off = motor_slot_offset(motor->index);
+      const bool commanding =
+        tx_data_[off + 0] != static_cast<int16_t>(DamiaoControlMode::kDisabled);
+      // cmd途絶 -> そのモータをDISABLE
+      if (commanding && seconds_since(motor->last_cmd_time, now) > cmd_timeout_sec_) {
+        set_command(tx_data_, motor->index, DamiaoControlMode::kDisabled, 0.0, 0.0);
+        motor->cmd_timed_out = true;
+        RCLCPP_WARN(
+          get_logger(), "[%s] cmdが%.2f秒以上届かないためDISABLEにしました",
+          motor->tag.c_str(), cmd_timeout_sec_);
+      }
     }
-
     publish_tx();
   }
 
@@ -168,34 +240,57 @@ private:
     }
     SlotArray rx{};
     std::copy(msg->data.begin(), msg->data.end(), rx.begin());
-    const auto fb = get_feedback(rx, static_cast<size_t>(motor_index_));
     const auto now = SteadyClock::now();
 
-    // 受信回数が進んでいれば、モータから帰還が届いている
-    if (!have_feedback_ || fb.counter != last_fb_counter_) {
-      last_fb_counter_ = fb.counter;
-      last_fb_change_time_ = now;
-      have_feedback_ = true;
-    }
-    const bool feedback_ok = seconds_since(last_fb_change_time_, now) <= feedback_timeout_sec_;
+    for (auto & motor_ptr : motors_) {
+      Motor & motor = *motor_ptr;
+      const auto fb = get_feedback(rx, motor.index);
 
-    if (feedback_ok && fb.state != last_state_) {
-      if (is_motor_fault(fb.state)) {
-        RCLCPP_ERROR(
-          get_logger(),
-          "モータ故障: 状態%d(%s)。モータは停止しています。復帰するには一度DISABLE(-1)を"
-          "送ってから、改めて指令してください", fb.state, motor_state_name(fb.state));
-      } else {
-        RCLCPP_INFO(get_logger(), "モータ状態: %s", motor_state_name(fb.state));
+      // 受信回数が進んでいれば、モータから帰還が届いている
+      if (!motor.have_feedback || fb.counter != motor.last_fb_counter) {
+        motor.last_fb_counter = fb.counter;
+        motor.last_fb_change_time = now;
+        motor.have_feedback = true;
       }
-      last_state_ = fb.state;
-    }
+      const bool feedback_ok =
+        seconds_since(motor.last_fb_change_time, now) <= feedback_timeout_sec_;
 
-    std_msgs::msg::Float32MultiArray state_msg;
-    state_msg.data = {
-      static_cast<float>(fb.position), static_cast<float>(fb.velocity),
-      static_cast<float>(fb.torque), static_cast<float>(fb.state), feedback_ok ? 1.0f : 0.0f};
-    state_pub_->publish(state_msg);
+      if (feedback_ok && fb.state != motor.last_state) {
+        if (is_motor_fault(fb.state)) {
+          RCLCPP_ERROR(
+            get_logger(),
+            "[%s] モータ故障: 状態%d(%s)。モータは停止しています。復帰するには一度DISABLE(-1)を"
+            "送ってから、改めて指令してください", motor.tag.c_str(), fb.state,
+            motor_state_name(fb.state));
+        } else {
+          RCLCPP_INFO(
+            get_logger(), "[%s] モータ状態: %s", motor.tag.c_str(), motor_state_name(fb.state));
+        }
+        motor.last_state = fb.state;
+      }
+
+      // 内部の位置が大きくなった/戻った時に知らせる
+      const bool large = !std::isnan(fb.internal_pos) && std::abs(fb.internal_pos) > kPosVelMaxInternalRad;
+      if (large != motor.internal_pos_large) {
+        if (large) {
+          RCLCPP_WARN(
+            get_logger(), "[%s] モータ内部の位置が%+.1fradです(±%.0fradを超えた)。ゆっくり回した時に"
+            "位置の読みが正しく変わらなくなり、角度制御は使えません。モータの電源を入れ直すと0に戻ります",
+            motor.tag.c_str(), fb.internal_pos, kPosVelMaxInternalRad);
+        } else {
+          RCLCPP_INFO(get_logger(), "[%s] モータ内部の位置が%+.1fradに戻りました", motor.tag.c_str(),
+            fb.internal_pos);
+        }
+        motor.internal_pos_large = large;
+      }
+
+      std_msgs::msg::Float32MultiArray state_msg;
+      state_msg.data = {
+        static_cast<float>(fb.position), static_cast<float>(fb.velocity),
+        static_cast<float>(fb.torque), static_cast<float>(fb.state), feedback_ok ? 1.0f : 0.0f,
+        static_cast<float>(fb.internal_pos)};
+      motor.state_pub->publish(state_msg);
+    }
   }
 
   void publish_tx()
@@ -214,8 +309,9 @@ private:
     {
       std::lock_guard<std::mutex> lock(tx_mutex_);
       shutting_down_ = true;
-      set_command(
-        tx_data_, static_cast<size_t>(motor_index_), DamiaoControlMode::kDisabled, 0.0, 0.0);
+      for (const auto & motor : motors_) {
+        set_command(tx_data_, motor->index, DamiaoControlMode::kDisabled, 0.0, 0.0);
+      }
     }
     // 直後にプロセスが終了するため、取りこぼし対策として数回送り、
     // 送信が完了するまで少し待つ。
@@ -231,25 +327,18 @@ private:
   }
 
   int device_id_{201};
-  int motor_index_{0};
   double cmd_timeout_sec_{0.5};
   double feedback_timeout_sec_{0.5};
+  double max_vel_radps_{45.6};
   SlotArray tx_data_{};
   std::mutex tx_mutex_;        // tx_data_とshutting_down_を守る
   bool shutting_down_{false};  // trueになったら以後DISABLE以外を送らない
 
-  SteadyClock::time_point last_cmd_time_{};
-  bool cmd_timed_out_{false};
-
-  bool have_feedback_{false};
-  int16_t last_fb_counter_{0};
-  SteadyClock::time_point last_fb_change_time_{};
-  int16_t last_state_{kMotorStateDisabled};
+  // unique_ptrで持つ(cmdのコールバックがMotorのアドレスを保持するため)
+  std::vector<std::unique_ptr<Motor>> motors_;
 
   rclcpp::Publisher<std_msgs::msg::Int16MultiArray>::SharedPtr tx_pub_;
   rclcpp::Subscription<std_msgs::msg::Int16MultiArray>::SharedPtr rx_sub_;
-  rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr state_pub_;
-  rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr cmd_sub_;
   rclcpp::TimerBase::SharedPtr timer_;
   rclcpp::PreShutdownCallbackHandle shutdown_cb_handle_;
 };

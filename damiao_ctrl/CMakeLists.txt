@@ -49,7 +49,32 @@ ament_target_dependencies(
   "sensor_msgs"
 )
 
-install(TARGETS bridge_node frame_codec_selftest damiao_driver_node ps4_teleop_node
+add_executable(motor_monitor src/motor_monitor_node.cpp)
+target_include_directories(motor_monitor PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include/${PROJECT_NAME}>)
+target_compile_features(motor_monitor PUBLIC cxx_std_17)
+ament_target_dependencies(
+  motor_monitor
+  "rclcpp"
+  "std_msgs"
+)
+
+# 自分のプログラムのお手本(docs/開発ガイド.md参照)
+add_executable(example_motor_control src/example_motor_control.cpp)
+target_compile_features(example_motor_control PUBLIC cxx_std_17)
+ament_target_dependencies(
+  example_motor_control
+  "rclcpp"
+  "std_msgs"
+)
+
+install(TARGETS bridge_node frame_codec_selftest damiao_driver_node ps4_teleop_node motor_monitor
+  example_motor_control
+  DESTINATION lib/${PROJECT_NAME})
+
+# 実機なしで試す道具・ESCの設定ツール(ros2 run damiao_ctrl fake_esp32.py などで使える)
+install(PROGRAMS scripts/fake_esp32.py scripts/dm_usbcan_param.py scripts/two_motor_test.py
   DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY launch config

@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
@@ -20,6 +20,11 @@ def generate_launch_description():
         [FindPackageShare('damiao_ctrl'), 'config', 'damiao_ctrl.yaml'])
 
     return LaunchDescription([
+        # このlaunchで起動するノードは同じPC内だけで通信する。既定(SUBNET)だと
+        # 同じWi-Fiの他のPCのノードとつながってしまい、2026-10-15に他PCのjoy_nodeの
+        # /joy(R1を押していない状態)が混ざってR1が0.1秒ごとに押す/離すを繰り返した。
+        # ros2canも同じPCで ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST を付けて起動すること。
+        SetEnvironmentVariable('ROS_AUTOMATIC_DISCOVERY_RANGE', 'LOCALHOST'),
         DeclareLaunchArgument(
             'use_joy', default_value='false',
             description='PS4コントローラのテレオペ(joy_node + ps4_teleop_node)を起動するか '

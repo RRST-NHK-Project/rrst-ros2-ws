@@ -9,17 +9,24 @@
 //            無視する仕様のため、「全ゼロ=DISABLED」を起動直後・通信途絶時の
 //            安全な既定値としている(0=VELモードにしてしまうと、ノードが
 //            落ちた瞬間に最後の指令のまま動き続ける恐れがあるため)。
-//   local 1: target        (0.001単位/LSB。VELモードならrad/s、POS_VELなら rad)
-//   local 2: vel_limit     (0.001 rad/s/LSB。POS_VELモードでのみ使用)
+//   local 1: target        (VELモードなら0.01 rad/s/LSB、POS_VELなら0.001 rad/LSB)
+//   local 2: vel_limit     (0.01 rad/s/LSB。POS_VELモードでのみ使用)
 // 帰還(ESP32 -> ROS):
 //   local 0: motor_state   (モータが返す状態コード。0=Disable, 1=Enable, それ以外=故障。
 //                           kMotorState*参照。ros2canのMODE_DAMIAOファームウェアが設定)
 //   local 1: fb_counter    (ESP32が帰還フレームを受け取るたびに+1。int16で一周する。
 //                           値が進まない=モータから返事が無い(電源OFF・CAN線抜け等))
+//   local 2: internal_pos  (0.1 rad/LSB、不明ならINT16_MIN。モータ内部の位置(レジスタ80)。
+//                           positionはこれを±12.5radに折り返した値。速度制御で何百rad回すと
+//                           大きくなり、ゆっくり回した時に位置が正しく変わらなくなる。
+//                           |internal_pos|>12radのモータはESP32が角度制御(POS_VEL)を有効にしない。
+//                           電源を入れ直すと0に戻る。2026-11-02追加)
 //   local 3: position      (0.001 rad/LSB。出力軸基準、±12.5rad(P_MAX)の範囲)
-//   local 4: velocity      (0.001 rad/s/LSB。出力軸基準。モータ側の分解能は約0.098 rad/s
+//   local 4: velocity      (0.01 rad/s/LSB。出力軸基準。モータ側の分解能は約0.098 rad/s
 //                           (V_MAX=200)で0を表せないため、静止中も±0.049程度を示す)
 //   local 5: torque        (0.001 N・m/LSB)
+// 速度だけ0.01単位なのは、最高速度(無負荷560rpm=58.6rad/s)がint16の0.001単位の
+// 上限(32.767)を超えるため(2026-10-15変更)。ESP32側(ros2canのdamiao.cpp)と一致させること。
 
 #include <algorithm>
 #include <cmath>
@@ -32,7 +39,13 @@ namespace damiao_ctrl
 
 constexpr size_t kSlotsPerMotor = 6;
 constexpr size_t kMaxMotors = kSlotCount / kSlotsPerMotor;  // 4
-constexpr double kScale = 0.001;  // 1 LSB = 0.001 (rad, rad/s, N・m 共通)
+constexpr double kPositionScale = 0.001;  // rad/LSB
+constexpr double kVelocityScale = 0.01;   // rad/s/LSB
+constexpr double kTorqueScale = 0.001;    // N・m/LSB
+constexpr double kInternalPosScale = 0.1;  // rad/LSB
+constexpr int16_t kInternalPosUnknown = INT16_MIN;
+// これを超えるとESP32が角度制御(POS_VEL)を有効にしない(damiao.cppのPOS_VEL_MAX_INTERNAL_RAD)
+constexpr double kPosVelMaxInternalRad = 12.0;
 
 enum class DamiaoControlMode : int16_t
 {
@@ -58,8 +71,10 @@ inline void set_command(
 {
   const size_t off = motor_slot_offset(motor_index);
   tx[off + 0] = static_cast<int16_t>(mode);
-  tx[off + 1] = clamp_to_i16(target / kScale);
-  tx[off + 2] = clamp_to_i16(vel_limit / kScale);
+  const double target_scale =
+    (mode == DamiaoControlMode::kVelocity) ? kVelocityScale : kPositionScale;
+  tx[off + 1] = clamp_to_i16(target / target_scale);
+  tx[off + 2] = clamp_to_i16(vel_limit / kVelocityScale);
 }
 
 // モータの状態コード(DM-S2325-1EC説明書の帰還フレームERR欄)。
@@ -97,6 +112,7 @@ struct MotorFeedback
   double position{0.0};
   double velocity{0.0};
   double torque{0.0};
+  double internal_pos{std::nan("")};  // モータ内部の位置[rad]。不明ならNaN
 };
 
 inline MotorFeedback get_feedback(const SlotArray & rx, size_t motor_index)
@@ -105,9 +121,12 @@ inline MotorFeedback get_feedback(const SlotArray & rx, size_t motor_index)
   MotorFeedback fb;
   fb.state = rx[off + 0];
   fb.counter = rx[off + 1];
-  fb.position = static_cast<double>(rx[off + 3]) * kScale;
-  fb.velocity = static_cast<double>(rx[off + 4]) * kScale;
-  fb.torque = static_cast<double>(rx[off + 5]) * kScale;
+  fb.position = static_cast<double>(rx[off + 3]) * kPositionScale;
+  fb.velocity = static_cast<double>(rx[off + 4]) * kVelocityScale;
+  fb.torque = static_cast<double>(rx[off + 5]) * kTorqueScale;
+  if (rx[off + 2] != kInternalPosUnknown) {
+    fb.internal_pos = static_cast<double>(rx[off + 2]) * kInternalPosScale;
+  }
   return fb;
 }
 
