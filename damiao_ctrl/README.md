@@ -22,7 +22,7 @@ Damiao DM2325(モータ) + DM3520(ESC) を ESP32 経由のCAN通信で
         +------------------------------------------  [DM3520 ESC] -- [DM2325]
 ```
 
-- PC-ESP32間は RRST-NHK-Project/ros2can を使う(`~/claude_ws/src/ros2can`)。
+- PC-ESP32間は RRST-NHK-Project/ros2can を使う(`~/ros2_ws/src/ros2can`)。
   ESP32には ros2can の `firmware/xiao-esp32-s3_can2io` を `MODE_DAMIAO`・
   `DEVICE_ID 201` で書き込む(Damiaoの設定は同ファームの `config.hpp` の
   `DAMIAO_*`)。旧来の `bridge_node` は `use_builtin_bridge:=true` の時だけ使う。
@@ -70,7 +70,7 @@ Damiao DM2325(モータ) + DM3520(ESC) を ESP32 経由のCAN通信で
 ## ビルド
 
 ```bash
-cd ~/claude_ws
+cd ~/ros2_ws
 colcon build --packages-select damiao_ctrl
 source install/setup.bash
 ```
@@ -92,17 +92,17 @@ PS4の入力が混ざったり、他PCの指令がモータに届いたりする
 
 ```bash
 # ターミナル1: PC<->ESP32の通信(ros2can)
-export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST && source ~/claude_ws/install/setup.bash && ros2 run ros2can ros2can --nogui
+export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST && source ~/ros2_ws/install/setup.bash && ros2 run ros2can ros2can --nogui
 ```
 
 ```bash
 # ターミナル2: 駆動ノード + PS4テレオペ(R1を押している間だけ動く)
-export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST && source ~/claude_ws/install/setup.bash && ros2 launch damiao_ctrl damiao_ctrl.launch.py use_joy:=true
+export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST && source ~/ros2_ws/install/setup.bash && ros2 launch damiao_ctrl damiao_ctrl.launch.py use_joy:=true
 ```
 
 ```bash
 # ターミナル3: 回転数の表示(rpm。指令は送らない。2台なら1台1行)
-export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST && source ~/claude_ws/install/setup.bash && ros2 run damiao_ctrl motor_monitor --ros-args --params-file ~/claude_ws/install/damiao_ctrl/share/damiao_ctrl/config/damiao_ctrl.yaml
+export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST && source ~/ros2_ws/install/setup.bash && ros2 run damiao_ctrl motor_monitor --ros-args --params-file ~/ros2_ws/install/damiao_ctrl/share/damiao_ctrl/config/damiao_ctrl.yaml
 ```
 
 終了はターミナル2 → ターミナル1の順にCtrl+C。
@@ -127,10 +127,10 @@ ros2 topic pub -r 20 damiao/motor1/cmd std_msgs/msg/Float32MultiArray "{data: [0
 - DM3520は工場出荷時 ESC_ID=1, MST_ID=0x000 なので、2台目以降は達妙USB-CAN(DM-USBCU1)を
   そのESCだけにつないで `scripts/dm_usbcan_param.py` で書き換える(ros2canは止めておく):
   ```bash
-  python3 ~/claude_ws/src/damiao_ctrl/scripts/dm_usbcan_param.py scan
+  python3 ~/ros2_ws/src/damiao_ctrl/scripts/dm_usbcan_param.py scan
   ```
   ```bash
-  python3 ~/claude_ws/src/damiao_ctrl/scripts/dm_usbcan_param.py set-id --id 1 --new-id 2 --new-mst 0x12
+  python3 ~/ros2_ws/src/damiao_ctrl/scripts/dm_usbcan_param.py set-id --id 1 --new-id 2 --new-mst 0x12
   ```
   MST_IDを台ごとに変えるのは、2台が同じCAN IDで同時に帰還を返すと衝突するため。
 - 配線: 2台のCANH同士・CANL同士をつないでSOKI基板のCAN1へ(並列)。終端抵抗はバスの両端に

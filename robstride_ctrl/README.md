@@ -20,7 +20,7 @@ ROS 2 (Jazzy) パッケージ。PS4 コントローラ (USB 有線) でのテレ
                                         [RobStride EduLite 05]
 ```
 
-- PC と ESP32 の間は RRST-NHK-Project/ros2can を使う (`~/claude_ws/src/ros2can`)。
+- PC と ESP32 の間は RRST-NHK-Project/ros2can を使う (`~/ros2_ws/src/ros2can`)。
   ESP32 には ros2can の `firmware/xiao-esp32-s3_can2io` を `MODE_ROBSTRIDE`・`DEVICE_ID 202`
   で書き込む。設定は同じファームの `config.hpp` にある `ROBSTRIDE_*`。
 - ESP32 と EL05 の間は RobStride の独自 (私有) プロトコルを使う。
@@ -79,7 +79,7 @@ cmd が `cmd_timeout_sec` (既定 0.5 秒) より長く届かないと、自動�
 ## ビルド
 
 ```bash
-cd ~/claude_ws && colcon build --packages-select robstride_ctrl && source install/setup.bash
+cd ~/ros2_ws && colcon build --packages-select robstride_ctrl && source install/setup.bash
 ```
 
 ## 実行
@@ -89,17 +89,17 @@ cd ~/claude_ws && colcon build --packages-select robstride_ctrl && source instal
 
 ```bash
 # ターミナル1: PCとESP32の通信
-export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST && source ~/claude_ws/install/setup.bash && ros2 run ros2can ros2can --nogui
+export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST && source ~/ros2_ws/install/setup.bash && ros2 run ros2can ros2can --nogui
 ```
 
 ```bash
 # ターミナル2: 駆動ノード (PS4 を使うときは use_joy:=true を付ける)
-export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST && source ~/claude_ws/install/setup.bash && ros2 launch robstride_ctrl robstride_ctrl.launch.py
+export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST && source ~/ros2_ws/install/setup.bash && ros2 launch robstride_ctrl robstride_ctrl.launch.py
 ```
 
 ```bash
 # ターミナル3: 表示 (指令は送らない)
-export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST && source ~/claude_ws/install/setup.bash && ros2 run robstride_ctrl motor_monitor
+export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST && source ~/ros2_ws/install/setup.bash && ros2 run robstride_ctrl motor_monitor
 ```
 
 ```bash

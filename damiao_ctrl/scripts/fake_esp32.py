@@ -5,7 +5,7 @@ ros2can と実機の代わりに、serial_tx_<ID> を受け取り serial_rx_<ID>
 damiao_driver_node・ps4_teleop_node・自分のプログラムは、実機の時と同じように動かせる。
 
 使い方(ターミナル1で。ros2canは起動しないこと):
-  export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST && source ~/claude_ws/install/setup.bash
+  export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST && source ~/ros2_ws/install/setup.bash
   ros2 run damiao_ctrl fake_esp32.py                  # DEVICE_ID 201、モータ2台
   ros2 run damiao_ctrl fake_esp32.py --motors 4       # 4台
   ros2 run damiao_ctrl fake_esp32.py --device-id 204  # 2枚目のESP32のふり
