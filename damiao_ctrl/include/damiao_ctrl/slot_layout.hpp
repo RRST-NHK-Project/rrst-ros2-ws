@@ -81,10 +81,22 @@ inline void set_command(
 constexpr int16_t kMotorStateDisabled = 0;
 constexpr int16_t kMotorStateEnabled = 1;
 constexpr int16_t kMotorStateCommLost = 0xD;  // 通信喪失(モータ側タイムアウト)
+// 15はモータではなくESP32が付ける印: 「止めたまま(ラッチ)。一度0(脱力)を送ると解除」。
+// PC途絶・モータの故障・帰還途絶の後と、ESP32の起動直後に出る(2026-11-06 ファーム変更。
+// ros2can/firmware/xiao-esp32-s3_can2io/src/damiao.cpp の STATE_LATCHED と一致させること)。
+constexpr int16_t kMotorStateLatched = 15;
 
+// ESP32が止めたまま(ラッチ中)か
+inline bool is_esp32_latched(int16_t state)
+{
+  return state == kMotorStateLatched;
+}
+
+// モータ自身の故障か(ESP32のラッチ15は含めない)
 inline bool is_motor_fault(int16_t state)
 {
-  return state != kMotorStateDisabled && state != kMotorStateEnabled;
+  return state != kMotorStateDisabled && state != kMotorStateEnabled &&
+         state != kMotorStateLatched;
 }
 
 inline const char * motor_state_name(int16_t state)
@@ -101,6 +113,7 @@ inline const char * motor_state_name(int16_t state)
     case 0xC: return "コイル過熱";
     case 0xD: return "通信喪失";
     case 0xE: return "過負荷";
+    case kMotorStateLatched: return "ESP32が停止中(一度0(脱力)を送ると解除)";
     default: return "不明";
   }
 }

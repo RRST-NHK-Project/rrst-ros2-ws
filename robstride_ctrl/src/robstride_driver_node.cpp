@@ -17,8 +17,10 @@
 //   motor_mode: 0=停止 1=校正中 2=運転
 //   fault_flags: 下位6bit=モータの故障、256=ESP32が止めた(ラッチ)、512=位置未取得
 //
-// 異常からの復帰: 運転中にモータが止まった(故障・CAN途絶・電源断)場合、ESP32が止めたまま
-// ラッチし、PCが指令を出し続けても再始動しない。一度DISABLE(-1)を送ってから改めて指令する。
+// 異常からの復帰: 運転中にモータが止まった(故障・CAN途絶・電源断)場合と、PCからの指令が
+// 途絶えた場合(ros2canの停止・USB抜け)、ESP32が止めたままラッチし、PCが指令を出し続けても
+// 再始動しない(通信が戻っただけでは動かない。ESP32の起動直後も同じ)。
+// 一度DISABLE(-1)を送ってから改めて指令する(2026-11-06 ファーム変更)。
 //
 // 同一device_idに対して駆動ノードは1つだけを想定している(複数ノードが同時に
 // serial_tx_<ID>へpublishすると互いの担当外スロットを0で上書きしてしまうため)。
@@ -261,10 +263,11 @@ private:
         RCLCPP_ERROR(get_logger(), "モータ故障: %s(0x%02x)", names.str().c_str(), faults);
       }
       if ((fb.flags & kFlagLatched) && !(last_flags_ & kFlagLatched)) {
-        RCLCPP_ERROR(
+        // 起動直後にも一度出る(このノードが脱力を送ればすぐ外れる)のでWARNにする
+        RCLCPP_WARN(
           get_logger(),
-          "運転中にモータが止まったため、ESP32が停止を保持しています。復帰するには一度"
-          "DISABLE(-1)を送ってから、改めて指令してください");
+          "ESP32がモータを止めています(起動直後・PCとの通信の途絶・運転中にモータが止まった後)。"
+          "動かすには一度DISABLE(-1)を送ってから、改めて指令してください");
       }
       if (!(fb.flags & kFlagPositionUnknown) && (last_flags_ & kFlagPositionUnknown)) {
         RCLCPP_INFO(get_logger(), "モータの位置を読めました: %.3f rad", fb.position);

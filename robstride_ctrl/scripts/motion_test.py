@@ -71,7 +71,7 @@ class MotionTest(Node):
         if flags & FAULT_MASK:
             raise RuntimeError(f'モータ故障 flags=0x{flags:x}')
         if flags & FLAG_LATCHED and mode != DISABLE:
-            raise RuntimeError('ESP32がモータを停止させました(運転中にモータが止まった)')
+            raise RuntimeError('ESP32がモータを停止させました(運転中にモータが止まった・通信が途絶えた)')
 
     def wait_state(self, timeout: float = 3.0) -> list[float]:
         end = time.monotonic() + timeout
@@ -79,7 +79,10 @@ class MotionTest(Node):
             self.send(DISABLE)
             rclpy.spin_once(self, timeout_sec=0.02)
             s = self.state
-            if s is not None and s[4] > 0.5 and not int(s[5]) & FLAG_POS_UNKNOWN:
+            # ESP32は起動直後・通信の途絶の後にラッチしている(2026-11-06 ファーム変更)。
+            # DISABLEを送り続けてラッチが外れるまで待つ(外れる前に動かすと即エラーになるため)
+            if (s is not None and s[4] > 0.5 and not int(s[5]) & FLAG_POS_UNKNOWN
+                    and not int(s[5]) & FLAG_LATCHED):
                 return s
         raise RuntimeError('モータの帰還・位置が届きません(ros2can・ESP32・モータの電源を確認)')
 

@@ -17,14 +17,17 @@
 //
 // ■ state(このノードが送る。data=[位置, 速度, トルク, 状態, 帰還OK, 内部の位置])
 //   位置[rad]: ±12.5radで一周する  速度[rad/s]  トルク[N・m]
-//   状態: 0=脱力 1=有効 それ以外=故障(13=通信喪失)
+//   状態: 0=脱力 1=有効 15=ESP32が止めている(下の「止まった後の復帰」) それ以外=故障(13=通信喪失)
 //   帰還OK: 1=モータから返事が届いている 0=途絶(電源OFF・CAN線抜けなど)
 //   内部の位置[rad]: モータが内部で数えている位置(不明ならNaN)。±12radを超えていると
 //                    角度制御は使えない(モータの電源を入れ直すと0に戻る)
 //
-// ■ 故障からの復帰
+// ■ 止まった後の復帰(故障・状態15)
 //   故障するとモータは自分で止まり、指令を出し続けても再始動しない。
-//   一度 [-1,0,0](脱力)を送ってから、改めて指令すると復帰する。
+//   ESP32も、PCとの通信が途絶えた・モータの返事が途絶えた・故障した時に止めて、状態を15にする
+//   (通信が戻っただけでは動かない。2026-11-06 ファーム変更)。
+//   どちらも、一度 [-1,0,0](脱力)を送ってから、改めて指令すると復帰する。
+//   PS4テレオペならR1を一度離せばよい。
 //
 // ■ 【よく変える場所】config/damiao_ctrl.yaml の damiao_driver_node:
 //   device_id(ESP32のDEVICE_ID)、motor_count(台数)、first_motor_number(2枚目以降のESP32用)
@@ -256,7 +259,12 @@ private:
         seconds_since(motor.last_fb_change_time, now) <= feedback_timeout_sec_;
 
       if (feedback_ok && fb.state != motor.last_state) {
-        if (is_motor_fault(fb.state)) {
+        if (is_esp32_latched(fb.state)) {
+          RCLCPP_WARN(
+            get_logger(),
+            "[%s] ESP32がモータを止めています(状態15。起動直後・PCとの通信の途絶・モータの返事の途絶・故障の後)。"
+            "一度DISABLE(-1)を送る(PS4ならR1を離す)と解除されます", motor.tag.c_str());
+        } else if (is_motor_fault(fb.state)) {
           RCLCPP_ERROR(
             get_logger(),
             "[%s] モータ故障: 状態%d(%s)。モータは停止しています。復帰するには一度DISABLE(-1)を"

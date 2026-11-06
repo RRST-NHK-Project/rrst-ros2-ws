@@ -13,7 +13,9 @@ damiao_driver_node・ps4_teleop_node・自分のプログラムは、実機の�
 まねしていること(本物のESP32ファームウェア damiao.cpp と同じ決まり):
   ・データ枠(1台6個)の意味と単位
   ・有効化に約0.25秒かかる(脱力→エラー解除→設定書き込み→有効化)
-  ・PCからの指令が0.3秒途絶えたら全台脱力
+  ・PCからの指令が0.3秒途絶えたら全台脱力して止めたままにする(状態15)。
+    通信が戻っても動かず、PCが一度0(脱力)を送ると解除。起動直後も同じ(2026-11-06 ファーム変更)
+  ・速度は±45.6rad/sに丸める。角度制御の速さ上限が0以下なら有効にしない
   ・角度制御は、モータ内部の位置が±12rad以内の時だけ有効になる
   ・位置の返事は±12.5radで一周する
 まねしていないこと: 故障・通信喪失(13)、重さや摩擦、ゆっくり回した時の位置の精度の問題。
@@ -31,6 +33,8 @@ P_MAX = 12.5            # 位置の返事が一周する範囲[rad]
 POS_VEL_MAX_INTERNAL = 12.0
 ENABLE_DELAY = 0.25     # 有効化にかかる時間[s]
 LINK_TIMEOUT = 0.3      # PCの指令が途絶えたら脱力するまで[s]
+MAX_VEL = 45.6          # 速度の上限[rad/s](ファームのDAMIAO_MAX_VEL_RADPS)
+STATE_LATCHED = 15      # ESP32が止めたまま(一度0を送ると解除)
 MAX_ACCEL = 100.0       # 速さの変わり方の上限[rad/s^2](本物より大ざっぱ)
 POS_GAIN = 20.0         # 角度制御で目標へ向かう強さ[1/s]
 
@@ -44,8 +48,23 @@ class FakeMotor:
         self.vel = 0.0
         self.torque = 0.0
         self.counter = 0
+        self.latched = True      # ESP32が止めたままか(起動直後はPCが0を送るまで動かさない)
+
+    def update_latch(self, pc_mode, link_lost):
+        # 本物の damiao.cpp と同じ: 途絶でラッチ。外れるのは、PCが実際に0を送った時だけ
+        if link_lost:
+            self.latched = True
+        elif pc_mode == 0:
+            self.latched = False
+        return 0 if self.latched else pc_mode
 
     def update(self, mode, target, vel_limit, dt, now):
+        if mode == 1:
+            target = max(-MAX_VEL, min(MAX_VEL, target))
+        elif mode == 2:
+            if vel_limit <= 0.0:
+                mode = 0
+            vel_limit = min(vel_limit, MAX_VEL)
         # 角度制御は内部の位置が大きいと有効にしない(本物と同じ安全策)
         if mode == 2 and not (self.enabled and self.mode == 2) and abs(self.pos) > POS_VEL_MAX_INTERNAL:
             mode = 0
@@ -70,7 +89,7 @@ class FakeMotor:
 
     def slots(self):
         wrapped = (self.pos + P_MAX) % (2 * P_MAX) - P_MAX
-        state = 1 if self.enabled else 0
+        state = STATE_LATCHED if self.latched else (1 if self.enabled else 0)
 
         def clamp16(x):
             return max(-32767, min(32767, int(round(x))))
@@ -115,7 +134,7 @@ def main():
             out = [0] * 24
             for i, m in enumerate(motors):
                 o = i * SLOTS_PER_MOTOR
-                mode = 0 if link_lost else rx["data"][o]
+                mode = m.update_latch(rx["data"][o], link_lost)
                 target = rx["data"][o + 1] * (0.01 if mode == 1 else 0.001)
                 vel_limit = rx["data"][o + 2] * 0.01
                 m.update(mode, target, vel_limit, dt, now)

@@ -152,6 +152,8 @@ private:
       condition = "帰還途絶";
     } else if (!std::isnan(m.internal_pos) && std::abs(m.internal_pos) > kPosVelMaxInternalRad) {
       condition = "内部の位置が大きい(角度制御不可。電源を入れ直すと0に戻る)";
+    } else if (is_esp32_latched(m.motor_state)) {
+      condition = "ESP32が停止中(一度0(脱力)を送ると解除。PS4ならR1を離す)";
     } else if (is_motor_fault(m.motor_state)) {
       condition = std::string("故障: ") + motor_state_name(m.motor_state);
     } else {

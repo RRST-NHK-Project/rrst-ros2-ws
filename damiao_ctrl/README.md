@@ -23,9 +23,10 @@ Damiao DM2325(モータ) + DM3520(ESC) を ESP32 経由のCAN通信で
 ```
 
 - PC-ESP32間は RRST-NHK-Project/ros2can を使う(`~/ros2_ws/src/ros2can`)。
-  ESP32には ros2can の `firmware/xiao-esp32-s3_can2io` を `MODE_DAMIAO`・
-  `DEVICE_ID 201` で書き込む(Damiaoの設定は同ファームの `config.hpp` の
-  `DAMIAO_*`)。旧来の `bridge_node` は `use_builtin_bridge:=true` の時だけ使う。
+  ESP32には ros2can の `generated_firmware/soki_damiao_201`(`MODE_DAMIAO`・
+  `DEVICE_ID 201` で生成済み)を書き込む(Damiaoの設定は同フォルダの `src/config.hpp` の
+  `DAMIAO_*`)。テンプレート `firmware/xiao-esp32-s3_can2io` は既定(MODE_CAN_HOST)のままにする
+  (2026-11-06 PRレビュー指摘)。CAN線はDamiao専用にすること(CAN IDが他のモードと重なるため)。旧来の `bridge_node` は `use_builtin_bridge:=true` の時だけ使う。
 - ESP32-DM3520間は達妙(Damiao)公式のCANプロトコル(VEL/POS_VELモード)。
   帰還は Master ID(0x000)で届く。
 
@@ -39,7 +40,7 @@ Damiao DM2325(モータ) + DM3520(ESC) を ESP32 経由のCAN通信で
 | 0 | ROS→ESP32 | mode_word (0=DISABLE, 1=VEL, 2=POS_VEL) | - |
 | 1 | ROS→ESP32 | target (VEL:rad/s, POS_VEL:rad) | VEL:0.01 / POS_VEL:0.001 |
 | 2 | ROS→ESP32 | vel_limit (POS_VELのみ有効) | 0.01 rad/s |
-| 0 | ESP32→ROS | motor_state (0=Disable, 1=Enable, それ以外=故障。13=通信喪失) | - |
+| 0 | ESP32→ROS | motor_state (0=Disable, 1=Enable, 15=ESP32が停止中(一度0を送ると解除), それ以外=故障。13=通信喪失) | - |
 | 1 | ESP32→ROS | fb_counter (帰還を受け取るたび+1。止まったら帰還途絶) | - |
 | 3 | ESP32→ROS | position (出力軸、±12.5rad) | 0.001 rad |
 | 4 | ESP32→ROS | velocity (出力軸、モータ側分解能約0.098rad/sで静止中も±0.049) | 0.01 rad/s |
@@ -135,7 +136,7 @@ ros2 topic pub -r 20 damiao/motor1/cmd std_msgs/msg/Float32MultiArray "{data: [0
   MST_IDを台ごとに変えるのは、2台が同じCAN IDで同時に帰還を返すと衝突するため。
 - 配線: 2台のCANH同士・CANL同士をつないでSOKI基板のCAN1へ(並列)。終端抵抗はバスの両端に
   120Ω(電源OFFでCANH-CANL間が約60Ωになる)。
-- ESP32ファーム(ros2canのconfig.hpp): `DAMIAO_MOTOR_COUNT 2`、`DAMIAO_MOTOR_ID_n`/`DAMIAO_MASTER_ID_n`。
+- ESP32ファーム(`generated_firmware/soki_damiao_201/src/config.hpp`): `DAMIAO_MOTORS` の表に1台1行 `{ESC_ID, MST_ID}`。
   有効化シーケンスは台ごとに非同期で進む(1台の有効化中も他の台への指令は途切れない)。
 - PC側(config/damiao_ctrl.yaml): `damiao_driver_node.motor_count: 2`、
   `ps4_teleop_node.motor_numbers: [1, 2]` / `control_modes: ["velocity", "angle"]` /
