@@ -40,7 +40,7 @@ Damiao DM2325(モータ) + DM3520(ESC) を ESP32 経由のCAN通信で
 | 0 | ROS→ESP32 | mode_word (0=DISABLE, 1=VEL, 2=POS_VEL) | - |
 | 1 | ROS→ESP32 | target (VEL:rad/s, POS_VEL:rad) | VEL:0.01 / POS_VEL:0.001 |
 | 2 | ROS→ESP32 | vel_limit (POS_VELのみ有効) | 0.01 rad/s |
-| 0 | ESP32→ROS | motor_state (0=Disable, 1=Enable, 15=ESP32が停止中(一度0を送ると解除), それ以外=故障。13=通信喪失) | - |
+| 0 | ESP32→ROS | motor_state (0=Disable, 1=Enable, 15=止めたまま(ESP32または駆動ノードが止めている。一度0を送ると解除), それ以外=故障。13=通信喪失) | - |
 | 1 | ESP32→ROS | fb_counter (帰還を受け取るたび+1。止まったら帰還途絶) | - |
 | 3 | ESP32→ROS | position (出力軸、±12.5rad) | 0.001 rad |
 | 4 | ESP32→ROS | velocity (出力軸、モータ側分解能約0.098rad/sで静止中も±0.049) | 0.01 rad/s |

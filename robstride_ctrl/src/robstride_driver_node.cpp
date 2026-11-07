@@ -21,6 +21,11 @@
 // 途絶えた場合(ros2canの停止・USB抜け)、ESP32が止めたままラッチし、PCが指令を出し続けても
 // 再始動しない(通信が戻っただけでは動かない。ESP32の起動直後も同じ)。
 // 一度DISABLE(-1)を送ってから改めて指令する(2026-11-06 ファーム変更)。
+// このノードも、指令中に帰還がfeedback_timeout_sec途絶えた時と、ESP32の止めた印(0x100)を
+// 受け取った時は、止めたままにして0x100を立てて返す(2026-11-07、Damiaoの実機テストで判明:
+// ros2canは起動直後、このノードの指令が届くまでの1〜2秒間、全部0の指令を送る。ESP32はそれを
+// 「PCが0を送った」と区別できず止めたままを解除し、直後に届いた指令で動き出した)。
+// これもDISABLE(-1)を一度送ると解除される。
 //
 // 同一device_idに対して駆動ノードは1つだけを想定している(複数ノードが同時に
 // serial_tx_<ID>へpublishすると互いの担当外スロットを0で上書きしてしまうため)。
@@ -136,6 +141,13 @@ private:
     if (shutting_down_) {
       return;  // 終了処理中は上位からの指令でDISABLEを上書きさせない
     }
+    if (hold_) {
+      if (mode != RobstrideControlMode::kDisabled) {
+        return;  // 止めたまま。DISABLEが届くまで指令を通さない(start_holdで脱力にしてある)
+      }
+      hold_ = false;
+      RCLCPP_INFO(get_logger(), "DISABLEを受け取ったので、止めたままを解除しました(また指令できます)");
+    }
     if (mode == RobstrideControlMode::kPosition && !position_ready_) {
       RCLCPP_WARN_THROTTLE(
         get_logger(), *get_clock(), 2000,
@@ -194,8 +206,13 @@ private:
     const auto current_mode = static_cast<RobstrideControlMode>(tx_data_[off + 0]);
     const bool commanding = current_mode != RobstrideControlMode::kDisabled;
 
-    // cmd途絶 -> DISABLE
-    if (commanding && seconds_since(last_cmd_time_, now) > cmd_timeout_sec_) {
+    // 指令中に帰還が途絶えた(ros2canが落ちた・USBが抜けた・モータの電源が切れた) -> 止めたまま
+    if (commanding && have_feedback_ &&
+      seconds_since(last_fb_change_time_, now) > feedback_timeout_sec_)
+    {
+      start_hold("指令中にモータからの帰還が途絶えた");
+    } else if (commanding && seconds_since(last_cmd_time_, now) > cmd_timeout_sec_) {
+      // cmd途絶 -> DISABLE
       set_command(
         tx_data_, static_cast<size_t>(motor_index_), RobstrideControlMode::kDisabled, 0.0, 0.0);
       cmd_timed_out_ = true;
@@ -227,9 +244,19 @@ private:
       have_feedback_ = true;
     }
     const bool feedback_ok = seconds_since(last_fb_change_time_, now) <= feedback_timeout_sec_;
+    bool hold = false;
     {
       std::lock_guard<std::mutex> lock(tx_mutex_);
       position_ready_ = feedback_ok && !(fb.flags & kFlagPositionUnknown);
+      // 指令中にESP32が止めた(0x100) -> このノードでも止めたままにする
+      // (ESP32の止めたままは、ros2canの起動直後の0で外れてしまうことがあるため)
+      const size_t off = motor_slot_offset(static_cast<size_t>(motor_index_));
+      const bool commanding =
+        static_cast<RobstrideControlMode>(tx_data_[off + 0]) != RobstrideControlMode::kDisabled;
+      if (!shutting_down_ && feedback_ok && commanding && (fb.flags & kFlagLatched)) {
+        start_hold("ESP32がモータを止めた(0x100)");
+      }
+      hold = hold_;
     }
 
     report_changes(fb, feedback_ok);
@@ -239,7 +266,9 @@ private:
     state_msg.data = {
       static_cast<float>(fb.position), static_cast<float>(fb.velocity),
       static_cast<float>(fb.torque), static_cast<float>(fb.mode), feedback_ok ? 1.0f : 0.0f,
-      static_cast<float>(fb.flags), static_cast<float>(fb.temperature)};
+      // 止めたまま中は0x100を立てて返す(ESP32が止めた時と同じ印)
+      static_cast<float>(hold ? (fb.flags | kFlagLatched) : fb.flags),
+      static_cast<float>(fb.temperature)};
     state_pub_->publish(state_msg);
   }
 
@@ -297,6 +326,21 @@ private:
     }
   }
 
+  // 止めたままにする(すぐ脱力にし、上位が一度DISABLEを送るまで指令を通さない)。
+  // tx_mutex_を持って呼ぶこと。
+  void start_hold(const char * reason)
+  {
+    if (hold_) {
+      return;
+    }
+    hold_ = true;
+    set_command(
+      tx_data_, static_cast<size_t>(motor_index_), RobstrideControlMode::kDisabled, 0.0, 0.0);
+    RCLCPP_WARN(
+      get_logger(), "%sため、モータを止めたままにします。一度DISABLE(-1)を送ると、また指令できます",
+      reason);
+  }
+
   void publish_tx()
   {
     std_msgs::msg::Int16MultiArray msg;
@@ -332,9 +376,10 @@ private:
   double feedback_timeout_sec_{0.5};
   double max_vel_radps_{20.0};
   SlotArray tx_data_{};
-  std::mutex tx_mutex_;        // tx_data_, shutting_down_, position_ready_を守る
+  std::mutex tx_mutex_;        // tx_data_, shutting_down_, position_ready_, hold_を守る
   bool shutting_down_{false};  // trueになったら以後DISABLE以外を送らない
   bool position_ready_{false}; // 帰還があり、位置(mechPos)を読めている
+  bool hold_{false};           // 止めたまま(上位が一度DISABLEを送るまで指令を通さない)
 
   SteadyClock::time_point last_cmd_time_{};
   bool cmd_timed_out_{false};

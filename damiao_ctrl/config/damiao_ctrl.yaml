@@ -18,7 +18,7 @@ damiao_bridge_node:
 damiao_driver_node:
   ros__parameters:
     device_id: 201             # ESP32ファームウェア(config.hppのDEVICE_ID)と同じ番号
-    motor_count: 2             # このESP32につないだ台数 = config.hppのDAMIAO_MOTORSの行数
+    motor_count: 3             # このESP32につないだ台数 = config.hppのDAMIAO_MOTORSの行数
     first_motor_number: 1      # トピック名の最初の番号(damiao/motor1〜)。2枚目以降のESP32で使う
     cmd_timeout_sec: 0.5       # cmdがこの時間届かないと自動でDISABLE
     feedback_timeout_sec: 0.5  # モータ帰還がこの時間途絶えたらfeedback_ok=0にして警告
@@ -28,11 +28,11 @@ damiao_driver_node:
 ps4_teleop_node:
   ros__parameters:
     # 番号は2026-10-14実機確認済み(DualShock 4 USB有線, joy 3.3.0, 軸8本・ボタン13個)
-    motor_numbers: [1, 2]                  # 動かすモータ
-    control_modes: ["velocity", "angle"]   # velocity=スティック上下で速度 / angle=スティックを倒した方向を向く
-    stick_y_axes: [1, 4]                   # 上下の軸: 1=左スティック, 4=右スティック(上が+)
-    stick_x_axes: [0, 3]                   # 左右の軸: 0=左スティック, 3=右スティック(angleで使う)
-    invert_axes: [false, false]            # velocity: 回転方向を逆に / angle: 向きを鏡写しに(右に倒して左を向く時true)
+    motor_numbers: [1, 2, 3]               # 動かすモータ(3=DM3519。2026-11-07追加)
+    control_modes: ["velocity", "angle", "velocity"]   # velocity=スティック上下で速度 / angle=スティックを倒した方向を向く
+    stick_y_axes: [1, 4, 0]                # 上下の軸: 1=左スティック, 4=右スティック(上が+)。モータ3だけ0=左スティックの左右(左が+)
+    stick_x_axes: [0, 3, 0]                # 左右の軸: 0=左スティック, 3=右スティック(angleで使う)
+    invert_axes: [false, false, true]      # velocity: 回転方向を逆に / angle: 向きを鏡写しに(右に倒して左を向く時true)。モータ3はtrue=右に倒すと+
     deadman_button_index: 5    # R1(押している間だけ動く)
     estop_button_index: 9      # Options(E-STOP)
     zero_button_index: 2       # △(角度制御のモータの今の向きを「スティック上」にする)
@@ -46,4 +46,4 @@ ps4_teleop_node:
 # 回転数の表示(ros2 run damiao_ctrl motor_monitor --ros-args --params-file <このファイル>)
 motor_monitor:
   ros__parameters:
-    motor_numbers: [1, 2]
+    motor_numbers: [1, 2, 3]

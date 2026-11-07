@@ -17,7 +17,7 @@
 //
 // ■ state(このノードが送る。data=[位置, 速度, トルク, 状態, 帰還OK, 内部の位置])
 //   位置[rad]: ±12.5radで一周する  速度[rad/s]  トルク[N・m]
-//   状態: 0=脱力 1=有効 15=ESP32が止めている(下の「止まった後の復帰」) それ以外=故障(13=通信喪失)
+//   状態: 0=脱力 1=有効 15=止めたまま(下の「止まった後の復帰」) それ以外=故障(13=通信喪失)
 //   帰還OK: 1=モータから返事が届いている 0=途絶(電源OFF・CAN線抜けなど)
 //   内部の位置[rad]: モータが内部で数えている位置(不明ならNaN)。±12radを超えていると
 //                    角度制御は使えない(モータの電源を入れ直すと0に戻る)
@@ -26,7 +26,12 @@
 //   故障するとモータは自分で止まり、指令を出し続けても再始動しない。
 //   ESP32も、PCとの通信が途絶えた・モータの返事が途絶えた・故障した時に止めて、状態を15にする
 //   (通信が戻っただけでは動かない。2026-11-06 ファーム変更)。
-//   どちらも、一度 [-1,0,0](脱力)を送ってから、改めて指令すると復帰する。
+//   このノードも、指令中にモータの返事が feedback_timeout_sec 途絶えた時と、状態15を
+//   受け取った時は、そのモータを止めたままにし、状態を15として返す。
+//   ※ESP32だけでは足りないため(2026-11-07実機テストで判明): ros2canは起動直後、このノードの
+//     指令が届くまでの1〜2秒間、全部0の指令を送る。ESP32はそれを「PCが0を送った」と区別できず
+//     止めたままを解除し、直後に届いた指令で、R1を押したまま動き出した。
+//   どれも、一度 [-1,0,0](脱力)を送ってから、改めて指令すると復帰する。
 //   PS4テレオペならR1を一度離せばよい。
 //
 // ■ 【よく変える場所】config/damiao_ctrl.yaml の damiao_driver_node:
@@ -154,6 +159,9 @@ private:
     SteadyClock::time_point last_fb_change_time{};
     int16_t last_state{kMotorStateDisabled};
     bool internal_pos_large{false};
+
+    // 止めたまま(上位が一度DISABLEを送るまで、速度・角度の指令を通さない)。tx_mutex_で守る
+    bool hold{false};
   };
 
   void on_cmd(Motor & motor, const std_msgs::msg::Float32MultiArray::SharedPtr msg)
@@ -175,6 +183,15 @@ private:
     std::lock_guard<std::mutex> lock(tx_mutex_);
     if (shutting_down_) {
       return;  // 終了処理中は上位からの指令でDISABLEを上書きさせない
+    }
+    if (motor.hold) {
+      if (mode != DamiaoControlMode::kDisabled) {
+        return;  // 止めたまま。DISABLEが届くまで指令を通さない(start_holdで脱力にしてある)
+      }
+      motor.hold = false;
+      RCLCPP_INFO(
+        get_logger(), "[%s] DISABLEを受け取ったので、止めたままを解除しました(また指令できます)",
+        motor.tag.c_str());
     }
     double target = msg->data[1];
     double vel_limit = msg->data[2];
@@ -224,6 +241,13 @@ private:
       const size_t off = motor_slot_offset(motor->index);
       const bool commanding =
         tx_data_[off + 0] != static_cast<int16_t>(DamiaoControlMode::kDisabled);
+      // 指令中に帰還が途絶えた(ros2canが落ちた・USBが抜けた・ESCの電源が切れた) -> 止めたまま
+      if (commanding && motor->have_feedback &&
+        seconds_since(motor->last_fb_change_time, now) > feedback_timeout_sec_)
+      {
+        start_hold(*motor, "指令中にモータからの帰還が途絶えた");
+        continue;
+      }
       // cmd途絶 -> そのモータをDISABLE
       if (commanding && seconds_since(motor->last_cmd_time, now) > cmd_timeout_sec_) {
         set_command(tx_data_, motor->index, DamiaoControlMode::kDisabled, 0.0, 0.0);
@@ -257,6 +281,20 @@ private:
       }
       const bool feedback_ok =
         seconds_since(motor.last_fb_change_time, now) <= feedback_timeout_sec_;
+
+      // 指令中にESP32が止めた(状態15) -> このノードでも止めたままにする
+      // (ESP32の止めたままは、ros2canの起動直後の0で外れてしまうことがあるため)
+      bool hold = false;
+      {
+        std::lock_guard<std::mutex> lock(tx_mutex_);
+        const size_t off = motor_slot_offset(motor.index);
+        const bool commanding =
+          tx_data_[off + 0] != static_cast<int16_t>(DamiaoControlMode::kDisabled);
+        if (!shutting_down_ && feedback_ok && commanding && is_esp32_latched(fb.state)) {
+          start_hold(motor, "ESP32がモータを止めた(状態15)");
+        }
+        hold = motor.hold;
+      }
 
       if (feedback_ok && fb.state != motor.last_state) {
         if (is_esp32_latched(fb.state)) {
@@ -292,13 +330,30 @@ private:
         motor.internal_pos_large = large;
       }
 
+      // 止めたまま中は状態を15で返す(モータ自身の故障コードがある時はそちらを優先。ESP32と同じ)
+      const int16_t state_to_pub =
+        (hold && !is_motor_fault(fb.state)) ? kMotorStateLatched : fb.state;
       std_msgs::msg::Float32MultiArray state_msg;
       state_msg.data = {
         static_cast<float>(fb.position), static_cast<float>(fb.velocity),
-        static_cast<float>(fb.torque), static_cast<float>(fb.state), feedback_ok ? 1.0f : 0.0f,
+        static_cast<float>(fb.torque), static_cast<float>(state_to_pub), feedback_ok ? 1.0f : 0.0f,
         static_cast<float>(fb.internal_pos)};
       motor.state_pub->publish(state_msg);
     }
+  }
+
+  // そのモータを止めたままにする(すぐ脱力にし、上位が一度DISABLEを送るまで指令を通さない)。
+  // tx_mutex_を持って呼ぶこと。
+  void start_hold(Motor & motor, const char * reason)
+  {
+    if (motor.hold) {
+      return;
+    }
+    motor.hold = true;
+    set_command(tx_data_, motor.index, DamiaoControlMode::kDisabled, 0.0, 0.0);
+    RCLCPP_WARN(
+      get_logger(), "[%s] %sため、モータを止めたままにします。一度DISABLE(-1)を送る"
+      "(PS4ならR1を離す)と、また指令できます", motor.tag.c_str(), reason);
   }
 
   void publish_tx()
