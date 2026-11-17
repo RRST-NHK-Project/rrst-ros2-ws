@@ -13,7 +13,8 @@
 //   [ 1, 角度, 速さ]    角度制御。角度[rad]へ、速さ[rad/s]以下で回る
 //   ・動かし続けるには、50回/秒くらいで送り続けること。cmd_timeout_sec(0.5秒)届かないと
 //     そのモータは自動で脱力する(自分のプログラムが落ちても止まるように)。
-//   ・速度と速さは ±max_vel_radps(45.6rad/s)に制限される。
+//   ・速度と速さは、モータごとの上限に制限される(max_vel_per_motor。書かなければ
+//     全モータ max_vel_radps=45.6rad/s。DM3519は59.4rad/s。2026-11-17)。
 //
 // ■ state(このノードが送る。data=[位置, 速度, トルク, 状態, 帰還OK, 内部の位置])
 //   位置[rad]: ±12.5radで一周する  速度[rad/s]  トルク[N・m]
@@ -35,13 +36,15 @@
 //   PS4テレオペならR1を一度離せばよい。
 //
 // ■ 【よく変える場所】config/damiao_ctrl.yaml の damiao_driver_node:
-//   device_id(ESP32のDEVICE_ID)、motor_count(台数)、first_motor_number(2枚目以降のESP32用)
+//   device_id(ESP32のDEVICE_ID)、motor_count(台数)、first_motor_number(2枚目以降のESP32用)、
+//   max_vel_per_motor(モータごとの速度の上限。ESP32のconfig.hppのDAMIAO_MOTORSの3列目と同じ値)
 //
 // ■ 注意: 同じdevice_idに駆動ノードを2つ起動しないこと(お互いの指令を0で上書きする)。
 // =====================================================================
 
 #include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -77,6 +80,10 @@ public:
     // 1200(モータ軸rad/s)÷減速比25=48rad/sのため。2台目のESCも同じ値を確認)。
     // その95%を上限にする。
     max_vel_radps_ = declare_parameter<double>("max_vel_radps", 45.6);
+    // モータごとの速度の上限[rad/s](このESP32の1台目から順に)。空ならmax_vel_radpsを全モータに使う。
+    // モータの種類で最高速度が違うため(DM3519は59.4、2026-11-17)。
+    const auto max_vel_per_motor =
+      declare_parameter<std::vector<double>>("max_vel_per_motor", std::vector<double>{});
     const double publish_rate_hz = declare_parameter<double>("publish_rate_hz", 50.0);
 
     if (motor_count < 1 || static_cast<size_t>(motor_count) > kMaxMotors) {
@@ -86,6 +93,18 @@ public:
     if (first_motor_number < 1) {
       RCLCPP_FATAL(get_logger(), "first_motor_numberは1以上にしてください");
       throw std::runtime_error("invalid first_motor_number");
+    }
+    if (!max_vel_per_motor.empty() &&
+      max_vel_per_motor.size() != static_cast<size_t>(motor_count))
+    {
+      RCLCPP_FATAL(get_logger(), "max_vel_per_motorはmotor_count(%d)と同じ数にしてください", motor_count);
+      throw std::runtime_error("invalid max_vel_per_motor");
+    }
+    for (const double v : max_vel_per_motor) {
+      if (!(v > 0.0)) {
+        RCLCPP_FATAL(get_logger(), "max_vel_per_motorは正の値にしてください");
+        throw std::runtime_error("invalid max_vel_per_motor");
+      }
     }
     if (publish_rate_hz <= 0.0) {
       RCLCPP_FATAL(get_logger(), "publish_rate_hzは正の値を指定してください");
@@ -102,11 +121,16 @@ public:
       "serial_rx_" + std::to_string(device_id_), 10,
       std::bind(&DamiaoDriverNode::on_rx, this, std::placeholders::_1));
 
+    std::string max_vel_text;  // 起動時のログ用
     for (int i = 0; i < motor_count; ++i) {
       auto motor = std::make_unique<Motor>();
       motor->index = static_cast<size_t>(i);  // ESP32の中での順番(データ枠の位置)
       const int number = first_motor_number + i;  // トピック名の番号
       motor->tag = "モータ" + std::to_string(number);
+      motor->max_vel = max_vel_per_motor.empty() ? max_vel_radps_ : max_vel_per_motor[i];
+      char buf[64];
+      std::snprintf(buf, sizeof(buf), "%s%s=%.1f", i ? ", " : "", motor->tag.c_str(), motor->max_vel);
+      max_vel_text += buf;
       const std::string prefix = "damiao/motor" + std::to_string(number);
       motor->state_pub = create_publisher<std_msgs::msg::Float32MultiArray>(prefix + "/state", 10);
       Motor * raw = motor.get();
@@ -128,9 +152,9 @@ public:
 
     RCLCPP_INFO(
       get_logger(),
-      "damiao_driver_node: device_id=%d motor_count=%d cmd_timeout=%.2fs max_vel=%.2frad/s "
+      "damiao_driver_node: device_id=%d motor_count=%d cmd_timeout=%.2fs 速度の上限[rad/s]: %s "
       "(topics: damiao/motor%d〜%d/cmd, /state)",
-      device_id_, motor_count, cmd_timeout_sec_, max_vel_radps_, first_motor_number,
+      device_id_, motor_count, cmd_timeout_sec_, max_vel_text.c_str(), first_motor_number,
       first_motor_number + motor_count - 1);
   }
 
@@ -148,6 +172,7 @@ private:
   {
     size_t index{0};  // 0-origin(スロットの位置)
     std::string tag;  // ログ用("モータ1"等)
+    double max_vel{45.6};  // 速度の上限[rad/s](max_vel_per_motor または max_vel_radps)
     rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr state_pub;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr cmd_sub;
 
@@ -196,17 +221,17 @@ private:
     double target = msg->data[1];
     double vel_limit = msg->data[2];
     // cmdはfloatなので、上限ちょうど(例: 45.6)でも誤差で僅かに超えることがある。1e-3は許容する。
-    if (mode == DamiaoControlMode::kVelocity && std::abs(target) > max_vel_radps_ + 1e-3) {
+    if (mode == DamiaoControlMode::kVelocity && std::abs(target) > motor.max_vel + 1e-3) {
       RCLCPP_WARN_THROTTLE(
         get_logger(), *get_clock(), 2000, "[%s] 速度指令%.2frad/sを上限%.2frad/sに制限しました",
-        motor.tag.c_str(), target, max_vel_radps_);
-      target = std::copysign(max_vel_radps_, target);
+        motor.tag.c_str(), target, motor.max_vel);
+      target = std::copysign(motor.max_vel, target);
     }
-    if (mode == DamiaoControlMode::kPositionVelocity && vel_limit > max_vel_radps_ + 1e-3) {
+    if (mode == DamiaoControlMode::kPositionVelocity && vel_limit > motor.max_vel + 1e-3) {
       RCLCPP_WARN_THROTTLE(
         get_logger(), *get_clock(), 2000, "[%s] 速度上限%.2frad/sを%.2frad/sに制限しました",
-        motor.tag.c_str(), vel_limit, max_vel_radps_);
-      vel_limit = max_vel_radps_;
+        motor.tag.c_str(), vel_limit, motor.max_vel);
+      vel_limit = motor.max_vel;
     }
     set_command(tx_data_, motor.index, mode, target, vel_limit);
     motor.last_cmd_time = SteadyClock::now();

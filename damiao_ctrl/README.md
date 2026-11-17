@@ -54,6 +54,9 @@ Damiao DM2325(モータ) + DM3520(ESC) を ESP32 経由のCAN通信で
 約1200(モータ軸rad/s)÷減速比25=48rad/sのため)。
 その95%の**45.6rad/s(435rpm)**を上限とし、damiao_driver_nodeの`max_vel_radps`で
 どの指令もこれを超えないよう制限している。
+DM3519(減速比19.2)は、計算上の最高速度 1200÷19.2 = 62.5rad/s の95%の**59.4rad/s**を上限にする
+(2026-11-17。実測はまだ)。モータごとの上限は、駆動ノード・PS4ノードの `max_vel_per_motor` と、
+ESP32の `DAMIAO_MOTORS` の3列目で決める(3か所とも同じ値にする)。
 
 **`mode_word=0`(全スロット0)が起動直後・通信途絶時の既定値**。Damiaoモータは
 明示的なEnable(0xFC)コマンドを送るまでCAN指令を無視する仕様のため、この
@@ -116,22 +119,25 @@ PS4を使わずにコマンドで速度指令を送る例(Ctrl+Cで止めると0
 ros2 topic pub -r 20 damiao/motor1/cmd std_msgs/msg/Float32MultiArray "{data: [0.0, 0.5, 0.0]}"
 ```
 
-## 2台構成(2026-11-02〜)
+## 独ステ1号機の構成(2026-11-09〜)
 
-| | モータ1(元からのESC) | モータ2(新しいESC) |
+| | モータ1(1号機 操舵) | モータ2(1号機 駆動) |
 |---|---|---|
+| モータ | DM2325(減速比25) | DM3519(減速比19.2) |
 | ESC_ID(指令を受けるCAN ID) | 1 | 2 |
-| MST_ID(帰還を返すCAN ID) | 0x000 | 0x012 |
-| PS4 | 左スティック上下で**速度制御** | 右スティックで**角度制御**(倒した方向を向く) |
+| MST_ID(帰還を返すCAN ID) | 0x21 | 0x22 |
+| PS4 | 右スティックで**角度制御**(倒した方向を向く) | 左スティック上下で**速度制御** |
 | トピック | damiao/motor1/cmd, /state | damiao/motor2/cmd, /state |
 
-- DM3520は工場出荷時 ESC_ID=1, MST_ID=0x000 なので、2台目以降は達妙USB-CAN(DM-USBCU1)を
-  そのESCだけにつないで `scripts/dm_usbcan_param.py` で書き換える(ros2canは止めておく):
+- IDの決まり(4号機・8台まで)は docs/開発ガイド.md の 5.1。モータnは ESC_ID=n、MST_ID=0x2n。
+  ESC_IDは15以下にすること(16以上だと状態を読み違える。2026-11-09実機で確認)。
+- ESCは工場出荷時 ESC_ID=1, MST_ID=0x000 なので、達妙USB-CAN(DM-USBCU1)をつないで
+  `scripts/dm_usbcan_param.py` で書き換える(ros2canは止めておく。線の両端に120Ωの終端抵抗が必要):
   ```bash
   python3 ~/ros2_ws/src/damiao_ctrl/scripts/dm_usbcan_param.py scan
   ```
   ```bash
-  python3 ~/ros2_ws/src/damiao_ctrl/scripts/dm_usbcan_param.py set-id --id 1 --new-id 2 --new-mst 0x12
+  python3 ~/ros2_ws/src/damiao_ctrl/scripts/dm_usbcan_param.py set-id --id 1 --new-id 1 --new-mst 0x21
   ```
   MST_IDを台ごとに変えるのは、2台が同じCAN IDで同時に帰還を返すと衝突するため。
 - 配線: 2台のCANH同士・CANL同士をつないでSOKI基板のCAN1へ(並列)。終端抵抗はバスの両端に
@@ -139,8 +145,8 @@ ros2 topic pub -r 20 damiao/motor1/cmd std_msgs/msg/Float32MultiArray "{data: [0
 - ESP32ファーム(`generated_firmware/soki_damiao_201/src/config.hpp`): `DAMIAO_MOTORS` の表に1台1行 `{ESC_ID, MST_ID}`。
   有効化シーケンスは台ごとに非同期で進む(1台の有効化中も他の台への指令は途切れない)。
 - PC側(config/damiao_ctrl.yaml): `damiao_driver_node.motor_count: 2`、
-  `ps4_teleop_node.motor_numbers: [1, 2]` / `control_modes: ["velocity", "angle"]` /
-  `stick_y_axes: [1, 4]` / `stick_x_axes: [0, 3]`。
+  `ps4_teleop_node.motor_numbers: [1, 2]` / `control_modes: ["angle", "velocity"]` /
+  `stick_y_axes: [4, 1]` / `stick_x_axes: [3, 0]`。
   駆動ノードは1つで2台を扱う(2つ起動するとお互いのスロットを0で上書きするため)。
 
 ## 角度制御(PS4の右スティック、2026-11-02〜)
@@ -178,7 +184,7 @@ ros2 topic pub -r 20 damiao/motor1/cmd std_msgs/msg/Float32MultiArray "{data: [0
   最後に受け取った指令を送り続けるため、モータは止まらない。その場合はros2canを
   止める(Ctrl+C)とESP32の見張りで止まる。
 - `ps4_teleop_node`(`use_joy:=true` で起動)の操作:
-  - **R1を押している間だけ**左スティック上下で速度指令(倒し切りで `max_vel_radps` = 45.6rad/s)。
+  - **R1を押している間だけ**左スティック上下で速度指令(倒し切りで `max_vel_per_motor` の値。DM3519は59.4rad/s)。
     R1を離すと即DISABLE。
   - **Options = E-STOP**。再開はR1を一度離して押し直す。
   - R1を押したまま起動・復帰しても動かない(必ずR1の押し直しが必要)。

@@ -9,13 +9,14 @@ damiao_driver_node・ps4_teleop_node・自分のプログラムは、実機の�
   ros2 run damiao_ctrl fake_esp32.py                  # DEVICE_ID 201、モータ2台
   ros2 run damiao_ctrl fake_esp32.py --motors 4       # 4台
   ros2 run damiao_ctrl fake_esp32.py --device-id 204  # 2枚目のESP32のふり
+  ros2 run damiao_ctrl fake_esp32.py --max-vel 45.6,59.4  # 独ステ1号機(操舵DM2325・駆動DM3519)
 
 まねしていること(本物のESP32ファームウェア damiao.cpp と同じ決まり):
   ・データ枠(1台6個)の意味と単位
   ・有効化に約0.25秒かかる(脱力→エラー解除→設定書き込み→有効化)
   ・PCからの指令が0.3秒途絶えたら全台脱力して止めたままにする(状態15)。
     通信が戻っても動かず、PCが一度0(脱力)を送ると解除。起動直後も同じ(2026-11-06 ファーム変更)
-  ・速度は±45.6rad/sに丸める。角度制御の速さ上限が0以下なら有効にしない
+  ・速度はモータごとの上限(--max-vel、既定は全台45.6rad/s)に丸める。角度制御の速さ上限が0以下なら有効にしない
   ・角度制御は、モータ内部の位置が±12rad以内の時だけ有効になる
   ・位置の返事は±12.5radで一周する
 まねしていないこと: 故障・通信喪失(13)、重さや摩擦、ゆっくり回した時の位置の精度の問題。
@@ -33,14 +34,15 @@ P_MAX = 12.5            # 位置の返事が一周する範囲[rad]
 POS_VEL_MAX_INTERNAL = 12.0
 ENABLE_DELAY = 0.25     # 有効化にかかる時間[s]
 LINK_TIMEOUT = 0.3      # PCの指令が途絶えたら脱力するまで[s]
-MAX_VEL = 45.6          # 速度の上限[rad/s](ファームのDAMIAO_MAX_VEL_RADPS)
+MAX_VEL = 45.6          # 速度の上限の既定[rad/s](ファームのDAMIAO_MAX_VEL_RADPS)。--max-velで台ごとに変えられる
 STATE_LATCHED = 15      # ESP32が止めたまま(一度0を送ると解除)
 MAX_ACCEL = 100.0       # 速さの変わり方の上限[rad/s^2](本物より大ざっぱ)
 POS_GAIN = 20.0         # 角度制御で目標へ向かう強さ[1/s]
 
 
 class FakeMotor:
-    def __init__(self):
+    def __init__(self, max_vel=MAX_VEL):
+        self.max_vel = max_vel   # このモータの速度の上限[rad/s](ファームのDAMIAO_MOTORSの3列目)
         self.mode = 0            # 今のモード(0=脱力 1=速度 2=角度)
         self.enable_at = None    # 有効になる時刻(有効化の途中)
         self.enabled = False
@@ -60,11 +62,11 @@ class FakeMotor:
 
     def update(self, mode, target, vel_limit, dt, now):
         if mode == 1:
-            target = max(-MAX_VEL, min(MAX_VEL, target))
+            target = max(-self.max_vel, min(self.max_vel, target))
         elif mode == 2:
             if vel_limit <= 0.0:
                 mode = 0
-            vel_limit = min(vel_limit, MAX_VEL)
+            vel_limit = min(vel_limit, self.max_vel)
         # 角度制御は内部の位置が大きいと有効にしない(本物と同じ安全策)
         if mode == 2 and not (self.enabled and self.mode == 2) and abs(self.pos) > POS_VEL_MAX_INTERNAL:
             mode = 0
@@ -102,13 +104,18 @@ def main():
     ap.add_argument("--device-id", type=int, default=201)
     ap.add_argument("--motors", type=int, default=2, help="台数(1〜4)")
     ap.add_argument("--rate", type=float, default=200.0, help="返事を送る回数/秒")
+    ap.add_argument("--max-vel", default="",
+                    help="台ごとの速度の上限[rad/s]をカンマ区切りで(例: 45.6,59.4)。省略すると全台45.6")
     args, _ = ap.parse_known_args()
     if not 1 <= args.motors <= 4:
         ap.error("--motorsは1〜4")
 
     rclpy.init()
     node = rclpy.create_node("fake_esp32_%d" % args.device_id)
-    motors = [FakeMotor() for _ in range(args.motors)]
+    max_vels = [float(v) for v in args.max_vel.split(",")] if args.max_vel else [MAX_VEL] * args.motors
+    if len(max_vels) != args.motors:
+        ap.error("--max-velは--motorsと同じ数にする")
+    motors = [FakeMotor(v) for v in max_vels]
     rx = {"data": [0] * 24, "time": 0.0}
 
     def on_tx(msg):

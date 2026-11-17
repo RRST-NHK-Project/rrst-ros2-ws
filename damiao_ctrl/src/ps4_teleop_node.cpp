@@ -9,8 +9,10 @@
 //                 押すと「今の向き」を基準(=スティック上)にし直す。
 //               ・R1を押した瞬間の目標は現在位置(押した瞬間に急に回らない)。
 //               ・回転方向が鏡写し(右に倒すと左を向く)ならinvert_axesをtrueにする。
-// 2台構成の既定(config/damiao_ctrl.yaml): モータ1=左スティック上下で速度、
-// モータ2=右スティックで角度。R1・Options・各種停止は全台共通。
+// 既定(config/damiao_ctrl.yaml、独ステ1号機): モータ1(操舵)=右スティックで角度、
+// モータ2(駆動)=左スティック上下で速度。R1・Options・各種停止は全台共通。
+// スティックを倒し切った時の速度は、モータごとに max_vel_per_motor で決める(書かなければ
+// 全モータ max_vel_radps。DM3519は59.4rad/s、2026-11-17)。
 //
 // 安全設計:
 //   - デッドマンスイッチ: R1(既定)を押している間だけ指令を有効化する。
@@ -52,6 +54,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -90,6 +93,10 @@ public:
     estop_button_index_ = declare_parameter<int>("estop_button_index", 9);       // Options
     zero_button_index_ = declare_parameter<int>("zero_button_index", 2);         // △
     max_vel_radps_ = declare_parameter<double>("max_vel_radps", 1.0);       // 初回動作確認用に控えめな値
+    // velocity: モータごとの「倒し切った時の速度」[rad/s](motor_numbersと同じ順・同じ数)。
+    // 空ならmax_vel_radpsを全モータに使う。angleのモータの値は使わない(何か入れておく)。
+    const auto max_vel_per_motor =
+      declare_parameter<std::vector<double>>("max_vel_per_motor", std::vector<double>{});
     deadzone_ = declare_parameter<double>("deadzone", 0.08);
     angle_vel_limit_radps_ = declare_parameter<double>("angle_vel_limit_radps", 10.0);
     angle_deadzone_ = declare_parameter<double>("angle_deadzone", 0.5);
@@ -102,6 +109,10 @@ public:
         get_logger(), "motor_numbers・control_modes・stick_y_axes・stick_x_axesは"
         "同じ長さ(1以上)にしてください");
       throw std::runtime_error("invalid teleop parameters");
+    }
+    if (!max_vel_per_motor.empty() && max_vel_per_motor.size() != n) {
+      RCLCPP_FATAL(get_logger(), "max_vel_per_motorはmotor_numbersと同じ数にしてください");
+      throw std::runtime_error("invalid max_vel_per_motor");
     }
     if (angle_limit_rad_ < M_PI || angle_limit_rad_ > 12.4) {
       // 位置の帰還は±12.5rad(P_MAX)で一周してしまうため、その内側に収める
@@ -123,6 +134,11 @@ public:
       ch->y_axis = static_cast<int>(y_axes[i]);
       ch->x_axis = static_cast<int>(x_axes[i]);
       ch->invert = i < invert_axes.size() && invert_axes[i];
+      ch->max_vel = max_vel_per_motor.empty() ? max_vel_radps_ : max_vel_per_motor[i];
+      if (!ch->angle_mode && !(ch->max_vel > 0.0)) {
+        RCLCPP_FATAL(get_logger(), "max_vel_per_motorは正の値にしてください");
+        throw std::runtime_error("invalid max_vel_per_motor");
+      }
       const std::string prefix = "damiao/motor" + std::to_string(ch->motor_number);
       ch->cmd_pub = create_publisher<std_msgs::msg::Float32MultiArray>(prefix + "/cmd", 10);
       Channel * raw = ch.get();
@@ -150,7 +166,8 @@ public:
       mapping += " モータ" + std::to_string(ch->motor_number) +
         (ch->angle_mode ?
         "=角度(軸" + std::to_string(ch->x_axis) + "," + std::to_string(ch->y_axis) + ")" :
-        "=速度(軸" + std::to_string(ch->y_axis) + ")") + (ch->invert ? "反転" : "");
+        "=速度(軸" + std::to_string(ch->y_axis) + "、最大" + format_vel(ch->max_vel) + "rad/s)") +
+        (ch->invert ? "反転" : "");
       channels_.push_back(std::move(ch));
     }
 
@@ -167,11 +184,11 @@ public:
 
     RCLCPP_INFO(
       get_logger(),
-      "ps4_teleop_node:%s deadman=%d estop=%d zero=%d max_vel=%.2frad/s "
+      "ps4_teleop_node:%s deadman=%d estop=%d zero=%d "
       "angle_vel_limit=%.2frad/s joy_timeout=%.2fs (R1を押している間だけ動く。"
       "実際のボタン配置は `ros2 topic echo /joy` で要確認)",
       mapping.c_str(), deadman_button_index_, estop_button_index_, zero_button_index_,
-      max_vel_radps_, angle_vel_limit_radps_, joy_timeout_sec_);
+      angle_vel_limit_radps_, joy_timeout_sec_);
   }
 
   ~Ps4TeleopNode() override
@@ -182,6 +199,13 @@ public:
 private:
   using SteadyClock = std::chrono::steady_clock;
 
+  static std::string format_vel(double v)
+  {
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%.1f", v);
+    return buf;
+  }
+
   // モータ1台分の割り当て
   struct Channel
   {
@@ -190,6 +214,7 @@ private:
     int y_axis{1};
     int x_axis{0};
     bool invert{false};
+    double max_vel{1.0};       // velocity: スティックを倒し切った時の速度[rad/s]
     double target_vel{0.0};    // velocity: 速度指令[rad/s]
     double target_pos{0.0};    // angle: 角度指令[rad](モータの位置の値)
     double zero_pos{0.0};      // angle: スティック上に対応するモータの位置[rad]
@@ -315,7 +340,7 @@ private:
       const double y = static_cast<double>(msg->axes[ch->y_axis]);
       if (!ch->angle_mode) {
         const double raw = std::abs(y) < deadzone_ ? 0.0 : y;
-        ch->target_vel = (ch->invert ? -raw : raw) * max_vel_radps_;
+        ch->target_vel = (ch->invert ? -raw : raw) * ch->max_vel;
         ch->active = true;
         continue;
       }
