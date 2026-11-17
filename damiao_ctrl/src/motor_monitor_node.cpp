@@ -152,6 +152,8 @@ private:
       condition = "帰還途絶";
     } else if (!std::isnan(m.internal_pos) && std::abs(m.internal_pos) > kPosVelMaxInternalRad) {
       condition = "内部の位置が大きい(角度制御不可。電源を入れ直すと0に戻る)";
+    } else if (m.motor_state == kMotorStateRunaway) {
+      condition = "暴走を見つけて止めた(モータ・ESCを点検。煙・におい・熱が無いか。一度脱力で解除)";
     } else if (is_esp32_latched(m.motor_state)) {
       condition = "止めたまま(通信の途絶などの後。一度脱力を送ると解除。PS4ならR1を離す)";
     } else if (is_motor_fault(m.motor_state)) {

@@ -27,8 +27,11 @@
 //   故障するとモータは自分で止まり、指令を出し続けても再始動しない。
 //   ESP32も、PCとの通信が途絶えた・モータの返事が途絶えた・故障した時に止めて、状態を15にする
 //   (通信が戻っただけでは動かない。2026-11-06 ファーム変更)。
-//   このノードも、指令中にモータの返事が feedback_timeout_sec 途絶えた時と、状態15を
+//   このノードも、指令中にモータの返事が feedback_timeout_sec 途絶えた時と、状態15・7を
 //   受け取った時は、そのモータを止めたままにし、状態を15として返す。
+//   暴走(速度制御で指令と逆向きに速く回ったまま減速しない、または上限より速い、が0.2秒)を
+//   見つけた時も止めたままにし、状態を7として返す(ESP32にも同じ見張りがあり、そちらが先に
+//   止める。これは予備。2026-11-17追加: DM3519が逆向きに全速で回り続けて煙が出たため)。
 //   ※ESP32だけでは足りないため(2026-11-07実機テストで判明): ros2canは起動直後、このノードの
 //     指令が届くまでの1〜2秒間、全部0の指令を送る。ESP32はそれを「PCが0を送った」と区別できず
 //     止めたままを解除し、直後に届いた指令で、R1を押したまま動き出した。
@@ -55,6 +58,7 @@
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int16_multi_array.hpp"
 
+#include "damiao_ctrl/runaway_guard.hpp"
 #include "damiao_ctrl/slot_layout.hpp"
 
 using namespace std::chrono_literals;
@@ -187,6 +191,8 @@ private:
 
     // 止めたまま(上位が一度DISABLEを送るまで、速度・角度の指令を通さない)。tx_mutex_で守る
     bool hold{false};
+    bool runaway{false};  // 止めたままの理由が暴走か(状態7で知らせる)
+    RunawayGuard guard;   // 暴走の見張り(runaway_guard.hpp)
   };
 
   void on_cmd(Motor & motor, const std_msgs::msg::Float32MultiArray::SharedPtr msg)
@@ -214,6 +220,8 @@ private:
         return;  // 止めたまま。DISABLEが届くまで指令を通さない(start_holdで脱力にしてある)
       }
       motor.hold = false;
+      motor.runaway = false;
+      motor.guard.reset();
       RCLCPP_INFO(
         get_logger(), "[%s] DISABLEを受け取ったので、止めたままを解除しました(また指令できます)",
         motor.tag.c_str());
@@ -310,19 +318,48 @@ private:
       // 指令中にESP32が止めた(状態15) -> このノードでも止めたままにする
       // (ESP32の止めたままは、ros2canの起動直後の0で外れてしまうことがあるため)
       bool hold = false;
+      bool runaway = false;
       {
         std::lock_guard<std::mutex> lock(tx_mutex_);
         const size_t off = motor_slot_offset(motor.index);
         const bool commanding =
           tx_data_[off + 0] != static_cast<int16_t>(DamiaoControlMode::kDisabled);
         if (!shutting_down_ && feedback_ok && commanding && is_esp32_latched(fb.state)) {
-          start_hold(motor, "ESP32がモータを止めた(状態15)");
+          if (fb.state == kMotorStateRunaway) {
+            motor.runaway = true;
+          }
+          start_hold(motor, fb.state == kMotorStateRunaway ?
+            "ESP32がモータの暴走を見つけて止めた(状態7)" : "ESP32がモータを止めた(状態15)");
+        }
+        // 暴走の見張り(ESP32の見張りが働かなかった時の予備)。有効中・返事が新しい時だけ見る
+        const auto mode = static_cast<DamiaoControlMode>(tx_data_[off + 0]);
+        if (!shutting_down_ && !motor.hold && feedback_ok && commanding &&
+          fb.state == kMotorStateEnabled)
+        {
+          const bool vel_mode = mode == DamiaoControlMode::kVelocity;
+          const double target = vel_mode ? tx_data_[off + 1] * kVelocityScale : 0.0;
+          const double limit = vel_mode ? motor.max_vel : tx_data_[off + 2] * kVelocityScale;
+          if (motor.guard.update(vel_mode, target, limit, fb.velocity, now)) {
+            motor.runaway = true;
+            start_hold(motor, "暴走(指令と逆向きに速く回ったまま減速しない、または上限より速い)を見つけた");
+            RCLCPP_ERROR(
+              get_logger(), "[%s] 暴走: 指令%+.2frad/s・実際の速度%+.2frad/s。モータ・ESCを点検すること"
+              "(煙・におい・異常な熱が無いか)", motor.tag.c_str(), target, fb.velocity);
+          }
+        } else {
+          motor.guard.reset();
         }
         hold = motor.hold;
+        runaway = motor.runaway;
       }
 
       if (feedback_ok && fb.state != motor.last_state) {
-        if (is_esp32_latched(fb.state)) {
+        if (fb.state == kMotorStateRunaway) {
+          RCLCPP_ERROR(
+            get_logger(),
+            "[%s] ESP32がモータの暴走を見つけて止めました(状態7)。モータ・ESCを点検すること"
+            "(煙・におい・異常な熱が無いか)。一度DISABLE(-1)を送ると解除されます", motor.tag.c_str());
+        } else if (is_esp32_latched(fb.state)) {
           RCLCPP_WARN(
             get_logger(),
             "[%s] ESP32がモータを止めています(状態15。起動直後・PCとの通信の途絶・モータの返事の途絶・故障の後)。"
@@ -355,9 +392,9 @@ private:
         motor.internal_pos_large = large;
       }
 
-      // 止めたまま中は状態を15で返す(モータ自身の故障コードがある時はそちらを優先。ESP32と同じ)
-      const int16_t state_to_pub =
-        (hold && !is_motor_fault(fb.state)) ? kMotorStateLatched : fb.state;
+      // 止めたまま中は状態を15(暴走なら7)で返す(モータ自身の故障コードがある時はそちらを優先。ESP32と同じ)
+      const int16_t state_to_pub = (hold && !is_motor_fault(fb.state)) ?
+        (runaway ? kMotorStateRunaway : kMotorStateLatched) : fb.state;
       std_msgs::msg::Float32MultiArray state_msg;
       state_msg.data = {
         static_cast<float>(fb.position), static_cast<float>(fb.velocity),

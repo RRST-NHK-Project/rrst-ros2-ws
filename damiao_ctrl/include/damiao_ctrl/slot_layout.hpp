@@ -85,18 +85,21 @@ constexpr int16_t kMotorStateCommLost = 0xD;  // 通信喪失(モータ側タイ
 // 送ると解除」。PC途絶・モータの故障・帰還途絶の後と、ESP32の起動直後に出る(2026-11-06 ファーム変更。
 // ros2can/firmware/xiao-esp32-s3_can2io/src/damiao.cpp の STATE_LATCHED と一致させること)。
 constexpr int16_t kMotorStateLatched = 15;
+// 7もESP32(と damiao_driver_node)が付ける印: 「暴走を見つけて止めたまま。一度0(脱力)を送ると解除」
+// (2026-11-17追加。damiao.cpp の STATE_RUNAWAY と一致させること。モータ自身は7を使わない)。
+constexpr int16_t kMotorStateRunaway = 7;
 
-// ESP32が止めたまま(ラッチ中)か
+// ESP32(または駆動ノード)が止めたまま(ラッチ中)か。暴走で止めた時(7)も含む
 inline bool is_esp32_latched(int16_t state)
 {
-  return state == kMotorStateLatched;
+  return state == kMotorStateLatched || state == kMotorStateRunaway;
 }
 
-// モータ自身の故障か(ESP32のラッチ15は含めない)
+// モータ自身の故障か(ESP32のラッチ15・7は含めない)
 inline bool is_motor_fault(int16_t state)
 {
   return state != kMotorStateDisabled && state != kMotorStateEnabled &&
-         state != kMotorStateLatched;
+         !is_esp32_latched(state);
 }
 
 inline const char * motor_state_name(int16_t state)
@@ -114,6 +117,7 @@ inline const char * motor_state_name(int16_t state)
     case 0xD: return "通信喪失";
     case 0xE: return "過負荷";
     case kMotorStateLatched: return "止めたまま(一度脱力を送ると解除)";
+    case kMotorStateRunaway: return "暴走を見つけて止めたまま(モータ・ESCを点検。一度脱力を送ると解除)";
     default: return "不明";
   }
 }

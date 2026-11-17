@@ -40,7 +40,7 @@ Damiao DM2325(モータ) + DM3520(ESC) を ESP32 経由のCAN通信で
 | 0 | ROS→ESP32 | mode_word (0=DISABLE, 1=VEL, 2=POS_VEL) | - |
 | 1 | ROS→ESP32 | target (VEL:rad/s, POS_VEL:rad) | VEL:0.01 / POS_VEL:0.001 |
 | 2 | ROS→ESP32 | vel_limit (POS_VELのみ有効) | 0.01 rad/s |
-| 0 | ESP32→ROS | motor_state (0=Disable, 1=Enable, 15=止めたまま(ESP32または駆動ノードが止めている。一度0を送ると解除), それ以外=故障。13=通信喪失) | - |
+| 0 | ESP32→ROS | motor_state (0=Disable, 1=Enable, 15=止めたまま(ESP32または駆動ノードが止めている。一度0を送ると解除), 7=暴走を見つけて止めたまま(同じく一度0で解除), それ以外=故障。13=通信喪失) | - |
 | 1 | ESP32→ROS | fb_counter (帰還を受け取るたび+1。止まったら帰還途絶) | - |
 | 3 | ESP32→ROS | position (出力軸、±12.5rad) | 0.001 rad |
 | 4 | ESP32→ROS | velocity (出力軸、モータ側分解能約0.098rad/sで静止中も±0.049) | 0.01 rad/s |
@@ -54,8 +54,8 @@ Damiao DM2325(モータ) + DM3520(ESC) を ESP32 経由のCAN通信で
 約1200(モータ軸rad/s)÷減速比25=48rad/sのため)。
 その95%の**45.6rad/s(435rpm)**を上限とし、damiao_driver_nodeの`max_vel_radps`で
 どの指令もこれを超えないよう制限している。
-DM3519(減速比19.2)は、計算上の最高速度 1200÷19.2 = 62.5rad/s の95%の**59.4rad/s**を上限にする
-(2026-11-17。実測はまだ)。モータごとの上限は、駆動ノード・PS4ノードの `max_vel_per_motor` と、
+DM3519(減速比19.2)は、計算上の最高速度 1200÷19.2 = 62.5rad/s の95%の59.4rad/sを上限にしたが、
+同じ日(2026-11-17)に暴走してモータの中から白い煙が出たため、原因が分かるまで**20rad/s**に下げている。モータごとの上限は、駆動ノード・PS4ノードの `max_vel_per_motor` と、
 ESP32の `DAMIAO_MOTORS` の3列目で決める(3か所とも同じ値にする)。
 
 **`mode_word=0`(全スロット0)が起動直後・通信途絶時の既定値**。Damiaoモータは
@@ -184,7 +184,7 @@ ros2 topic pub -r 20 damiao/motor1/cmd std_msgs/msg/Float32MultiArray "{data: [0
   最後に受け取った指令を送り続けるため、モータは止まらない。その場合はros2canを
   止める(Ctrl+C)とESP32の見張りで止まる。
 - `ps4_teleop_node`(`use_joy:=true` で起動)の操作:
-  - **R1を押している間だけ**左スティック上下で速度指令(倒し切りで `max_vel_per_motor` の値。DM3519は59.4rad/s)。
+  - **R1を押している間だけ**左スティック上下で速度指令(倒し切りで `max_vel_per_motor` の値。DM3519は今は20rad/s)。
     R1を離すと即DISABLE。
   - **Options = E-STOP**。再開はR1を一度離して押し直す。
   - R1を押したまま起動・復帰しても動かない(必ずR1の押し直しが必要)。
