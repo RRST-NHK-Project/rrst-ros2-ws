@@ -9,7 +9,7 @@ damiao_driver_node・ps4_teleop_node・自分のプログラムは、実機の�
   ros2 run damiao_ctrl fake_esp32.py                  # DEVICE_ID 201、モータ2台
   ros2 run damiao_ctrl fake_esp32.py --motors 4       # 4台
   ros2 run damiao_ctrl fake_esp32.py --device-id 204  # 2枚目のESP32のふり
-  ros2 run damiao_ctrl fake_esp32.py --max-vel 45.6,20.0  # 独ステ1号機(操舵DM2325・駆動DM3519)
+  ros2 run damiao_ctrl fake_esp32.py --max-vel 45.6,40.0  # 独ステ1号機(操舵DM2325・駆動DM3519)
   ros2 run damiao_ctrl fake_esp32.py --runaway 2:1.0   # 試験用: モータ2が速度制御1秒後に暴走する
   ros2 run damiao_ctrl fake_esp32.py --runaway 2:1.0 --no-guard  # 偽ESP32の暴走の見張りを切る
                                                        # (駆動ノード側の見張りを試す時)

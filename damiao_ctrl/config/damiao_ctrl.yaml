@@ -25,9 +25,10 @@ damiao_driver_node:
     max_vel_radps: 45.6        # 速度の上限[rad/s]の既定(max_vel_per_motorを書かない時に全モータに使う)
     # モータごとの速度の上限[rad/s](モータ1から順に、motor_countと同じ数)。ESP32のconfig.hppの
     # DAMIAO_MOTORSの3列目と同じ値にする。DM2325=実測の最高速度48rad/sの95%。
-    # DM3519は計算上の最高速度62.5rad/s(MAX_SPD 1200÷減速比19.2)の95%=59.4にしたが、同じ日
-    # (2026-11-17)に暴走してモータから白い煙が出たため、原因が分かるまで20に下げている
-    max_vel_per_motor: [45.6, 20.0]   # 1=操舵DM2325, 2=駆動DM3519
+    # DM3519は、2026-11-17に暴走して煙が出たため一時20に下げたが、原因はモータの1相の断線と
+    # 分かり(3相の間の抵抗が「0.何Ω・測れない・測れない」)、DM-S3519-1ECに交換して正常に
+    # 動いたため、40に上げた(2026-11-19。計算上の最高速度62.5rad/s = MAX_SPD 1200÷減速比19.2 より下)
+    max_vel_per_motor: [45.6, 40.0]   # 1=操舵DM2325, 2=駆動DM3519
     publish_rate_hz: 50.0
 
 ps4_teleop_node:
@@ -42,7 +43,7 @@ ps4_teleop_node:
     estop_button_index: 9      # Options(E-STOP)
     zero_button_index: 2       # △(角度制御のモータの今の向きを「スティック上」にする)
     max_vel_radps: 45.6        # velocity: スティックを倒し切った時の速度[rad/s]の既定(max_vel_per_motorを書かない時)
-    max_vel_per_motor: [45.6, 20.0]   # velocity: モータごとの倒し切った時の速度(motor_numbersと同じ順。angleのモータの値は使わない)
+    max_vel_per_motor: [45.6, 40.0]   # velocity: モータごとの倒し切った時の速度(motor_numbersと同じ順。angleのモータの値は使わない)
     deadzone: 0.08
     angle_vel_limit_radps: 10.0  # angle: 向きを変える時の速さの上限[rad/s](約95rpm)
     angle_deadzone: 0.5        # angle: これ未満しか倒していない時は今の向きを保つ
